@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgis/postgis:15-3.5
+    container_name: volunteer_db
+    environment:
+      POSTGRES_USER: pbu_admin
+      POSTGRES_PASSWORD: super_secret_password
+      POSTGRES_DB: volunteer_monster
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+#      Adding the :Z tells docker to update the SElinux permissions
+      - ./init:/docker-entrypoint-initdb.d:Z
+    restart: unless-stopped
+
+volumes:
+  pg_data:
