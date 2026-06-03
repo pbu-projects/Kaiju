@@ -1,0 +1,6 @@
+applicationType: default
+defaultPackage: lol.pbu
+testFramework: spock
+sourceLanguage: java
+buildTool: gradle_kotlin
+features: [app-name, asciidoctor, data, data-jdbc, graalvm, gradle, http-client-test, java, java-application, jdbc-hikari, logback, lombok, management, micrometer, micrometer-observation-http, micronaut-aot, micronaut-build, micronaut-http-validation, netty-server, postgres, reactor-http-client, readme, retry, security, security-annotations, serialization-jackson, shade, spock, static-resources, testcontainers, views-jte, yaml, yaml-build]
