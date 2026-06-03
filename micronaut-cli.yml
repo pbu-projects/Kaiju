@@ -1,5 +1,5 @@
 applicationType: default
-defaultPackage: lol.pbu
+defaultPackage: lol.pbu.kaiju
 testFramework: spock
 sourceLanguage: java
 buildTool: gradle_kotlin

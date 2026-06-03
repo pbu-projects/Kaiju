@@ -1,4 +1,4 @@
-package lol.pbu;
+package lol.pbu.kaiju.server;
 
 import io.micronaut.runtime.Micronaut;
 
