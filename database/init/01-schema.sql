@@ -1,52 +1,49 @@
--- Enable PostGIS spatial engine
-CREATE EXTENSION IF NOT EXISTS postgis;
-
--- 1. Base independent table for partners
-CREATE TABLE organizations
-(
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name        VARCHAR(255) NOT NULL,
-    website_url VARCHAR(255),
-    created_at  TIMESTAMPTZ      DEFAULT NOW()
-);
-
--- 2. Base independent table for geospatial tracking
 CREATE TABLE locations
 (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name         VARCHAR(255),
-    address_line TEXT                   NOT NULL,
+    address_line VARCHAR(255)           NOT NULL,
     city         VARCHAR(100)           NOT NULL,
     state        VARCHAR(50)            NOT NULL,
     zip_code     VARCHAR(20),
-    -- PostGIS geography type defaults strictly to meters
     geom         GEOGRAPHY(Point, 4326) NOT NULL
 );
 
--- Spatial index to optimize bounding-box and radius queries
+-- Index for instant radial math
 CREATE INDEX idx_locations_geom ON locations USING GIST (geom);
 
--- 3. Core domain entity mapping orgs to locations
 CREATE TABLE projects
 (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    organization_id UUID         NOT NULL REFERENCES organizations (id) ON DELETE CASCADE,
-    location_id     UUID         REFERENCES locations (id) ON DELETE SET NULL,
+    id              UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
+    organization_id UUID         NOT NULL, -- References organizations(id)
     title           VARCHAR(255) NOT NULL,
     description     TEXT         NOT NULL,
-    project_type    VARCHAR(50)  NOT NULL, -- 'ONGOING' or 'EVENT'
-    created_at      TIMESTAMPTZ      DEFAULT NOW()
+    status          VARCHAR(50)  NOT NULL DEFAULT 'DRAFT'
+        CHECK (status IN ('DRAFT', 'PENDING', 'ACTIVE', 'FLAGGED', 'REJECTED')),
+    created_at      TIMESTAMPTZ           DEFAULT NOW()
 );
 
--- 4. Time-slot allocation layer
+-- The join table mapping a project to its official operating locations
+CREATE TABLE project_locations
+(
+    project_id  UUID REFERENCES projects (id) ON DELETE CASCADE,
+    location_id UUID REFERENCES locations (id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id, location_id)
+);
+
 CREATE TABLE shifts
 (
-    id           UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
-    project_id   UUID        NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
-    start_time   TIMESTAMPTZ NOT NULL,
-    end_time     TIMESTAMPTZ NOT NULL,
-    capacity     INT         NOT NULL DEFAULT 1,
-    spots_filled INT         NOT NULL DEFAULT 0,
-    -- Prevent exact time-slot duplicates per project
-    UNIQUE (project_id, start_time, end_time)
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id  UUID NOT NULL,
+    location_id UUID NOT NULL,
+    role_title  VARCHAR(100),
+    start_time  TIMESTAMPTZ,
+    end_time    TIMESTAMPTZ,
+    capacity    INT  NOT NULL    DEFAULT 1,
+
+    -- Composite foreign key guarantees consistency
+    FOREIGN KEY (project_id, location_id) REFERENCES project_locations (project_id, location_id) ON DELETE CASCADE
 );
+
+-- Index for rapid chronological filtration
+CREATE INDEX idx_shifts_start_time ON shifts (start_time);

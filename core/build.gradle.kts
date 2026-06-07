@@ -12,6 +12,7 @@ dependencies {
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
+    implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
     
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("ch.qos.logback:logback-classic")
