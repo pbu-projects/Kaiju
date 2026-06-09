@@ -1,7 +1,7 @@
 package lol.pbu.kaiju.core.controller;
 
-import io.micronaut.data.model.Page;
-import io.micronaut.data.model.Pageable;
+import io.micronaut.data.model.CursoredPage;
+import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -15,6 +15,7 @@ import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.PathVariable;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
@@ -28,13 +29,13 @@ public class LocationController {
     }
 
     @Get
-    public Page<Location> getLocations(@Valid Pageable pageable) {
+    public CursoredPage<Location> getLocations(@Valid CursoredPageable pageable) {
         return locationRepository.findAll(pageable);
     }
 
     @Get("/{id}")
-    public Location getLocation(@PathVariable UUID id) {
-        return locationRepository.findById(id).orElse(null);
+    public Optional<Location> getLocation(@PathVariable UUID id) {
+        return locationRepository.findById(id);
     }
 
     @Post
@@ -44,11 +45,20 @@ public class LocationController {
 
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
-        return locationRepository.update(location);
+        var locationWithId = new Location(
+            id,
+            location.name(),
+            location.addressLine(),
+            location.city(),
+            location.state(),
+            location.zipCode(),
+            location.geom()
+        );
+        return locationRepository.update(locationWithId);
     }
 
     @Delete("/{id}")
-    public void deleteLocation(@PathVariable UUID id) {
+    public void deleteById(@PathVariable UUID id) {
         locationRepository.deleteById(id);
     }
 }

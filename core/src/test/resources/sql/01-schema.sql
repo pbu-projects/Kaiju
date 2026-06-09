@@ -1,4 +1,4 @@
-CREATE EXTENSION IF NOT EXISTS postgis;
+-- copy and paste this from root/database/init
 
 CREATE TABLE locations
 (

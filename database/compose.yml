@@ -3,8 +3,8 @@ services:
     image: postgis/postgis:15-3.5
     container_name: volunteer_db
     environment:
-      POSTGRES_USER: pbu_admin
-      POSTGRES_PASSWORD: super_secret_password
+      POSTGRES_USER: jimmy
+      POSTGRES_PASSWORD: warm-farts-smell-worse
       POSTGRES_DB: volunteer_monster
     ports:
       - "5432:5432"

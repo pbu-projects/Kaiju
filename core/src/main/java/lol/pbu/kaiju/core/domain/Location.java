@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.core.domain;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
@@ -17,7 +18,7 @@ public record Location(
         String addressLine,
         String city,
         String state,
-        String zipCode,
+        @Nullable String zipCode,
 
         Point geom
 ) {}
