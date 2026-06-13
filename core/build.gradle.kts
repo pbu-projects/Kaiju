@@ -18,6 +18,8 @@ dependencies {
     implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
     implementation("org.postgresql:postgresql")
 
+    testImplementation("org.apache.groovy:groovy-sql:${project.properties["groovySqlVersion"]}")
+
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly("org.yaml:snakeyaml")
 
@@ -30,13 +32,13 @@ tasks.test {
     }
 }
 
-tasks.withType<JavaExec>().configureEach {
-    jvmArgs("-Xshare:off")
-}
-
-tasks.withType<Test>().configureEach {
-    jvmArgs("-Xshare:off")
-}
+//tasks.withType<JavaExec>().configureEach {
+//    jvmArgs("-Xshare:off")
+//}
+//
+//tasks.withType<Test>().configureEach {
+//    jvmArgs("-Xshare:off")
+//}
 
 micronaut {
     runtime("netty")

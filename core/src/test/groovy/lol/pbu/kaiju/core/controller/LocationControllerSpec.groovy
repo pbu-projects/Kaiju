@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.core.controller
 
+import groovy.sql.Sql
 import io.micronaut.core.io.ResourceLoader
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
@@ -27,9 +28,9 @@ class LocationControllerSpec extends Specification {
     @Inject
     LocationController locationController
 
-
     def "should fully drain all locations sequentially using cursors"() {
         setup:
+        Sql sql = new Sql(connection)
         Set<Location> allLocations = new LinkedHashSet<>()
         int pageSize = 1
 
@@ -44,19 +45,71 @@ class LocationControllerSpec extends Specification {
         }
 
         then:
-        allLocations.size() == 3
-        List<LinkedHashMap<String, String>> fields = allLocations.collect { [name: it.name(), address: it.addressLine(), city: it.city()] }
+        allLocations.size() == locationRepository.count()
 
-        fields.containsAll([[name: 'Main Pantry', address: '123 Main St', city: 'Bountiful'],
-                            [name: 'North Sorting Facility', address: '456 Center St', city: 'Centerville'],
-                            [name: 'Ogden Warehouse', address: '789 Far Ave', city: 'Ogden']])
+        List<Map> fields = allLocations.collect { [name: it.name(), address: it.addressLine(), city: it.city()] }
+        List<Map> expectedFields = sql.rows("SELECT name, address_line as address, city FROM locations")
+
+        fields.containsAll(expectedFields)
     }
 
-    def "GetLocation"() {}
 
-    def "AddLocation"() {}
+    def "GetLocation"() {
+        setup:
+        Sql sql = new Sql(connection)
+        def firstLocationId = sql.firstRow("SELECT id FROM locations LIMIT 1").id as UUID
 
-    def "UpdateLocation"() {}
+        when:
+        Optional<Location> result = locationController.getLocation(firstLocationId)
 
-    def "DeleteLocation"() {}
+        then:
+        result.isPresent()
+        result.get().id() == firstLocationId
+        result.get().name() == sql.firstRow("SELECT name FROM locations WHERE id = ?", [firstLocationId]).name
+    }
+
+    def "AddLocation"() {
+        setup:
+        Sql sql = new Sql(connection)
+        def newLocation = new Location(null, "New Test Location", "101 Test St", "Test City", "UT", "84000", null)
+
+        when:
+        Location saved = locationController.addLocation(newLocation)
+
+        then:
+        saved.id() != null
+        saved.name() == "New Test Location"
+        sql.firstRow("SELECT count(*) as count FROM locations WHERE name = 'New Test Location'").count == 1
+    }
+
+    def "UpdateLocation"() {
+        setup:
+        Sql sql = new Sql(connection)
+        def firstLocation = sql.firstRow("SELECT id, name FROM locations LIMIT 1")
+        def originalId = firstLocation.id as UUID
+        def updatedName = "Updated " + firstLocation.name
+        def updateRequest = new Location(null, updatedName, "Updated Address", "Updated City", "UT", "84000", null)
+
+        when:
+        Location updated = locationController.updateLocation(originalId, updateRequest)
+
+        then:
+        updated.id() == originalId
+        updated.name() == updatedName
+        sql.firstRow("SELECT name FROM locations WHERE id = ?", [originalId]).name == updatedName
+    }
+
+    def "DeleteLocation"() {
+        setup:
+        Sql sql = new Sql(connection)
+        def locationToDelete = sql.firstRow("SELECT id FROM locations ORDER BY name DESC LIMIT 1")
+        def idToDelete = locationToDelete.id as UUID
+
+        when:
+        locationController.deleteById(idToDelete)
+
+        then:
+        !locationRepository.findById(idToDelete).isPresent()
+        sql.firstRow("SELECT count(*) as count FROM locations WHERE id = ?", [idToDelete]).count == 0
+    }
 }
