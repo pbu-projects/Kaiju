@@ -9,13 +9,9 @@ import java.util.UUID;
 
 @MappedEntity("shifts")
 public record Shift(
-    @Id
-    @GeneratedValue
-    UUID id,
-
-    UUID locationId,
-    String name,
-    OffsetDateTime startTime,
-    OffsetDateTime endTime
-) {
+        @Id @GeneratedValue UUID id,
+        UUID locationId,
+        String name,
+        OffsetDateTime startTime,
+        OffsetDateTime endTime) {
 }

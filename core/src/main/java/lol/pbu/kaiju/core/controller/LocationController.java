@@ -50,8 +50,9 @@ public class LocationController {
             location.name(),
             location.addressLine(),
             location.city(),
-            location.state(),
-            location.zipCode(),
+            location.stateProvince(),
+            location.postalCode(),
+            location.countryCode(),
             location.geom()
         );
         return locationRepository.update(locationWithId);

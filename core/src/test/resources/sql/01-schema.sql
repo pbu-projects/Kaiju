@@ -1,14 +1,22 @@
 -- copy and paste this from root/database/init
 
+CREATE TABLE organizations
+(
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name        VARCHAR(255) NOT NULL,
+    website_url VARCHAR(255)
+);
+
 CREATE TABLE locations
 (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name         VARCHAR(255),
-    address_line VARCHAR(255)           NOT NULL,
-    city         VARCHAR(100)           NOT NULL,
-    state        VARCHAR(50)            NOT NULL,
-    zip_code     VARCHAR(20),
-    geom         GEOGRAPHY(Point, 4326) NOT NULL
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name           VARCHAR(255)           NOT NULL,
+    address_line   VARCHAR(255)           NOT NULL,
+    city           VARCHAR(100)           NOT NULL,
+    state_province VARCHAR(100),
+    postal_code    VARCHAR(20),
+    country_code   CHAR(2)                NOT NULL,
+    geom           GEOGRAPHY(Point, 4326) NOT NULL
 );
 
 -- Index for instant radial math

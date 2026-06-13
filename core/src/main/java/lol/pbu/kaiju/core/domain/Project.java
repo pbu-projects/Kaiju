@@ -20,7 +20,6 @@ public record Project(
         String description,
         ProjectStatus status,
 
-        // Micronaut automatically handles the 'project_locations' join table behind the scenes
         @Relation(
                 value = Relation.Kind.MANY_TO_MANY,
                 cascade = Relation.Cascade.PERSIST
@@ -28,7 +27,6 @@ public record Project(
         @JoinTable(name = "project_locations")
         List<Location> locations
 ) {
-    // Optional: Add a compact constructor to set defaults if desired
     public Project {
         if (status == null) status = ProjectStatus.DRAFT;
         if (locations == null) locations = List.of();

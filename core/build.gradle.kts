@@ -19,6 +19,7 @@ dependencies {
     implementation("org.postgresql:postgresql")
 
     testImplementation("org.apache.groovy:groovy-sql:${project.properties["groovySqlVersion"]}")
+    testImplementation("net.datafaker:datafaker:${project.properties["datafakerVersion"]}")
 
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly("org.yaml:snakeyaml")
