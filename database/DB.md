@@ -30,7 +30,7 @@ separated from the main search to keep the main search performant
 Acts as the central umbrella record defining the details of a volunteer opportunity, regardless of its physical location
 or timing.
 
-- Uses a `project_type` discriminator (`STANDARD`, `OPEN_DOOR`, `REGIONAL_ROSTER`, `REGIONAL_BILLBOARD`) to dictate UI
+- Uses a `project_type` [discriminator] (`STANDARD`, `OPEN_DOOR`, `REGIONAL`) to dictate UI
   rendering and search logic without needing multiple tables.
 - Implements soft deletes (`deleted_at`, `deleted_by`) for moderating
 - Reading: [Single Table Inheritance Pattern]
@@ -105,6 +105,8 @@ controls over scraped data.
 [Single Table Inheritance Pattern]: https://martinfowler.com/eaaCatalog/singleTableInheritance.html
 
 [Why OFFSET is Bad (Keyset Pagination)]: https://use-the-index-luke.com/no-offset
+
+[descriminator]: Project_Descriminator.md
 
 [Event Sourcing & Audit Logs]: https://microservices.io/patterns/data/event-sourcing.html
 

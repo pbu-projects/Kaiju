@@ -44,7 +44,7 @@ nodes = [e for e in elements if e.get('type') == 'node']
 print(f"Mapped {len(node_to_country)} capitals via relations. Found {len(nodes)} total nodes. Preparing SQL...")
 
 # Target a dedicated file for global locations
-target_file = "03-global-locations.sql"
+target_file = "04-global-locations.sql"
 
 try:
     # Collect all values for a single bulk INSERT
