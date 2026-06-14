@@ -19,13 +19,10 @@ CREATE TABLE locations
     geom           GEOGRAPHY(Point, 4326) NOT NULL
 );
 
--- Index for instant radial math
-CREATE INDEX idx_locations_geom ON locations USING GIST (geom);
-
 CREATE TABLE projects
 (
     id              UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
-    organization_id UUID         NOT NULL, -- References organizations(id)
+    organization_id UUID         NOT NULL,
     title           VARCHAR(255) NOT NULL,
     description     TEXT         NOT NULL,
     status          VARCHAR(50)  NOT NULL DEFAULT 'DRAFT'
@@ -33,7 +30,6 @@ CREATE TABLE projects
     created_at      TIMESTAMPTZ           DEFAULT NOW()
 );
 
--- The join table mapping a project to its official operating locations
 CREATE TABLE project_locations
 (
     project_id  UUID REFERENCES projects (id) ON DELETE CASCADE,
@@ -51,9 +47,8 @@ CREATE TABLE shifts
     end_time    TIMESTAMPTZ,
     capacity    INT  NOT NULL    DEFAULT 1,
 
-    -- Composite foreign key guarantees consistency
     FOREIGN KEY (project_id, location_id) REFERENCES project_locations (project_id, location_id) ON DELETE CASCADE
 );
 
--- Index for rapid chronological filtration
+CREATE INDEX idx_locations_geom ON locations USING GIST (geom);
 CREATE INDEX idx_shifts_start_time ON shifts (start_time);

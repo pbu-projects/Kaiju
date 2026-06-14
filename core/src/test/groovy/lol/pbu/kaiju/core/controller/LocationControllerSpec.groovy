@@ -74,8 +74,6 @@ class LocationControllerSpec extends Specification {
         then:
         saved.id() != null
         saved.countryCode() == countryCode
-
-        // Verification for Australia using PostGIS radius search
         if (country == "Australia") {
             def row = sql.firstRow("""
                 SELECT id FROM locations 
@@ -97,7 +95,7 @@ class LocationControllerSpec extends Specification {
     }
 
     @Unroll
-    def "should fail database constraints for missing required fields"() {
+    def "not nullable field(s) should not be null in #location"() {
         when:
         locationController.addLocation(location)
 
@@ -116,7 +114,7 @@ class LocationControllerSpec extends Specification {
                 new Location(null, n, a, c, "State", "12345", co, g)
             }
 
-            // Filter out the single completely valid combination
+            //one combination is actually valid.
             combinations.findAll { loc ->
                 loc.name() == null || loc.name().isBlank() ||
                 loc.addressLine() == null || loc.addressLine().isBlank() ||
@@ -143,7 +141,7 @@ class LocationControllerSpec extends Specification {
         result.get().name() == expectedName
 
         where:
-        expectedName << ["Main Pantry", "North Sorting Facility"]
+        expectedName << ["Main Pantry", "North Sorting Facility"] // database/init/02-data.sql
     }
 
     @Unroll
