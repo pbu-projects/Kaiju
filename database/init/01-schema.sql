@@ -37,7 +37,7 @@ CREATE TABLE organization_locations
 
     location_type   VARCHAR(50) NOT NULL DEFAULT 'HEADQUARTERS' CHECK ( location_type in ('HEADQUARTERS', 'BRANCH') ),
 
-    is_public       BOOLEAN DEFAULT true,
+    is_public       BOOLEAN              DEFAULT true,
 
     PRIMARY KEY (organization_id, location_id)
 );
@@ -91,17 +91,24 @@ CREATE TABLE project_boundaries
 -- Specific time slots and capacity limits
 CREATE TABLE shifts
 (
-    id          UUID PRIMARY KEY     DEFAULT gen_random_uuid(),
-    project_id  UUID        NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
-    location_id UUID, -- If NULL, the shift is inherently Remote/Virtual
-    role_title  VARCHAR(100),
-    start_time  TIMESTAMPTZ NOT NULL,
-    end_time    TIMESTAMPTZ NOT NULL,
-    capacity    INT         NOT NULL DEFAULT 1,
+    id          UUID PRIMARY KEY                  DEFAULT gen_random_uuid(),
+    project_id  UUID                     NOT NULL REFERENCES projects (id),
 
-    -- Composite foreign key to ensure location is associated with the project
-    -- Note: MATCH SIMPLE allows location_id to be NULL
-    FOREIGN KEY (project_id, location_id) REFERENCES project_locations (project_id, location_id) ON DELETE CASCADE
+    -- The explicit intent
+    is_virtual  BOOLEAN                  NOT NULL DEFAULT false,
+
+    -- The nullable foreign key
+    location_id UUID REFERENCES locations (id),
+
+    start_time  TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time    TIMESTAMP WITH TIME ZONE NOT NULL,
+
+    -- The Data Integrity Lock
+    CONSTRAINT enforce_virtual_location_logic CHECK (
+        (is_virtual = true AND location_id IS NULL)
+            OR
+        (is_virtual = false AND location_id IS NOT NULL)
+        )
 );
 
 -- Composite index for high-performance keyset pagination
