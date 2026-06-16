@@ -12,9 +12,6 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @MappedEntity("users")
-public record User(
-        @Id @GeneratedValue UUID id,
-        @NotBlank @Email String email,
-        @NotNull UserRole role,
-        OffsetDateTime createdAt
-) {}
+public record User(@Id @GeneratedValue UUID id, @NotBlank @Email String email, @NotNull UserRole role,
+                   OffsetDateTime createdAt) {
+}

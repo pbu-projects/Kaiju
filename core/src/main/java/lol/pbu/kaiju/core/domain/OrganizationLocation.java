@@ -9,14 +9,8 @@ import lol.pbu.kaiju.core.model.LocationType;
 import java.util.UUID;
 
 @MappedEntity("organization_locations")
-public record OrganizationLocation(
-        @EmbeddedId Id id,
-        @NotNull LocationType locationType,
-        boolean isPublic
-) {
+public record OrganizationLocation(@EmbeddedId Id id, @NotNull LocationType locationType, boolean isPublic) {
     @Embeddable
-    public record Id(
-            @NotNull UUID organizationId,
-            @NotNull UUID locationId
-    ) {}
+    public record Id(@NotNull UUID organizationId, @NotNull UUID locationId) {
+    }
 }

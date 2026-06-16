@@ -4,6 +4,5 @@ import io.micronaut.serde.annotation.Serdeable;
 
 @Serdeable
 public enum LocationType {
-    HEADQUARTERS,
-    BRANCH
+    HEADQUARTERS, BRANCH
 }

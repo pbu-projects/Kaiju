@@ -15,11 +15,14 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_MANY;
+import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_ONE;
+
 @MappedEntity("projects")
 public record Project(
         @Id @GeneratedValue UUID id,
         
-        @Relation(Relation.Kind.MANY_TO_ONE)
+        @Relation(MANY_TO_ONE)
         @NotNull Organization organization,
         
         @NotBlank String title,
@@ -29,19 +32,15 @@ public record Project(
         OffsetDateTime createdAt,
         @Nullable OffsetDateTime deletedAt,
         
-        @Relation(Relation.Kind.MANY_TO_ONE)
+        @Relation(MANY_TO_ONE)
         @Nullable User deletedBy,
 
-        @Relation(value = Relation.Kind.MANY_TO_MANY)
+        @Relation(value = MANY_TO_MANY)
         @JoinTable(name = "project_locations")
         List<Location> locations,
 
-        @Relation(value = Relation.Kind.MANY_TO_MANY)
+        @Relation(value = MANY_TO_MANY)
         @JoinTable(name = "project_boundaries")
         List<Boundary> boundaries
 ) {
-    // Compatibility constructor (partial)
-    public Project(UUID id, String title, String description, ProjectStatus status, List<Location> locations) {
-        this(id, null, title, description, ProjectType.STANDARD, status, OffsetDateTime.now(), null, null, locations, List.of());
-    }
 }

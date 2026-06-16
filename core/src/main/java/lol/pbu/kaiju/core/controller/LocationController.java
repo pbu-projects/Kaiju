@@ -45,17 +45,7 @@ public class LocationController {
 
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
-        var locationWithId = new Location(
-            id,
-            location.name(),
-            location.addressLine(),
-            location.city(),
-            location.stateProvince(),
-            location.postalCode(),
-            location.countryCode(),
-            location.geom()
-        );
-        return locationRepository.update(locationWithId);
+        return locationRepository.update(location.withId(id));
     }
 
     @Delete("/{id}")

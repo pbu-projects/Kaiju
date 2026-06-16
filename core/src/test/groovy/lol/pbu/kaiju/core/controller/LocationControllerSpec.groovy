@@ -108,7 +108,7 @@ class LocationControllerSpec extends Specification {
 
             combinations.findAll { loc ->
                 loc.name() == null || loc.name().isBlank() ||
-                loc.addressLine() == null || loc.addressLine().isBlank() ||
+                loc.address() == null || loc.address().isBlank() ||
                 loc.city() == null || loc.city().isBlank() ||
                 loc.countryCode() == null || loc.countryCode().length() != 2 ||
                 loc.geom() == null

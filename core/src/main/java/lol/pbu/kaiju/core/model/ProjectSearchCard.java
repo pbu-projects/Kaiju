@@ -6,11 +6,6 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Serdeable
-public record ProjectSearchCard(
-        UUID projectId,
-        String projectTitle,
-        UUID locationId,
-        String locationName,
-        OffsetDateTime nextShiftStart
-) {
+public record ProjectSearchCard(UUID projectId, String projectTitle, UUID locationId, String locationName,
+                                OffsetDateTime nextShiftStart) {
 }

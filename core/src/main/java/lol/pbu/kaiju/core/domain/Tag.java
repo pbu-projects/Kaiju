@@ -9,7 +9,5 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 @MappedEntity("tags")
-public record Tag(
-        @Id @GeneratedValue UUID id,
-        @NotBlank @Size(max = 50) String name
-) {}
+public record Tag(@Id @GeneratedValue UUID id, @NotBlank @Size(max = 50) String name) {
+}

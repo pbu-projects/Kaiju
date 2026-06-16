@@ -4,7 +4,5 @@ import io.micronaut.serde.annotation.Serdeable;
 
 @Serdeable
 public enum ProjectType {
-    STANDARD,
-    OPEN_DOOR,
-    REGIONAL
+    STANDARD, OPEN_DOOR, REGIONAL
 }

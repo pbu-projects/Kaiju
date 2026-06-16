@@ -10,8 +10,10 @@ dependencies {
     annotationProcessor("io.micronaut.data:micronaut-data-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+    annotationProcessor("io.micronaut.sourcegen:micronaut-sourcegen-generator-java")
 
     implementation("io.micronaut.validation:micronaut-validation")
+    implementation("io.micronaut.sourcegen:micronaut-sourcegen-annotations")
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("io.micronaut.serde:micronaut-serde-jackson")

@@ -1,12 +1,7 @@
 package lol.pbu.kaiju.core.domain;
 
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.data.annotation.GeneratedValue;
-import io.micronaut.data.annotation.Id;
-import io.micronaut.data.annotation.MappedEntity;
-import io.micronaut.data.annotation.Relation;
-import io.micronaut.data.annotation.TypeDef;
-import io.micronaut.data.model.DataType;
+import io.micronaut.data.annotation.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.core.model.JtsPointConverter;
@@ -15,38 +10,47 @@ import org.locationtech.jts.geom.Point;
 import java.util.List;
 import java.util.UUID;
 
+import static io.micronaut.data.annotation.Relation.Kind.ONE_TO_MANY;
+import static io.micronaut.data.model.DataType.OBJECT;
+
 @MappedEntity("locations")
 public record Location(
         @Id
         @GeneratedValue
         UUID id,
 
-        @NotBlank
+        @NotBlank(message = "A location name is required")
+        @Size(min = 1, max = 80, message = "Location name must be between 1 and 80 characters")
         String name,
 
-        @NotBlank
-        String addressLine,
+        @NotBlank(message = "An address line is required")
+        @Size(min = 1, max = 255, message = "Address line must be between 1 and 255 characters")
+        String address,
 
-        @NotBlank
+        @NotBlank(message = "A city is required")
+        @Size(min = 1, max = 100, message = "City must be between 1 and 100 characters")
         String city,
 
-        @Nullable
+        @NotBlank(message = "A state province is required")
+        @Size(min = 1, max = 100, message = "State province must be between 1 and 100 characters")
         String stateProvince,
 
         @Nullable
+        @Size(min = 1, max = 20, message = "Postal code must be between 1 and 20 characters")
         String postalCode,
 
-        @NotBlank
-        @Size(min = 2, max = 2)
+        @NotBlank(message = "A country code is required")
+        @Size(min = 2, max = 2, message = "Country code must be 2 characters")
         String countryCode,
 
-        @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class)
+        @NotBlank(message = "a geometry point is required")
+        @TypeDef(type = OBJECT, converter = JtsPointConverter.class)
         Point geom,
 
-        @Relation(value = Relation.Kind.ONE_TO_MANY, mappedBy = "id.locationId")
+        @Relation(value = ONE_TO_MANY, mappedBy = "id.locationId")
         List<OrganizationLocation> organizationLocations
 ) {
-    public Location(UUID id, String name, String addressLine, String city, String stateProvince, String postalCode, String countryCode, Point geom) {
-        this(id, name, addressLine, city, stateProvince, postalCode, countryCode, geom, List.of());
+    public Location withId(UUID id) {
+        return new Location(id, name, address, city, stateProvince, postalCode, countryCode, geom, organizationLocations);
     }
 }
