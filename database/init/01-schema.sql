@@ -12,7 +12,8 @@ CREATE TABLE organizations
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(255) NOT NULL,
     website_url VARCHAR(255),
-    parent_id   UUID REFERENCES organizations (id) ON DELETE RESTRICT
+    parent_id   UUID REFERENCES organizations (id) ON DELETE RESTRICT,
+    is_public       BOOLEAN              DEFAULT true
 );
 
 CREATE TABLE locations
@@ -31,8 +32,6 @@ CREATE TABLE organization_locations
 (
     organization_id UUID REFERENCES organizations (id) ON DELETE CASCADE,
     location_id     UUID REFERENCES locations (id) ON DELETE CASCADE,
-    location_type   VARCHAR(50) NOT NULL DEFAULT 'HEADQUARTERS' CHECK ( location_type in ('HEADQUARTERS', 'BRANCH') ),
-    is_public       BOOLEAN              DEFAULT true,
     PRIMARY KEY (organization_id, location_id)
 );
 
