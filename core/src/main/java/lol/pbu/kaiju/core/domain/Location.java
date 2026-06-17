@@ -4,16 +4,15 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
-import io.micronaut.data.annotation.Relation;
 import io.micronaut.data.annotation.TypeDef;
-import io.micronaut.data.model.DataType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.core.model.JtsPointConverter;
 import org.locationtech.jts.geom.Point;
 
-import java.util.List;
 import java.util.UUID;
+
+import static io.micronaut.data.model.DataType.OBJECT;
 
 @MappedEntity("locations")
 public record Location(
@@ -45,13 +44,7 @@ public record Location(
         @Size(min = 2, max = 2, message = "Country code must be 2 characters.")
         String countryCode,
 
-        @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class)
-        Point geom,
-
-        @Relation(value = Relation.Kind.ONE_TO_MANY, mappedBy = "id.locationId")
-        List<OrganizationLocation> organizationLocations
+        @TypeDef(type = OBJECT, converter = JtsPointConverter.class)
+        Point geom
 ) {
-    public Location(UUID id, String name, String addressLine, String city, String stateProvince, String postalCode, String countryCode, Point geom) {
-        this(id, name, addressLine, city, stateProvince, postalCode, countryCode, geom, List.of());
-    }
 }
