@@ -1,6 +1,4 @@
 CREATE EXTENSION IF NOT EXISTS postgis;
-
--- Application User Profiles
 CREATE TABLE users
 (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -17,7 +15,6 @@ CREATE TABLE organizations
     parent_id   UUID REFERENCES organizations (id) ON DELETE RESTRICT
 );
 
--- pizza deliveries
 CREATE TABLE locations
 (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,17 +31,11 @@ CREATE TABLE organization_locations
 (
     organization_id UUID REFERENCES organizations (id) ON DELETE CASCADE,
     location_id     UUID REFERENCES locations (id) ON DELETE CASCADE,
-
     location_type   VARCHAR(50) NOT NULL DEFAULT 'HEADQUARTERS' CHECK ( location_type in ('HEADQUARTERS', 'BRANCH') ),
-
     is_public       BOOLEAN              DEFAULT true,
-
     PRIMARY KEY (organization_id, location_id)
 );
 
-CREATE INDEX idx_locations_geom ON locations USING GIST (geom);
-
--- not compatible for pizza deliveries
 CREATE TABLE boundaries
 (
     id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,10 +43,6 @@ CREATE TABLE boundaries
     geom GEOGRAPHY(Polygon, 4326) NOT NULL
 );
 
--- Index for spatial intersection queries
-CREATE INDEX idx_boundaries_geom ON boundaries USING GIST (geom);
-
--- Central Project Umbrella
 CREATE TABLE projects
 (
     id              UUID PRIMARY KEY      DEFAULT gen_random_uuid(),
@@ -67,9 +54,7 @@ CREATE TABLE projects
     status          VARCHAR(50)  NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT', 'PENDING', 'ACTIVE', 'FLAGGED', 'REJECTED')),
     created_at      TIMESTAMPTZ           DEFAULT NOW(),
-
-    -- Soft Deletes
-    deleted_at      TIMESTAMPTZ,
+       deleted_at      TIMESTAMPTZ,
     deleted_by      UUID REFERENCES users (id)
 );
 
@@ -80,7 +65,6 @@ CREATE TABLE project_locations
     PRIMARY KEY (project_id, location_id)
 );
 
--- Links projects to massive regional areas (when no street address is available)
 CREATE TABLE project_boundaries
 (
     project_id  UUID REFERENCES projects (id) ON DELETE CASCADE,
@@ -88,33 +72,20 @@ CREATE TABLE project_boundaries
     PRIMARY KEY (project_id, boundary_id)
 );
 
--- Specific time slots and capacity limits
 CREATE TABLE shifts
 (
     id          UUID PRIMARY KEY                  DEFAULT gen_random_uuid(),
     project_id  UUID                     NOT NULL REFERENCES projects (id),
-
-    -- The explicit intent
-    is_virtual  BOOLEAN                  NOT NULL DEFAULT false,
-
-    -- The nullable foreign key
-    location_id UUID REFERENCES locations (id),
-
+       is_virtual  BOOLEAN                  NOT NULL DEFAULT false,
+       location_id UUID REFERENCES locations (id),
     start_time  TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time    TIMESTAMP WITH TIME ZONE NOT NULL,
-
-    -- The Data Integrity Lock
-    CONSTRAINT enforce_virtual_location_logic CHECK (
+       CONSTRAINT enforce_virtual_location_logic CHECK (
         (is_virtual = true AND location_id IS NULL)
             OR
         (is_virtual = false AND location_id IS NOT NULL)
         )
 );
-
--- Composite index for high-performance keyset pagination
-CREATE INDEX idx_shifts_pagination ON shifts (start_time, id);
-
--- Classifications for shifts (critical for remote work)
 CREATE TABLE tags
 (
     id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -128,7 +99,6 @@ CREATE TABLE shift_tags
     PRIMARY KEY (shift_id, tag_id)
 );
 
--- Immutable auditing trail
 CREATE TABLE project_audit_logs
 (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -138,3 +108,7 @@ CREATE TABLE project_audit_logs
         CHECK (action IN ('CREATED', 'APPROVED', 'REJECTED', 'EDITED')),
     created_at TIMESTAMPTZ      DEFAULT NOW()
 );
+
+CREATE INDEX idx_locations_geom ON locations USING GIST (geom);
+CREATE INDEX idx_shifts_pagination ON shifts (start_time, id);
+CREATE INDEX idx_boundaries_geom ON boundaries USING GIST (geom);
