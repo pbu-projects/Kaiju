@@ -2,7 +2,9 @@ package lol.pbu.kaiju.core.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
@@ -17,6 +19,8 @@ import io.micronaut.http.annotation.PathVariable;
 
 import java.util.Optional;
 import java.util.UUID;
+
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/locations")
@@ -45,6 +49,9 @@ public class LocationController {
 
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
+        if (!locationRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, "Location not found");
+        }
         var locationWithId = new Location(
             id,
             location.name(),
