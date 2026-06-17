@@ -21,23 +21,28 @@ public record Location(
         @GeneratedValue
         UUID id,
 
-        @NotBlank
+        @NotBlank(message = "Name is required.")
+        @Size(min = 1, max = 255, message = "Name must be between 1 and 255 characters.")
         String name,
 
-        @NotBlank
+        @NotBlank(message = "Address line is required.")
+        @Size(min = 1, max = 255, message = "Address line must be between 1 and 255 characters.")
         String addressLine,
 
-        @NotBlank
+        @NotBlank(message = "City is required.")
+        @Size(min = 1, max = 100, message = "City must be between 1 and 100 characters.")
         String city,
 
         @Nullable
+        @Size(min = 1, max = 100, message = "State/Province must be between 1 and 100 characters.")
         String stateProvince,
 
         @Nullable
+        @Size(min = 1, max = 20, message = "Postal code must be between 1 and 20 characters.")
         String postalCode,
 
-        @NotBlank
-        @Size(min = 2, max = 2)
+        @NotBlank(message = "Country code is required.")
+        @Size(min = 2, max = 2, message = "Country code must be 2 characters.")
         String countryCode,
 
         @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class)
