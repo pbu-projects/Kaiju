@@ -62,17 +62,17 @@ class LocationControllerSpec extends Specification {
         Location saved = locationController.addLocation(newLocation)
 
         then: "the location is persisted with a generated ID"
-        verifyAll(saved) {
-            id() != null
-            name() == newLocation.name()
-            countryCode() == countryCode
+        verifyAll {
+            saved.id() != null
+            saved.name() == newLocation.name()
+            saved.countryCode() == countryCode
         }
 
         and: "it can be retrieved from the database"
         def result = new Sql(connection).firstRow("SELECT * FROM locations WHERE id = ?", [saved.id()])
         verifyAll(result) {
-            id == saved.id()
-            name == saved.name()
+            saved.id() == id
+            saved.name() == name
         }
 
         where:
@@ -93,14 +93,40 @@ class LocationControllerSpec extends Specification {
 
         where:
         [testCase, location] << {
-            def invalidCombos = [["Null Name", new Location(null, null, "Addr", "City", "ST", "12345", "US", createPoint())],
-                                 ["Blank Name", new Location(null, " ", "Addr", "City", "ST", "12345", "US", createPoint())],
-                                 ["Null Address", new Location(null, "Name", null, "City", "ST", "12345", "US", createPoint())],
-                                 ["Null City", new Location(null, "Name", "Addr", null, "ST", "12345", "US", createPoint())],
-                                 ["Null Country", new Location(null, "Name", "Addr", "City", "ST", "12345", null, createPoint())],
-                                 ["Short Country", new Location(null, "Name", "Addr", "City", "ST", "12345", "U", createPoint())],
-                                 ["Long Country", new Location(null, "Name", "Addr", "City", "ST", "12345", "USA", createPoint())],]
-            invalidCombos.collect { [it[0], it[1]] }
+            def validData = [
+                    name         : "Valid Name",
+                    addressLine  : "Valid Address",
+                    city         : "Valid City",
+                    stateProvince: "ST",
+                    postalCode   : "12345",
+                    countryCode  : "US"
+            ]
+
+            def invalidCases = [
+                    [field: 'name', value: null, caseName: "Null Name"],
+                    [field: 'name', value: ' ', caseName: "Blank Name"],
+                    [field: 'addressLine', value: null, caseName: "Null Address"],
+                    [field: 'city', value: null, caseName: "Null City"],
+                    [field: 'countryCode', value: null, caseName: "Null Country"],
+                    [field: 'countryCode', value: 'U', caseName: "Short Country"],
+                    [field: 'countryCode', value: 'USA', caseName: "Long Country"]
+            ]
+
+            return invalidCases.collect { invalidCase ->
+                def props = new HashMap(validData)
+                props[invalidCase.field] = invalidCase.value
+                def loc = new Location(
+                        null,
+                        props.name as String,
+                        props.addressLine as String,
+                        props.city as String,
+                        props.stateProvince as String,
+                        props.postalCode as String,
+                        props.countryCode as String,
+                        createPoint()
+                )
+                [invalidCase.caseName, loc]
+            }
         }()
     }
 
@@ -176,9 +202,7 @@ class LocationControllerSpec extends Specification {
         e.status.code == 404
     }
 
-    // =================================================================================================================
-    // DELETE Tests
-    // =================================================================================================================
+    /********** DELETE Tests **********/
 
     @Unroll
     def "DELETE | should remove an existing location"() {
@@ -210,9 +234,7 @@ class LocationControllerSpec extends Specification {
         noExceptionThrown()
     }
 
-    // =================================================================================================================
-    // LIST Tests
-    // =================================================================================================================
+    /********** LIST Tests **********/
 
     @Unroll
     def "LIST | should fully drain all locations sequentially using cursors"() {
