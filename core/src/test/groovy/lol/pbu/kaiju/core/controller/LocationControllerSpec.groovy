@@ -28,6 +28,9 @@ class LocationControllerSpec extends Specification {
     @Inject @Shared
     Connection connection
 
+    @Shared
+    Sql sql
+
     @Inject
     ResourceLoader resourceLoader
 
@@ -47,8 +50,13 @@ class LocationControllerSpec extends Specification {
         geometryFactory.createPoint(new Coordinate(lon, lat))
     }
 
-    def cleanup() {
-        new Sql(connection).execute("DELETE FROM locations WHERE name LIKE 'Test %' OR name LIKE 'Updated %'")
+    def setupSpec() {
+        // look in database/compose.yml
+        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+    }
+
+    def cleanupSpec() {
+        sql?.close()
     }
 
     /********** CREATE Tests **********/
@@ -145,7 +153,7 @@ class LocationControllerSpec extends Specification {
         }
 
         where:
-        [id, name] << new Sql(connection).rows("SELECT id, name FROM locations LIMIT 3").collect { [it.id, it.name] }
+        [id, name] << sql.rows("SELECT id, name FROM locations LIMIT 3").collect { [it.id, it.name] }
     }
 
     @Unroll
@@ -171,10 +179,10 @@ class LocationControllerSpec extends Specification {
         Location updated = locationController.updateLocation(id, updateRequest)
 
         then: "the returned location contains the updated data"
-        verifyAll(updated) {
-            id() == id
-            name() == newName
-            city() == newCity
+        verifyAll() {
+            updated.id() == id
+            updated.name() == newName
+            updated.city() == newCity
         }
 
         and: "the changes are persisted in the database"
@@ -185,7 +193,7 @@ class LocationControllerSpec extends Specification {
         }
 
         where:
-        [id, originalName] << new Sql(connection).rows("SELECT id, name FROM locations LIMIT 2").collect { [it.id, it.name] }
+        [id, originalName] << sql.rows("SELECT id, name FROM locations LIMIT 2").collect { [it.id, it.name] }
     }
 
     @Unroll

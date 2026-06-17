@@ -2,7 +2,6 @@ package lol.pbu.kaiju.core.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
