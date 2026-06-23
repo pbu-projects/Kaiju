@@ -1,18 +1,16 @@
 package lol.pbu.kaiju.core.controller
 
 import groovy.sql.Sql
-import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
+import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
-import lol.pbu.kaiju.core.domain.Project
 import lol.pbu.kaiju.core.domain.Organization
-import lol.pbu.kaiju.core.domain.User
-import lol.pbu.kaiju.core.model.UserRole
-import lol.pbu.kaiju.core.model.ProjectType
+import lol.pbu.kaiju.core.domain.Project
 import lol.pbu.kaiju.core.model.ProjectStatus
+import lol.pbu.kaiju.core.model.ProjectType
 import lol.pbu.kaiju.core.repository.ProjectRepository
 import net.datafaker.Faker
 import spock.lang.Shared
@@ -88,7 +86,7 @@ class ProjectControllerSpec extends Specification {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM projects WHERE id = ?", [saved.id()])
+        def result = new Sql(connection).firstRow("SELECT * FROM projects WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.title() == title
@@ -180,7 +178,7 @@ class ProjectControllerSpec extends Specification {
         assert existingProject != null
 
         when: "projects are searched by this title"
-        def page = projectController.getProjects(existingProject.title, CursoredPageable.from(10))
+        def page = projectController.getProjects(existingProject.title, CursoredPageable.from(10, Sort.of(Sort.Order.asc("title"))))
 
         then: "the search returns a page containing the project"
         verifyAll {
@@ -224,7 +222,7 @@ class ProjectControllerSpec extends Specification {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT title, description, status FROM projects WHERE id = ?", [id])
+        def dbResult = new Sql(connection).firstRow("SELECT title, description, status FROM projects WHERE id = ?", [id])
         verifyAll(dbResult) {
             title == newTitle
             description == newDescription
@@ -289,7 +287,7 @@ class ProjectControllerSpec extends Specification {
         then: "the project no longer exists in the repository or database"
         verifyAll {
             !projectRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
+            new Sql(connection).firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
         }
     }
 

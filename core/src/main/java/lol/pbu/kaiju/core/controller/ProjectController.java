@@ -2,21 +2,17 @@ package lol.pbu.kaiju.core.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import jakarta.validation.Valid;
 import lol.pbu.kaiju.core.domain.Project;
 import lol.pbu.kaiju.core.repository.ProjectRepository;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Put;
-import io.micronaut.http.annotation.Delete;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.PathVariable;
 
 import java.util.Optional;
 import java.util.UUID;
-import jakarta.validation.Valid;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/projects")
@@ -45,6 +41,9 @@ public class ProjectController {
 
     @Put("/{id}")
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project) {
+        if (!projectRepository.existsById(id)) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
         return projectRepository.update(project.withId(id));
     }
 
