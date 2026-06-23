@@ -20,28 +20,28 @@ public record Location(
         @GeneratedValue
         UUID id,
 
-        @NotBlank(message = "Name is required.")
-        @Size(min = 1, max = 255, message = "Name must be between 1 and 255 characters.")
+        @NotBlank(message = "Location name is required.")
+        @Size(min = 1, max = 255, message = "Location name must be between 1 and 255 characters.")
         String name,
 
-        @NotBlank(message = "Address line is required.")
-        @Size(min = 1, max = 255, message = "Address line must be between 1 and 255 characters.")
+        @NotBlank(message = "Location address line is required.")
+        @Size(min = 1, max = 255, message = "Location address line must be between 1 and 255 characters.")
         String addressLine,
 
-        @NotBlank(message = "City is required.")
-        @Size(min = 1, max = 100, message = "City must be between 1 and 100 characters.")
+        @NotBlank(message = "Location city is required.")
+        @Size(min = 1, max = 100, message = "Location city must be between 1 and 100 characters.")
         String city,
 
         @Nullable
-        @Size(min = 1, max = 100, message = "State/Province must be between 1 and 100 characters.")
+        @Size(min = 1, max = 100, message = "Location state/province must be between 1 and 100 characters.")
         String stateProvince,
 
         @Nullable
-        @Size(min = 1, max = 20, message = "Postal code must be between 1 and 20 characters.")
+        @Size(min = 1, max = 20, message = "Location postal code must be between 1 and 20 characters.")
         String postalCode,
 
-        @NotBlank(message = "Country code is required.")
-        @Size(min = 2, max = 2, message = "Country code must be 2 characters.")
+        @NotBlank(message = "Location country code is required.")
+        @Size(min = 2, max = 2, message = "Location country code must be 2 characters.")
         String countryCode,
 
         @TypeDef(type = OBJECT, converter = JtsPointConverter.class)

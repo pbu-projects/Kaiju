@@ -10,16 +10,23 @@ import lol.pbu.kaiju.core.model.AuditAction;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_ONE;
+
 @MappedEntity("project_audit_logs")
 public record ProjectAuditLog(
-        @Id @GeneratedValue UUID id,
+        @Id
+        @GeneratedValue
+        UUID id,
         
-        @Relation(Relation.Kind.MANY_TO_ONE)
-        @NotNull Project project,
+        @Relation(MANY_TO_ONE)
+        @NotNull(message = "Audit log project is required.")
+        Project project,
         
-        @Relation(Relation.Kind.MANY_TO_ONE)
-        @NotNull User actor,
+        @Relation(MANY_TO_ONE)
+        @NotNull(message = "Audit log actor is required.")
+        User actor,
         
-        @NotNull AuditAction action,
+        @NotNull(message = "Audit log action is required.")
+        AuditAction action,
         OffsetDateTime createdAt
 ) {}

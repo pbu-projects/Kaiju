@@ -10,6 +10,11 @@ import java.util.UUID;
 
 @MappedEntity("tags")
 public record Tag(
-        @Id @GeneratedValue UUID id,
-        @NotBlank @Size(max = 50) String name
+        @Id
+        @GeneratedValue
+        UUID id,
+
+        @NotBlank(message = "Tag name is required.")
+        @Size(min = 1, max = 50, message = "Tag name must be between 1 and 50 characters.")
+        String name
 ) {}
