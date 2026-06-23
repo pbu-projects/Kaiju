@@ -11,10 +11,17 @@ import org.locationtech.jts.geom.Polygon;
 
 import java.util.UUID;
 
+import static io.micronaut.data.model.DataType.OBJECT;
+
 @MappedEntity("boundaries")
 public record Boundary(
-        @Id @GeneratedValue UUID id,
-        @NotBlank String name,
-        @TypeDef(type = DataType.OBJECT, converter = JtsPolygonConverter.class)
+        @Id
+        @GeneratedValue
+        UUID id,
+
+        @NotBlank
+        String name,
+
+        @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
         Polygon geom
 ) {}
