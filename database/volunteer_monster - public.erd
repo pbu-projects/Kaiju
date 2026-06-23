@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<diagram version="1" name="volunteer_monster - public.erd">
+	<entities>
+		<data-source id="postgres-jdbc-19ed36bd313-3c7bad3499b329f6">
+			<entity id="1" name="boundaries" fq-name="public.boundaries" order="0" x="968" y="28">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="2" name="geography_columns" fq-name="public.geography_columns" order="1" x="286" y="1054">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="3" name="geometry_columns" fq-name="public.geometry_columns" order="2" x="584" y="1054">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="4" name="locations" fq-name="public.locations" order="3" x="339" y="528">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="5" name="organization_locations" fq-name="public.organization_locations" order="4" x="715" y="445">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="6" name="organizations" fq-name="public.organizations" order="5" x="876" y="221">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="7" name="project_audit_logs" fq-name="public.project_audit_logs" order="6" x="18" y="227">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="8" name="project_boundaries" fq-name="public.project_boundaries" order="7" x="729" y="25">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="9" name="project_locations" fq-name="public.project_locations" order="8" x="594" y="282">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="10" name="projects" fq-name="public.projects" order="9" border-width="3" x="382" y="35">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="11" name="shift_tags" fq-name="public.shift_tags" order="10" x="71" y="581">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="12" name="shifts" fq-name="public.shifts" order="11" x="326" y="304">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="13" name="spatial_ref_sys" fq-name="public.spatial_ref_sys" order="12" x="40" y="1074">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="14" name="tags" fq-name="public.tags" order="13" x="107" y="685">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+			<entity id="15" name="users" fq-name="public.users" order="14" x="108" y="38">
+				<path name="public"/>
+				<path name="volunteer_monster"/>
+			</entity>
+		</data-source>
+	</entities>
+	<relations>
+		<relation name="project_boundaries_boundary_id_fkey" fq-name="public.project_boundaries.project_boundaries_boundary_id_fkey" type="fk" pk-ref="1" fk-ref="8"/>
+		<relation name="organization_locations_location_id_fkey" fq-name="public.organization_locations.organization_locations_location_id_fkey" type="fk" pk-ref="4" fk-ref="5"/>
+		<relation name="project_locations_location_id_fkey" fq-name="public.project_locations.project_locations_location_id_fkey" type="fk" pk-ref="4" fk-ref="9"/>
+		<relation name="shifts_location_id_fkey" fq-name="public.shifts.shifts_location_id_fkey" type="fk" pk-ref="4" fk-ref="12"/>
+		<relation name="organization_locations_organization_id_fkey" fq-name="public.organization_locations.organization_locations_organization_id_fkey" type="fk" pk-ref="6" fk-ref="5"/>
+		<relation name="organizations_parent_id_fkey" fq-name="public.organizations.organizations_parent_id_fkey" type="fk" pk-ref="6" fk-ref="6">
+			<bend type="rel" x="1159" y="344"/>
+			<bend type="rel" x="1216" y="316"/>
+			<bend type="rel" x="1216" y="260"/>
+			<bend type="rel" x="1159" y="231"/>
+		</relation>
+		<relation name="projects_organization_id_fkey" fq-name="public.projects.projects_organization_id_fkey" type="fk" pk-ref="6" fk-ref="10"/>
+		<relation name="project_audit_logs_project_id_fkey" fq-name="public.project_audit_logs.project_audit_logs_project_id_fkey" type="fk" pk-ref="10" fk-ref="7"/>
+		<relation name="project_boundaries_project_id_fkey" fq-name="public.project_boundaries.project_boundaries_project_id_fkey" type="fk" pk-ref="10" fk-ref="8"/>
+		<relation name="project_locations_project_id_fkey" fq-name="public.project_locations.project_locations_project_id_fkey" type="fk" pk-ref="10" fk-ref="9"/>
+		<relation name="shifts_project_id_fkey" fq-name="public.shifts.shifts_project_id_fkey" type="fk" pk-ref="10" fk-ref="12"/>
+		<relation name="shift_tags_shift_id_fkey" fq-name="public.shift_tags.shift_tags_shift_id_fkey" type="fk" pk-ref="12" fk-ref="11"/>
+		<relation name="shift_tags_tag_id_fkey" fq-name="public.shift_tags.shift_tags_tag_id_fkey" type="fk" pk-ref="14" fk-ref="11"/>
+		<relation name="project_audit_logs_actor_id_fkey" fq-name="public.project_audit_logs.project_audit_logs_actor_id_fkey" type="fk" pk-ref="15" fk-ref="7"/>
+		<relation name="projects_deleted_by_fkey" fq-name="public.projects.projects_deleted_by_fkey" type="fk" pk-ref="15" fk-ref="10"/>
+	</relations>
+</diagram>
