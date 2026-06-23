@@ -26,4 +26,20 @@ public record User(
         @NotNull(message = "User role is required.")
         UserRole role,
         OffsetDateTime createdAt
-) {}
+) {
+    /**
+     * Instead of using setters, this method gives the opportunity to take an existing user ID and assign that to
+     * the user properties in this user record.
+     *
+     * @param newId The UUID to assign to the user.
+     * @return A new {@link User} with the given ID.
+     */
+    public User withId(@NotNull UUID newId) {
+        return new User(
+                newId,
+                this.email(),
+                this.role(),
+                this.createdAt()
+        );
+    }
+}

@@ -42,8 +42,33 @@ public record Shift(
         @JoinTable(name = "shift_tags")
         List<Tag> tags
 ) {
+    public Shift {
+        if ((isVirtual && location != null) || (!isVirtual && location == null)) {
+            throw new jakarta.validation.ValidationException("A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
+        }
+    }
+
     @AssertTrue(message = "A shift must have a location if it is not virtual, and must not have a location if it is virtual.")
     public boolean isValidLocationLogic() {
         return (isVirtual && location == null) || (!isVirtual && location != null);
+    }
+
+    /**
+     * Instead of using setters, this method gives the opportunity to take an existing shift ID and assign that to
+     * the shift properties in this shift record.
+     *
+     * @param newId The UUID to assign to the shift.
+     * @return A new {@link Shift} with the given ID.
+     */
+    public Shift withId(@NotNull UUID newId) {
+        return new Shift(
+                newId,
+                this.project(),
+                this.isVirtual(),
+                this.location(),
+                this.startTime(),
+                this.endTime(),
+                this.tags()
+        );
     }
 }

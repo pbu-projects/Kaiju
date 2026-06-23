@@ -8,7 +8,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.core.model.JtsPolygonConverter;
-import org.locationtech.jts.geom.Polygon;
 
 import java.util.UUID;
 
@@ -26,5 +25,20 @@ public record Boundary(
 
         @NotNull(message = "Boundary geometry is required.")
         @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
-        Polygon geom
-) {}
+        org.locationtech.jts.geom.Geometry geom
+) {
+    /**
+     * Instead of using setters, this method gives the opportunity to take an existing boundary ID and assign that to
+     * the boundary properties in this boundary record.
+     *
+     * @param newId The UUID to assign to the boundary.
+     * @return A new {@link Boundary} with the given ID.
+     */
+    public Boundary withId(@NotNull UUID newId) {
+        return new Boundary(
+                newId,
+                this.name(),
+                this.geom()
+        );
+    }
+}

@@ -3,6 +3,7 @@ package lol.pbu.kaiju.core.model;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.data.model.runtime.convert.AttributeConverter;
 import jakarta.inject.Singleton;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
@@ -12,10 +13,10 @@ import org.postgresql.util.PGobject;
 import java.sql.SQLException;
 
 @Singleton
-public class JtsPolygonConverter implements AttributeConverter<Polygon, PGobject> {
+public class JtsPolygonConverter implements AttributeConverter<Geometry, Object> {
 
     @Override
-    public PGobject convertToPersistedValue(Polygon entityValue, ConversionContext context) {
+    public Object convertToPersistedValue(Geometry entityValue, ConversionContext context) {
         if (entityValue == null) {
             return null;
         }
@@ -35,13 +36,17 @@ public class JtsPolygonConverter implements AttributeConverter<Polygon, PGobject
     }
 
     @Override
-    public Polygon convertToEntityValue(PGobject persistedValue, ConversionContext context) {
-        if (persistedValue == null || persistedValue.getValue() == null) {
+    public Geometry convertToEntityValue(Object persistedValue, ConversionContext context) {
+        if (persistedValue == null) {
+            return null;
+        }
+        PGobject pgObject = (PGobject) persistedValue;
+        if (pgObject.getValue() == null) {
             return null;
         }
         try {
             WKBReader reader = new WKBReader();
-            byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
+            byte[] bytes = WKBReader.hexToBytes(pgObject.getValue());
             Polygon polygon = (Polygon) reader.read(bytes);
             if (polygon.getSRID() == 0) {
                 polygon.setSRID(4326);
