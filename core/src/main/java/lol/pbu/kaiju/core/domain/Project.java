@@ -56,4 +56,25 @@ public record Project(
         @JoinTable(name = "project_boundaries")
         List<Boundary> boundaries
 ) {
+    /**
+     * Instead of using setters, this method gives the opportunity to take an existing project ID and assign that to
+     * the project properties in this project record.
+     * @param newId The UUID to assign to the project.
+     * @return A new {@link Project} with the given ID.
+     */
+    public Project withId(@NotNull UUID newId) {
+        return new Project(
+                newId,
+                this.organization(),
+                this.title(),
+                this.description(),
+                this.projectType(),
+                this.status(),
+                this.createdAt(),
+                this.deletedAt(),
+                this.deletedBy(),
+                this.locations(),
+                this.boundaries()
+        );
+    }
 }

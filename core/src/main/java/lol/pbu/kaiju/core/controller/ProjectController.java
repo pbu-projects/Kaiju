@@ -45,14 +45,7 @@ public class ProjectController {
 
     @Put("/{id}")
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project) {
-        var projectWithId = new Project(
-            id,
-            project.title(),
-            project.description(),
-            project.status(),
-            project.locations()
-        );
-        return projectRepository.update(projectWithId);
+        return projectRepository.update(project.withId(id));
     }
 
     @Delete("/{id}")
