@@ -1,7 +1,6 @@
 package lol.pbu.kaiju.core.controller
 
 import groovy.sql.Sql
-import io.micronaut.core.io.ResourceLoader
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -21,7 +20,9 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.sql.Connection
-
+/**
+ * These are more for my own comfort than anything.
+ */
 @MicronautTest
 class LocationControllerSpec extends Specification {
 
@@ -30,9 +31,6 @@ class LocationControllerSpec extends Specification {
 
     @Shared
     Sql sql
-
-    @Inject
-    ResourceLoader resourceLoader
 
     @Inject
     LocationRepository locationRepository
@@ -141,6 +139,7 @@ class LocationControllerSpec extends Specification {
     /********** READ Tests **********/
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck")
     def "READ | should retrieve an existing location by ID: #name"(UUID id, String name) {
         when: "the location is requested by its ID"
         def result = locationController.getLocation(id)
@@ -168,6 +167,7 @@ class LocationControllerSpec extends Specification {
     /********** UPDATE Tests **********/
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck") // where block left shift
     def "UPDATE | should successfully update an existing location: #originalName"(UUID id, String originalName) {
         given: "an existing location to update"
         def sql = new Sql(connection)
@@ -262,7 +262,7 @@ class LocationControllerSpec extends Specification {
         def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM locations").count
         verifyAll {
             allLocations.size() == totalCount
-            allLocations.size() >= 2 // Sanity check based on seeded data
+            allLocations.size() >= 2
         }
     }
 }
