@@ -2,19 +2,13 @@ package lol.pbu.kaiju.core.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.core.domain.Location;
 import lol.pbu.kaiju.core.repository.LocationRepository;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Post;
-import io.micronaut.http.annotation.Put;
-import io.micronaut.http.annotation.Delete;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.PathVariable;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -51,17 +45,7 @@ public class LocationController {
         if (!locationRepository.existsById(id)) {
             throw new HttpStatusException(NOT_FOUND, "Location not found");
         }
-        var locationWithId = new Location(
-            id,
-            location.name(),
-            location.addressLine(),
-            location.city(),
-            location.stateProvince(),
-            location.postalCode(),
-            location.countryCode(),
-            location.geom()
-        );
-        return locationRepository.update(locationWithId);
+        return locationRepository.update(location.withId(id));
     }
 
     @Delete("/{id}")

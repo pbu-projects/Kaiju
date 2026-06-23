@@ -6,6 +6,7 @@ import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
 import io.micronaut.data.annotation.TypeDef;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.core.model.JtsPointConverter;
 import org.locationtech.jts.geom.Point;
@@ -47,4 +48,23 @@ public record Location(
         @TypeDef(type = OBJECT, converter = JtsPointConverter.class)
         Point geom
 ) {
+    /**
+     * Instead of using setters, this method gives the opportunity to take an existing location ID and assign that to
+     * the location properties in this location record.
+     *
+     * @param newId The UUID to assign to the location.
+     * @return A new {@link Location} with the given ID.
+     */
+    public Location withId(@NotNull UUID newId) {
+        return new Location(
+                newId,
+                this.name(),
+                this.addressLine(),
+                this.city(),
+                this.stateProvince(),
+                this.postalCode(),
+                this.countryCode(),
+                this.geom()
+        );
+    }
 }
