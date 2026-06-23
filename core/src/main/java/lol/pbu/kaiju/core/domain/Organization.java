@@ -8,6 +8,7 @@ import io.micronaut.data.annotation.Relation;
 import io.micronaut.data.annotation.sql.JoinColumn;
 import io.micronaut.data.annotation.sql.JoinTable;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -39,4 +40,20 @@ public record Organization(
         )
         List<Location> locations
 ) {
+    /**
+     * Instead of using setters, this method gives the opportunity to take an existing organization ID and assign that to
+     * the organization properties in this organization record.
+     *
+     * @param newId The UUID to assign to the organization.
+     * @return A new {@link Organization} with the given ID.
+     */
+    public Organization withId(@NotNull UUID newId) {
+        return new Organization(
+                newId,
+                this.name(),
+                this.websiteUrl(),
+                this.parentId(),
+                this.locations()
+        );
+    }
 }
