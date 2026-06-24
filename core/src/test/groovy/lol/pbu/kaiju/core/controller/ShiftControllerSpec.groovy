@@ -27,6 +27,8 @@ import java.sql.DriverManager
 import java.sql.Timestamp
 import java.time.OffsetDateTime
 
+import static java.time.temporal.ChronoUnit.SECONDS
+
 @MicronautTest
 class ShiftControllerSpec extends Specification {
 
@@ -245,11 +247,9 @@ class ShiftControllerSpec extends Specification {
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT start_time, end_time FROM shifts WHERE id = ?", [id])
-        verifyAll(dbResult) {
-            // Need to match instant or compare correctly since offset/timezones can vary slightly
-            ((Timestamp) dbResult.start_time).toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
-            ((Timestamp) dbResult.end_time).toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
-        }
+        dbResult != null
+        ((Timestamp) dbResult.start_time).toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
+        ((Timestamp) dbResult.end_time).toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
     }
 
     def "UPDATE | should fail to update a non-existent shift"() {
