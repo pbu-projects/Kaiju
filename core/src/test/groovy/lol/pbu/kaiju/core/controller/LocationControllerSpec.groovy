@@ -228,6 +228,18 @@ class LocationControllerSpec extends Specification {
         e.status.code == 404
     }
 
+    def "UPDATE | should handle update of non-existent location gracefully when using no-look"() {
+        given: "a random non-existent ID"
+        def nonExistentId = UUID.randomUUID()
+        def updateRequest = new Location(null, "Test", "Addr", "City", "ST", "12345", "US", createPoint())
+
+        when: "a no-look update is attempted"
+        locationController.updateLocationNoLook(nonExistentId, updateRequest)
+
+        then: "no exception is thrown"
+        noExceptionThrown()
+    }
+
     /********** DELETE Tests **********/
 
     @Unroll
@@ -248,13 +260,24 @@ class LocationControllerSpec extends Specification {
         }
     }
 
-    @Unroll
-    def "DELETE | should handle deletion of non-existent location gracefully"() {
+    def "DELETE | should fail to delete a non-existent location"() {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
         when: "a delete is attempted"
         locationController.deleteById(nonExistentId)
+
+        then: "an exception is thrown indicating not found"
+        def e = thrown(HttpStatusException)
+        e.status.code == 404
+    }
+
+    def "DELETE | should handle deletion of non-existent location gracefully when using no-look"() {
+        given: "a random non-existent ID"
+        def nonExistentId = UUID.randomUUID()
+
+        when: "a no-look delete is attempted"
+        locationController.deleteByIdNoLook(nonExistentId)
 
         then: "no exception is thrown"
         noExceptionThrown()

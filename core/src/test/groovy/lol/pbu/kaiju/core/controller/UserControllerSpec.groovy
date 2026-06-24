@@ -201,6 +201,18 @@ class UserControllerSpec extends Specification {
         e.status.code == 404
     }
 
+    def "UPDATE | should handle update of non-existent user gracefully when using no-look"() {
+        given: "a random non-existent ID and an update request"
+        def nonExistentId = UUID.randomUUID()
+        def updateRequest = new User(null, "test@example.com", UserRole.VOLUNTEER, OffsetDateTime.now())
+
+        when: "a no-look update is attempted"
+        userController.updateUserNoLook(nonExistentId, updateRequest)
+
+        then: "no exception is thrown"
+        noExceptionThrown()
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing user"() {
@@ -225,12 +237,24 @@ class UserControllerSpec extends Specification {
         }
     }
 
-    def "DELETE | should handle deletion of non-existent user gracefully"() {
+    def "DELETE | should fail to delete a non-existent user"() {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
         when: "a delete is attempted"
         userController.deleteUser(nonExistentId)
+
+        then: "an exception is thrown indicating not found"
+        def e = thrown(HttpStatusException)
+        e.status.code == 404
+    }
+
+    def "DELETE | should handle deletion of non-existent user gracefully when using no-look"() {
+        given: "a random non-existent ID"
+        def nonExistentId = UUID.randomUUID()
+
+        when: "a no-look delete is attempted"
+        userController.deleteUserNoLook(nonExistentId)
 
         then: "no exception is thrown"
         noExceptionThrown()

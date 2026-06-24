@@ -39,6 +39,15 @@ public class OrganizationController {
         return organizationRepository.save(organization);
     }
 
+    /**
+     * Updates an existing organization by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the organization does not exist.
+     * Refer to the sister method {@link #updateOrganizationNoLook(UUID, Organization)} to update without validation.
+     *
+     * @param id           the ID of the organization to update
+     * @param organization the updated organization details
+     * @return the updated organization
+     */
     @Put("/{id}")
     public Organization updateOrganization(@PathVariable UUID id, @Valid @Body Organization organization) {
         if (!organizationRepository.existsById(id)) {
@@ -47,8 +56,44 @@ public class OrganizationController {
         return organizationRepository.update(organization.withId(id));
     }
 
+    /**
+     * Updates an organization by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #updateOrganization(UUID, Organization)} to update with existence validation.
+     *
+     * @param id           the ID of the organization to update
+     * @param organization the updated organization details
+     * @return the updated organization
+     */
+    @Put("/{id}/no-look")
+    public Organization updateOrganizationNoLook(@PathVariable UUID id, @Valid @Body Organization organization) {
+        return organizationRepository.update(organization.withId(id));
+    }
+
+    /**
+     * Deletes an organization by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the organization does not exist.
+     * Refer to the sister method {@link #deleteOrganizationNoLook(UUID)} to delete without validation.
+     *
+     * @param id the ID of the organization to delete
+     */
     @Delete("/{id}")
     public void deleteOrganization(@PathVariable UUID id) {
+        if (!organizationRepository.existsById(id)) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization not found");
+        }
+        organizationRepository.deleteById(id);
+    }
+
+    /**
+     * Deletes an organization by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #deleteOrganization(UUID)} to delete with existence validation.
+     *
+     * @param id the ID of the organization to delete
+     */
+    @Delete("/{id}/no-look")
+    public void deleteOrganizationNoLook(@PathVariable UUID id) {
         organizationRepository.deleteById(id);
     }
 }

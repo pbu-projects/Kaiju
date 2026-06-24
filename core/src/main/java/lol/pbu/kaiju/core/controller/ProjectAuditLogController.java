@@ -39,6 +39,15 @@ public class ProjectAuditLogController {
         return projectAuditLogRepository.save(log);
     }
 
+    /**
+     * Updates an existing project audit log by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the project audit log does not exist.
+     * Refer to the sister method {@link #updateProjectAuditLogNoLook(UUID, ProjectAuditLog)} to update without validation.
+     *
+     * @param id  the ID of the project audit log to update
+     * @param log the updated project audit log details
+     * @return the updated project audit log
+     */
     @Put("/{id}")
     public ProjectAuditLog updateProjectAuditLog(@PathVariable UUID id, @Valid @Body ProjectAuditLog log) {
         if (!projectAuditLogRepository.existsById(id)) {
@@ -47,8 +56,44 @@ public class ProjectAuditLogController {
         return projectAuditLogRepository.update(log.withId(id));
     }
 
+    /**
+     * Updates a project audit log by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #updateProjectAuditLog(UUID, ProjectAuditLog)} to update with existence validation.
+     *
+     * @param id  the ID of the project audit log to update
+     * @param log the updated project audit log details
+     * @return the updated project audit log
+     */
+    @Put("/{id}/no-look")
+    public ProjectAuditLog updateProjectAuditLogNoLook(@PathVariable UUID id, @Valid @Body ProjectAuditLog log) {
+        return projectAuditLogRepository.update(log.withId(id));
+    }
+
+    /**
+     * Deletes a project audit log by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the project audit log does not exist.
+     * Refer to the sister method {@link #deleteProjectAuditLogNoLook(UUID)} to delete without validation.
+     *
+     * @param id the ID of the project audit log to delete
+     */
     @Delete("/{id}")
     public void deleteProjectAuditLog(@PathVariable UUID id) {
+        if (!projectAuditLogRepository.existsById(id)) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project audit log not found");
+        }
+        projectAuditLogRepository.deleteById(id);
+    }
+
+    /**
+     * Deletes a project audit log by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #deleteProjectAuditLog(UUID)} to delete with existence validation.
+     *
+     * @param id the ID of the project audit log to delete
+     */
+    @Delete("/{id}/no-look")
+    public void deleteProjectAuditLogNoLook(@PathVariable UUID id) {
         projectAuditLogRepository.deleteById(id);
     }
 }

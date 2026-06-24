@@ -39,6 +39,15 @@ public class UserController {
         return userRepository.save(user);
     }
 
+    /**
+     * Updates an existing user by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the user does not exist.
+     * Refer to the sister method {@link #updateUserNoLook(UUID, User)} to update without validation.
+     *
+     * @param id   the ID of the user to update
+     * @param user the updated user details
+     * @return the updated user
+     */
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body User user) {
         if (!userRepository.existsById(id)) {
@@ -47,8 +56,44 @@ public class UserController {
         return userRepository.update(user.withId(id));
     }
 
+    /**
+     * Updates a user by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #updateUser(UUID, User)} to update with existence validation.
+     *
+     * @param id   the ID of the user to update
+     * @param user the updated user details
+     * @return the updated user
+     */
+    @Put("/{id}/no-look")
+    public User updateUserNoLook(@PathVariable UUID id, @Valid @Body User user) {
+        return userRepository.update(user.withId(id));
+    }
+
+    /**
+     * Deletes a user by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the user does not exist.
+     * Refer to the sister method {@link #deleteUserNoLook(UUID)} to delete without validation.
+     *
+     * @param id the ID of the user to delete
+     */
     @Delete("/{id}")
     public void deleteUser(@PathVariable UUID id) {
+        if (!userRepository.existsById(id)) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "User not found");
+        }
+        userRepository.deleteById(id);
+    }
+
+    /**
+     * Deletes a user by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #deleteUser(UUID)} to delete with existence validation.
+     *
+     * @param id the ID of the user to delete
+     */
+    @Delete("/{id}/no-look")
+    public void deleteUserNoLook(@PathVariable UUID id) {
         userRepository.deleteById(id);
     }
 }

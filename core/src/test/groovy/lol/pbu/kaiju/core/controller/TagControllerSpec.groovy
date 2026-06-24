@@ -191,6 +191,18 @@ class TagControllerSpec extends Specification {
         e.status.code == 404
     }
 
+    def "UPDATE | should handle update of non-existent tag gracefully when using no-look"() {
+        given: "a random non-existent ID and an update request"
+        def nonExistentId = UUID.randomUUID()
+        def updateRequest = new Tag(null, "new-tag")
+
+        when: "a no-look update is attempted"
+        tagController.updateTagNoLook(nonExistentId, updateRequest)
+
+        then: "no exception is thrown"
+        noExceptionThrown()
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing tag"() {
@@ -213,12 +225,24 @@ class TagControllerSpec extends Specification {
         }
     }
 
-    def "DELETE | should handle deletion of non-existent tag gracefully"() {
+    def "DELETE | should fail to delete a non-existent tag"() {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
         when: "a delete is attempted"
         tagController.deleteTag(nonExistentId)
+
+        then: "an exception is thrown indicating not found"
+        def e = thrown(HttpStatusException)
+        e.status.code == 404
+    }
+
+    def "DELETE | should handle deletion of non-existent tag gracefully when using no-look"() {
+        given: "a random non-existent ID"
+        def nonExistentId = UUID.randomUUID()
+
+        when: "a no-look delete is attempted"
+        tagController.deleteTagNoLook(nonExistentId)
 
         then: "no exception is thrown"
         noExceptionThrown()

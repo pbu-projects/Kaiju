@@ -40,6 +40,15 @@ public class LocationController {
         return locationRepository.save(location);
     }
 
+    /**
+     * Updates an existing location by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the location does not exist.
+     * Refer to the sister method {@link #updateLocationNoLook(UUID, Location)} to update without validation.
+     *
+     * @param id       the ID of the location to update
+     * @param location the updated location details
+     * @return the updated location
+     */
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
         if (!locationRepository.existsById(id)) {
@@ -48,8 +57,44 @@ public class LocationController {
         return locationRepository.update(location.withId(id));
     }
 
+    /**
+     * Updates a location by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #updateLocation(UUID, Location)} to update with existence validation.
+     *
+     * @param id       the ID of the location to update
+     * @param location the updated location details
+     * @return the updated location
+     */
+    @Put("/{id}/no-look")
+    public Location updateLocationNoLook(@PathVariable UUID id, @Valid @Body Location location) {
+        return locationRepository.update(location.withId(id));
+    }
+
+    /**
+     * Deletes a location by its ID after validating that it exists.
+     * Throws 404 NOT_FOUND if the location does not exist.
+     * Refer to the sister method {@link #deleteByIdNoLook(UUID)} to delete without validation.
+     *
+     * @param id the ID of the location to delete
+     */
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id) {
+        if (!locationRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, "Location not found");
+        }
+        locationRepository.deleteById(id);
+    }
+
+    /**
+     * Deletes a location by its ID without checking if it exists first.
+     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
+     * Refer to the sister method {@link #deleteById(UUID)} to delete with existence validation.
+     *
+     * @param id the ID of the location to delete
+     */
+    @Delete("/{id}/no-look")
+    public void deleteByIdNoLook(@PathVariable UUID id) {
         locationRepository.deleteById(id);
     }
 }
