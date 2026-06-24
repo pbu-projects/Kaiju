@@ -21,6 +21,9 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.time.OffsetDateTime
 
@@ -32,6 +35,9 @@ class ProjectAuditLogControllerSpec extends Specification {
     Connection connection
 
     @Shared
+    Connection standaloneConnection
+
+    @Shared
     Sql sql
 
     @Inject
@@ -41,16 +47,43 @@ class ProjectAuditLogControllerSpec extends Specification {
     ProjectAuditLogController projectAuditLogController
 
     def setupSpec() {
-        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        def projectId = sql.firstRow("SELECT id FROM projects LIMIT 1").id
-        def actorId = sql.firstRow("SELECT id FROM users LIMIT 1").id
-        sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", [projectId, actorId])
-        sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')", [projectId, actorId])
+        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        sql = new Sql((Connection) Proxy.newProxyInstance(
+                Connection.class.classLoader,
+                [Connection.class] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    try {
+                        return method.invoke(connection, args)
+                    } catch (Throwable t) {
+                        return method.invoke(standaloneConnection, args)
+                    }
+                } as InvocationHandler
+        ))
+
+        // Use standaloneConnection to query and seed data
+        def stmt = standaloneConnection.createStatement()
+        def rsProj = stmt.executeQuery("SELECT id FROM projects LIMIT 1")
+        rsProj.next()
+        def projectId = java.util.UUID.fromString(rsProj.getString("id"))
+
+        def rsUser = stmt.executeQuery("SELECT id FROM users LIMIT 1")
+        rsUser.next()
+        def actorId = java.util.UUID.fromString(rsUser.getString("id"))
+
+        def ps = standaloneConnection.prepareStatement("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')")
+        ps.setObject(1, projectId)
+        ps.setObject(2, actorId)
+        ps.executeUpdate()
+
+        ps = standaloneConnection.prepareStatement("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')")
+        ps.setObject(1, projectId)
+        ps.setObject(2, actorId)
+        ps.executeUpdate()
     }
 
     def cleanupSpec() {
-        sql.execute("DELETE FROM project_audit_logs WHERE action IN ('CREATED', 'EDITED')")
-        sql?.close()
+        standaloneConnection.createStatement().execute("DELETE FROM project_audit_logs WHERE action IN ('CREATED', 'EDITED')")
+        standaloneConnection?.close()
     }
 
     private Project getRandomProject() {
@@ -67,7 +100,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         if (!userRow) {
             throw new IllegalStateException("No users found in database to link audit log to.")
         }
-        new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role), OffsetDateTime.now())
+        new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
     }
 
     /********** CREATE Tests **********/
@@ -96,7 +129,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM project_audit_logs WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM project_audit_logs WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.project().id() == project_id
@@ -108,7 +141,7 @@ class ProjectAuditLogControllerSpec extends Specification {
     @Unroll
     def "CREATE | should fail to save project audit log with invalid data: #testCase"(String testCase, ProjectAuditLog log) {
         when: "an attempt is made to add a project audit log with invalid data"
-        projectController = projectAuditLogController.addProjectAuditLog(log)
+        projectAuditLogController.addProjectAuditLog(log)
 
         then: "an exception is thrown"
         thrown(ValidationException)
@@ -159,7 +192,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         given: "an existing project audit log ID from the database"
         def firstRow = sql.firstRow("SELECT id FROM project_audit_logs LIMIT 1")
         assert firstRow != null
-        UUID id = firstRow.id
+        UUID id = firstRow.id as UUID
 
         when: "the project audit log is requested by its ID"
         def result = projectAuditLogController.getProjectAuditLog(id)
@@ -185,7 +218,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         given: "an existing project audit log's details"
         def logRow = sql.firstRow("SELECT id FROM project_audit_logs LIMIT 1")
         assert logRow != null
-        UUID id = logRow.id
+        UUID id = logRow.id as UUID
         def project = getRandomProject()
         def actor = getRandomUser()
         def updateRequest = new ProjectAuditLog(null, project, actor, AuditAction.EDITED, OffsetDateTime.now())
@@ -200,7 +233,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = new Sql(connection).firstRow("SELECT action FROM project_audit_logs WHERE id = ?", [id])
+        def dbResult = sql.firstRow("SELECT action FROM project_audit_logs WHERE id = ?", [id])
         verifyAll(dbResult) {
             action == 'EDITED'
         }
@@ -244,7 +277,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         then: "the project audit log no longer exists in the repository or database"
         verifyAll {
             !projectAuditLogRepository.findById(id).isPresent()
-            new Sql(connection).firstRow("SELECT count(*) as count FROM project_audit_logs WHERE id = ?", [id]).count == 0
+            sql.firstRow("SELECT count(*) as count FROM project_audit_logs WHERE id = ?", [id]).count == 0
         }
     }
 
@@ -275,7 +308,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         }
 
         then: "the collected set contains all project audit logs from the database"
-        def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM project_audit_logs").count
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM project_audit_logs").count
         verifyAll {
             allLogs.size() == totalCount
             allLogs.size() >= 2

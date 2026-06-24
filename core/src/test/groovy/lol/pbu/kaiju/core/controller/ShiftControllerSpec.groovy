@@ -19,7 +19,12 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.sql.Connection
+import java.sql.DriverManager
+import java.sql.Timestamp
 import java.time.OffsetDateTime
 
 @MicronautTest
@@ -28,6 +33,9 @@ class ShiftControllerSpec extends Specification {
     @Inject
     @Shared
     Connection connection
+
+    @Shared
+    Connection standaloneConnection
 
     @Shared
     Sql sql
@@ -39,11 +47,22 @@ class ShiftControllerSpec extends Specification {
     ShiftController shiftController
 
     def setupSpec() {
-        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        sql = new Sql((Connection) Proxy.newProxyInstance(
+                Connection.class.classLoader,
+                [Connection.class] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    try {
+                        return method.invoke(connection, args)
+                    } catch (Throwable ignored) {
+                        return method.invoke(standaloneConnection, args)
+                    }
+                } as InvocationHandler
+        ))
     }
 
     def cleanupSpec() {
-        sql?.close()
+        standaloneConnection?.close()
     }
 
     private Project getRandomProject() {
@@ -68,15 +87,7 @@ class ShiftControllerSpec extends Specification {
     def "CREATE | should successfully save a valid virtual shift"() {
         given: "a new valid virtual shift"
         def project = getRandomProject()
-        def newShift = new Shift(
-                null,
-                project,
-                true, // isVirtual
-                null, // location
-                OffsetDateTime.now(),
-                OffsetDateTime.now().plusHours(2),
-                []
-        )
+        def newShift = new Shift(null, project, true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), [])
 
         when: "the shift is added"
         Shift saved = shiftController.addShift(newShift)
@@ -85,12 +96,12 @@ class ShiftControllerSpec extends Specification {
         verifyAll {
             saved.id() != null
             saved.project().id() == project.id()
-            saved.isVirtual() == true
+            saved.isVirtual()
             saved.location() == null
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM shifts WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM shifts WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.project().id() == project_id
@@ -103,15 +114,13 @@ class ShiftControllerSpec extends Specification {
         given: "a new valid physical shift"
         def project = getRandomProject()
         def location = getRandomLocation()
-        def newShift = new Shift(
-                null,
+        def newShift = new Shift(null,
                 project,
                 false, // isVirtual
                 location, // location
                 OffsetDateTime.now(),
                 OffsetDateTime.now().plusHours(2),
-                []
-        )
+                [])
 
         when: "the shift is added"
         Shift saved = shiftController.addShift(newShift)
@@ -120,12 +129,12 @@ class ShiftControllerSpec extends Specification {
         verifyAll {
             saved.id() != null
             saved.project().id() == project.id()
-            saved.isVirtual() == false
+            (!saved.isVirtual())
             saved.location().id() == location.id()
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM shifts WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM shifts WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.project().id() == project_id
@@ -235,11 +244,11 @@ class ShiftControllerSpec extends Specification {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = new Sql(connection).firstRow("SELECT start_time, end_time FROM shifts WHERE id = ?", [id])
+        def dbResult = sql.firstRow("SELECT start_time, end_time FROM shifts WHERE id = ?", [id])
         verifyAll(dbResult) {
             // Need to match instant or compare correctly since offset/timezones can vary slightly
-            dbResult.start_time.toInstant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS) == newStart.toInstant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
-            dbResult.end_time.toInstant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS) == newEnd.toInstant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+            ((Timestamp) dbResult.start_time).toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
+            ((Timestamp) dbResult.end_time).toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
         }
     }
 
@@ -279,7 +288,7 @@ class ShiftControllerSpec extends Specification {
         then: "the shift no longer exists in the repository or database"
         verifyAll {
             !shiftRepository.findById(id).isPresent()
-            new Sql(connection).firstRow("SELECT count(*) as count FROM shifts WHERE id = ?", [id]).count == 0
+            sql.firstRow("SELECT count(*) as count FROM shifts WHERE id = ?", [id]).count == 0
         }
     }
 
@@ -310,7 +319,7 @@ class ShiftControllerSpec extends Specification {
         }
 
         then: "the collected set contains all shifts from the database"
-        def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM shifts").count
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM shifts").count
         verifyAll {
             allShifts.size() == totalCount
             allShifts.size() >= 2

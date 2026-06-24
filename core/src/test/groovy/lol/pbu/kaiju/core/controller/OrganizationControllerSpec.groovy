@@ -15,6 +15,9 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.sql.Connection
 
 @MicronautTest
@@ -23,6 +26,9 @@ class OrganizationControllerSpec extends Specification {
     @Inject
     @Shared
     Connection connection
+
+    @Shared
+    Connection standaloneConnection
 
     @Shared
     Sql sql
@@ -37,11 +43,22 @@ class OrganizationControllerSpec extends Specification {
     Faker faker = new Faker()
 
     def setupSpec() {
-        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        sql = new Sql((Connection) Proxy.newProxyInstance(
+                Connection.class.classLoader,
+                [Connection.class] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    try {
+                        return method.invoke(connection, args)
+                    } catch (Throwable t) {
+                        return method.invoke(standaloneConnection, args)
+                    }
+                } as InvocationHandler
+        ))
     }
 
     def cleanupSpec() {
-        sql?.close()
+        standaloneConnection?.close()
     }
 
     /********** CREATE Tests **********/
@@ -67,7 +84,7 @@ class OrganizationControllerSpec extends Specification {
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM organizations WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM organizations WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.name() == name
@@ -159,7 +176,7 @@ class OrganizationControllerSpec extends Specification {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = new Sql(connection).firstRow("SELECT name, website_url FROM organizations WHERE id = ?", [id])
+        def dbResult = sql.firstRow("SELECT name, website_url FROM organizations WHERE id = ?", [id])
         verifyAll(dbResult) {
             name == newName
             website_url == newUrl
@@ -203,7 +220,7 @@ class OrganizationControllerSpec extends Specification {
         then: "the organization no longer exists in the repository or database"
         verifyAll {
             !organizationRepository.findById(id).isPresent()
-            new Sql(connection).firstRow("SELECT count(*) as count FROM organizations WHERE id = ?", [id]).count == 0
+            sql.firstRow("SELECT count(*) as count FROM organizations WHERE id = ?", [id]).count == 0
         }
     }
 
@@ -234,7 +251,7 @@ class OrganizationControllerSpec extends Specification {
         }
 
         then: "the collected set contains all organizations from the database"
-        def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM organizations").count
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM organizations").count
         verifyAll {
             allOrgs.size() == totalCount
             allOrgs.size() >= 2

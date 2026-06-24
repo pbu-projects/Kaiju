@@ -15,6 +15,9 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.sql.Connection
 
 @MicronautTest
@@ -23,6 +26,9 @@ class TagControllerSpec extends Specification {
     @Inject
     @Shared
     Connection connection
+
+    @Shared
+    Connection standaloneConnection
 
     @Shared
     Sql sql
@@ -37,14 +43,25 @@ class TagControllerSpec extends Specification {
     Faker faker = new Faker()
 
     def setupSpec() {
-        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        sql.execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
-        sql.execute("INSERT INTO tags (name) VALUES ('test-tag-b')")
+        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        sql = new Sql((Connection) Proxy.newProxyInstance(
+                Connection.class.classLoader,
+                [Connection.class] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    try {
+                        return method.invoke(connection, args)
+                    } catch (Throwable t) {
+                        return method.invoke(standaloneConnection, args)
+                    }
+                } as InvocationHandler
+        ))
+        standaloneConnection.createStatement().execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
+        standaloneConnection.createStatement().execute("INSERT INTO tags (name) VALUES ('test-tag-b')")
     }
 
     def cleanupSpec() {
-        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%'")
-        sql?.close()
+        standaloneConnection.createStatement().execute("DELETE FROM tags WHERE name LIKE 'test-tag-%'")
+        standaloneConnection?.close()
     }
 
     /********** CREATE Tests **********/
@@ -66,7 +83,7 @@ class TagControllerSpec extends Specification {
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.name() == name
@@ -149,7 +166,7 @@ class TagControllerSpec extends Specification {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = new Sql(connection).firstRow("SELECT name FROM tags WHERE id = ?", [id])
+        def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
         verifyAll(dbResult) {
             name == newName
         }
@@ -189,7 +206,7 @@ class TagControllerSpec extends Specification {
         then: "the tag no longer exists in the repository or database"
         verifyAll {
             !tagRepository.findById(id).isPresent()
-            new Sql(connection).firstRow("SELECT count(*) as count FROM tags WHERE id = ?", [id]).count == 0
+            sql.firstRow("SELECT count(*) as count FROM tags WHERE id = ?", [id]).count == 0
         }
     }
 
@@ -220,7 +237,7 @@ class TagControllerSpec extends Specification {
         }
 
         then: "the collected set contains all tags from the database"
-        def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM tags").count
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM tags").count
         verifyAll {
             allTags.size() == totalCount
             allTags.size() >= 2

@@ -19,6 +19,9 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.sql.Connection
 
 @MicronautTest
@@ -27,6 +30,9 @@ class BoundaryControllerSpec extends Specification {
     @Inject
     @Shared
     Connection connection
+
+    @Shared
+    Connection standaloneConnection
 
     @Shared
     Sql sql
@@ -55,14 +61,25 @@ class BoundaryControllerSpec extends Specification {
     }
 
     def setupSpec() {
-        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary A', ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))', 4326))")
-        sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary B', ST_GeomFromText('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', 4326))")
+        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        sql = new Sql((Connection) Proxy.newProxyInstance(
+                Connection.class.classLoader,
+                [Connection.class] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    try {
+                        return method.invoke(connection, args)
+                    } catch (Throwable t) {
+                        return method.invoke(standaloneConnection, args)
+                    }
+                } as InvocationHandler
+        ))
+        standaloneConnection.createStatement().execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary A', ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))', 4326))")
+        standaloneConnection.createStatement().execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary B', ST_GeomFromText('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', 4326))")
     }
 
     def cleanupSpec() {
-        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %'")
-        sql?.close()
+        standaloneConnection.createStatement().execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %'")
+        standaloneConnection?.close()
     }
 
     /********** CREATE Tests **********/
@@ -85,7 +102,7 @@ class BoundaryControllerSpec extends Specification {
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM boundaries WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM boundaries WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.name() == name
@@ -171,7 +188,7 @@ class BoundaryControllerSpec extends Specification {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = new Sql(connection).firstRow("SELECT name FROM boundaries WHERE id = ?", [id])
+        def dbResult = sql.firstRow("SELECT name FROM boundaries WHERE id = ?", [id])
         verifyAll(dbResult) {
             name == newName
         }
@@ -212,7 +229,7 @@ class BoundaryControllerSpec extends Specification {
         then: "the boundary no longer exists in the repository or database"
         verifyAll {
             !boundaryRepository.findById(id).isPresent()
-            new Sql(connection).firstRow("SELECT count(*) as count FROM boundaries WHERE id = ?", [id]).count == 0
+            sql.firstRow("SELECT count(*) as count FROM boundaries WHERE id = ?", [id]).count == 0
         }
     }
 
@@ -243,7 +260,7 @@ class BoundaryControllerSpec extends Specification {
         }
 
         then: "the collected set contains all boundaries from the database"
-        def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM boundaries").count
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM boundaries").count
         verifyAll {
             allBoundaries.size() == totalCount
             allBoundaries.size() >= 2

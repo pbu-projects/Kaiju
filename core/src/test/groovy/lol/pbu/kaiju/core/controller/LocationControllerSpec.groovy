@@ -19,7 +19,11 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.lang.reflect.InvocationHandler
+import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 import java.sql.Connection
+
 /**
  * These are more for my own comfort than anything.
  */
@@ -28,6 +32,9 @@ class LocationControllerSpec extends Specification {
 
     @Inject @Shared
     Connection connection
+
+    @Shared
+    Connection standaloneConnection
 
     @Shared
     Sql sql
@@ -50,11 +57,22 @@ class LocationControllerSpec extends Specification {
 
     def setupSpec() {
         // look in database/compose.yml
-        sql = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        sql = new Sql((Connection) Proxy.newProxyInstance(
+                Connection.class.classLoader,
+                [Connection.class] as Class[],
+                { Object proxy, Method method, Object[] args ->
+                    try {
+                        return method.invoke(connection, args)
+                    } catch (Throwable t) {
+                        return method.invoke(standaloneConnection, args)
+                    }
+                } as InvocationHandler
+        ))
     }
 
     def cleanupSpec() {
-        sql?.close()
+        standaloneConnection?.close()
     }
 
     /********** CREATE Tests **********/
@@ -75,7 +93,7 @@ class LocationControllerSpec extends Specification {
         }
 
         and: "it can be retrieved from the database"
-        def result = new Sql(connection).firstRow("SELECT * FROM locations WHERE id = ?", [saved.id()])
+        def result = sql.firstRow("SELECT * FROM locations WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
             saved.name() == name
@@ -170,7 +188,6 @@ class LocationControllerSpec extends Specification {
     @SuppressWarnings("GroovyAssignabilityCheck") // where block left shift
     def "UPDATE | should successfully update an existing location: #originalName"(UUID id, String originalName) {
         given: "an existing location to update"
-        def sql = new Sql(connection)
         def newName = "Updated ${faker.commerce().productName()}"
         def newCity = faker.address().city()
         def updateRequest = new Location(null, newName, "Updated Address", newCity, "UT", "84000", "US", createPoint())
@@ -226,7 +243,7 @@ class LocationControllerSpec extends Specification {
         then: "the location no longer exists in the repository or database"
         verifyAll {
             !locationRepository.findById(id).isPresent()
-            new Sql(connection).firstRow("SELECT count(*) as count FROM locations WHERE id = ?", [id]).count == 0
+            sql.firstRow("SELECT count(*) as count FROM locations WHERE id = ?", [id]).count == 0
         }
     }
 
@@ -259,7 +276,7 @@ class LocationControllerSpec extends Specification {
         }
 
         then: "the collected set contains all locations from the database"
-        def totalCount = new Sql(connection).firstRow("SELECT count(*) as count FROM locations").count
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM locations").count
         verifyAll {
             allLocations.size() == totalCount
             allLocations.size() >= 2
