@@ -146,6 +146,7 @@ class ShiftControllerSpec extends Specification {
     }
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck")
     def "CREATE | should fail to save shift with invalid data: #testCase"(String testCase, Closure<Shift> shiftCreator) {
         when: "an attempt is made to add a shift with invalid data"
         Shift shift = shiftCreator()

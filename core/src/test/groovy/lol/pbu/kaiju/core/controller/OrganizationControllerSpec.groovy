@@ -19,6 +19,7 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.sql.Connection
+import java.sql.DriverManager
 
 @MicronautTest
 class OrganizationControllerSpec extends Specification {
@@ -43,14 +44,14 @@ class OrganizationControllerSpec extends Specification {
     Faker faker = new Faker()
 
     def setupSpec() {
-        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
         sql = new Sql((Connection) Proxy.newProxyInstance(
                 Connection.class.classLoader,
                 [Connection.class] as Class[],
                 { Object proxy, Method method, Object[] args ->
                     try {
                         return method.invoke(connection, args)
-                    } catch (Throwable t) {
+                    } catch (Throwable ignored) {
                         return method.invoke(standaloneConnection, args)
                     }
                 } as InvocationHandler
@@ -133,6 +134,7 @@ class OrganizationControllerSpec extends Specification {
     /********** READ Tests **********/
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck")
     def "READ | should retrieve an existing organization by ID: #name"(UUID id, String name) {
         when: "the organization is requested by its ID"
         def result = organizationController.getOrganization(id)
@@ -159,6 +161,7 @@ class OrganizationControllerSpec extends Specification {
     /********** UPDATE Tests **********/
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck")
     def "UPDATE | should successfully update an existing organization: #originalName"(UUID id, String originalName) {
         given: "an existing organization's details"
         def newName = "Updated ${faker.company().name()}"

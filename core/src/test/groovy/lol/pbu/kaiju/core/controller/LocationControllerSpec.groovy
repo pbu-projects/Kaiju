@@ -23,6 +23,7 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.sql.Connection
+import java.sql.DriverManager
 
 /**
  * These are more for my own comfort than anything.
@@ -57,14 +58,14 @@ class LocationControllerSpec extends Specification {
 
     def setupSpec() {
         // look in database/compose.yml
-        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
         sql = new Sql((Connection) Proxy.newProxyInstance(
                 Connection.class.classLoader,
                 [Connection.class] as Class[],
                 { Object proxy, Method method, Object[] args ->
                     try {
                         return method.invoke(connection, args)
-                    } catch (Throwable t) {
+                    } catch (Throwable ignored) {
                         return method.invoke(standaloneConnection, args)
                     }
                 } as InvocationHandler

@@ -20,6 +20,7 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.sql.Connection
+import java.sql.DriverManager
 import java.time.OffsetDateTime
 
 @MicronautTest
@@ -45,14 +46,14 @@ class UserControllerSpec extends Specification {
     Faker faker = new Faker()
 
     def setupSpec() {
-        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
         sql = new Sql((Connection) Proxy.newProxyInstance(
                 Connection.class.classLoader,
                 [Connection.class] as Class[],
                 { Object proxy, Method method, Object[] args ->
                     try {
                         return method.invoke(connection, args)
-                    } catch (Throwable t) {
+                    } catch (Throwable ignored) {
                         return method.invoke(standaloneConnection, args)
                     }
                 } as InvocationHandler
@@ -133,6 +134,7 @@ class UserControllerSpec extends Specification {
     /********** READ Tests **********/
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck")
     def "READ | should retrieve an existing user by ID: #email"(UUID id, String email) {
         when: "the user is requested by its ID"
         def result = userController.getUser(id)
@@ -159,6 +161,7 @@ class UserControllerSpec extends Specification {
     /********** UPDATE Tests **********/
 
     @Unroll
+    @SuppressWarnings("GroovyAssignabilityCheck")
     def "UPDATE | should successfully update an existing user: #originalEmail"(UUID id, String originalEmail) {
         given: "an existing user's details"
         def newEmail = faker.internet().emailAddress()

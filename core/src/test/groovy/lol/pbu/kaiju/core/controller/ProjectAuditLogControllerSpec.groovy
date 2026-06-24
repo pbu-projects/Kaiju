@@ -13,8 +13,6 @@ import lol.pbu.kaiju.core.domain.Project
 import lol.pbu.kaiju.core.domain.ProjectAuditLog
 import lol.pbu.kaiju.core.domain.User
 import lol.pbu.kaiju.core.model.AuditAction
-import lol.pbu.kaiju.core.model.ProjectStatus
-import lol.pbu.kaiju.core.model.ProjectType
 import lol.pbu.kaiju.core.model.UserRole
 import lol.pbu.kaiju.core.repository.ProjectAuditLogRepository
 import spock.lang.Shared
@@ -25,7 +23,12 @@ import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.sql.Connection
+import java.sql.DriverManager
 import java.time.OffsetDateTime
+
+import static lol.pbu.kaiju.core.model.AuditAction.CREATED
+import static lol.pbu.kaiju.core.model.ProjectStatus.DRAFT
+import static lol.pbu.kaiju.core.model.ProjectType.STANDARD
 
 @MicronautTest
 class ProjectAuditLogControllerSpec extends Specification {
@@ -47,14 +50,14 @@ class ProjectAuditLogControllerSpec extends Specification {
     ProjectAuditLogController projectAuditLogController
 
     def setupSpec() {
-        standaloneConnection = java.sql.DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
+        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
         sql = new Sql((Connection) Proxy.newProxyInstance(
                 Connection.class.classLoader,
                 [Connection.class] as Class[],
                 { Object proxy, Method method, Object[] args ->
                     try {
                         return method.invoke(connection, args)
-                    } catch (Throwable t) {
+                    } catch (Throwable ignored) {
                         return method.invoke(standaloneConnection, args)
                     }
                 } as InvocationHandler
@@ -64,11 +67,11 @@ class ProjectAuditLogControllerSpec extends Specification {
         def stmt = standaloneConnection.createStatement()
         def rsProj = stmt.executeQuery("SELECT id FROM projects LIMIT 1")
         rsProj.next()
-        def projectId = java.util.UUID.fromString(rsProj.getString("id"))
+        def projectId = UUID.fromString(rsProj.getString("id"))
 
         def rsUser = stmt.executeQuery("SELECT id FROM users LIMIT 1")
         rsUser.next()
-        def actorId = java.util.UUID.fromString(rsUser.getString("id"))
+        def actorId = UUID.fromString(rsUser.getString("id"))
 
         def ps = standaloneConnection.prepareStatement("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')")
         ps.setObject(1, projectId)
@@ -92,7 +95,7 @@ class ProjectAuditLogControllerSpec extends Specification {
             throw new IllegalStateException("No projects found in database to link audit log to.")
         }
         def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-        new Project(projectRow.id as UUID, org, projectRow.title as String, "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, OffsetDateTime.now(), null, null, [], [])
+        new Project(projectRow.id as UUID, org, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 
     private User getRandomUser() {
@@ -109,13 +112,7 @@ class ProjectAuditLogControllerSpec extends Specification {
         given: "a new valid project audit log"
         def project = getRandomProject()
         def actor = getRandomUser()
-        def newLog = new ProjectAuditLog(
-                null,
-                project,
-                actor,
-                AuditAction.CREATED,
-                OffsetDateTime.now()
-        )
+        def newLog = new ProjectAuditLog(null, project, actor, CREATED, OffsetDateTime.now())
 
         when: "the project audit log is added"
         ProjectAuditLog saved = projectAuditLogController.addProjectAuditLog(newLog)
@@ -125,7 +122,7 @@ class ProjectAuditLogControllerSpec extends Specification {
             saved.id() != null
             saved.project().id() == project.id()
             saved.actor().id() == actor.id()
-            saved.action() == AuditAction.CREATED
+            saved.action() == CREATED
         }
 
         and: "it can be retrieved from the database"
@@ -155,13 +152,13 @@ class ProjectAuditLogControllerSpec extends Specification {
             sqlInstance.close()
 
             def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-            def validProject = new Project(projRow.id as UUID, org, projRow.title as String, "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, OffsetDateTime.now(), null, null, [], [])
-            def validActor = new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role), OffsetDateTime.now())
+            def validProject = new Project(projRow.id as UUID, org, projRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+            def validActor = new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
 
             def validData = [
                     project: validProject,
                     actor  : validActor,
-                    action : AuditAction.CREATED
+                    action: CREATED
             ]
 
             def invalidCases = [
@@ -264,7 +261,7 @@ class ProjectAuditLogControllerSpec extends Specification {
                 null,
                 project,
                 actor,
-                AuditAction.CREATED,
+                CREATED,
                 OffsetDateTime.now()
         )
         def saved = projectAuditLogController.addProjectAuditLog(tempLog)
