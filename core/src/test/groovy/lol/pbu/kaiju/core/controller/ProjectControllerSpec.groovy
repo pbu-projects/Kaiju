@@ -1,17 +1,23 @@
 package lol.pbu.kaiju.core.controller
 
-
 import io.micronaut.data.model.CursoredPageable
+import io.micronaut.data.model.Page
+import io.micronaut.data.model.Pageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.core.domain.Organization
 import lol.pbu.kaiju.core.domain.Project
+import lol.pbu.kaiju.core.model.ProjectSearchCard
 import lol.pbu.kaiju.core.model.ProjectStatus
 import lol.pbu.kaiju.core.model.ProjectType
 import lol.pbu.kaiju.core.repository.ProjectRepository
 import net.datafaker.Faker
+import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.Point
+import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -250,5 +256,102 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "no exception is thrown"
         noExceptionThrown()
+    }
+
+    def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
+        given: "a test organization, project, locations (one close, one far), and active shifts"
+        def organizationId = UUID.randomUUID()
+        def projectId = UUID.randomUUID()
+        def closeLocId = UUID.randomUUID()
+        def farLocId = UUID.randomUUID()
+        def closeShiftId = UUID.randomUUID()
+        def farShiftId = UUID.randomUUID()
+
+        // 1. Organization
+        def orgPs = standaloneConnection.prepareStatement("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Distance Test Org', true)")
+        orgPs.setObject(1, organizationId)
+        orgPs.executeUpdate()
+
+        // 2. Project
+        def projPs = standaloneConnection.prepareStatement(
+                "INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at) " +
+                        "VALUES (?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW())"
+        )
+        projPs.setObject(1, projectId)
+        projPs.setObject(2, organizationId)
+        projPs.executeUpdate()
+
+        // 3. Locations
+        // Close Location (~1km from Denver center: -104.9903, 39.7392)
+        def locClosePs = standaloneConnection.prepareStatement(
+                "INSERT INTO locations (id, name, address_line, city, country_code, geom) " +
+                        "VALUES (?, 'Close Location', '123 Close St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))"
+        )
+        locClosePs.setObject(1, closeLocId)
+        locClosePs.executeUpdate()
+
+        // Far Location (~10km from Denver center: -104.9903, 39.7392)
+        def locFarPs = standaloneConnection.prepareStatement(
+                "INSERT INTO locations (id, name, address_line, city, country_code, geom) " +
+                        "VALUES (?, 'Far Location', '456 Far St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9 39.7)'))"
+        )
+        locFarPs.setObject(1, farLocId)
+        locFarPs.executeUpdate()
+
+        // 4. Map project to locations
+        def plPs = standaloneConnection.prepareStatement("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)")
+        plPs.setObject(1, projectId)
+        plPs.setObject(2, closeLocId)
+        plPs.executeUpdate()
+
+        plPs.setObject(1, projectId)
+        plPs.setObject(2, farLocId)
+        plPs.executeUpdate()
+
+        // 5. Active Shifts in the future
+        def shiftPs = standaloneConnection.prepareStatement(
+                "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " +
+                        "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')"
+        )
+        shiftPs.setObject(1, closeShiftId)
+        shiftPs.setObject(2, projectId)
+        shiftPs.setObject(3, closeLocId)
+        shiftPs.executeUpdate()
+
+        shiftPs.setObject(1, farShiftId)
+        shiftPs.setObject(2, projectId)
+        shiftPs.setObject(3, farLocId)
+        shiftPs.executeUpdate()
+
+        and: "a reference point at Denver center"
+        def geomFactory = new GeometryFactory(new PrecisionModel(), 4326)
+        Point point = geomFactory.createPoint(new Coordinate(-104.9903, 39.7392))
+
+        when: "searching projects by location with 20km radius"
+        Page<ProjectSearchCard> page = projectRepository.searchByLocation(point, 20000.0, Pageable.from(0, 10))
+
+        then: "only our distance test project-locations are retrieved (or existing matching ones), ordered closest first"
+        page != null
+        def testResults = page.content.findAll { it.projectId() == projectId }
+        testResults.size() == 2
+        testResults[0].locationId() == closeLocId
+        testResults[0].locationName() == 'Close Location'
+        testResults[1].locationId() == farLocId
+        testResults[1].locationName() == 'Far Location'
+
+        cleanup:
+        if (closeShiftId) {
+            standaloneConnection.createStatement().execute("DELETE FROM shifts WHERE id IN ('${closeShiftId}', '${farShiftId}')")
+        }
+        if (projectId) {
+            standaloneConnection.createStatement().execute("DELETE FROM project_locations WHERE project_id = '${projectId}'")
+            standaloneConnection.createStatement().execute("DELETE FROM projects WHERE id = '${projectId}'")
+        }
+        if (closeLocId) {
+            standaloneConnection.createStatement().execute("DELETE FROM locations WHERE id IN ('${closeLocId}', '${farLocId}')")
+        }
+        if (organizationId) {
+            standaloneConnection.createStatement().execute("DELETE FROM organizations WHERE id = '${organizationId}'")
+        }
     }
 }
