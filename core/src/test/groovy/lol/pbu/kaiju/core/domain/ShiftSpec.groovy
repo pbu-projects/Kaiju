@@ -1,18 +1,19 @@
 package lol.pbu.kaiju.core.domain
 
 import jakarta.validation.ValidationException
-import lol.pbu.kaiju.core.model.ProjectStatus
-import lol.pbu.kaiju.core.model.ProjectType
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 
+import static lol.pbu.kaiju.core.model.ProjectStatus.DRAFT
+import static lol.pbu.kaiju.core.model.ProjectType.STANDARD
+
 class ShiftSpec extends Specification {
 
     private static Project createDummyProject() {
         def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-        return new Project(UUID.randomUUID(), org, "Dummy Project", "Description", ProjectType.STANDARD, ProjectStatus.DRAFT, OffsetDateTime.now(), null, null, [], [])
+        return new Project(UUID.randomUUID(), org, "Dummy Project", "Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 
     private static Location createDummyLocation() {

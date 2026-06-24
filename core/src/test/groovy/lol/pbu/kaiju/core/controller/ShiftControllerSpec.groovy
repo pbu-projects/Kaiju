@@ -1,46 +1,27 @@
 package lol.pbu.kaiju.core.controller
 
-import groovy.sql.Sql
+
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
-import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.core.domain.Location
 import lol.pbu.kaiju.core.domain.Organization
 import lol.pbu.kaiju.core.domain.Project
 import lol.pbu.kaiju.core.domain.Shift
-import lol.pbu.kaiju.core.model.ProjectStatus
-import lol.pbu.kaiju.core.model.ProjectType
 import lol.pbu.kaiju.core.repository.ShiftRepository
-import spock.lang.Shared
-import spock.lang.Specification
 import spock.lang.Unroll
 
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.sql.Connection
-import java.sql.DriverManager
 import java.sql.Timestamp
 import java.time.OffsetDateTime
 
 import static java.time.temporal.ChronoUnit.SECONDS
+import static lol.pbu.kaiju.core.model.ProjectStatus.DRAFT
+import static lol.pbu.kaiju.core.model.ProjectType.STANDARD
 
-@MicronautTest
-class ShiftControllerSpec extends Specification {
-
-    @Inject
-    @Shared
-    Connection connection
-
-    @Shared
-    Connection standaloneConnection
-
-    @Shared
-    Sql sql
+class ShiftControllerSpec extends BaseControllerSpec {
 
     @Inject
     ShiftRepository shiftRepository
@@ -48,32 +29,13 @@ class ShiftControllerSpec extends Specification {
     @Inject
     ShiftController shiftController
 
-    def setupSpec() {
-        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        sql = new Sql((Connection) Proxy.newProxyInstance(
-                Connection.class.classLoader,
-                [Connection.class] as Class[],
-                { Object proxy, Method method, Object[] args ->
-                    try {
-                        return method.invoke(connection, args)
-                    } catch (Throwable ignored) {
-                        return method.invoke(standaloneConnection, args)
-                    }
-                } as InvocationHandler
-        ))
-    }
-
-    def cleanupSpec() {
-        standaloneConnection?.close()
-    }
-
     private Project getRandomProject() {
         def projectRow = sql.firstRow("SELECT id, title FROM projects LIMIT 1")
         if (!projectRow) {
             throw new IllegalStateException("No projects found in database to link shift to.")
         }
         def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-        new Project(projectRow.id as UUID, org, projectRow.title as String, "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, OffsetDateTime.now(), null, null, [], [])
+        new Project(projectRow.id as UUID, org, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 
     private Location getRandomLocation() {
@@ -157,42 +119,34 @@ class ShiftControllerSpec extends Specification {
 
         where:
         [testCase, shiftCreator] << {
-            // Static connection inside where closure
-            def sqlInstance = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-            def projRow = sqlInstance.firstRow("SELECT id, title FROM projects LIMIT 1")
-            def locRow = sqlInstance.firstRow("SELECT id, name FROM locations LIMIT 1")
-            sqlInstance.close()
+            def validProject = { -> getRandomProject() }
+            def validLocation = { -> getRandomLocation() }
 
-            def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-            def validProject = new Project(projRow.id as UUID, org, projRow.title as String, "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, OffsetDateTime.now(), null, null, [], [])
-            def validLocation = new Location(locRow.id as UUID, locRow.name as String, "123 St", "City", null, null, "US", null)
-
-            def validData = [project  : validProject,
-                             isVirtual: true,
-                             location : null,
-                             startTime: OffsetDateTime.now(),
-                             endTime  : OffsetDateTime.now().plusHours(2)]
-
-            def invalidCases = [[field: 'project', value: null, caseName: "Null Project"],
-                                [field: 'startTime', value: null, caseName: "Null Start Time"],
-                                [field: 'endTime', value: null, caseName: "Null End Time"],
-                                [field: 'isVirtual', value: false, locationValue: null, caseName: "Physical Shift with Null Location"],
-                                [field: 'isVirtual', value: true, locationValue: validLocation, caseName: "Virtual Shift with Non-Null Location"]]
+            def invalidCases = [
+                    [field: 'project', value: { -> null }, caseName: "Null Project"],
+                    [field: 'startTime', value: { -> null }, caseName: "Null Start Time"],
+                    [field: 'endTime', value: { -> null }, caseName: "Null End Time"],
+                    [field     : 'isVirtual', value: { -> false }, locationValue: { ->
+                        null
+                    }, caseName: "Physical Shift with Null Location"],
+                    [field     : 'isVirtual', value: { -> true }, locationValue: { ->
+                        validLocation()
+                    }, caseName: "Virtual Shift with Non-Null Location"]
+            ]
 
             return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def locVal = invalidCase.containsKey('locationValue') ? invalidCase.locationValue : props.location
-                Closure<Shift> s = { ->
-                    new Shift(null,
-                            props.project as Project,
-                            props.isVirtual as Boolean,
-                            locVal as Location,
-                            props.startTime as OffsetDateTime,
-                            props.endTime as OffsetDateTime,
-                            [])
-                }
-                [invalidCase.caseName, s]
+                [
+                        invalidCase.caseName,
+                        { ->
+                            def proj = (invalidCase.field == 'project' ? invalidCase.value() : validProject()) as Project
+                            def start = (invalidCase.field == 'startTime' ? invalidCase.value() : OffsetDateTime.now()) as OffsetDateTime
+                            def end = (invalidCase.field == 'endTime' ? invalidCase.value() : OffsetDateTime.now().plusHours(2)) as OffsetDateTime
+                            def isVirt = (invalidCase.field == 'isVirtual' ? invalidCase.value() : true) as Boolean
+                            def loc = (invalidCase.containsKey('locationValue') ? invalidCase.locationValue() : null) as Location
+
+                            new Shift(null, proj, isVirt, loc, start, end, [])
+                        } as Closure<Shift>
+                ]
             }
         }()
     }

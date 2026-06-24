@@ -1,11 +1,10 @@
 package lol.pbu.kaiju.core.controller
 
-import groovy.sql.Sql
+
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
-import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.core.domain.Organization
@@ -15,33 +14,15 @@ import lol.pbu.kaiju.core.domain.User
 import lol.pbu.kaiju.core.model.AuditAction
 import lol.pbu.kaiju.core.model.UserRole
 import lol.pbu.kaiju.core.repository.ProjectAuditLogRepository
-import spock.lang.Shared
-import spock.lang.Specification
 import spock.lang.Unroll
 
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.sql.Connection
-import java.sql.DriverManager
 import java.time.OffsetDateTime
 
 import static lol.pbu.kaiju.core.model.AuditAction.CREATED
 import static lol.pbu.kaiju.core.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.core.model.ProjectType.STANDARD
 
-@MicronautTest
-class ProjectAuditLogControllerSpec extends Specification {
-
-    @Inject
-    @Shared
-    Connection connection
-
-    @Shared
-    Connection standaloneConnection
-
-    @Shared
-    Sql sql
+class ProjectAuditLogControllerSpec extends BaseControllerSpec {
 
     @Inject
     ProjectAuditLogRepository projectAuditLogRepository
@@ -50,19 +31,6 @@ class ProjectAuditLogControllerSpec extends Specification {
     ProjectAuditLogController projectAuditLogController
 
     def setupSpec() {
-        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        sql = new Sql((Connection) Proxy.newProxyInstance(
-                Connection.class.classLoader,
-                [Connection.class] as Class[],
-                { Object proxy, Method method, Object[] args ->
-                    try {
-                        return method.invoke(connection, args)
-                    } catch (Throwable ignored) {
-                        return method.invoke(standaloneConnection, args)
-                    }
-                } as InvocationHandler
-        ))
-
         // Use standaloneConnection to query and seed data
         def stmt = standaloneConnection.createStatement()
         def rsProj = stmt.executeQuery("SELECT id FROM projects LIMIT 1")
@@ -86,7 +54,6 @@ class ProjectAuditLogControllerSpec extends Specification {
 
     def cleanupSpec() {
         standaloneConnection.createStatement().execute("DELETE FROM project_audit_logs WHERE action IN ('CREATED', 'EDITED')")
-        standaloneConnection?.close()
     }
 
     private Project getRandomProject() {
@@ -136,48 +103,38 @@ class ProjectAuditLogControllerSpec extends Specification {
     }
 
     @Unroll
-    def "CREATE | should fail to save project audit log with invalid data: #testCase"(String testCase, ProjectAuditLog log) {
+    @SuppressWarnings("GroovyAssignabilityCheck")
+    def "CREATE | should fail to save project audit log with invalid data: #testCase"(String testCase, Closure<ProjectAuditLog> logCreator) {
         when: "an attempt is made to add a project audit log with invalid data"
-        projectAuditLogController.addProjectAuditLog(log)
+        projectAuditLogController.addProjectAuditLog(logCreator())
 
         then: "an exception is thrown"
         thrown(ValidationException)
 
         where:
-        [testCase, log] << {
-            // Static connection inside where closure
-            def sqlInstance = Sql.newInstance("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-            def projRow = sqlInstance.firstRow("SELECT id, title FROM projects LIMIT 1")
-            def userRow = sqlInstance.firstRow("SELECT id, email, role FROM users LIMIT 1")
-            sqlInstance.close()
-
-            def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-            def validProject = new Project(projRow.id as UUID, org, projRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
-            def validActor = new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
-
-            def validData = [
-                    project: validProject,
-                    actor  : validActor,
-                    action: CREATED
-            ]
+        [testCase, logCreator] << {
+            def validProject = { -> getRandomProject() }
+            def validActor = { -> getRandomUser() }
 
             def invalidCases = [
-                    [field: 'project', value: null, caseName: "Null Project"],
-                    [field: 'actor', value: null, caseName: "Null Actor"],
-                    [field: 'action', value: null, caseName: "Null Action"]
+                    [field: 'project', value: { -> null }, caseName: "Null Project"],
+                    [field: 'actor', value: { -> null }, caseName: "Null Actor"],
+                    [field: 'action', value: { -> null }, caseName: "Null Action"]
             ]
 
             return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def l = new ProjectAuditLog(
-                        null,
-                        props.project as Project,
-                        props.actor as User,
-                        props.action as AuditAction,
-                        OffsetDateTime.now()
-                )
-                [invalidCase.caseName, l]
+                [
+                        invalidCase.caseName,
+                        { ->
+                            new ProjectAuditLog(
+                                    null,
+                                    (invalidCase.field == 'project' ? invalidCase.value() : validProject()) as Project,
+                                    (invalidCase.field == 'actor' ? invalidCase.value() : validActor()) as User,
+                                    (invalidCase.field == 'action' ? invalidCase.value() : CREATED) as AuditAction,
+                                    OffsetDateTime.now()
+                            )
+                        }
+                ]
             }
         }()
     }

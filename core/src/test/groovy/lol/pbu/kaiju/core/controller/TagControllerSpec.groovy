@@ -1,38 +1,19 @@
 package lol.pbu.kaiju.core.controller
 
-import groovy.sql.Sql
+
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
-import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.core.domain.Tag
 import lol.pbu.kaiju.core.repository.TagRepository
 import net.datafaker.Faker
 import spock.lang.Shared
-import spock.lang.Specification
 import spock.lang.Unroll
 
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.sql.Connection
-import java.sql.DriverManager
-
-@MicronautTest
-class TagControllerSpec extends Specification {
-
-    @Inject
-    @Shared
-    Connection connection
-
-    @Shared
-    Connection standaloneConnection
-
-    @Shared
-    Sql sql
+class TagControllerSpec extends BaseControllerSpec {
 
     @Inject
     TagRepository tagRepository
@@ -44,25 +25,12 @@ class TagControllerSpec extends Specification {
     Faker faker = new Faker()
 
     def setupSpec() {
-        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        sql = new Sql((Connection) Proxy.newProxyInstance(
-                Connection.class.classLoader,
-                [Connection.class] as Class[],
-                { Object proxy, Method method, Object[] args ->
-                    try {
-                        return method.invoke(connection, args)
-                    } catch (Throwable ignored) {
-                        return method.invoke(standaloneConnection, args)
-                    }
-                } as InvocationHandler
-        ))
         standaloneConnection.createStatement().execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
         standaloneConnection.createStatement().execute("INSERT INTO tags (name) VALUES ('test-tag-b')")
     }
 
     def cleanupSpec() {
         standaloneConnection.createStatement().execute("DELETE FROM tags WHERE name LIKE 'test-tag-%'")
-        standaloneConnection?.close()
     }
 
     /********** CREATE Tests **********/

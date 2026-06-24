@@ -1,10 +1,9 @@
 package lol.pbu.kaiju.core.controller
 
-import groovy.sql.Sql
+
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
-import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.core.domain.Organization
@@ -14,30 +13,15 @@ import lol.pbu.kaiju.core.model.ProjectType
 import lol.pbu.kaiju.core.repository.ProjectRepository
 import net.datafaker.Faker
 import spock.lang.Shared
-import spock.lang.Specification
 import spock.lang.Unroll
 
-import java.lang.reflect.InvocationHandler
-import java.lang.reflect.Method
-import java.lang.reflect.Proxy
-import java.sql.Connection
-import java.sql.DriverManager
 import java.time.OffsetDateTime
 
 import static lol.pbu.kaiju.core.model.ProjectStatus.ACTIVE
+import static lol.pbu.kaiju.core.model.ProjectStatus.DRAFT
+import static lol.pbu.kaiju.core.model.ProjectType.STANDARD
 
-@MicronautTest
-class ProjectControllerSpec extends Specification {
-
-    @Inject
-    @Shared
-    Connection connection
-
-    @Shared
-    Connection standaloneConnection
-
-    @Shared
-    Sql sql
+class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
     ProjectRepository projectRepository
@@ -47,23 +31,6 @@ class ProjectControllerSpec extends Specification {
 
     @Shared
     Faker faker = new Faker()
-
-    def setupSpec() {
-        standaloneConnection = DriverManager.getConnection("jdbc:postgresql://localhost:5432/volunteer_monster", "jimmy", "warm-farts-smell-worse")
-        sql = new Sql((Connection) Proxy.newProxyInstance(Connection.class.classLoader,
-                [Connection.class] as Class[],
-                { Object proxy, Method method, Object[] args ->
-                    try {
-                        return method.invoke(connection, args)
-                    } catch (Throwable ignored) {
-                        return method.invoke(standaloneConnection, args)
-                    }
-                } as InvocationHandler))
-    }
-
-    def cleanupSpec() {
-        standaloneConnection?.close()
-    }
 
     private Organization getRandomOrganization() {
         def orgRow = sql.firstRow("SELECT id, name FROM organizations LIMIT 1")
@@ -78,17 +45,7 @@ class ProjectControllerSpec extends Specification {
     def "CREATE | should successfully save a valid project"() {
         given: "a new valid project"
         def org = getRandomOrganization()
-        def newProject = new Project(null,
-                org,
-                "Test Project ${faker.company().name()}",
-                "Test Description ${faker.lorem().paragraph()}",
-                ProjectType.STANDARD,
-                ProjectStatus.DRAFT,
-                OffsetDateTime.now(),
-                null,
-                null,
-                [],
-                [])
+        def newProject = new Project(null, org, "Test Project ${faker.company().name()}", "Test Description ${faker.lorem().paragraph()}", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
 
         when: "the project is added"
         Project saved = projectController.addProject(newProject)
@@ -126,8 +83,8 @@ class ProjectControllerSpec extends Specification {
             def validData = [organization: dummyOrg,
                              title       : "Valid Title",
                              description : "Valid Description",
-                             projectType : ProjectType.STANDARD,
-                             status      : ProjectStatus.DRAFT]
+                             projectType: STANDARD,
+                             status     : DRAFT]
 
             def invalidCases = [[field: 'organization', value: null, caseName: "Null Organization"],
                                 [field: 'title', value: null, caseName: "Null Title"],
@@ -141,17 +98,7 @@ class ProjectControllerSpec extends Specification {
             return invalidCases.collect { invalidCase ->
                 def props = new HashMap(validData)
                 props[invalidCase.field] = invalidCase.value
-                def proj = new Project(null,
-                        props.organization as Organization,
-                        props.title as String,
-                        props.description as String,
-                        props.projectType as ProjectType,
-                        props.status as ProjectStatus,
-                        OffsetDateTime.now(),
-                        null,
-                        null,
-                        [],
-                        [])
+                def proj = new Project(null, props.organization as Organization, props.title as String, props.description as String, props.projectType as ProjectType, props.status as ProjectStatus, OffsetDateTime.now(), null, null, [], [])
                 [invalidCase.caseName, proj]
             }
         }()
@@ -210,8 +157,7 @@ class ProjectControllerSpec extends Specification {
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description ${faker.lorem().paragraph()}"
         ProjectType projectType = ProjectType.valueOf(projectRow.project_type as String)
-        def updateRequest = new Project(null, org, newTitle, newDescription, projectType, ACTIVE, OffsetDateTime.now(), null, null, [],
-                [])
+        def updateRequest = new Project(null, org, newTitle, newDescription, projectType, ACTIVE, OffsetDateTime.now(), null, null, [], [])
 
         when: "the project is updated"
         Project updated = projectController.updateProject(id, updateRequest)
@@ -240,17 +186,7 @@ class ProjectControllerSpec extends Specification {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = new Project(null,
-                org,
-                "New Title",
-                "New Description",
-                ProjectType.STANDARD,
-                ProjectStatus.DRAFT,
-                OffsetDateTime.now(),
-                null,
-                null,
-                [],
-                [])
+        def updateRequest = new Project(null, org, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
 
         when: "an update is attempted"
         projectController.updateProject(nonExistentId, updateRequest)
@@ -264,17 +200,7 @@ class ProjectControllerSpec extends Specification {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = new Project(null,
-                org,
-                "New Title",
-                "New Description",
-                ProjectType.STANDARD,
-                ProjectStatus.DRAFT,
-                OffsetDateTime.now(),
-                null,
-                null,
-                [],
-                [])
+        def updateRequest = new Project(null, org, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
 
         when: "a no-look update is attempted"
         projectController.updateProjectNoLook(nonExistentId, updateRequest)
@@ -288,17 +214,7 @@ class ProjectControllerSpec extends Specification {
     def "DELETE | should remove an existing project"() {
         given: "a new project to be deleted"
         def org = getRandomOrganization()
-        def tempProject = new Project(null,
-                org,
-                "Temporary Project to Delete",
-                "Temporary Description",
-                ProjectType.STANDARD,
-                ProjectStatus.DRAFT,
-                OffsetDateTime.now(),
-                null,
-                null,
-                [],
-                [])
+        def tempProject = new Project(null, org, "Temporary Project to Delete", "Temporary Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
         def saved = projectController.addProject(tempProject)
         UUID id = saved.id()
         assert projectRepository.existsById(id)
