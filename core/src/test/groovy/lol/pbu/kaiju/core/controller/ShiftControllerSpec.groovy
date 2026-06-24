@@ -155,36 +155,30 @@ class ShiftControllerSpec extends Specification {
             def validProject = new Project(projRow.id as UUID, org, projRow.title as String, "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, OffsetDateTime.now(), null, null, [], [])
             def validLocation = new Location(locRow.id as UUID, locRow.name as String, "123 St", "City", null, null, "US", null)
 
-            def validData = [
-                    project  : validProject,
-                    isVirtual: true,
-                    location : null,
-                    startTime: OffsetDateTime.now(),
-                    endTime  : OffsetDateTime.now().plusHours(2)
-            ]
+            def validData = [project  : validProject,
+                             isVirtual: true,
+                             location : null,
+                             startTime: OffsetDateTime.now(),
+                             endTime  : OffsetDateTime.now().plusHours(2)]
 
-            def invalidCases = [
-                    [field: 'project', value: null, caseName: "Null Project"],
-                    [field: 'startTime', value: null, caseName: "Null Start Time"],
-                    [field: 'endTime', value: null, caseName: "Null End Time"],
-                    [field: 'isVirtual', value: false, locationValue: null, caseName: "Physical Shift with Null Location"],
-                    [field: 'isVirtual', value: true, locationValue: validLocation, caseName: "Virtual Shift with Non-Null Location"]
-            ]
+            def invalidCases = [[field: 'project', value: null, caseName: "Null Project"],
+                                [field: 'startTime', value: null, caseName: "Null Start Time"],
+                                [field: 'endTime', value: null, caseName: "Null End Time"],
+                                [field: 'isVirtual', value: false, locationValue: null, caseName: "Physical Shift with Null Location"],
+                                [field: 'isVirtual', value: true, locationValue: validLocation, caseName: "Virtual Shift with Non-Null Location"]]
 
             return invalidCases.collect { invalidCase ->
                 def props = new HashMap(validData)
                 props[invalidCase.field] = invalidCase.value
                 def locVal = invalidCase.containsKey('locationValue') ? invalidCase.locationValue : props.location
                 Closure<Shift> s = { ->
-                    new Shift(
-                            null,
+                    new Shift(null,
                             props.project as Project,
                             props.isVirtual as Boolean,
                             locVal as Location,
                             props.startTime as OffsetDateTime,
                             props.endTime as OffsetDateTime,
-                            []
-                    )
+                            [])
                 }
                 [invalidCase.caseName, s]
             }
@@ -198,7 +192,7 @@ class ShiftControllerSpec extends Specification {
         given: "an existing shift ID from the database"
         def firstRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
         assert firstRow != null
-        UUID id = firstRow.id
+        UUID id = firstRow.id as UUID
 
         when: "the shift is requested by its ID"
         def result = shiftController.getShift(id)
@@ -224,7 +218,7 @@ class ShiftControllerSpec extends Specification {
         given: "an existing shift's details"
         def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
         assert shiftRow != null
-        UUID id = shiftRow.id
+        UUID id = shiftRow.id as UUID
         def project = getRandomProject()
         def newStart = OffsetDateTime.now().plusDays(1)
         def newEnd = newStart.plusHours(4)
@@ -268,15 +262,13 @@ class ShiftControllerSpec extends Specification {
     def "DELETE | should remove an existing shift"() {
         given: "a new shift to be deleted"
         def project = getRandomProject()
-        def tempShift = new Shift(
-                null,
+        def tempShift = new Shift(null,
                 project,
                 true,
                 null,
                 OffsetDateTime.now(),
                 OffsetDateTime.now().plusHours(2),
-                []
-        )
+                [])
         def saved = shiftController.addShift(tempShift)
         UUID id = saved.id()
         assert shiftRepository.existsById(id)
