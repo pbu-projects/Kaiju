@@ -260,27 +260,28 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
         given: "seed the database with test organization, project, locations (one close, one far), and active shifts"
-        UUID organizationId = UUID.randomUUID()
-        UUID projectId = UUID.randomUUID()
-        UUID closeLocationId = UUID.randomUUID()
-        UUID farLocationId = UUID.randomUUID()
-        UUID closeShiftId = UUID.randomUUID()
-        UUID farShiftId = UUID.randomUUID()
+        def uuids = [:].withDefault { UUID.randomUUID() }
 
-        String insertOrganizationSql = "INSERT INTO organizations (id, name, is_public) VALUES (?, 'Distance Test Org', true)"
-        String insertProjectSql = "INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at) " + "VALUES (?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW())"
-        String insertLocationSql = "INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, ?, ?, ?, ?, ST_GeographyFromText(?))"
-        String insertProjectLocationSql = "INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)"
-        String insertShiftSql = "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " + "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')"
+        // SQL Templates Helper
+        String idName = "id, name"
+        def insertInto = { String table, String columns, String values ->
+            "INSERT INTO ${table} (${columns}) VALUES (${values})"
+        }
 
-        [[insertOrganizationSql, [organizationId]],
-         [insertProjectSql, [projectId, organizationId]],
-         [insertLocationSql, [closeLocationId, 'Close Location', '123 Close St', 'Denver', 'US', 'POINT(-104.99 39.74)']],
-         [insertLocationSql, [farLocationId, 'Far Location', '456 Far St', 'Denver', 'US', 'POINT(-104.9 39.7)']],
-         [insertProjectLocationSql, [projectId, closeLocationId]],
-         [insertProjectLocationSql, [projectId, farLocationId]],
-         [insertShiftSql, [closeShiftId, projectId, closeLocationId]],
-         [insertShiftSql, [farShiftId, projectId, farLocationId]]].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
+        String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Distance Test Org', true")
+        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW()")
+        String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
+        String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
+        String insertShiftSql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours'")
+
+        [[insertOrganizationSql, [uuids.organizationId]],
+         [insertProjectSql, [uuids.projectId, uuids.organizationId]],
+         [insertLocationSql, [uuids.closeLocationId, 'Close Location', '123 Close St', 'Denver', 'US', 'POINT(-104.99 39.74)']],
+         [insertLocationSql, [uuids.farLocationId, 'Far Location', '456 Far St', 'Denver', 'US', 'POINT(-104.9 39.7)']],
+         [insertProjectLocationSql, [uuids.projectId, uuids.closeLocationId]],
+         [insertProjectLocationSql, [uuids.projectId, uuids.farLocationId]],
+         [insertShiftSql, [uuids.closeShiftId, uuids.projectId, uuids.closeLocationId]],
+         [insertShiftSql, [uuids.farShiftId, uuids.projectId, uuids.farLocationId]]].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
 
         and: "a reference point at Denver center"
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
@@ -291,26 +292,26 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "only our distance test project-locations are retrieved (or existing matching ones), ordered closest first"
         page != null
-        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() == projectId }
+        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() == uuids.projectId }
         testResults.size() == 2
-        testResults[0].locationId() == closeLocationId
+        testResults[0].locationId() == uuids.closeLocationId
         testResults[0].locationName() == 'Close Location'
-        testResults[1].locationId() == farLocationId
+        testResults[1].locationId() == uuids.farLocationId
         testResults[1].locationName() == 'Far Location'
 
         cleanup:
-        if (closeShiftId) {
-            standaloneConnection.createStatement().execute("DELETE FROM shifts WHERE id IN ('${closeShiftId}', '${farShiftId}')")
+        if (uuids.containsKey('closeShiftId')) {
+            standaloneConnection.createStatement().execute("DELETE FROM shifts WHERE id IN ('${uuids.closeShiftId}', '${uuids.farShiftId}')")
         }
-        if (projectId) {
-            standaloneConnection.createStatement().execute("DELETE FROM project_locations WHERE project_id = '${projectId}'")
-            standaloneConnection.createStatement().execute("DELETE FROM projects WHERE id = '${projectId}'")
+        if (uuids.containsKey('projectId')) {
+            standaloneConnection.createStatement().execute("DELETE FROM project_locations WHERE project_id = '${uuids.projectId}'")
+            standaloneConnection.createStatement().execute("DELETE FROM projects WHERE id = '${uuids.projectId}'")
         }
-        if (closeLocationId) {
-            standaloneConnection.createStatement().execute("DELETE FROM locations WHERE id IN ('${closeLocationId}', '${farLocationId}')")
+        if (uuids.containsKey('closeLocationId')) {
+            standaloneConnection.createStatement().execute("DELETE FROM locations WHERE id IN ('${uuids.closeLocationId}', '${uuids.farLocationId}')")
         }
-        if (organizationId) {
-            standaloneConnection.createStatement().execute("DELETE FROM organizations WHERE id = '${organizationId}'")
+        if (uuids.containsKey('organizationId')) {
+            standaloneConnection.createStatement().execute("DELETE FROM organizations WHERE id = '${uuids.organizationId}'")
         }
     }
 }
