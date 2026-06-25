@@ -11,6 +11,7 @@ import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.sql.Connection
 import java.sql.DriverManager
+import java.sql.PreparedStatement
 
 @MicronautTest
 class BaseControllerSpec extends Specification {
@@ -42,5 +43,14 @@ class BaseControllerSpec extends Specification {
 
     def cleanupSpec() {
         standaloneConnection?.close()
+    }
+
+    protected void executeUpdate(String sqlString, Object... parameters) {
+        try (PreparedStatement preparedStatement = standaloneConnection.prepareStatement(sqlString)) {
+            for (int i = 0; i < parameters.length; i++) {
+                preparedStatement.setObject(i + 1, parameters[i])
+            }
+            preparedStatement.executeUpdate()
+        }
     }
 }

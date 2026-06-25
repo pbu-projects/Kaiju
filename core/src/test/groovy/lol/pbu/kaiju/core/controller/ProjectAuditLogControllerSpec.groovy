@@ -41,15 +41,8 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         rsUser.next()
         def actorId = UUID.fromString(rsUser.getString("id"))
 
-        def ps = standaloneConnection.prepareStatement("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')")
-        ps.setObject(1, projectId)
-        ps.setObject(2, actorId)
-        ps.executeUpdate()
-
-        ps = standaloneConnection.prepareStatement("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')")
-        ps.setObject(1, projectId)
-        ps.setObject(2, actorId)
-        ps.executeUpdate()
+        executeUpdate("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", projectId, actorId)
+        executeUpdate("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')", projectId, actorId)
     }
 
     def cleanupSpec() {

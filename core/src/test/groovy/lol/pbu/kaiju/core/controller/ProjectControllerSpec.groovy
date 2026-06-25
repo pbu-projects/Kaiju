@@ -21,7 +21,6 @@ import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import java.sql.PreparedStatement
 import java.time.OffsetDateTime
 
 import static lol.pbu.kaiju.core.model.ProjectStatus.ACTIVE
@@ -269,60 +268,45 @@ class ProjectControllerSpec extends BaseControllerSpec {
         UUID farShiftId = UUID.randomUUID()
 
         // 1. Organization
-        PreparedStatement orgPreparedStatement = standaloneConnection.prepareStatement("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Distance Test Org', true)")
-        orgPreparedStatement.setObject(1, organizationId)
-        orgPreparedStatement.executeUpdate()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Distance Test Org', true)", organizationId)
 
         // 2. Project
-        PreparedStatement projectPreparedStatement = standaloneConnection.prepareStatement(
+        executeUpdate(
                 "INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at) " +
-                        "VALUES (?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW())"
+                        "VALUES (?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW())",
+                projectId, organizationId
         )
-        projectPreparedStatement.setObject(1, projectId)
-        projectPreparedStatement.setObject(2, organizationId)
-        projectPreparedStatement.executeUpdate()
 
         // 3. Locations
         // Close Location (~1km from Denver center: -104.9903, 39.7392)
-        PreparedStatement closeLocationPreparedStatement = standaloneConnection.prepareStatement(
+        executeUpdate(
                 "INSERT INTO locations (id, name, address_line, city, country_code, geom) " +
-                        "VALUES (?, 'Close Location', '123 Close St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))"
+                        "VALUES (?, 'Close Location', '123 Close St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))",
+                closeLocationId
         )
-        closeLocationPreparedStatement.setObject(1, closeLocationId)
-        closeLocationPreparedStatement.executeUpdate()
 
         // Far Location (~10km from Denver center: -104.9903, 39.7392)
-        PreparedStatement farLocationPreparedStatement = standaloneConnection.prepareStatement(
+        executeUpdate(
                 "INSERT INTO locations (id, name, address_line, city, country_code, geom) " +
-                        "VALUES (?, 'Far Location', '456 Far St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9 39.7)'))"
+                        "VALUES (?, 'Far Location', '456 Far St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9 39.7)'))",
+                farLocationId
         )
-        farLocationPreparedStatement.setObject(1, farLocationId)
-        farLocationPreparedStatement.executeUpdate()
 
         // 4. Map project to locations
-        PreparedStatement projectLocationPreparedStatement = standaloneConnection.prepareStatement("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)")
-        projectLocationPreparedStatement.setObject(1, projectId)
-        projectLocationPreparedStatement.setObject(2, closeLocationId)
-        projectLocationPreparedStatement.executeUpdate()
-
-        projectLocationPreparedStatement.setObject(1, projectId)
-        projectLocationPreparedStatement.setObject(2, farLocationId)
-        projectLocationPreparedStatement.executeUpdate()
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projectId, closeLocationId)
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projectId, farLocationId)
 
         // 5. Active Shifts in the future
-        PreparedStatement shiftPreparedStatement = standaloneConnection.prepareStatement(
+        executeUpdate(
                 "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " +
-                        "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')"
+                        "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')",
+                closeShiftId, projectId, closeLocationId
         )
-        shiftPreparedStatement.setObject(1, closeShiftId)
-        shiftPreparedStatement.setObject(2, projectId)
-        shiftPreparedStatement.setObject(3, closeLocationId)
-        shiftPreparedStatement.executeUpdate()
-
-        shiftPreparedStatement.setObject(1, farShiftId)
-        shiftPreparedStatement.setObject(2, projectId)
-        shiftPreparedStatement.setObject(3, farLocationId)
-        shiftPreparedStatement.executeUpdate()
+        executeUpdate(
+                "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " +
+                        "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')",
+                farShiftId, projectId, farLocationId
+        )
 
         and: "a reference point at Denver center"
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
