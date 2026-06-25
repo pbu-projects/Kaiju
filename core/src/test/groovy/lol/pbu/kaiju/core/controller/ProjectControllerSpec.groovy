@@ -284,6 +284,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 [insertProjectSql, [uuids.projectIdD, uuids.organizationId, 'Project D']],
                 [insertProjectSql, [uuids.projectIdE, uuids.organizationId, 'Project E']],
 
+                /*
+                validate point math with sql queries to database, ie
+                SELECT
+                    name,
+                    ST_Distance(
+                        geom,
+                        ST_GeographyFromText('POINT(-104.9903 39.7392)')
+                    ) / 1000.0 AS distance_km
+                FROM locations
+                ORDER BY distance_km ASC;
+                 */
+
                 // Locations (Reference point: POINT(-104.9903 39.7392))
                 [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']], // ~2 km (1st closest)
                 [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']], // ~5 km (2nd closest)
