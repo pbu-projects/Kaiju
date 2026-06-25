@@ -259,7 +259,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
-        given: "seed the database with test organization, project, locations (one close, one far), and active shifts"
+        given: "seed the database with test organization, projects, locations (closest to furthest), and active shifts"
         def uuids = [:].withDefault { UUID.randomUUID() }
 
         // SQL Templates Helper
@@ -269,49 +269,76 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Distance Test Org', true")
-        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW()")
+        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description', 'STANDARD', 'ACTIVE', NOW()")
         String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
         String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
         String insertShiftSql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours'")
 
-        [[insertOrganizationSql, [uuids.organizationId]],
-         [insertProjectSql, [uuids.projectId, uuids.organizationId]],
-         [insertLocationSql, [uuids.closeLocationId, 'Close Location', '123 Close St', 'Denver', 'US', 'POINT(-104.99 39.74)']],
-         [insertLocationSql, [uuids.farLocationId, 'Far Location', '456 Far St', 'Denver', 'US', 'POINT(-104.9 39.7)']],
-         [insertProjectLocationSql, [uuids.projectId, uuids.closeLocationId]],
-         [insertProjectLocationSql, [uuids.projectId, uuids.farLocationId]],
-         [insertShiftSql, [uuids.closeShiftId, uuids.projectId, uuids.closeLocationId]],
-         [insertShiftSql, [uuids.farShiftId, uuids.projectId, uuids.farLocationId]]].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
+        [
+                [insertOrganizationSql, [uuids.organizationId]],
+
+                // Projects
+                [insertProjectSql, [uuids.projectIdA, uuids.organizationId, 'Project A']],
+                [insertProjectSql, [uuids.projectIdB, uuids.organizationId, 'Project B']],
+                [insertProjectSql, [uuids.projectIdC, uuids.organizationId, 'Project C']],
+                [insertProjectSql, [uuids.projectIdD, uuids.organizationId, 'Project D']],
+                [insertProjectSql, [uuids.projectIdE, uuids.organizationId, 'Project E']],
+
+                // Locations (Reference point: POINT(-104.9903 39.7392))
+                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']], // ~2 km (1st closest)
+                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']], // ~5 km (2nd closest)
+                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],  // ~10 km (3rd closest)
+                [insertLocationSql, [uuids.locE1, 'Location E1', '101 Fourth St', 'Denver', 'US', 'POINT(-104.9903 39.8472)']], // ~12 km (4th closest)
+                [insertLocationSql, [uuids.locC1, 'Location C1', '202 Fifth St', 'Denver', 'US', 'POINT(-104.9903 39.8742)']],  // ~15 km (5th closest)
+                [insertLocationSql, [uuids.locA3, 'Location A3', '303 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],    // ~50 km (outside)
+                [insertLocationSql, [uuids.locD1, 'Location D1', '404 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],    // ~50 km (outside)
+
+                // Project Locations mappings
+                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA1]],
+                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA2]],
+                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA3]],
+                [insertProjectLocationSql, [uuids.projectIdB, uuids.locB1]],
+                [insertProjectLocationSql, [uuids.projectIdE, uuids.locE1]],
+                [insertProjectLocationSql, [uuids.projectIdC, uuids.locC1]],
+                [insertProjectLocationSql, [uuids.projectIdD, uuids.locD1]],
+
+                // Active Shifts
+                [insertShiftSql, [uuids.shiftA1, uuids.projectIdA, uuids.locA1]],
+                [insertShiftSql, [uuids.shiftA2, uuids.projectIdA, uuids.locA2]],
+                [insertShiftSql, [uuids.shiftA3, uuids.projectIdA, uuids.locA3]],
+                [insertShiftSql, [uuids.shiftB1, uuids.projectIdB, uuids.locB1]],
+                [insertShiftSql, [uuids.shiftE1, uuids.projectIdE, uuids.locE1]],
+                [insertShiftSql, [uuids.shiftC1, uuids.projectIdC, uuids.locC1]],
+                [insertShiftSql, [uuids.shiftD1, uuids.projectIdD, uuids.locD1]]
+        ].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
 
         and: "a reference point at Denver center"
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
         Point point = geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
 
-        when: "searching projects by location with 20km radius"
-        Page<ProjectSearchCard> page = projectRepository.searchByLocation(point, 20000.0, Pageable.from(0, 10))
+        when: "searching projects by location with 20km radius and a large page size to handle existing database records"
+        Page<ProjectSearchCard> page = projectRepository.searchByLocation(point, 20000.0, Pageable.from(0, 100))
 
-        then: "only our distance test project-locations are retrieved (or existing matching ones), ordered closest first"
+        then: "only active projects in range are returned sorted by closest location, with no duplicates per project"
         page != null
-        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() == uuids.projectId }
-        testResults.size() == 2
-        testResults[0].locationId() == uuids.closeLocationId
-        testResults[0].locationName() == 'Close Location'
-        testResults[1].locationId() == uuids.farLocationId
-        testResults[1].locationName() == 'Far Location'
+        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() in [uuids.projectIdA, uuids.projectIdB, uuids.projectIdC, uuids.projectIdD, uuids.projectIdE] }
+        testResults.size() == 4
 
-        cleanup:
-        if (uuids.containsKey('closeShiftId')) {
-            standaloneConnection.createStatement().execute("DELETE FROM shifts WHERE id IN ('${uuids.closeShiftId}', '${uuids.farShiftId}')")
-        }
-        if (uuids.containsKey('projectId')) {
-            standaloneConnection.createStatement().execute("DELETE FROM project_locations WHERE project_id = '${uuids.projectId}'")
-            standaloneConnection.createStatement().execute("DELETE FROM projects WHERE id = '${uuids.projectId}'")
-        }
-        if (uuids.containsKey('closeLocationId')) {
-            standaloneConnection.createStatement().execute("DELETE FROM locations WHERE id IN ('${uuids.closeLocationId}', '${uuids.farLocationId}')")
-        }
-        if (uuids.containsKey('organizationId')) {
-            standaloneConnection.createStatement().execute("DELETE FROM organizations WHERE id = '${uuids.organizationId}'")
-        }
+        // 1st: Project A (via Location A1 @ ~2km)
+        testResults[0].projectId() == uuids.projectIdA
+        testResults[0].locationId() == uuids.locA1
+
+        // 2nd: Project B (via Location B1 @ ~5km)
+        testResults[1].projectId() == uuids.projectIdB
+        testResults[1].locationId() == uuids.locB1
+
+        // 3rd: Project E (via Location E1 @ ~12km)
+        testResults[2].projectId() == uuids.projectIdE
+        testResults[2].locationId() == uuids.locE1
+
+        // 4th: Project C (via Location C1 @ ~15km)
+        testResults[3].projectId() == uuids.projectIdC
+        testResults[3].locationId() == uuids.locC1
+
     }
 }

@@ -13,7 +13,7 @@ import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.PreparedStatement
 
-@MicronautTest
+@MicronautTest(transactional = true)
 class BaseControllerSpec extends Specification {
 
     @Inject
@@ -46,7 +46,14 @@ class BaseControllerSpec extends Specification {
     }
 
     protected void executeUpdate(String sqlString, Object... parameters) {
-        try (PreparedStatement preparedStatement = standaloneConnection.prepareStatement(sqlString)) {
+        Connection activeConn
+        try {
+            connection.getAutoCommit()
+            activeConn = connection
+        } catch (Throwable ignored) {
+            activeConn = standaloneConnection
+        }
+        try (PreparedStatement preparedStatement = activeConn.prepareStatement(sqlString)) {
             for (int i = 0; i < parameters.length; i++) {
                 preparedStatement.setObject(i + 1, parameters[i])
             }

@@ -32,7 +32,7 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
                        project_.location_name,
                        project_.next_shift_start
                 FROM (
-                    SELECT DISTINCT ON (p.id, l.id)
+                    SELECT DISTINCT ON (p.id)
                         p.id AS id,
                         p.title AS project_title,
                         l.id AS location_id,
@@ -46,11 +46,11 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
                     WHERE p.status = 'ACTIVE'
                       AND s.start_time >= NOW()
                       AND ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
-                    ORDER BY p.id, l.id, s.start_time ASC
+                    ORDER BY p.id, ST_Distance(l.geom, CAST(:point AS geography)) ASC, s.start_time ASC
                 ) project_
                 ORDER BY ST_Distance(project_.geom, CAST(:point AS geography)) ASC
             """, countQuery = """
-                SELECT COUNT(DISTINCT (p.id, l.id))
+                SELECT COUNT(DISTINCT p.id)
                 FROM locations l
                 INNER JOIN project_locations pl ON l.id = pl.location_id
                 INNER JOIN projects p ON pl.project_id = p.id
