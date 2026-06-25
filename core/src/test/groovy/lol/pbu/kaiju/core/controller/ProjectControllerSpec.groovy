@@ -353,4 +353,75 @@ class ProjectControllerSpec extends BaseControllerSpec {
         testResults[3].locationId() == uuids.locC1
 
     }
+
+    @Unroll
+    def "SEARCH BY LOCATION | should handle project status #status and shift active state #shiftActive"() {
+        given: "seed the database with test organization, project statuses, and shift time configurations"
+        def uuids = [:].withDefault { UUID.randomUUID() }
+
+        // SQL Templates Helper
+        String idName = "id, name"
+        def insertInto = { String table, String columns, String values ->
+            "INSERT INTO ${table} (${columns}) VALUES (${values})"
+        }
+
+        String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Status Test Org', true")
+        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description', 'STANDARD', ?, NOW()")
+        String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
+        String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
+
+        String startOffset = shiftActive ? "1 day" : "-1 day"
+        String endOffset = shiftActive ? "1 day 2 hours" : "-22 hours"
+        String insertShiftA1Sql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '${startOffset}', NOW() + INTERVAL '${endOffset}'")
+        String insertShiftSql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours'")
+
+        [
+                [insertOrganizationSql, [uuids.organizationId]],
+
+                // Project A (multi-location) with status from where block
+                [insertProjectSql, [uuids.projectIdA, uuids.organizationId, 'Project A', status]],
+                // Project B (single-location) is always ACTIVE
+                [insertProjectSql, [uuids.projectIdB, uuids.organizationId, 'Project B', 'ACTIVE']],
+
+                // Locations (Reference point: POINT(-104.9903 39.7392))
+                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']], // ~2 km (closest)
+                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']], // ~5 km (second closest)
+                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],  // ~10 km (third closest)
+
+                // Mappings
+                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA1]],
+                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA2]],
+                [insertProjectLocationSql, [uuids.projectIdB, uuids.locB1]],
+
+                // Shifts
+                [insertShiftA1Sql, [uuids.shiftA1, uuids.projectIdA, uuids.locA1]],
+                [insertShiftSql, [uuids.shiftA2, uuids.projectIdA, uuids.locA2]],
+                [insertShiftSql, [uuids.shiftB1, uuids.projectIdB, uuids.locB1]]
+        ].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
+
+        and: "a reference point at Denver center"
+        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
+        Point point = geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
+
+        when: "searching projects by location"
+        Page<ProjectSearchCard> page = projectRepository.searchByLocation(point, 20000.0, Pageable.from(0, 100))
+
+        then: "the result matches expected order and presence based on project status and shift validity"
+        page != null
+        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() in [uuids.projectIdA, uuids.projectIdB] }
+
+        List<UUID> expectedUUIDs = expectedOrderNames.collect { name ->
+            name == 'A' ? uuids.projectIdA : uuids.projectIdB
+        }
+        testResults.collect { it.projectId() } == expectedUUIDs
+
+        where:
+        status     | shiftActive | expectedOrderNames
+        'ACTIVE'   | true        | ['A', 'B']
+        'ACTIVE'   | false       | ['B', 'A']
+        'DRAFT'    | true        | ['B']
+        'PENDING'  | true        | ['B']
+        'FLAGGED'  | true        | ['B']
+        'REJECTED' | true        | ['B']
+    }
 }
