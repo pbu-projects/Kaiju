@@ -329,7 +329,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Point point = geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
 
         when: "searching projects by location with 20km radius and a large page size to handle existing database records"
-        Page<ProjectSearchCard> page = projectRepository.searchByLocation(point, 20000.0, Pageable.from(0, 100))
+        Page<ProjectSearchCard> page = projectController.searchByLocation(point.getX(), point.getY(), 20000.0, Pageable.from(0, 100))
 
         then: "only active projects in range are returned sorted by closest location, with no duplicates per project"
         page != null
@@ -404,7 +404,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Point point = geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
 
         when: "searching projects by location"
-        Page<ProjectSearchCard> page = projectRepository.searchByLocation(point, 20000.0, Pageable.from(0, 100))
+        Page<ProjectSearchCard> page = projectController.searchByLocation(point.getX(), point.getY(), 20000.0, Pageable.from(0, 100))
 
         then: "the result matches expected order and presence based on project status and shift validity"
         page != null

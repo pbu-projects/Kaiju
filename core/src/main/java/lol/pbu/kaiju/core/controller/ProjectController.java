@@ -2,6 +2,8 @@ package lol.pbu.kaiju.core.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
+import io.micronaut.data.model.Page;
+import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
@@ -9,7 +11,12 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.core.domain.Project;
+import lol.pbu.kaiju.core.model.ProjectSearchCard;
 import lol.pbu.kaiju.core.repository.ProjectRepository;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.PrecisionModel;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -95,5 +102,27 @@ public class ProjectController {
     @Delete("/{id}/no-look")
     public void deleteProjectNoLook(@PathVariable UUID id) {
         projectRepository.deleteById(id);
+    }
+
+    /**
+     * Searches active projects by their closest location coordinates within a given radius.
+     * Each project is returned only once, representing its closest location within range.
+     *
+     * @param longitude    the longitude of the center point
+     * @param latitude     the latitude of the center point
+     * @param radiusMeters the search radius in meters
+     * @param pageable     pagination information
+     * @return a page of project search cards sorted by distance
+     */
+    @Get("/search-by-location")
+    public Page<ProjectSearchCard> searchByLocation(
+            @QueryValue double longitude,
+            @QueryValue double latitude,
+            @QueryValue double radiusMeters,
+            @Valid Pageable pageable
+    ) {
+        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
+        Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
+        return projectRepository.searchByLocation(point, radiusMeters, pageable);
     }
 }
