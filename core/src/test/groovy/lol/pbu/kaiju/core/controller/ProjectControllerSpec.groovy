@@ -259,7 +259,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
-        given: "a test organization, project, locations (one close, one far), and active shifts"
+        given: "seed the database with test organization, project, locations (one close, one far), and active shifts"
         UUID organizationId = UUID.randomUUID()
         UUID projectId = UUID.randomUUID()
         UUID closeLocationId = UUID.randomUUID()
@@ -267,46 +267,20 @@ class ProjectControllerSpec extends BaseControllerSpec {
         UUID closeShiftId = UUID.randomUUID()
         UUID farShiftId = UUID.randomUUID()
 
-        // 1. Organization
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Distance Test Org', true)", organizationId)
+        String insertOrganizationSql = "INSERT INTO organizations (id, name, is_public) VALUES (?, 'Distance Test Org', true)"
+        String insertProjectSql = "INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at) " + "VALUES (?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW())"
+        String insertLocationSql = "INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, ?, ?, ?, ?, ST_GeographyFromText(?))"
+        String insertProjectLocationSql = "INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)"
+        String insertShiftSql = "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " + "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')"
 
-        // 2. Project
-        executeUpdate(
-                "INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at) " +
-                        "VALUES (?, ?, 'Distance Test Project', 'Description', 'STANDARD', 'ACTIVE', NOW())",
-                projectId, organizationId
-        )
-
-        // 3. Locations
-        // Close Location (~1km from Denver center: -104.9903, 39.7392)
-        executeUpdate(
-                "INSERT INTO locations (id, name, address_line, city, country_code, geom) " +
-                        "VALUES (?, 'Close Location', '123 Close St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))",
-                closeLocationId
-        )
-
-        // Far Location (~10km from Denver center: -104.9903, 39.7392)
-        executeUpdate(
-                "INSERT INTO locations (id, name, address_line, city, country_code, geom) " +
-                        "VALUES (?, 'Far Location', '456 Far St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9 39.7)'))",
-                farLocationId
-        )
-
-        // 4. Map project to locations
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projectId, closeLocationId)
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projectId, farLocationId)
-
-        // 5. Active Shifts in the future
-        executeUpdate(
-                "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " +
-                        "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')",
-                closeShiftId, projectId, closeLocationId
-        )
-        executeUpdate(
-                "INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time) " +
-                        "VALUES (?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours')",
-                farShiftId, projectId, farLocationId
-        )
+        [[insertOrganizationSql, [organizationId]],
+         [insertProjectSql, [projectId, organizationId]],
+         [insertLocationSql, [closeLocationId, 'Close Location', '123 Close St', 'Denver', 'US', 'POINT(-104.99 39.74)']],
+         [insertLocationSql, [farLocationId, 'Far Location', '456 Far St', 'Denver', 'US', 'POINT(-104.9 39.7)']],
+         [insertProjectLocationSql, [projectId, closeLocationId]],
+         [insertProjectLocationSql, [projectId, farLocationId]],
+         [insertShiftSql, [closeShiftId, projectId, closeLocationId]],
+         [insertShiftSql, [farShiftId, projectId, farLocationId]]].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
 
         and: "a reference point at Denver center"
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
