@@ -34,7 +34,7 @@ class UserControllerSpec extends BaseControllerSpec {
         def newUser = new User(
                 null,
                 faker.internet().emailAddress(),
-                UserRole.VOLUNTEER,
+                UserRole.STANDARD_USER,
                 OffsetDateTime.now()
         )
 
@@ -69,7 +69,7 @@ class UserControllerSpec extends BaseControllerSpec {
         [testCase, user] << {
             def validData = [
                     email: "test@example.com",
-                    role : UserRole.VOLUNTEER
+                    role : UserRole.STANDARD_USER
             ]
 
             def invalidCases = [
@@ -128,7 +128,7 @@ class UserControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing user: #originalEmail"(UUID id, String originalEmail) {
         given: "an existing user's details"
         def newEmail = faker.internet().emailAddress()
-        def updateRequest = new User(null, newEmail, UserRole.MODERATOR, OffsetDateTime.now())
+        def updateRequest = new User(null, newEmail, UserRole.REGION_DIRECTOR, OffsetDateTime.now())
 
         when: "the user is updated"
         User updated = userController.updateUser(id, updateRequest)
@@ -137,14 +137,14 @@ class UserControllerSpec extends BaseControllerSpec {
         verifyAll {
             updated.id() == id
             updated.email() == newEmail
-            updated.role() == UserRole.MODERATOR
+            updated.role() == UserRole.REGION_DIRECTOR
         }
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT email, role FROM users WHERE id = ?", [id])
         verifyAll(dbResult) {
             email == newEmail
-            role == 'MODERATOR'
+            role == 'REGION_DIRECTOR'
         }
 
         where:
@@ -154,7 +154,7 @@ class UserControllerSpec extends BaseControllerSpec {
     def "UPDATE | should fail to update a non-existent user"() {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new User(null, "test@example.com", UserRole.VOLUNTEER, OffsetDateTime.now())
+        def updateRequest = new User(null, "test@example.com", UserRole.STANDARD_USER, OffsetDateTime.now())
 
         when: "an update is attempted"
         userController.updateUser(nonExistentId, updateRequest)
@@ -167,7 +167,7 @@ class UserControllerSpec extends BaseControllerSpec {
     def "UPDATE | should handle update of non-existent user gracefully when using no-look"() {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new User(null, "test@example.com", UserRole.VOLUNTEER, OffsetDateTime.now())
+        def updateRequest = new User(null, "test@example.com", UserRole.STANDARD_USER, OffsetDateTime.now())
 
         when: "a no-look update is attempted"
         userController.updateUserNoLook(nonExistentId, updateRequest)
@@ -183,7 +183,7 @@ class UserControllerSpec extends BaseControllerSpec {
         def tempUser = new User(
                 null,
                 "delete-me@example.org",
-                UserRole.VOLUNTEER,
+                UserRole.STANDARD_USER,
                 OffsetDateTime.now()
         )
         def saved = userController.addUser(tempUser)

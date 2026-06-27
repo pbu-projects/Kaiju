@@ -56,7 +56,7 @@ def generate_organizations(count=50):
 
 def generate_users(count=200):
     users = []
-    roles = ['SUPER_ADMIN', 'MODERATOR', 'ORGANIZATION_LEADER', 'VOLUNTEER']
+    roles = ['GLOBAL_ADMIN', 'REGION_DIRECTOR', 'REGION_AGENT', 'STANDARD_USER']
     for role in roles:
         user_id = str(uuid.uuid4())
         email = fake.unique.email()

@@ -12,6 +12,7 @@ import lol.pbu.kaiju.core.domain.Project
 import lol.pbu.kaiju.core.model.ProjectSearchCard
 import lol.pbu.kaiju.core.model.ProjectStatus
 import lol.pbu.kaiju.core.model.ProjectType
+import lol.pbu.kaiju.core.model.VerificationStatus
 import lol.pbu.kaiju.core.repository.ProjectRepository
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
@@ -43,7 +44,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         if (!orgRow) {
             throw new IllegalStateException("No organizations found in database to link project to.")
         }
-        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, [])
+        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, VerificationStatus.UNVERIFIED, null, [])
     }
 
     /********** CREATE Tests **********/
@@ -51,7 +52,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "CREATE | should successfully save a valid project"() {
         given: "a new valid project"
         def org = getRandomOrganization()
-        def newProject = new Project(null, org, "Test Project ${faker.company().name()}", "Test Description ${faker.lorem().paragraph()}", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def newProject = new Project(null, org, null, "Test Project ${faker.company().name()}", "Test Description ${faker.lorem().paragraph()}", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
 
         when: "the project is added"
         Project saved = projectController.addProject(newProject)
@@ -84,7 +85,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         where:
         [testCase, project] << {
-            def dummyOrg = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
+            def dummyOrg = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, VerificationStatus.UNVERIFIED, null, [])
 
             def validData = [organization: dummyOrg,
                              title       : "Valid Title",
@@ -104,7 +105,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
             return invalidCases.collect { invalidCase ->
                 def props = new HashMap(validData)
                 props[invalidCase.field] = invalidCase.value
-                def proj = new Project(null, props.organization as Organization, props.title as String, props.description as String, props.projectType as ProjectType, props.status as ProjectStatus, OffsetDateTime.now(), null, null, [], [])
+                def proj = new Project(null, props.organization as Organization, null, props.title as String, props.description as String, props.projectType as ProjectType, props.status as ProjectStatus, OffsetDateTime.now(), null, null, [], [])
                 [invalidCase.caseName, proj]
             }
         }()
@@ -163,7 +164,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description ${faker.lorem().paragraph()}"
         ProjectType projectType = ProjectType.valueOf(projectRow.project_type as String)
-        def updateRequest = new Project(null, org, newTitle, newDescription, projectType, ACTIVE, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = new Project(null, org, null, newTitle, newDescription, projectType, ACTIVE, OffsetDateTime.now(), null, null, [], [])
 
         when: "the project is updated"
         Project updated = projectController.updateProject(id, updateRequest)
@@ -192,7 +193,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = new Project(null, org, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = new Project(null, org, null, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
 
         when: "an update is attempted"
         projectController.updateProject(nonExistentId, updateRequest)
@@ -206,7 +207,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = new Project(null, org, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = new Project(null, org, null, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
 
         when: "a no-look update is attempted"
         projectController.updateProjectNoLook(nonExistentId, updateRequest)
@@ -220,7 +221,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "DELETE | should remove an existing project"() {
         given: "a new project to be deleted"
         def org = getRandomOrganization()
-        def tempProject = new Project(null, org, "Temporary Project to Delete", "Temporary Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def tempProject = new Project(null, org, null, "Temporary Project to Delete", "Temporary Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
         def saved = projectController.addProject(tempProject)
         UUID id = saved.id()
         assert projectRepository.existsById(id)

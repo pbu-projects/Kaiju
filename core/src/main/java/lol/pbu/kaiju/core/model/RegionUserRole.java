@@ -3,9 +3,7 @@ package lol.pbu.kaiju.core.model;
 import io.micronaut.serde.annotation.Serdeable;
 
 @Serdeable
-public enum UserRole {
-    GLOBAL_ADMIN,
+public enum RegionUserRole {
     REGION_DIRECTOR,
-    REGION_AGENT,
-    STANDARD_USER
+    REGION_AGENT
 }

@@ -11,6 +11,7 @@ import lol.pbu.kaiju.core.domain.Location
 import lol.pbu.kaiju.core.domain.Organization
 import lol.pbu.kaiju.core.domain.Project
 import lol.pbu.kaiju.core.domain.Shift
+import lol.pbu.kaiju.core.model.VerificationStatus
 import lol.pbu.kaiju.core.repository.ShiftRepository
 import spock.lang.Unroll
 
@@ -34,8 +35,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
         if (!projectRow) {
             throw new IllegalStateException("No projects found in database to link shift to.")
         }
-        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-        new Project(projectRow.id as UUID, org, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+        new Project(projectRow.id as UUID, org, null, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 
     private Location getRandomLocation() {
