@@ -1,5 +1,6 @@
 plugins {
     id("java")
+    id("jacoco")
     id("io.micronaut.application") version "4.4.2" apply false
     id("io.micronaut.library") version "4.4.2" apply false
     id("com.gradleup.shadow") version "8.3.3" apply false
@@ -19,9 +20,22 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
+    apply(plugin = "jacoco")
+
     java {
         sourceCompatibility = JavaVersion.toVersion("21")
         targetCompatibility = JavaVersion.toVersion("21")
+    }
+
+    tasks.withType<JacocoReport> {
+        reports {
+            xml.required.set(true)
+            html.required.set(true)
+        }
+    }
+
+    tasks.withType<Test> {
+        finalizedBy(tasks.withType<JacocoReport>())
     }
 }
 
@@ -37,4 +51,5 @@ sonar {
         }
     }
 }
+
 
