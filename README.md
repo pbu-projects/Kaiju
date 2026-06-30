@@ -23,8 +23,7 @@ that [runs the world](https://onyxwizard.medium.com/java-is-dead-but-it-still-ru
 
 #### User Focus
 
-Whether a piece of software is running on highly optimized machine code or a literal hamster wheel doesn't matter to us.
-If the [test suite](#Our-Testing-Culture) accurately personifies the user and passes, keep the hamster running.
+Whether a piece of software is built with the fastest, loosely coupled, cloud native, kubernetes, (insert whatever new tech is the cool kid on the block) we honestly dont care. On the other hand, we wouldn't care if we pulled back the curtain and saw that the tech stack was a hamster lazily jogging on a hamster wheel. At the end of the day, we just want to make sure our design and [test suite](#Our-Testing-Culture) accurately personifies the users' need and that those tests pass. If that is the case, just give the hamster a high five and move on.
 
 ## How We Build
 
