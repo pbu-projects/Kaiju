@@ -4,14 +4,26 @@ Volunteer Monster is a platform designed to connect people with regional, flexib
 
 However it is you'd like to help, we're thrilled to have you!
 
-## Our Engineering Philosophy
+## Our Design Priorities
 
-Our stack is special for the same reason a PB&J is special: it’s simple, dependable, and gets the job done.
+We can summarize our priorities in three main points.
 
-* **No bloat or black magic:** We build with clear, explicit patterns rather than tools that hide complexity behind the scenes.
-* **Lean & purpose-driven:** If a technology doesn't directly serve a user need or keep our server footprint light, it doesn't make the cut.
-* **Pragmatism over hype:** We measure success by real-world impact, not bandwagon tech trends.
+#### No bloat
 
+We deliver what's needed and keep it simple. We do this by clearly identifying target audiences and deliverables, we
+course correct at every iteration, and
+_[we do not do waterfall in sprints](https://www.linkedin.com/pulse/you-using-agile-just-splitting-waterfall-sprints-samruddhi-there-1a7le/)_
+
+#### No Bandwagon
+
+Our toolset is based on real-world impact, not bandwagon tech trends. Building with Java means we're building with the
+same foundation
+that [runs the world](https://onyxwizard.medium.com/java-is-dead-but-it-still-runs-the-world-ee68ed6e546f).
+
+#### User Focus
+
+Whether a piece of software is running on highly optimized machine code or a literal hamster wheel doesn't matter to us.
+If the [test suite](#Our-Testing-Culture) accurately personifies the user and passes, keep the hamster running.
 
 ## How We Build
 
@@ -27,10 +39,9 @@ To maintain our high standards, we rely on a carefully chosen set of tools.
 
 We do not care about vanity metrics like "100% test coverage". Instead, we care entirely about validating documented behavior. A failing test is not a problem to be "fixed" - it is a clear signal that our documentation and our code are no longer in sync, and it must be updated so that the two match once again. 
 
-When you write tests for Volunteer Monster, you will use a [highly readable, specification-driven testing tool](https://spockframework.org/) that reads like plain English. If a feature or user journey is documented, it must be proven in a test. To ensure absolute reliability, all of our database tests run automatically against [completely isolated, temporary data environments](https://testcontainers.com/) that destroy themselves the moment the test finishes.
-
-## Getting Started
-
-To get your local environment running, you don't need a massive checklist. You just need to run our [scripted, isolated container setup](https://docs.docker.com/compose/) to spin up the database and infrastructure, and then launch the backend engine.
-
-Grab a peanut butter sandwich and let's build something that helps people help people.
+When you write tests for Volunteer Monster, you will use
+a [highly readable, specification-driven testing tool called Spock](https://spockframework.org/) that reads like plain
+English. If a feature or user journey is documented, it must be proven in a test. To ensure absolute reliability, all of
+our database tests run automatically
+against [completely isolated, temporary data environments](https://testcontainers.com/) that destroy themselves the
+moment the test finishes.
