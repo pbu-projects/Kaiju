@@ -10,7 +10,9 @@ import io.micronaut.data.annotation.sql.JoinTable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lol.pbu.kaiju.core.model.VerificationStatus;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -31,6 +33,15 @@ public record Organization(
         String websiteUrl,
 
         @Nullable UUID parentId,
+
+        @NotNull(message = "isPublic is required.")
+        Boolean isPublic,
+
+        @NotNull(message = "Verification status is required.")
+        VerificationStatus verificationStatus,
+
+        @Nullable
+        OffsetDateTime verificationExpiresAt,
 
         @Relation(value = ONE_TO_MANY, mappedBy = "id.organizationId")
         @JoinTable(
@@ -53,6 +64,9 @@ public record Organization(
                 this.name(),
                 this.websiteUrl(),
                 this.parentId(),
+                this.isPublic(),
+                this.verificationStatus(),
+                this.verificationExpiresAt(),
                 this.locations()
         );
     }

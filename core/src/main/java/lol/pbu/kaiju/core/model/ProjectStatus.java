@@ -6,6 +6,7 @@ import io.micronaut.serde.annotation.Serdeable;
 public enum ProjectStatus {
     DRAFT,
     PENDING,
+    PENDING_UPDATE,
     ACTIVE,
     FLAGGED,
     REJECTED

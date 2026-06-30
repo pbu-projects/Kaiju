@@ -13,6 +13,7 @@ import lol.pbu.kaiju.core.domain.ProjectAuditLog
 import lol.pbu.kaiju.core.domain.User
 import lol.pbu.kaiju.core.model.AuditAction
 import lol.pbu.kaiju.core.model.UserRole
+import lol.pbu.kaiju.core.model.VerificationStatus
 import lol.pbu.kaiju.core.repository.ProjectAuditLogRepository
 import spock.lang.Unroll
 
@@ -54,8 +55,8 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         if (!projectRow) {
             throw new IllegalStateException("No projects found in database to link audit log to.")
         }
-        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, [])
-        new Project(projectRow.id as UUID, org, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+        new Project(projectRow.id as UUID, org, null, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 
     private User getRandomUser() {

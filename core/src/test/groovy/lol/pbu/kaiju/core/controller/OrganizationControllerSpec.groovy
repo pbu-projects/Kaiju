@@ -8,6 +8,7 @@ import io.micronaut.http.exceptions.HttpStatusException
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.core.domain.Organization
+import lol.pbu.kaiju.core.model.VerificationStatus
 import lol.pbu.kaiju.core.repository.OrganizationRepository
 import net.datafaker.Faker
 import spock.lang.Shared
@@ -32,6 +33,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 null,
                 "Test Org ${faker.company().name()}",
                 "https://${faker.internet().domainName()}",
+                null,
+                true,
+                VerificationStatus.UNVERIFIED,
                 null,
                 []
         )
@@ -86,6 +90,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                         props.name as String,
                         props.websiteUrl as String,
                         null,
+                        true,
+                        VerificationStatus.UNVERIFIED,
+                        null,
                         []
                 )
                 [invalidCase.caseName, org]
@@ -128,7 +135,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         given: "an existing organization's details"
         def newName = "Updated ${faker.company().name()}"
         def newUrl = "https://${faker.internet().domainName()}"
-        def updateRequest = new Organization(null, newName, newUrl, null, [])
+        def updateRequest = new Organization(null, newName, newUrl, null, true, VerificationStatus.UNVERIFIED, null, [])
 
         when: "the organization is updated"
         Organization updated = organizationController.updateOrganization(id, updateRequest)
@@ -154,7 +161,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "UPDATE | should fail to update a non-existent organization"() {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, [])
+        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, [])
 
         when: "an update is attempted"
         organizationController.updateOrganization(nonExistentId, updateRequest)
@@ -167,7 +174,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "UPDATE | should handle update of non-existent organization gracefully when using no-look"() {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, [])
+        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, [])
 
         when: "a no-look update is attempted"
         organizationController.updateOrganizationNoLook(nonExistentId, updateRequest)
@@ -184,6 +191,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 null,
                 "Temporary Org to Delete",
                 "https://example.org",
+                null,
+                true,
+                VerificationStatus.UNVERIFIED,
                 null,
                 []
         )

@@ -25,6 +25,10 @@ public record Project(
         @Relation(MANY_TO_ONE)
         @NotNull(message = "Project organization is required.")
         Organization organization,
+
+        @Relation(MANY_TO_ONE)
+        @MappedProperty("managing_region_id")
+        @Nullable AdministrativeRegion managingRegion,
         
         @NotBlank(message = "Project title is required.")
         @Size(min = 1, max = 255, message = "Project title must be between 1 and 255 characters.")
@@ -64,6 +68,7 @@ public record Project(
         return new Project(
                 newId,
                 this.organization(),
+                this.managingRegion(),
                 this.title(),
                 this.description(),
                 this.projectType(),
