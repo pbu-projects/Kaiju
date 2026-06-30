@@ -1,4 +1,4 @@
- <h1 style="display: inline-block;">We're Volunteer Monster <img src="https://media.tenor.com/i8vhkDUi1wsAAAAi/wave-joe.gif" alt="Waving Joe Biden" style="height: 1em; vertical-align: middle;"></h1>
+ <h1 style="display: inline-block;"><img src="https://media.tenor.com/i8vhkDUi1wsAAAAi/wave-joe.gif" alt="Waving" style="height: 4em; vertical-align: middle;">We're Volunteer Monster </h1>
 
  <p>Great projects need people, and people want to do good. Volunteer Monster connects the two. We empower both sides of
  community action: equipping organizers with the volunteers they need to get things done, and giving individuals an easy
