@@ -36,8 +36,8 @@ class JtsConverterSpec extends Specification {
 
         then: "it reconstructs the point with matching coordinates and SRID"
         convertedPoint != null
-        convertedPoint.x == -105.0
-        convertedPoint.y == 39.0
+        convertedPoint.x == Double.valueOf(-105.0)
+        convertedPoint.y == Double.valueOf(39.0)
         convertedPoint.SRID == 4326
     }
 
