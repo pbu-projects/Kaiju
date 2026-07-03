@@ -165,6 +165,31 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         executeUpdate("DELETE FROM users WHERE id = ?", userId)
     }
 
+    def "DELETE | should fail to delete a non-existent region user"() {
+        given: "a random non-existent user and region ID"
+        def nonExistentUserId = UUID.randomUUID()
+        def nonExistentRegionId = UUID.randomUUID()
+
+        when: "a delete is attempted"
+        regionUserController.deleteRegionUser(nonExistentUserId, nonExistentRegionId)
+
+        then: "an exception is thrown indicating not found"
+        def e = thrown(HttpStatusException)
+        e.status.code == 404
+    }
+
+    def "DELETE | should handle deletion of non-existent region user gracefully when using no-look"() {
+        given: "a random non-existent user and region ID"
+        def nonExistentUserId = UUID.randomUUID()
+        def nonExistentRegionId = UUID.randomUUID()
+
+        when: "a no-look delete is attempted"
+        regionUserController.deleteRegionUserNoLook(nonExistentUserId, nonExistentRegionId)
+
+        then: "no exception is thrown"
+        noExceptionThrown()
+    }
+
     /********** LIST Tests **********/
 
     def "LIST | should fully drain all region users sequentially using cursors"() {

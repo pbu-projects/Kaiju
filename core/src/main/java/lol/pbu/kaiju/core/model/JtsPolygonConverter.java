@@ -26,13 +26,17 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, Object>
             byte[] wkb = writer.write(entityValue);
             String hexWkb = WKBWriter.toHex(wkb);
 
-            PGobject pgObject = new PGobject();
+            PGobject pgObject = createPGobject();
             pgObject.setType("geography");
             pgObject.setValue(hexWkb);
             return pgObject;
         } catch (SQLException e) {
             return null;
         }
+    }
+
+    protected PGobject createPGobject() {
+        return new PGobject();
     }
 
     @Override
