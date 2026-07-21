@@ -1,6 +1,8 @@
 
 
-rootProject.name = "kaiju"
 
-include("core")
+
+
+
+rootProject.name="kaiju"
 
