@@ -1,44 +1,91 @@
 plugins {
-    id("java")
-    id("jacoco")
-    id("io.micronaut.application") version "4.4.2" apply false
-    id("io.micronaut.library") version "4.4.2" apply false
-    id("com.gradleup.shadow") version "8.3.3" apply false
-    id("io.micronaut.aot") version "4.4.2" apply false
-    id("gg.jte.gradle") version "3.1.12" apply false
-    id("org.sonarqube") version "7.3.1.8318"
+    id("groovy") 
+    id("io.micronaut.application") version "5.0.2"
+    id("com.gradleup.shadow") version "9.4.1"
+    id("io.micronaut.aot") version "5.0.2"
+    id("org.sonarqube")
 }
 
-allprojects {
-    group = "lol.pbu.kaiju"
-    version = "0.1"
+version = project.properties["kaijuVersion"]!!
+group = "lol.pbu"
 
-    repositories {
-        mavenCentral()
-    }
+
+
+repositories {
+    mavenCentral()
 }
 
-subprojects {
-    apply(plugin = "java")
-    apply(plugin = "jacoco")
+dependencies {
+    annotationProcessor("io.micronaut.data:micronaut-data-processor")
+    annotationProcessor("io.micronaut:micronaut-http-validation")
+    annotationProcessor("io.micronaut.security:micronaut-security-processor")
+    annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
+    annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+    implementation("io.micronaut.data:micronaut-data-jdbc")
+    implementation("io.micronaut.security:micronaut-security")
+    implementation("io.micronaut.serde:micronaut-serde-jackson")
+    implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    implementation("io.micronaut.validation:micronaut-validation")
+    implementation("jakarta.validation:jakarta.validation-api")
+    implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
+    compileOnly("io.micronaut:micronaut-http-client")
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.postgresql:postgresql")
+    runtimeOnly("org.yaml:snakeyaml")
+    testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
+    testImplementation("org.testcontainers:testcontainers")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.testcontainers:testcontainers-spock")
+    testImplementation("org.apache.groovy:groovy-sql:${project.properties["groovySqlVersion"]}")
+    testImplementation("net.datafaker:datafaker:${project.properties["datafakerVersion"]}")
+}
 
-    java {
-        sourceCompatibility = JavaVersion.toVersion("21")
-        targetCompatibility = JavaVersion.toVersion("21")
-    }
 
-    tasks.withType<JacocoReport> {
-        reports {
-            xml.required.set(true)
-            html.required.set(true)
+
+application {
+    mainClass = "lol.pbu.Application"
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("25")
+    targetCompatibility = JavaVersion.toVersion("25")
+}
+
+
+
+
+graalvmNative.toolchainDetection = false
+graalvmNative {
+    binaries {
+        all {
+            buildArgs.add("-H:+SharedArenaSupport")
         }
     }
-
-    tasks.withType<Test> {
-        finalizedBy(tasks.withType<JacocoReport>())
-    }
 }
 
+
+
+
+micronaut {
+    runtime("netty")
+    testRuntime("spock2")
+    processing {
+        incremental(true)
+        annotations("lol.pbu.*")
+    }
+    aot {
+        // Please review carefully the optimizations enabled below
+        // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
+        optimizeServiceLoading = false
+        convertYamlToJava = false
+        precomputeOperations = true
+        cacheEnvironment = true
+        optimizeClassLoading = true
+        deduceEnvironment = true
+        optimizeNetty = true
+        replaceLogbackXml = true
+    }
+}
 sonar {
     properties {
         property("sonar.projectKey", "pbu-projects_Kaiju")
@@ -51,5 +98,15 @@ sonar {
         }
     }
 }
+
+tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
+    baseImage = "eclipse-temurin:25-jre"
+}
+// https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
+tasks.withType<AbstractTestTask>().configureEach {
+    failOnNoDiscoveredTests = false
+}
+
+
 
 
