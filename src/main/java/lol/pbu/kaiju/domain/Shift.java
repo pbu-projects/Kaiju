@@ -26,7 +26,6 @@ public record Shift(
         @NotNull(message = "Shift project is required.")
         Project project,
 
-        @Nullable
         boolean isVirtual,
         
         @Relation(MANY_TO_ONE)

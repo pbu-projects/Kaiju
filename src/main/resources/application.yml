@@ -1,6 +1,8 @@
 micronaut:
   application:
     name: kaiju
+  metrics:
+    enabled: true
 datasources:
   default:
     url: jdbc:postgresql://localhost:5432/postgres
@@ -8,5 +10,13 @@ datasources:
     password: ''
     driver-class-name: org.postgresql.Driver
     db-type: postgres
-    schema-generate: CREATE_DROP
+    schema-generate: NONE
     dialect: POSTGRES
+micrometer:
+  observation:
+    http:
+      server:
+        enabled: true
+      client:
+        enabled: true
+

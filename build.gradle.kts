@@ -3,7 +3,7 @@ plugins {
     id("io.micronaut.application") version "5.0.2"
     id("com.gradleup.shadow") version "9.4.1"
     id("io.micronaut.aot") version "5.0.2"
-    id("org.sonarqube")
+    id("org.sonarqube") version "5.1.0.4882"
 }
 
 version = project.properties["kaijuVersion"]!!
@@ -29,8 +29,13 @@ dependencies {
     implementation("jakarta.validation:jakarta.validation-api")
     implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
     compileOnly("io.micronaut:micronaut-http-client")
+    implementation("org.postgresql:postgresql")
+    implementation("io.micronaut:micronaut-retry")
+    implementation("io.micronaut.reactor:micronaut-reactor-http-client")
+    implementation("io.micronaut:micronaut-management")
+    implementation("io.micronaut.micrometer:micronaut-micrometer-core")
+    implementation("io.micronaut.micrometer:micronaut-micrometer-observation-http")
     runtimeOnly("ch.qos.logback:logback-classic")
-    runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.yaml:snakeyaml")
     testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
     testImplementation("org.testcontainers:testcontainers")

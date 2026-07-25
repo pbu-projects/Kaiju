@@ -1,4 +1,9 @@
 datasources:
   default:
-    url: jdbc:tc:postgresql:14:///postgres
-    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    db-type: postgres
+    url: jdbc:postgresql://localhost:5432/volunteer_monster
+    username: jimmy
+    password: warm-farts-smell-worse
+    dialect: POSTGRES
+    driver-class-name: org.postgresql.Driver
+    schema-generate: NONE
