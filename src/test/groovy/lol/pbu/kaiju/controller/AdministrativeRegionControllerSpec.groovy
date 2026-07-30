@@ -10,6 +10,7 @@ import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
@@ -29,7 +30,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
 
-    private org.locationtech.jts.geom.Geometry createTestPolygon() {
+    private Geometry createTestPolygon() {
         Coordinate[] coords = [
                 new Coordinate(-105.0, 39.0),
                 new Coordinate(-104.0, 39.0),

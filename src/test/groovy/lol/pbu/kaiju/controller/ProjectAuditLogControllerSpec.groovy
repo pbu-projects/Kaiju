@@ -1,5 +1,7 @@
 package lol.pbu.kaiju.controller
 
+import groovy.sql.Sql
+
 
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
@@ -31,23 +33,19 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
     @Inject
     ProjectAuditLogController projectAuditLogController
 
-    def setupSpec() {
-        // Use standaloneConnection to query and seed data
-        def stmt = standaloneConnection.createStatement()
-        def rsProj = stmt.executeQuery("SELECT id FROM projects LIMIT 1")
-        rsProj.next()
-        def projectId = UUID.fromString(rsProj.getString("id"))
+    def setup() {
+        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
+        def projectId = projRow.id as UUID
 
-        def rsUser = stmt.executeQuery("SELECT id FROM users LIMIT 1")
-        rsUser.next()
-        def actorId = UUID.fromString(rsUser.getString("id"))
+        def userRow = sql.firstRow("SELECT id FROM users LIMIT 1")
+        def actorId = userRow.id as UUID
 
-        executeUpdate("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", projectId, actorId)
-        executeUpdate("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')", projectId, actorId)
+        sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", [projectId, actorId])
+        sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')", [projectId, actorId])
     }
 
-    def cleanupSpec() {
-        standaloneConnection.createStatement().execute("DELETE FROM project_audit_logs WHERE action IN ('CREATED', 'EDITED')")
+    def cleanup() {
+        sql.execute("DELETE FROM project_audit_logs WHERE action IN ('CREATED', 'EDITED')")
     }
 
     private Project getRandomProject() {

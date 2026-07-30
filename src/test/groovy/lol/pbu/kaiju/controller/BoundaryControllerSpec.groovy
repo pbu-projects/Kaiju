@@ -1,5 +1,7 @@
 package lol.pbu.kaiju.controller
 
+import groovy.sql.Sql
+
 
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
@@ -42,13 +44,13 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         geometryFactory.createPolygon(coords)
     }
 
-    def setupSpec() {
-        standaloneConnection.createStatement().execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary A', ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))', 4326))")
-        standaloneConnection.createStatement().execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary B', ST_GeomFromText('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', 4326))")
+    def setup() {
+        sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary A', ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))', 4326))")
+        sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary B', ST_GeomFromText('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', 4326))")
     }
 
-    def cleanupSpec() {
-        standaloneConnection.createStatement().execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %'")
+    def cleanup() {
+        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %'")
     }
 
     /********** CREATE Tests **********/

@@ -3,6 +3,7 @@ plugins {
     id("io.micronaut.application") version "5.0.2"
     id("com.gradleup.shadow") version "9.4.1"
     id("io.micronaut.aot") version "5.0.2"
+    id("io.micronaut.test-resources") version "5.0.2"
     id("org.sonarqube") version "5.1.0.4882"
 }
 
@@ -21,6 +22,7 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+    implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.security:micronaut-security")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
@@ -36,6 +38,7 @@ dependencies {
     implementation("io.micronaut.micrometer:micronaut-micrometer-core")
     implementation("io.micronaut.micrometer:micronaut-micrometer-observation-http")
     runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.yaml:snakeyaml")
     testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
     testImplementation("org.testcontainers:testcontainers")

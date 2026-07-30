@@ -1,5 +1,7 @@
 package lol.pbu.kaiju.controller
 
+import groovy.sql.Sql
+
 
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
@@ -24,13 +26,13 @@ class TagControllerSpec extends BaseControllerSpec {
     @Shared
     Faker faker = new Faker()
 
-    def setupSpec() {
-        standaloneConnection.createStatement().execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
-        standaloneConnection.createStatement().execute("INSERT INTO tags (name) VALUES ('test-tag-b')")
+    def setup() {
+        sql.execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
+        sql.execute("INSERT INTO tags (name) VALUES ('test-tag-b')")
     }
 
-    def cleanupSpec() {
-        standaloneConnection.createStatement().execute("DELETE FROM tags WHERE name LIKE 'test-tag-%'")
+    def cleanup() {
+        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%'")
     }
 
     /********** CREATE Tests **********/
