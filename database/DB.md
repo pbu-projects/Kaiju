@@ -94,7 +94,7 @@ controls over scraped data.
 - The Regional Boundary Match: `ST_Intersects(boundaries.geom, :user_point)`
 - The Remote Search: `WHERE shifts.location_id IS NULL`
 
-[4326]: https://gis.stackexchange.com/questions/3334/difference-between-wgs84-and-epsg4326
+[4326]: https://epsg.io/4326
 
 [PostGIS Geography Type]: https://postgis.net/workshops/postgis-intro/geography.html
 
