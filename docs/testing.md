@@ -5,7 +5,7 @@ We use [Spock](https://spockframework.org/) and [Testcontainers](https://testcon
 ## Core Practices
 
 - **Behavior-Driven Focus**: Test user journeys and edge cases rather than aiming for arbitrary line coverage numbers.
-- **Avoid Mocking**: Avoid mocks whenever a real dependency or sandbox can be spun up—test against real services (similar to how [z4j](https://github.com/Jonathan-Zollinger/z4j) tests API integrations against a real Zendesk sandbox).
+- **Avoid Mocking**: Avoid mocks whenever a real dependency or sandbox can be spun up—test against real services (similar to how [z4j](https://github.com/pbu-projects/z4j) tests API integrations against a real Zendesk sandbox).
 - **Data-Driven Tables**: Use Spock `@Unroll` and `where:` tables to test multiple inputs, boundary conditions, and failure modes cleanly within a single specification.
 - **Real Database Integration**: Tests run against a live PostgreSQL + PostGIS container managed by Testcontainers.
 - **Transaction Isolation**: Use `@MicronautTest(transactional = true)` so each test rolls back changes automatically. Avoid manual database cleanup blocks.
