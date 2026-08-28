@@ -82,7 +82,7 @@ authentication database.
 ### `project_audit_logs` Table
 
 Provides an immutable historical trail of who created, edited, or approved a project, ensuring strict moderation
-controls over scraped data.
+controls over project submissions.
 
 - An append-only ledger tracking every major action (Created, Approved, Rejected, Edited). Ensures the moderators can
   find data somewhere if it's eventually needed
