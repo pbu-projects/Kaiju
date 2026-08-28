@@ -1,38 +1,25 @@
-# Volunteer Monster MVP Roadmap
-**Objective:** Launch a blazing-fast, localized, and self-updating volunteer aggregator to prove operational superiority to enterprise acquisition targets.
+# MVP Roadmap
 
-## Phase 1: The Spatial Foundation & Engine (Weeks 1-3)
-**Goal:** Build a live database populated with thousands of active projects using zero-cost local geocoding.
+Goal: Launch a fast, localized volunteer management platform with spatial search and moderation tooling.
 
-*   **[ ] Multi-Module Infrastructure:** Finalize the Gradle `core`, `server`, and `sync` boundaries alongside the mobile directories.
-*   **[ ] PostGIS Schema:** Implement tables for `Project`, `Shift`, and `Organization`, alongside `boundary_layers` and `boundaries` for spatial fence overrides.
-*   **[ ] Identity Management:** Wire Micronaut Security to Keycloak for secure, enterprise-ready authentication.
-*   **[ ] The Scraper:** Write the `@Scheduled` Micronaut jobs in the `sync` module to harvest data from UServeUtah and Samaritan Scout.
-*   **[ ] Local Geocoding Pipeline:** Build the enrichment logic to inject spatial coordinates into scraped addresses using a static, zero-cost ZIP/City reference database.
+## Phase 1: Spatial Foundation & Core Data
+- [x] **Application Infrastructure**: Single-module Micronaut 5 + Java 25 application.
+- [x] **PostGIS Schema**: Tables for `projects`, `shifts`, `locations`, `boundaries`, `organizations`, and audit logs.
+- [x] **Authentication & RBAC**: Micronaut Security JWT configuration with Authentik role enforcement.
+- [x] **REST Endpoints**: CRUD controllers for all domain entities.
+- [x] **Data Initialization**: Database seed scripts for local development and testing.
 
-## Phase 2: The Public SEO Explorer (Weeks 4-6)
-**Goal:** Launch an SEO-optimized, blazing-fast web portal where volunteers can discover opportunities.
+## Phase 2: Public Web & Spatial Explorer
+- [ ] **JTE View Architecture**: Server-rendered layouts for project listings and organization profiles.
+- [ ] **Spatial Search Interface**: Location-based radius search (`ST_DWithin`) supporting standard, open-door, and regional projects.
+- [ ] **Local Geo-Detection**: Edge header detection to suggest local projects based on user location.
 
-*   **[ ] Read-Only APIs:** Expose the `core` data securely via internal controllers.
-*   **[ ] JTE Architecture:** Establish the base JTE HTML layouts, headers, and footers for a semantic, server-rendered web UI that guarantees elite SEO ranking.
-*   **[ ] The Geographic Fallback:** Implement Cloudflare edge-header reading to passively detect a user's city, falling back to the pilot market if unknown.
-*   **[ ] Spatial Search Interface:** Build the feed separating time-bound "Shifts" from flexible "Missions" using PostGIS `ST_DWithin` bounding-box math.
-*   **[ ] Deep-Linking:** Ensure all harvested projects link cleanly back to their original source to maintain data attribution.
+## Phase 3: Organization Admin & Moderation
+- [ ] **Organization Onboarding**: Self-service organization creation and project ownership workflows.
+- [ ] **Regional Moderation Queue**: Admin interface to review and approve projects assigned to geographic boundaries.
+- [ ] **Shift Management**: Scheduling, volunteer capacity limits, and sign-up flows.
 
-## Phase 3: The Boundary Admin & Nonprofit "Trojan Horse" (Weeks 7-9)
-**Goal:** Deploy operational tooling that incentivizes nonprofits to claim their profiles and manage geographic reporting territories.
-
-*   **[ ] Org Onboarding:** Build the "Claim this Project" authentication flow for coordinators.
-*   **[ ] The Click-to-Merge Fencer:** Build the interface allowing admins to select pre-existing ZIP/County polygon layers, running `ST_Union` on the backend to create custom fences.
-*   **[ ] The Shift Generator:** Build the backend logic that translates vague ongoing needs into discrete, schedulable micro-shifts.
-*   **[ ] The Dashboard:** Create a private JTE view for verified organizations to visualize active shifts, user retention, and territory analytics using `ST_Intersects` reporting.
-*   **[ ] Pilot Launch:** Onboard 3-5 local nonprofits to validate the Shift Generator and custom fencing in the real world.
-
-## Phase 4: Mobile Last-Mile & Analytics (Weeks 10-12)
-**Goal:** Close the feedback loop natively via mobile devices, proving the platform increases retention and decreases administrative overhead.
-
-*   **[ ] Mobile Rollout:** Compile the shared Compose Multiplatform codebase into native `androidApp` and `iosApp` binaries.
-*   **[ ] Volunteer Profiles:** Allow users to log in natively, save their regional preferences, and claim shifts from their devices.
-*   **[ ] Automated Comms:** Integrate basic SMS/Email logic for shift reminders and post-event feedback.
-*   **[ ] Impact Reporting:** Build the scannable data dashboards nonprofits can export for board meetings.
-*   **[ ] M&A Preparation:** Audit the repository for a pristine Git history, strictly enforced CLA signatures, and clean architectural boundaries.
+## Phase 4: Multiplatform Mobile & Dashboards
+- [ ] **Compose Multiplatform UI**: Shared interface for web admin dashboards and mobile clients (`androidApp` / `iosApp`).
+- [ ] **Volunteer Profiles**: Saved preferences, shift commitments, and check-in workflows.
+- [ ] **Notifications**: Shift reminders and schedule updates.
