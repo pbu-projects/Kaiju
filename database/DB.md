@@ -106,7 +106,7 @@ controls over scraped data.
 
 [Why OFFSET is Bad (Keyset Pagination)]: https://use-the-index-luke.com/no-offset
 
-[descriminator]: Project_Descriminator.md
+[discriminator]: Project_Descriminator.md
 
 [Event Sourcing & Audit Logs]: https://microservices.io/patterns/data/event-sourcing.html
 
