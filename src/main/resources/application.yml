@@ -1,0 +1,41 @@
+micronaut:
+  application:
+    name: kaiju
+  metrics:
+    enabled: true
+datasources:
+  default:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: ''
+    driver-class-name: org.postgresql.Driver
+    db-type: postgres
+    schema-generate: NONE
+    dialect: POSTGRES
+flyway:
+  datasources:
+    default:
+      enabled: true
+      locations:
+        - filesystem:database/init
+      sql-migration-prefix: ""
+      sql-migration-separator: "-"
+test-resources:
+  containers:
+    postgres:
+      image-name: postgis/postgis:15-3.5
+      db-name: volunteer_monster
+      username: jimmy
+      password: warm-farts-smell-worse
+    postgis:
+      image-name: postgis/postgis:15-3.5
+      db-name: volunteer_monster
+      username: jimmy
+      password: warm-farts-smell-worse
+micrometer:
+  observation:
+    http:
+      server:
+        enabled: true
+      client:
+        enabled: true
