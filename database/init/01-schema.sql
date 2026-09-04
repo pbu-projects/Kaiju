@@ -56,7 +56,6 @@ CREATE TABLE organization_audit_logs
     created_at      TIMESTAMPTZ      DEFAULT NOW()
 );
 
--- The Escalation Queue
 CREATE TABLE administrative_regions
 (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -65,7 +64,7 @@ CREATE TABLE administrative_regions
     geom             GEOGRAPHY(Polygon, 4326) NOT NULL
 );
 
--- 6. admin boundaries
+-- admin boundaries
 CREATE TABLE region_users
 (
     user_id   UUID REFERENCES users (id) ON DELETE CASCADE,
@@ -76,7 +75,7 @@ CREATE TABLE region_users
     PRIMARY KEY (user_id, region_id)
 );
 
--- 7. pizza deliveries
+-- pizza deliveries only
 CREATE TABLE locations
 (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
