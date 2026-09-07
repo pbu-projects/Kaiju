@@ -63,7 +63,9 @@ Each persona profile captures a comprehensive current-state experience across fo
 * *Critical Pains & Risks*: Synthesizes obstacles, liability exposure, and wasted operational bandwidth.
 * *Desired Gains & Success Metrics*: Articulates the measurable payoffs and relief provided by platform capabilities.
 
-== The Volunteer Spectrum (4 Proto-Personas)
+== Core Personas & Human Spectrums
+
+=== The Volunteer Spectrum (4 Proto-Personas)
 
 include::personas/maya-spontaneous-volunteer.adoc[]
 
@@ -81,7 +83,7 @@ include::personas/raymond-mandated-compliance.adoc[]
 
 <<<
 
-== The Coordinator Spectrum (2 Proto-Personas)
+=== The Coordinator Spectrum (2 Proto-Personas)
 
 include::personas/marcus-high-volume-coordinator.adoc[]
 
@@ -91,7 +93,7 @@ include::personas/sarah-high-liability-director.adoc[]
 
 <<<
 
-== The Civic Governance Authority (1 Proto-Persona)
+=== The Civic Governance Authority (1 Proto-Persona)
 
 include::personas/elena-civic-regional-moderator.adoc[]
 

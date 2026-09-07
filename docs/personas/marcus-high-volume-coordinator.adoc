@@ -1,4 +1,4 @@
-=== Marcus Vance — The High-Volume Operations Coordinator
+==== Marcus Vance — The High-Volume Operations Coordinator
 
 [role="persona-card"]
 --
@@ -9,15 +9,18 @@
 *Occupation:* Volunteer Operations Coordinator (Metro Food Relief) | *Location:* Regional HQ | *Device:* Dual Desktop & iPad Tablet | *Scope:* 600+ monthly volunteer slots across 5 hubs
 
 *Bio & Context:*
+
 Marcus manages volunteer logistics for a metropolitan food rescue and urban agriculture non-profit. He coordinates over 600 monthly volunteer slots across 5 physical distribution warehouses and seasonal farm gleaning sites. Operating with a minimal staff, he spends excessive hours re-entering data between paper clipboards, Excel sheets, and municipal permits while battling a frustrating 30–50% volunteer no-show rate.
 
 *Needs & Core Goals:*
+
 * Fill 100% of shift capacity for critical assembly lines (e.g. Saturday emergency food boxes).
 * Eliminate the chronic 35% volunteer no-show rate through automated waitlists and reminders.
 * Manage multi-site initiatives under a single umbrella project without cloning identical records.
 * Maintain digital records of signed liability waivers and emergency contacts to shield the non-profit.
 
 *Frustrations & Obstacles:*
+
 * Volunteers RSVPing weeks in advance and ghosting on Saturday morning, starving packaging lines.
 * Spreadsheet desynchronization between office coordinators and on-site warehouse managers.
 * Re-typing the same project description, safety rules, and requirements 10 times for 10 distribution hubs.
@@ -26,6 +29,7 @@ Marcus manages volunteer logistics for a metropolitan food rescue and urban agri
 
 <<<
 
+[discrete]
 ==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]

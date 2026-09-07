@@ -1,4 +1,4 @@
-=== Chloe Torres — The Academic & Portfolio-Building Student Volunteer
+==== Chloe Torres — The Academic & Portfolio-Building Student Volunteer
 
 [role="persona-card"]
 --
@@ -9,15 +9,18 @@
 *Occupation:* High School Junior & Key Club Officer | *Location:* Suburban Metro | *Device:* iPhone 14 & Chromebook | *Goal:* 100 verified service hours & group projects
 
 *Bio & Context:*
+
 Chloe is an ambitious high school student preparing competitive college and scholarship applications. She needs 100 verified service hours for her National Honor Society and diploma seals. As her school's Key Club officer, she coordinates weekend group service projects for 15–20 classmates. She requires tamper-proof hour logging, digital parent waivers, group slot holds, and an exportable certified service transcript for university admissions portals.
 
 *Needs & Core Goals:*
+
 * Earn 100 verified service hours before December scholarship and college application deadlines.
 * Reserve blocks of 15–20 volunteer slots for high school club members to attend weekend service projects together.
 * Generate an official, tamper-proof PDF service transcript with organization tax IDs and supervisor sign-offs.
 * Secure digital endorsements from project directors highlighting her team coordination and leadership.
 
 *Frustrations & Obstacles:*
+
 * Paper verification forms getting coffee-stained, lost, or rejected by guidance counselors.
 * Arriving at a service site with 15 club members only to be told there's only enough work for 5 people.
 * Non-profit coordinators taking weeks to sign off on hours when scholarship submission deadlines are days away.
@@ -26,6 +29,7 @@ Chloe is an ambitious high school student preparing competitive college and scho
 
 <<<
 
+[discrete]
 ==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]

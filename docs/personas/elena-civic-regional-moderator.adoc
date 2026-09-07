@@ -1,4 +1,4 @@
-=== Elena Rostova — The Civic Regional Moderator
+==== Elena Rostova — The Civic Regional Moderator
 
 [role="persona-card"]
 --
@@ -9,15 +9,18 @@
 *Occupation:* County Director of Civic Engagement | *Location:* County Government Center | *Device:* Dual Display & GIS Terminal | *Jurisdiction:* Regional territory covering 4 municipalities
 
 *Bio & Context:*
+
 Elena oversees municipal volunteer services, community engagement initiatives, and public safety vetting across a regional jurisdiction covering four municipalities. She is legally responsible for ensuring that all published volunteer opportunities adhere to municipal safety codes, insurance requirements, and non-profit validity. She must balance thorough civic oversight with strict 48-hour SLA turnaround times to avoid stalling grassroots initiatives.
 
 *Needs & Core Goals:*
+
 * Safeguard public trust by intercepting fraudulent projects, commercial marketing scams, or hazardous tasks.
 * Clear all pending regional project reviews within the mandatory 48-hour SLA window.
 * Ensure regional boundaries are strictly respected so emergency services and municipal liability are clear.
 * Maintain an immutable, court-admissible audit trail of all project approvals, rejections, and revisions.
 
 *Frustrations & Obstacles:*
+
 * Vague project submissions missing basic safety protocols, insurance proof, or accurate physical coordinates.
 * Grassroots organizers making unauthorized edits to project descriptions after civic approval has been granted.
 * Submissions straddling municipal boundaries creating confusion over emergency service jurisdictions.
@@ -26,6 +29,7 @@ Elena oversees municipal volunteer services, community engagement initiatives, a
 
 <<<
 
+[discrete]
 ==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]

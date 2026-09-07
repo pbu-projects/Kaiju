@@ -1,4 +1,4 @@
-=== Raymond Miller — The Compliance & Mandated Service Volunteer
+==== Raymond Miller — The Compliance & Mandated Service Volunteer
 
 [role="persona-card"]
 --
@@ -9,15 +9,18 @@
 *Occupation:* Hourly Warehouse Employee | *Location:* Urban Center | *Device:* Android Smartphone | *Obligation:* 40-hr Court Diversion & 20-hr/mo SNAP ABAWD
 
 *Bio & Context:*
+
 Raymond is an hourly warehouse employee balancing a 40-hour court-ordered community restitution requirement (traffic diversion) with monthly 20-hour SNAP ABAWD work requirements. He relies on public bus transit and hourly wages, meaning he cannot afford to miss work and must find flexible evening or weekend community service. His freedom and nutritional benefits depend on strictly compliant, tamper-proof, court-admissible service documentation.
 
 *Needs & Core Goals:*
+
 * Complete 40 court-ordered hours before his probation compliance hearing on the 30th of the month.
 * Fulfill 20 monthly community service hours to satisfy SNAP ABAWD work requirements and maintain food assistance.
 * Find flexible evening and Sunday shifts that do not conflict with hourly wage-earning employment.
 * Obtain tamper-proof, supervisor-signed logs with exact timestamps and non-profit EINs for court officers.
 
 *Frustrations & Obstacles:*
+
 * Traveling 45 minutes on the bus only to be told on arrival: 'We do not accept court-mandated volunteers.'
 * Probation officers rejecting paper logs due to messy handwriting, missing supervisor phone numbers, or lack of EINs.
 * Delayed verification causing SNAP benefits to lapse, resulting in sudden food insecurity for his household.
@@ -26,6 +29,7 @@ Raymond is an hourly warehouse employee balancing a 40-hour court-ordered commun
 
 <<<
 
+[discrete]
 ==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]

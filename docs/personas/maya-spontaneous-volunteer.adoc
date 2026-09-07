@@ -1,4 +1,4 @@
-=== Maya Lin — The Spontaneous Local Volunteer
+==== Maya Lin — The Spontaneous Local Volunteer
 
 [role="persona-card"]
 --
@@ -9,15 +9,18 @@
 *Occupation:* Marketing Specialist & Grad Student | *Location:* Salt Lake City / Urban Metro | *Device:* iPhone 15 (Cellular) | *Time Budget:* 2–3 hr weekend slots
 
 *Bio & Context:*
+
 Maya recently moved to the city and wants to connect with her neighborhood through weekend volunteering while fulfilling a 20-hour service requirement for her degree. Juggling corporate work and night classes, her availability is strictly bounded to specific weekend slots. She has zero patience for administrative paperwork, mandatory app downloads, or account creation walls just to view event details.
 
 *Needs & Core Goals:*
+
 * Discover meaningful community work within a 15-minute bike or transit radius.
 * Instantly distinguish between scheduled commitments (soup kitchen shifts) and flexible walk-in drives (coat donations).
 * Obtain verifiable digital proof of service hours for her university graduation requirement.
 * Arrive with zero ambiguity regarding parking, attire, tools, and check-in procedures.
 
 *Frustrations & Obstacles:*
+
 * Clunky non-profit websites taking 8+ seconds to load on mobile cellular browsers.
 * Being forced to submit a 5-page personal profile just to check donation drop-off hours.
 * Arriving at a venue only to discover the event was quietly rescheduled, cancelled, or overbooked.
@@ -26,6 +29,7 @@ Maya recently moved to the city and wants to connect with her neighborhood throu
 
 <<<
 
+[discrete]
 ==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
