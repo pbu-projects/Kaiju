@@ -1,18 +1,116 @@
 services:
+
+  # ── App Database (PostGIS) ────────────────────────────────────────────────
   db:
     image: postgis/postgis:15-3.5
     container_name: volunteer_db
+    env_file: .env
     environment:
-      POSTGRES_USER: jimmy
-      POSTGRES_PASSWORD: warm-farts-smell-worse
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: volunteer_monster
     ports:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-#      Adding the :Z tells docker to update the SElinux permissions
+      # :Z updates SELinux permissions for the bind mount
       - ./init:/docker-entrypoint-initdb.d:Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d volunteer_monster -U ${DB_USERNAME}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── Authentik Database (separate PostgreSQL install) ──────────────────────
+  authentik-db:
+    image: postgres:16-alpine
+    container_name: authentik_db
+    env_file: .env
+    environment:
+      POSTGRES_DB: authentik
+      POSTGRES_USER: ${AUTHENTIK_PG_USER:-authentik}
+      POSTGRES_PASSWORD: ${AUTHENTIK_PG_PASS:?authentik db password required}
+    volumes:
+      - authentik_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d authentik -U ${AUTHENTIK_PG_USER:-authentik}"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # ── Authentik Cache ───────────────────────────────────────────────────────
+  authentik-redis:
+    image: redis:alpine
+    container_name: authentik_redis
+    command: --save 60 1 --loglevel warning
+    volumes:
+      - authentik_redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 30s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  # ── Authentik Server ──────────────────────────────────────────────────────
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2025.6
+    container_name: authentik_server
+    command: server
+    env_file: .env
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY:?authentik secret key required}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: false
+    ports:
+      - "9000:9000"   # HTTP  → http://localhost:9000/if/admin/
+      - "9443:9443"   # HTTPS
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Authentik Worker ──────────────────────────────────────────────────────
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2025.6
+    container_name: authentik_worker
+    command: worker
+    env_file: .env
+    environment:
+      AUTHENTIK_REDIS__HOST: authentik-redis
+      AUTHENTIK_POSTGRESQL__HOST: authentik-db
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_POSTGRESQL__USER: ${AUTHENTIK_PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${AUTHENTIK_PG_PASS}
+      AUTHENTIK_SECRET_KEY: ${AUTHENTIK_SECRET_KEY}
+      AUTHENTIK_ERROR_REPORTING__ENABLED: false
+    volumes:
+      - authentik_media:/media
+      - authentik_templates:/templates
+    depends_on:
+      authentik-db:
+        condition: service_healthy
+      authentik-redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
   pg_data:
+  authentik_pg_data:
+  authentik_redis_data:
+  authentik_media:
+  authentik_templates:
