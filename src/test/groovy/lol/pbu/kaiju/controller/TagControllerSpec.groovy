@@ -95,9 +95,11 @@ class TagControllerSpec extends BaseControllerSpec {
 
     /********** READ Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "READ | should retrieve an existing tag by ID: #name"(UUID id, String name) {
+    def "READ | should retrieve an existing tag by ID"() {
+        given: "an existing tag"
+        def tag = tagRepository.save(new Tag(null, "test-tag-read-${faker.number().digits(5)}"))
+        UUID id = tag.id()
+
         when: "the tag is requested by its ID"
         def result = tagController.getTag(id)
 
@@ -105,11 +107,8 @@ class TagControllerSpec extends BaseControllerSpec {
         verifyAll {
             result.isPresent()
             result.get().id() == id
-            result.get().name() == name
+            result.get().name() == tag.name()
         }
-
-        where:
-        [id, name] << sql.rows("SELECT id, name FROM tags LIMIT 3").collect { [it.id, it.name] }
     }
 
     def "READ | should return empty for a non-existent tag ID"() {
@@ -122,10 +121,10 @@ class TagControllerSpec extends BaseControllerSpec {
 
     /********** UPDATE Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "UPDATE | should successfully update an existing tag: #originalName"(UUID id, String originalName) {
-        given: "an existing tag's details"
+    def "UPDATE | should successfully update an existing tag"() {
+        given: "an existing tag"
+        def tag = tagRepository.save(new Tag(null, "original-tag-${faker.number().digits(5)}"))
+        UUID id = tag.id()
         def newName = "updated-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
         def updateRequest = new Tag(null, newName)
 
@@ -143,9 +142,6 @@ class TagControllerSpec extends BaseControllerSpec {
         verifyAll(dbResult) {
             name == newName
         }
-
-        where:
-        [id, originalName] << sql.rows("SELECT id, name FROM tags LIMIT 2").collect { [it.id, it.name] }
     }
 
     def "UPDATE | should fail to update a non-existent tag"() {

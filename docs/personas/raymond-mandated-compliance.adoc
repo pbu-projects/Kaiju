@@ -1,0 +1,77 @@
+=== Raymond Miller — The Compliance & Mandated Service Volunteer
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Raymond Miller (35)* -- [.persona-role-badge]#STANDARD_USER (Court / SNAP Mandated)#
+
+[role="demographics-grid"]
+*Occupation:* Hourly Warehouse Employee | *Location:* Urban Center | *Device:* Android Smartphone | *Obligation:* 40-hr Court Diversion & 20-hr/mo SNAP ABAWD
+
+*Bio & Context:*
+Raymond is an hourly warehouse employee balancing a 40-hour court-ordered community restitution requirement (traffic diversion) with monthly 20-hour SNAP ABAWD work requirements. He relies on public bus transit and hourly wages, meaning he cannot afford to miss work and must find flexible evening or weekend community service. His freedom and nutritional benefits depend on strictly compliant, tamper-proof, court-admissible service documentation.
+
+*Needs & Core Goals:*
+* Complete 40 court-ordered hours before his probation compliance hearing on the 30th of the month.
+* Fulfill 20 monthly community service hours to satisfy SNAP ABAWD work requirements and maintain food assistance.
+* Find flexible evening and Sunday shifts that do not conflict with hourly wage-earning employment.
+* Obtain tamper-proof, supervisor-signed logs with exact timestamps and non-profit EINs for court officers.
+
+*Frustrations & Obstacles:*
+* Traveling 45 minutes on the bus only to be told on arrival: 'We do not accept court-mandated volunteers.'
+* Probation officers rejecting paper logs due to messy handwriting, missing supervisor phone numbers, or lack of EINs.
+* Delayed verification causing SNAP benefits to lapse, resulting in sudden food insecurity for his household.
+* Facing humiliating judgment or intrusive questions about his offense when signing up for community initiatives.
+--
+
+<<<
+
+==== 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| 
+
+| * _If I lose this food assistance or miss my court hours, my whole family will suffer._ +
+* _I feel judged when people ask why I'm volunteering; I just want to do honest hard work and clear my record._ +
+* _I hope the probation officer accepts this digital report without demanding a wet-ink rubber stamp._ +
+* _I can't afford to waste bus fare traveling to a site that turns me away at the door._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| 
+
+| * *Pressured:* Constantly aware of legal deadlines and the severe consequences of non-compliance. +
+* *Vulnerable:* Afraid of bureaucratic delays causing benefit termination or probation revocation. +
+* *Dignified:* Proud of doing genuine, productive hard work to repay his civic obligation. +
+* *Relieved:* Deeply grateful when verified hours are logged cleanly and court requirements are fulfilled.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *Rejection at Venue:* Being turned away at the door because an organization silently bars court-mandated volunteers. +
+* *Probation Non-Compliance:* Paper logs rejected for formatting technicalities, risking bench warrants or fines. +
+* *Benefit Lapses:* Delays in monthly hour reporting causing SNAP food assistance to be abruptly suspended.
+
+| * *Compliance Search Filter:* Clear visibility into court-approved and SNAP-eligible non-profit opportunities. +
+* *GPS-Verified Check-in:* Incontestable timestamped attendance logs with supervisor verification IDs. +
+* *Court-Admissible Reports:* Official PDF summaries with organization tax IDs and verification tokens for judges.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for Raymond Miller (35)*
+
+[role="tech-grid"]
+* *Compliance Attribute Flags:* Database schema flags (accepts_court_mandated, snap_work_eligible) on projects prevent wasted bus trips and rejection.
+* *Tamper-Proof Audit Logging:* project_audit_logs captures exact GPS geofenced check-in/out timestamps and supervisor actor IDs.
+* *Court-Admissible PDF Export:* Generates standardized official compliance documents with organization EIN, supervisor phone, and verification QR codes.
+* *Flexible Keyset Shift Schedules:* Filters for evening and weekend shift series, allowing hourly wage earners to fulfill hours without missing paid shifts.
+--

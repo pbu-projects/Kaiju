@@ -1,0 +1,77 @@
+=== Marcus Vance — The High-Volume Operations Coordinator
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Marcus Vance (38)* -- [.persona-role-badge]#ORG_ADMIN / ORG_MANAGER (Operations)#
+
+[role="demographics-grid"]
+*Occupation:* Volunteer Operations Coordinator (Metro Food Relief) | *Location:* Regional HQ | *Device:* Dual Desktop & iPad Tablet | *Scope:* 600+ monthly volunteer slots across 5 hubs
+
+*Bio & Context:*
+Marcus manages volunteer logistics for a metropolitan food rescue and urban agriculture non-profit. He coordinates over 600 monthly volunteer slots across 5 physical distribution warehouses and seasonal farm gleaning sites. Operating with a minimal staff, he spends excessive hours re-entering data between paper clipboards, Excel sheets, and municipal permits while battling a frustrating 30–50% volunteer no-show rate.
+
+*Needs & Core Goals:*
+* Fill 100% of shift capacity for critical assembly lines (e.g. Saturday emergency food boxes).
+* Eliminate the chronic 35% volunteer no-show rate through automated waitlists and reminders.
+* Manage multi-site initiatives under a single umbrella project without cloning identical records.
+* Maintain digital records of signed liability waivers and emergency contacts to shield the non-profit.
+
+*Frustrations & Obstacles:*
+* Volunteers RSVPing weeks in advance and ghosting on Saturday morning, starving packaging lines.
+* Spreadsheet desynchronization between office coordinators and on-site warehouse managers.
+* Re-typing the same project description, safety rules, and requirements 10 times for 10 distribution hubs.
+* Spending hours manually generating PDF service verification letters for high school students.
+--
+
+<<<
+
+==== 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| 
+
+| * _If volunteers don't show up on Saturday morning, vulnerable families don't get food boxes this week._ +
+* _I got into non-profit work to serve my community, but 70% of my time is spent on clerical data entry._ +
+* _I hope our regional moderation approval doesn't get stuck in civic review limbo before this weekend's drive._ +
+* _We desperately need a core cohort of vetted regulars rather than an endless churn of one-off tourists._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| 
+
+| * *Chronically Overwhelmed:* Constantly buried under administrative repetition, roster churn, and spreadsheets. +
+* *Anxious:* Stressed on event mornings about shift capacity shortfalls and critical assembly bottlenecks. +
+* *Protective:* Passionately committed to organizational liability compliance and volunteer physical safety. +
+* *Mission-Driven:* Deeply gratified when distribution lines run smoothly and food reaches community members.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *30–50% No-Show Rates:* Chronic volunteer absenteeism crippling physical warehouse and harvest operations. +
+* *Duplicate Data Entry:* Redundant project cloning across multiple physical addresses and distribution nodes. +
+* *Liability Vulnerability:* Paper waivers lost or misplaced, risking catastrophic liability in injury claims.
+
+| * *Automated Waitlist Backfill:* Real-time promotion of standby volunteers when cancellations occur. +
+* *1-to-Many Project Locations:* Creating one umbrella project linked to multiple physical locations. +
+* *Digital Roster Check-In:* QR scanning and geofenced check-in eliminating paper clipboard transcription.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for Marcus Vance (38)*
+
+[role="tech-grid"]
+* *Compose Multiplatform Admin:* Provides Marcus with desktop-grade shift builders, drag-and-drop calendars, and batch roster tables without web UI lag.
+* *project_locations Bridge:* Enables Marcus to link 1 umbrella food drive to 10 physical distribution hubs, eliminating duplicate project cloning.
+* */no-look Ingestion Endpoints:* Bypasses redundant pre-flight existsById checks, allowing Marcus to sync 500+ shift slots from external systems in seconds.
+* *Verified Status Bypass:* Once Marcus's organization achieves VERIFIED status, his project updates publish instantly without waiting for moderation queues.
+--

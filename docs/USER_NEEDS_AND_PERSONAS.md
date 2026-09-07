@@ -1,6 +1,5 @@
 # User Personas & Human Need Statements: Volunteer Management
 
-**Companion Document**: [ARCHITECTURE_SYNTHESIS.md](../ARCHITECTURE_SYNTHESIS.md)  
 **Methodological Framework**: Nielsen Norman Group (NN/g) Persona Anatomy & 3-Part User Need Statement Standard  
 **Target Platform**: Kaiju (Volunteer Monster)  
 **Visual Artifacts**:
@@ -12,7 +11,7 @@
 
 ## 1. Executive Summary: Grounding the "Human Half"
 
-In [ARCHITECTURE_SYNTHESIS.md Part IX](../ARCHITECTURE_SYNTHESIS.md#L299-L368), Kaiju was evaluated as having built an elite **Spatial Discovery Engine** (geospatial indexing, radius search, normalized geometry boundaries), but having not yet tackled the **"Human Half"** of the platform: **Volunteer Management**.
+Kaiju has successfully built an elite **Spatial Discovery Engine** (geospatial indexing, radius search, normalized geometry boundaries), but having not yet tackled the **"Human Half"** of the platform: **Volunteer Management**.
 
 Before jumping into database migrations, state machines, or system architectures, user experience design mandates that we first understand the **human beings** who inhabit this system:
 * What drives someone to give up their Saturday morning to plant trees or pack food boxes?

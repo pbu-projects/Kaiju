@@ -1,0 +1,77 @@
+=== Dr. Sarah Al-Mansoor — The High-Liability Program Director
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Dr. Sarah Al-Mansoor (42)* -- [.persona-role-badge]#ORG_ADMIN (High-Liability / Vetting-Intensive)#
+
+[role="demographics-grid"]
+*Occupation:* Program Director (Youth Horizons & Crisis Lines) | *Location:* Metro Youth Center | *Device:* Secure Workstation & Encrypted Laptop | *Scope:* Minors, Foster Youth & 24/7 Crisis Hotline
+
+*Bio & Context:*
+Dr. Sarah oversees court-mandated youth mentoring, transitional foster youth programs, and a 24/7 crisis support line. Her programs involve direct contact with vulnerable minors and individuals in trauma. She faces strict legal mandates (state child protection laws, HIPAA/privacy rules, liability insurance) and cannot permit unvetted public sign-ups. She requires rigorous screening, background check tracking, and certified training verifications before shift booking is unlocked.
+
+*Needs & Core Goals:*
+* Enforce mandatory qualification gates (FBI/DOJ background check, 40h crisis training) before any volunteer accesses shifts.
+* Track expiration dates of background clearances and professional licenses automatically with zero compliance lapses.
+* Manage a structured onboarding pipeline: Application -> Background Check -> Training -> Supervised Shift -> Qualified Roster.
+* Maintain an immutable, audit-ready compliance ledger of every volunteer's credentials, supervisor approvals, and client contact hours.
+
+*Frustrations & Obstacles:*
+* Public platforms allowing unvetted walk-ins to self-register for sensitive youth or shelter shifts without screening.
+* Tracking background check renewal dates across 150 volunteers in messy spreadsheets, creating extreme liability risk.
+* High drop-out rates midway through the 40-hour training curriculum, wasting hundreds of dollars in non-profit vetting fees.
+* Lack of granular permissions to restrict sensitive case notes and client addresses from general volunteers.
+--
+
+<<<
+
+==== 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| 
+
+| * _A single safeguarding failure or unvetted individual could cause catastrophic harm to a child and destroy our mission._ +
+* _I feel guilty turning away eager people, but our duty of care to vulnerable clients must always come first._ +
+* _I waste thousands of dollars in background check fees on volunteers who ghost us during training._ +
+* _I need an automated system that locks shifts until all credentials, trainings, and waivers are verified._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| 
+
+| * *Vigilant:* Hyper-aware of legal liability, youth safeguarding, and institutional compliance. +
+* *Protective:* Fiercely devoted to shielding trauma survivors and minors from physical or emotional harm. +
+* *Cautious:* Skeptical of 'instant sign-up' features that sacrifice safety for user acquisition metrics. +
+* *Relieved:* Deeply reassured when technical guardrails guarantee that only 100% vetted volunteers access shifts.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *Safeguarding Breach Risk:* Unauthorized or unvetted individuals gaining access to vulnerable populations. +
+* *Expired Credential Blind Spots:* Volunteers working with lapsed background checks or certifications. +
+* *Wasted Screening Capital:* Paying expensive background check fees for flaky volunteers who abandon the program.
+
+| * *Automated Qualification Gating:* Shifts automatically locked until background checks and training are certified. +
+* *Integrated Screening Pipeline:* Direct API verification of background clearances and identity records. +
+* *Audit-Ready Compliance Reports:* 1-click export of tamper-proof credential logs for grant and legal authorities.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for Dr. Sarah Al-Mansoor (42)*
+
+[role="tech-grid"]
+* *Gated Roster State Machine:* Shifts evaluate volunteer qualification state (status = QUALIFIED) before allowing sign-up transactions, preventing unvetted access.
+* *Micronaut Security & RBAC:* Enforces strict tiered permissions across ORG_ADMIN, ORG_MANAGER, and verified volunteer role claims.
+* *Credential Expiration Tracking:* Database schema stores certification expiration dates, triggering automated alerts before clearances lapse.
+* *Transactional Audit Ledgers:* Immutable append-only ledger logs every background approval, waiver e-signature, and supervised hour for grant audits.
+--

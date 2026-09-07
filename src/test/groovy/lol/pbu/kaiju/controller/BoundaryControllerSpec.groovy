@@ -117,9 +117,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     /********** READ Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "READ | should retrieve an existing boundary by ID: #name"(UUID id, String name) {
+    def "READ | should retrieve an existing boundary by ID"() {
+        given: "an existing boundary"
+        def boundary = boundaryRepository.save(new Boundary(null, "Test Boundary Read", createPolygon()))
+        UUID id = boundary.id()
+
         when: "the boundary is requested by its ID"
         def result = boundaryController.getBoundary(id)
 
@@ -127,11 +129,8 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         verifyAll {
             result.isPresent()
             result.get().id() == id
-            result.get().name() == name
+            result.get().name() == "Test Boundary Read"
         }
-
-        where:
-        [id, name] << sql.rows("SELECT id, name FROM boundaries LIMIT 3").collect { [it.id, it.name] }
     }
 
     def "READ | should return empty for a non-existent boundary ID"() {
@@ -144,11 +143,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     /********** UPDATE Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "UPDATE | should successfully update an existing boundary: #originalName"(UUID id, String originalName) {
-        given: "an existing boundary's details"
-        def newName = "Updated ${faker.address().city()}"
+    def "UPDATE | should successfully update an existing boundary"() {
+        given: "an existing boundary"
+        def boundary = boundaryRepository.save(new Boundary(null, "Original Boundary Name", createPolygon()))
+        UUID id = boundary.id()
+        def newName = "Updated Boundary ${faker.address().city()}"
         def updateRequest = new Boundary(null, newName, createPolygon())
 
         when: "the boundary is updated"
@@ -165,9 +164,6 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         verifyAll(dbResult) {
             name == newName
         }
-
-        where:
-        [id, originalName] << sql.rows("SELECT id, name FROM boundaries LIMIT 2").collect { [it.id, it.name] }
     }
 
     def "UPDATE | should fail to update a non-existent boundary"() {

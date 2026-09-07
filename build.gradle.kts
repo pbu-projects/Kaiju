@@ -5,6 +5,8 @@ plugins {
     id("io.micronaut.aot") version "5.0.2"
     id("io.micronaut.test-resources") version "5.0.2"
     id("org.sonarqube") version "5.1.0.4882"
+    id("org.asciidoctor.jvm.pdf") version "4.0.2"
+    id("com.github.node-gradle.node") version "7.0.2"
 }
 
 version = project.properties["kaijuVersion"]!!
@@ -113,6 +115,29 @@ tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
 // https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
 tasks.withType<AbstractTestTask>().configureEach {
     failOnNoDiscoveredTests = false
+}
+
+tasks.named<org.asciidoctor.gradle.jvm.pdf.AsciidoctorPdfTask>("asciidoctorPdf") {
+    baseDirFollowsSourceDir()
+    setSourceDir(file("docs"))
+    setOutputDir(file("docs"))
+    sources {
+        include("human-strategy.adoc")
+    }
+}
+
+node {
+    // Automatically download Node.js so the host system doesn't need npm installed
+    download.set(true)
+    version.set("20.11.0")
+}
+
+tasks.register<com.github.gradle.node.npm.task.NpxTask>("asciidoctorWebPdf") {
+    group = "documentation"
+    description = "Generates PDF using the Chromium-based asciidoctor-web-pdf engine via Gradle Node plugin"
+    
+    command.set("@asciidoctor/web-pdf")
+    args.set(listOf("docs/human-strategy.adoc", "--base-dir", "docs", "--out-dir", "docs"))
 }
 
 tasks.register("lighthouse") {

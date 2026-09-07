@@ -119,9 +119,11 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     /********** READ Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "READ | should retrieve an existing location by ID: #name"(UUID id, String name) {
+    def "READ | should retrieve an existing location by ID"() {
+        given: "an existing location"
+        def location = locationRepository.save(new Location(null, "Test Location Read", "123 Main St", "City", "UT", "84000", "US", createPoint()))
+        UUID id = location.id()
+
         when: "the location is requested by its ID"
         def result = locationController.getLocation(id)
 
@@ -129,14 +131,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         verifyAll {
             result.isPresent()
             result.get().id() == id
-            result.get().name() == name
+            result.get().name() == "Test Location Read"
         }
-
-        where:
-        [id, name] << sql.rows("SELECT id, name FROM locations LIMIT 3").collect { [it.id, it.name] }
     }
 
-    @Unroll
     def "READ | should return empty for a non-existent location ID"() {
         when: "a non-existent location is requested"
         def result = locationController.getLocation(UUID.randomUUID())
@@ -147,10 +145,10 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     /********** UPDATE Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck") // where block left shift
-    def "UPDATE | should successfully update an existing location: #originalName"(UUID id, String originalName) {
+    def "UPDATE | should successfully update an existing location"() {
         given: "an existing location to update"
+        def location = locationRepository.save(new Location(null, "Original Location Name", "123 Main St", "Original City", "UT", "84000", "US", createPoint()))
+        UUID id = location.id()
         def newName = "Updated ${faker.commerce().productName()}"
         def newCity = faker.address().city()
         def updateRequest = new Location(null, newName, "Updated Address", newCity, "UT", "84000", "US", createPoint())
@@ -171,9 +169,6 @@ class LocationControllerSpec extends BaseControllerSpec {
             name == newName
             city == newCity
         }
-
-        where:
-        [id, originalName] << sql.rows("SELECT id, name FROM locations LIMIT 2").collect { [it.id, it.name] }
     }
 
     @Unroll

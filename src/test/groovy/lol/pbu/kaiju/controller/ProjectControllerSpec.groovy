@@ -113,9 +113,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     /********** READ Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "READ | should retrieve an existing project by ID: #title"(UUID id, String title) {
+    def "READ | should retrieve an existing project by ID"() {
+        given: "an existing project"
+        def org = getRandomOrganization()
+        def project = projectController.addProject(new Project(null, org, null, "Test Project Read", "Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], []))
+        UUID id = project.id()
+
         when: "the project is requested by its ID"
         def result = projectController.getProject(id)
 
@@ -123,11 +126,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         verifyAll {
             result.isPresent()
             result.get().id() == id
-            result.get().title() == title
+            result.get().title() == "Test Project Read"
         }
-
-        where:
-        [id, title] << sql.rows("SELECT id, title FROM projects LIMIT 3").collect { [it.id, it.title] }
     }
 
     def "READ | should return empty for a non-existent project ID"() {
@@ -140,31 +140,30 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve projects by title"() {
         given: "an existing project's title from the database"
-        def existingProject = sql.firstRow("SELECT title FROM projects LIMIT 1")
-        assert existingProject != null
+        def org = getRandomOrganization()
+        def project = projectController.addProject(new Project(null, org, null, "Searchable Title ${faker.number().digits(5)}", "Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], []))
+        def targetTitle = project.title()
 
         when: "projects are searched by this title"
-        def page = projectController.getProjects(existingProject.title as String, CursoredPageable.from(10, Sort.of(Sort.Order.asc("title"))))
+        def page = projectController.getProjects(targetTitle, CursoredPageable.from(10, Sort.of(Sort.Order.asc("title"))))
 
         then: "the search returns a page containing the project"
         verifyAll {
             page != null
-            page.content.any { it.title() == existingProject.title }
+            page.content.any { it.title() == targetTitle }
         }
     }
 
     /********** UPDATE Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "UPDATE | should successfully update an existing project: #originalTitle"(UUID id, String originalTitle) {
-        given: "an existing project's details"
-        def projectRow = sql.firstRow("SELECT * FROM projects WHERE id = ?", [id])
+    def "UPDATE | should successfully update an existing project"() {
+        given: "an existing project"
         def org = getRandomOrganization()
+        def project = projectController.addProject(new Project(null, org, null, "Original Project Title", "Original Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], []))
+        UUID id = project.id()
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description ${faker.lorem().paragraph()}"
-        ProjectType projectType = ProjectType.valueOf(projectRow.project_type as String)
-        def updateRequest = new Project(null, org, null, newTitle, newDescription, projectType, ACTIVE, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = new Project(null, org, null, newTitle, newDescription, STANDARD, ACTIVE, OffsetDateTime.now(), null, null, [], [])
 
         when: "the project is updated"
         Project updated = projectController.updateProject(id, updateRequest)
@@ -184,9 +183,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
             description == newDescription
             status == 'ACTIVE'
         }
-
-        where:
-        [id, originalTitle] << sql.rows("SELECT id, title FROM projects LIMIT 2").collect { [it.id, it.title] }
     }
 
     def "UPDATE | should fail to update a non-existent project"() {

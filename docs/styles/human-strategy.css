@@ -1,0 +1,644 @@
+/* ==========================================================================
+   Kaiju Human Strategy & NN/g Empathy Maps - Custom AsciiDoc Stylesheet
+   ========================================================================== */
+
+:root {
+  --primary-color: #2563eb;
+  --primary-dark: #1d4ed8;
+  --primary-light: #eff6ff;
+  --secondary-color: #0f172a;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --bg-main: #ffffff;
+  --bg-alt: #f8fafc;
+  --border-color: #e2e8f0;
+  
+  /* Quadrant Theme Colors (NN/g Standard) */
+  --says-bg: #f0f9ff;
+  --says-border: #0284c7;
+  --says-title-bg: #bae6fd;
+  --says-text: #0369a1;
+  
+  --thinks-bg: #f5f3ff;
+  --thinks-border: #7c3aed;
+  --thinks-title-bg: #ddd6fe;
+  --thinks-text: #5b21b6;
+  
+  --does-bg: #fefce8;
+  --does-border: #d97706;
+  --does-title-bg: #fde68a;
+  --does-text: #854d0e;
+  
+  --feels-bg: #fff1f2;
+  --feels-border: #e11d48;
+  --feels-title-bg: #fecdd3;
+  --feels-text: #9f1239;
+  
+  --pain-bg: #fef2f2;
+  --pain-border: #ef4444;
+  --pain-text: #991b1b;
+  
+  --gain-bg: #f0fdf4;
+  --gain-border: #22c55e;
+  --gain-text: #166534;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--text-main);
+  background-color: var(--bg-main);
+  line-height: 1.65;
+  font-size: 15px;
+  margin: 0;
+  padding: 0;
+}
+
+#header {
+  border-bottom: 2px solid var(--border-color);
+  padding: 2.5rem 2rem 2rem 2rem;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  color: #ffffff;
+}
+
+#header h1 {
+  color: #ffffff;
+  font-size: 2.25rem;
+  font-weight: 800;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.025em;
+}
+
+#header .details {
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+#header .details a {
+  color: #38bdf8;
+}
+
+#content {
+  padding: 2rem;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+#toc.toc-left {
+  background: var(--bg-alt);
+  border-right: 1px solid var(--border-color);
+  padding: 1.5rem 1rem;
+}
+
+#toc .title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--secondary-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+#toc a {
+  color: #475569;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+#toc a:hover {
+  color: var(--primary-color);
+}
+
+/* Headings */
+h2 {
+  color: var(--secondary-color);
+  font-size: 1.65rem;
+  font-weight: 700;
+  border-bottom: 2px solid var(--primary-light);
+  padding-bottom: 0.5rem;
+  margin-top: 2.5rem;
+}
+
+h3 {
+  color: #334155;
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-top: 2rem;
+}
+
+h4 {
+  color: #475569;
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-top: 1.5rem;
+}
+
+/* Persona Profile Card */
+.persona-card {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-top: 4px solid var(--primary-color);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}
+
+.persona-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.persona-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--secondary-color);
+}
+
+.persona-role-badge {
+  display: inline-block;
+  background: var(--primary-light);
+  color: var(--primary-dark);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  border: 1px solid #bfdbfe;
+  text-transform: uppercase;
+}
+
+.demographics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  background: var(--bg-alt);
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   NN/g 4-Quadrant Empathy Map Canvas & Quadrant Grid
+   ========================================================================== */
+
+.empathy-canvas, .empathy-map {
+  position: relative;
+  margin: 2rem 0 1.5rem 0;
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  border-radius: 14px;
+  padding: 1.75rem;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.07), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+}
+
+/* 2x2 Grid Container */
+.empathy-canvas > .content, .empathy-map > .content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 1.75rem;
+  position: relative;
+}
+
+/* Center Dividing Crosshairs */
+.empathy-canvas > .content::before, .empathy-map > .content::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  width: 2px;
+  background: #cbd5e1;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+/* Central NN/g Persona Focal Node */
+.empathy-canvas > .content::after, .empathy-map > .content::after {
+  content: "USER";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #f8fafc;
+  border: 4px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-align: center;
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* Quadrant Reset & Positioning */
+.quadrant {
+  margin: 0 !important;
+  position: relative;
+  z-index: 2;
+}
+
+/* Base Quadrant Card Body */
+.quadrant > .content {
+  padding: 1.25rem 1.5rem !important;
+  border-radius: 10px !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Top-Left: SAYS (1, 1) */
+.quadrant-says {
+  grid-column: 1;
+  grid-row: 1;
+}
+.quadrant-says > .content {
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%) !important;
+  border: 2px solid var(--says-border) !important;
+}
+.quadrant-says .ulist > .title {
+  color: var(--says-text) !important;
+  background: var(--says-title-bg) !important;
+  border: 1px solid #7dd3fc !important;
+}
+
+/* Top-Right: THINKS (2, 1) */
+.quadrant-thinks {
+  grid-column: 2;
+  grid-row: 1;
+}
+.quadrant-thinks > .content {
+  background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%) !important;
+  border: 2px solid var(--thinks-border) !important;
+}
+.quadrant-thinks .ulist > .title {
+  color: var(--thinks-text) !important;
+  background: var(--thinks-title-bg) !important;
+  border: 1px solid #c4b5fd !important;
+}
+
+/* Bottom-Left: DOES (1, 2) */
+.quadrant-does {
+  grid-column: 1;
+  grid-row: 2;
+}
+.quadrant-does > .content {
+  background: linear-gradient(180deg, #fefce8 0%, #fef9c3 100%) !important;
+  border: 2px solid var(--does-border) !important;
+}
+.quadrant-does .ulist > .title {
+  color: var(--does-text) !important;
+  background: var(--does-title-bg) !important;
+  border: 1px solid #fcd34d !important;
+}
+
+/* Bottom-Right: FEELS (2, 2) */
+.quadrant-feels {
+  grid-column: 2;
+  grid-row: 2;
+}
+.quadrant-feels > .content {
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%) !important;
+  border: 2px solid var(--feels-border) !important;
+}
+.quadrant-feels .ulist > .title {
+  color: var(--feels-text) !important;
+  background: var(--feels-title-bg) !important;
+  border: 1px solid #fda4af !important;
+}
+
+/* Quadrant Title Header Pill */
+.quadrant .ulist > .title {
+  font-size: 0.95rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  padding: 0.45rem 0.85rem !important;
+  border-radius: 6px !important;
+  margin-bottom: 0.85rem !important;
+  display: inline-block !important;
+  width: auto !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Sticky-Note Style List Items */
+.quadrant .ulist ul {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.65rem !important;
+}
+
+.quadrant .ulist li {
+  position: relative !important;
+  padding: 0.6rem 0.85rem 0.6rem 2rem !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(0, 0, 0, 0.07) !important;
+  font-size: 0.92rem !important;
+  line-height: 1.5 !important;
+  color: #1e293b !important;
+  margin-bottom: 0 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+.quadrant .ulist li p {
+  margin: 0 !important;
+}
+
+.quadrant-says .ulist li::before {
+  content: "💬";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.quadrant-thinks .ulist li::before {
+  content: "💭";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.quadrant-does .ulist li::before {
+  content: "⚡";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.quadrant-feels .ulist li::before {
+  content: "❤️";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.6rem;
+  font-size: 0.8rem;
+}
+
+/* ==========================================================================
+   Pains & Gains Two-Column Container
+   ========================================================================== */
+
+.pains-gains-canvas, .pains-gains-container {
+  margin: 1.5rem 0;
+}
+
+.pains-gains-canvas > .content, .pains-gains-container > .content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.pain-box, .gain-box {
+  margin: 0 !important;
+}
+
+.pain-box > .content {
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%) !important;
+  border: 2px solid var(--pain-border) !important;
+  border-left: 6px solid #dc2626 !important;
+  border-radius: 8px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.08) !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.pain-box .ulist > .title {
+  color: var(--pain-text) !important;
+  font-weight: 800 !important;
+  font-size: 0.95rem !important;
+  text-transform: uppercase !important;
+  margin-bottom: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+}
+
+.pain-box .ulist ul {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+}
+
+.pain-box .ulist li {
+  position: relative !important;
+  padding: 0.5rem 0.75rem 0.5rem 1.85rem !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  font-size: 0.9rem !important;
+  color: #7f1d1d !important;
+}
+
+.pain-box .ulist li p { margin: 0 !important; }
+.pain-box .ulist li::before {
+  content: "❌";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.gain-box > .content {
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%) !important;
+  border: 2px solid var(--gain-border) !important;
+  border-left: 6px solid #16a34a !important;
+  border-radius: 8px !important;
+  padding: 1.25rem !important;
+  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.08) !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.gain-box .ulist > .title {
+  color: var(--gain-text) !important;
+  font-weight: 800 !important;
+  font-size: 0.95rem !important;
+  text-transform: uppercase !important;
+  margin-bottom: 0.75rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.4rem !important;
+}
+
+.gain-box .ulist ul {
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.5rem !important;
+}
+
+.gain-box .ulist li {
+  position: relative !important;
+  padding: 0.5rem 0.75rem 0.5rem 1.85rem !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(34, 197, 94, 0.25) !important;
+  font-size: 0.9rem !important;
+  color: #14532d !important;
+}
+
+.gain-box .ulist li p { margin: 0 !important; }
+.gain-box .ulist li::before {
+  content: "✅";
+  position: absolute;
+  left: 0.55rem;
+  top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   Tech Stack Architecture Callout Card
+   ========================================================================== */
+
+.tech-alignment-card {
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.tech-alignment-card > p:first-child strong {
+  color: #38bdf8 !important;
+  font-size: 1.1rem;
+  display: block;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #334155;
+  padding-bottom: 0.5rem;
+}
+
+.tech-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.tech-item {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 0.85rem;
+}
+
+.tech-feature-title {
+  color: #60a5fa;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 0.35rem;
+}
+
+.tech-feature-desc {
+  font-size: 0.85rem;
+  color: #cbd5e1;
+  line-height: 1.45;
+}
+
+/* ==========================================================================
+   Tables & Structural Admonitions
+   ========================================================================== */
+
+table.tableblock {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+table.tableblock th {
+  background-color: var(--secondary-color);
+  color: #ffffff;
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+table.tableblock td {
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  vertical-align: top;
+}
+
+table.tableblock tr:nth-child(even) td {
+  background-color: var(--bg-alt);
+}
+
+.admonitionblock {
+  margin: 1.5rem 0;
+}
+
+.admonitionblock td.icon {
+  font-weight: bold;
+  padding-right: 1rem;
+}
+
+/* ==========================================================================
+   Responsive & Print Styles
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .empathy-canvas > .content, .empathy-map > .content {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 1.25rem;
+  }
+  .empathy-canvas > .content::before, .empathy-map > .content::before,
+  .empathy-canvas > .content::after, .empathy-map > .content::after {
+    display: none;
+  }
+  .quadrant-says, .quadrant-thinks, .quadrant-does, .quadrant-feels {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .pains-gains-canvas > .content, .pains-gains-container > .content {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  #content {
+    padding: 1rem;
+  }
+}
+
+@media print {
+  #toc.toc-left {
+    display: none;
+  }
+  #content {
+    padding: 0;
+    max-width: 100%;
+  }
+  .persona-card, .empathy-canvas, .pains-gains-canvas {
+    page-break-inside: avoid;
+  }
+}

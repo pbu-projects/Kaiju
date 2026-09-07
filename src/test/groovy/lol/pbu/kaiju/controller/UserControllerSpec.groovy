@@ -96,9 +96,11 @@ class UserControllerSpec extends BaseControllerSpec {
 
     /********** READ Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "READ | should retrieve an existing user by ID: #email"(UUID id, String email) {
+    def "READ | should retrieve an existing user by ID"() {
+        given: "an existing user"
+        def user = userRepository.save(new User(null, "test-user-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
+        UUID id = user.id()
+
         when: "the user is requested by its ID"
         def result = userController.getUser(id)
 
@@ -106,11 +108,8 @@ class UserControllerSpec extends BaseControllerSpec {
         verifyAll {
             result.isPresent()
             result.get().id() == id
-            result.get().email() == email
+            result.get().email() == user.email()
         }
-
-        where:
-        [id, email] << sql.rows("SELECT id, email FROM users LIMIT 3").collect { [it.id, it.email] }
     }
 
     def "READ | should return empty for a non-existent user ID"() {
@@ -123,10 +122,10 @@ class UserControllerSpec extends BaseControllerSpec {
 
     /********** UPDATE Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "UPDATE | should successfully update an existing user: #originalEmail"(UUID id, String originalEmail) {
-        given: "an existing user's details"
+    def "UPDATE | should successfully update an existing user"() {
+        given: "an existing user"
+        def user = userRepository.save(new User(null, "orig-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
+        UUID id = user.id()
         def newEmail = faker.internet().emailAddress()
         def updateRequest = new User(null, newEmail, UserRole.REGION_DIRECTOR, OffsetDateTime.now())
 
@@ -146,9 +145,6 @@ class UserControllerSpec extends BaseControllerSpec {
             email == newEmail
             role == 'REGION_DIRECTOR'
         }
-
-        where:
-        [id, originalEmail] << sql.rows("SELECT id, email FROM users LIMIT 2").collect { [it.id, it.email] }
     }
 
     def "UPDATE | should fail to update a non-existent user"() {
