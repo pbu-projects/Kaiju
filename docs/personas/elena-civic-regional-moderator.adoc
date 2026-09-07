@@ -1,0 +1,83 @@
+=== Elena Rostova — The Civic Regional Moderator
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Elena Rostova (45)* -- [.persona-role-badge]#REGION_DIRECTOR / REGION_AGENT (Civic Authority)#
+
+[role="demographics-grid"]
+*Occupation:* County Director of Civic Engagement | *Location:* County Government Center | *Device:* Dual Display & GIS Terminal | *Jurisdiction:* Regional territory covering 4 municipalities
+
+*Bio & Context:*
+Elena oversees municipal volunteer services, community engagement initiatives, and public safety vetting across a regional jurisdiction covering four municipalities. She is legally responsible for ensuring that all published volunteer opportunities adhere to municipal safety codes, insurance requirements, and non-profit validity. She must balance thorough civic oversight with strict 48-hour SLA turnaround times to avoid stalling grassroots initiatives.
+
+*Needs & Core Goals:*
+* Safeguard public trust by intercepting fraudulent projects, commercial marketing scams, or hazardous tasks.
+* Clear all pending regional project reviews within the mandatory 48-hour SLA window.
+* Ensure regional boundaries are strictly respected so emergency services and municipal liability are clear.
+* Maintain an immutable, court-admissible audit trail of all project approvals, rejections, and revisions.
+
+*Frustrations & Obstacles:*
+* Vague project submissions missing basic safety protocols, insurance proof, or accurate physical coordinates.
+* Grassroots organizers making unauthorized edits to project descriptions after civic approval has been granted.
+* Submissions straddling municipal boundaries creating confusion over emergency service jurisdictions.
+* Review queue bottlenecks during peak disaster relief or holiday seasons threatening 48-hour SLA compliance.
+--
+
+<<<
+
+==== NN/g 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| * "Does this volunteer stream restoration project have clearance to dig near municipal storm drains?" +
+* "This event borders two municipalities; which city's emergency response is designated if an injury occurs?" +
+* "I have 8 projects in the queue that will auto-escalate to the state level in 6 hours if I don't triage them." +
+* "Who modified the youth safety requirements on this construction build after we already approved it?"
+
+| * _If an unvetted group runs a hazardous project and a citizen gets injured, the city and platform bear liability._ +
+* _I don't want to be the bureaucratic bottleneck holding back passionate neighborhood volunteers._ +
+* _Is this project truly a public charity initiative, or is a private commercial business seeking free labor?_ +
+* _I need clear, binding PostGIS polygon containment checks, not vague text descriptions of service territories._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| * Logs into the regional moderation portal every morning to inspect incoming pending submissions. +
+* Cross-references submitted boundary polygons against municipal administrative boundaries in GIS viewers. +
+* Verifies IRS non-profit determination letters and organization verification statuses. +
+* Triggers administrative re-reviews whenever flagged projects submit material description or location changes.
+
+| * *Accountable:* Strongly weighs the legal, ethical, and public safety responsibilities of municipal governance. +
+* *Pressured:* Constantly aware of the ticking 48-hour SLA escalation clock and heavy seasonal volume. +
+* *Vigilant:* Skeptical of ambiguous descriptions, missing safety precautions, and unverified organizations. +
+* *Gratified:* Proud when well-governed civic volunteer initiatives mobilize hundreds of residents safely.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *Boundary Ambiguity:* Cross-jurisdictional projects lacking clear municipal liability boundaries. +
+* *Stealth Edits:* Organizers altering project scope post-approval without triggering municipal re-review. +
+* *SLA Queue Bottlenecks:* Ticking 48-hour escalation timers causing operational stress and review backlogs.
+
+| * *Automated Spatial Routing:* PostGIS boundary intersection automatically assigning projects to correct region. +
+* *Immutable Audit Trails:* Append-only transaction records capturing actor, timestamp, and status diff. +
+* *Automated 48h Escalation:* Scheduled partial index job escalating stalled projects without manual tracking.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for Elena Rostova (45)*
+
+[role="tech-grid"]
+* *administrative_regions (DDD):* Separates civic governance authority from operational project boundaries, preserving municipal jurisdiction integrity.
+* *48h Escalation Queue:* Partial index (idx_projects_pending_escalation) backs an hourly background job that auto-escalates stalled reviews to parent region.
+* *PENDING_UPDATE State Machine:* Material edits by non-admin organizers automatically flip status to PENDING_UPDATE, preventing unapproved changes to live events.
+* *project_audit_logs Ledger:* Immutable append-only ledger recording every CREATED, APPROVED, REJECTED, and EDITED state transition with actor ID.
+--

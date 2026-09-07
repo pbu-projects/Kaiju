@@ -1,0 +1,83 @@
+=== David Chen — The Purpose-Driven & Skill-Building Volunteer
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*David Chen (31)* -- [.persona-role-badge]#STANDARD_USER (Specialist / High-Commitment)#
+
+[role="demographics-grid"]
+*Occupation:* Data Analyst transitioning to ESG Tech | *Location:* Metro Area / Suburban | *Device:* MacBook Pro + Pixel Phone | *Time Budget:* 5–10 hrs/week recurring
+
+*Bio & Context:*
+David has stable employment and wants to dedicate 5–10 hours every week to causes he is deeply passionate about (wildlife conservation, climate resilience, and youth STEM education). He wants to build real-world leadership experience and apply professional skills (data engineering, GIS mapping, project management) to charitable initiatives. He is completely willing to undergo background checks, attend a 4-hour orientation, and commit to long-term schedules.
+
+*Needs & Core Goals:*
+* Filter volunteer opportunities by specific mission cause (#wildlife, #climate) and professional skill requirements (#gis, #data).
+* Find long-term, high-impact leadership roles (committee seats, specialized regional projects) rather than one-off manual tasks.
+* Complete qualification prerequisites (background checks, skill certifications) once and have them recognized across platforms.
+* Build a verified portfolio of community technical impact for resume and professional ESG credentialing.
+
+*Frustrations & Obstacles:*
+* Offering professional data analysis or GIS expertise to a charity and being assigned to hand out water bottles.
+* Search tools that only sort by physical distance, burying regional wildlife initiatives under dozens of neighborhood coat drives.
+* Having to re-submit redundant background checks, ID proofs, and reference letters for every individual non-profit.
+* Vague project postings that lack clear prerequisite requirements, time commitments, or technical scopes.
+--
+
+<<<
+
+==== NN/g 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| * "I have 10 hours a week to give, and I want to use my professional data/GIS skills where they're actually needed." +
+* "I'm happy to do a background check and complete an orientation—just give me the clear onboarding steps." +
+* "Why does search only show events 2 miles away? I'll gladly drive 30 miles for an endangered species habitat cleanup." +
+* "Is there a way to speak with the project director before committing to a 3-month recurring schedule?"
+
+| * _I don't want to waste my Saturdays doing manual busywork that a machine or general volunteer could do in 5 minutes._ +
+* _If this organization is disorganized during onboarding, their field operations will probably be chaotic too._ +
+* _I want this service experience on my resume to demonstrate community leadership in clean tech and public data._ +
+* _I hope they respect my professional time and don't cancel specialized shifts after I've blocked out my calendar._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| * Uses advanced faceted search filters: toggles cause tags (#wildlife, #stem) and skill tags (#gis, #data). +
+* Reads organization mission statements and past project audit histories before applying. +
+* Uploads professional credentials, clearances, and LinkedIn profile to his volunteer dossier. +
+* Commits to recurring weekly schedules or joins REGIONAL initiative waitlists across the county.
+
+| * *Purpose-Driven:* Deeply compelled by moral mission, environmental stewardship, and community impact. +
+* *Selective:* Unwilling to squander finite professional bandwidth on chaotic, low-impact tasks. +
+* *Committed:* Highly dependable, accountable, and steadfast once aligned with a competent leadership team. +
+* *Fulfilled:* Deeply energized when high-skill contributions transform a non-profit's operational capacity.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *Skill Underutilization:* Being relegated to manual busywork despite possessing high-demand technical capabilities. +
+* *Distance-Only Search:* Physical radius filters that exclude high-relevance regional initiatives across county borders. +
+* *Redundant Screening:* Repeating background checks and reference interviews for every new organization.
+
+| * *Deep Skill & Cause Taxonomy:* Fast faceted filtering by required competencies (#gis, #cpr) and causes (#wildlife). +
+* *Regional Initiative Access:* Joining geofenced polygon projects (REGIONAL STI) with remote or field components. +
+* *Verified Credential Passport:* Reusable digital clearances unlocking specialized, high-trust shifts instantly.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for David Chen (31)*
+
+[role="tech-grid"]
+* *tags & shift_tags Taxonomy:* Enables multi-tag faceted filtering on skills (#gis, #carpentry) and causes (#wildlife), matching David to high-skill opportunities.
+* *REGIONAL Project Discriminator:* Bypasses physical point radius limits to surface county/state-wide initiatives that need specialized remote or distributed contributors.
+* *Verified Volunteer Passport:* Stores verified credential badges (background check clearance, CPR license) on users profile to unlock gated shifts.
+* *Keyset Scheduled Shifts:* Streams recurring multi-week shift series with sub-millisecond latency for seamless long-term schedule planning.
+--

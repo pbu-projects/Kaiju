@@ -15,11 +15,20 @@ class BaseControllerSpec extends Specification {
     DataSource dataSource
 
     @Shared
-    Sql sql
+    DataSource rawDataSource
 
     def setupSpec() {
-        def target = dataSource.hasProperty('targetDataSource') ? dataSource.targetDataSource : dataSource
-        sql = new Sql((DataSource) target)
+        rawDataSource = dataSource.hasProperty('targetDataSource') ? (DataSource) dataSource.targetDataSource : dataSource
+    }
+
+    Sql getSql() {
+        try {
+            def conn = dataSource.getConnection()
+            conn.close()
+            return new Sql(dataSource)
+        } catch (Exception ignored) {
+            return new Sql(rawDataSource)
+        }
     }
 
     protected void executeUpdate(String sqlString, Object... parameters) {

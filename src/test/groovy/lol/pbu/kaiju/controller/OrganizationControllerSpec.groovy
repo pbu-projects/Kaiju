@@ -102,9 +102,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     /********** READ Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "READ | should retrieve an existing organization by ID: #name"(UUID id, String name) {
+    def "READ | should retrieve an existing organization by ID"() {
+        given: "an existing organization"
+        def org = organizationRepository.save(new Organization(null, "Test Organization Read", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, []))
+        UUID id = org.id()
+
         when: "the organization is requested by its ID"
         def result = organizationController.getOrganization(id)
 
@@ -112,11 +114,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         verifyAll {
             result.isPresent()
             result.get().id() == id
-            result.get().name() == name
+            result.get().name() == "Test Organization Read"
         }
-
-        where:
-        [id, name] << sql.rows("SELECT id, name FROM organizations LIMIT 3").collect { [it.id, it.name] }
     }
 
     def "READ | should return empty for a non-existent organization ID"() {
@@ -129,10 +128,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     /********** UPDATE Tests **********/
 
-    @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "UPDATE | should successfully update an existing organization: #originalName"(UUID id, String originalName) {
-        given: "an existing organization's details"
+    def "UPDATE | should successfully update an existing organization"() {
+        given: "an existing organization"
+        def org = organizationRepository.save(new Organization(null, "Original Org Name", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, []))
+        UUID id = org.id()
         def newName = "Updated ${faker.company().name()}"
         def newUrl = "https://${faker.internet().domainName()}"
         def updateRequest = new Organization(null, newName, newUrl, null, true, VerificationStatus.UNVERIFIED, null, [])
@@ -153,9 +152,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             name == newName
             website_url == newUrl
         }
-
-        where:
-        [id, originalName] << sql.rows("SELECT id, name FROM organizations LIMIT 2").collect { [it.id, it.name] }
     }
 
     def "UPDATE | should fail to update a non-existent organization"() {

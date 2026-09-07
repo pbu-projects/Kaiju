@@ -1,0 +1,209 @@
+= Comprehensive Human Strategy & NN/g Empathy Maps: Kaiju (Volunteer Monster)
+Kaiju Architecture Team <team@pbu.lol>
+v1.0, September 2026: Work-In-Progress Architectural & Human Strategy Specification
+:doctype: book
+:toc: left
+:toclevels: 3
+:sectnums:
+:sectanchors:
+:icons: font
+:stylesheet: styles/human-strategy.css
+:linkcss:
+:source-highlighter: highlight.js
+:imagesdir: ./
+
+[abstract]
+--
+This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Adhering to **Nielsen Norman Group (NN/g)** best practices, this document models 7 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
+--
+
+== Executive Summary: The Dual Human Spectrums & The Domain Chasm
+
+As synthesized in the architectural evaluation, the Kaiju platform has achieved an elite foundation in **Phase 1: Spatial Discovery & Core Data**. Powered by PostgreSQL 17, PostGIS `GEOGRAPHY(Point, 4326)` and `Polygon` indexing, Fowler's Single Table Inheritance (STI), and Micronaut 5 compile-time dependency injection, the system reliably answers:
+[quote]
+"Where is an initiative located, what type of opportunity is it, and within which civic boundary does it reside?"
+
+However, an enterprise volunteer ecosystem is governed by **two distinct human spectrums**:
+
+=== 1. The Volunteer Spectrum (Motivations & Commitments)
+1. **Spontaneous / Proximity-First Volunteers (Maya Lin)**: Seeking low-friction, 2-to-3-hour opportunities near home. High abandonment risk if faced with login walls, paperwork, or mobile lag.
+2. **Purpose-Driven & Skill-Building Specialists (David Chen)**: Seeking cause alignment (`#wildlife`, `#climate`) and professional skill utilization (`#gis`, `#data-analysis`). Willing to complete background checks, attend orientations, and commit to multi-month recurring schedules.
+3. **Academic & Portfolio-Building Students (Chloe Torres)**: Seeking 100+ verified service hours for college admissions, National Honor Society, or club philanthropy. Requires group slot reservations and official, accredited PDF transcripts.
+4. **Compliance & Mandated Volunteers (Raymond Miller)**: Fulfilling court-ordered community restitution or SNAP ABAWD monthly work requirements. Requires explicit court/SNAP eligibility filters, GPS-verified check-in/out timestamps, and tamper-proof legal reporting to avoid probation violations or benefit loss.
+
+=== 2. The Non-Profit Coordinator Spectrum (Volume vs. Liability)
+1. **High-Volume Operations Coordinators (Marcus Vance)**: Managing food banks, community cleanups, and warehouse packaging lines. Battles a chronic 30–50% volunteer no-show rate and needs fast multi-site shift coordination.
+2. **Specialized & High-Liability Program Directors (Dr. Sarah Al-Mansoor)**: Managing youth mentorship, foster care, and 24/7 crisis support lines. Legally cannot allow "just anyone off the street" near vulnerable populations. Requires mandatory background check vetting, certified training gates, and credential expiration tracking.
+
+=== 3. The Civic Governance Authority
+* **Civic Regional Moderators (Elena Rostova)**: Municipal leaders responsible for public safety, territorial boundary integrity, and 48-hour SLA turnaround.
+
+[IMPORTANT]
+.Bridging the Domain Chasm
+====
+Phase 1 established the *Spatial Catalog*. Phases 2, 3, and 4 must construct the *Human Half*: Capacity controls, automated waitlists, digital liability waivers, on-site QR attendance, and verified volunteer hour credentials.
+====
+
+== Nielsen Norman Group (NN/g) Framework & Methodology
+
+According to Nielsen Norman Group research standards:
+* **Proto-Personas**: Assumption-based archetypes synthesizing existing domain knowledge, organizational context, and behavioral observations before formal field studies.
+* **4-Quadrant Empathy Maps**: Capture a single user persona's current-state experience:
+** **SAYS**: Direct verbal statements, quotes, and explicit questions vocalized aloud.
+** **THINKS**: Unspoken anxieties, doubts, preoccupations, and internalized beliefs.
+** **DOES**: Concrete physical actions, workflows, workarounds, and observable habits.
+** **FEELS**: Emotional states, affective adjectives, cognitive fatigue, and emotional triumphs.
+** **PAINS & GAINS**: Synthesized obstacles (risks, wasted time) vs. desired outcomes (success metrics, relief).
+
+== The Volunteer Spectrum (4 Proto-Personas)
+
+include::personas/maya-spontaneous-volunteer.adoc[]
+
+<<<
+
+include::personas/david-purpose-skill-volunteer.adoc[]
+
+<<<
+
+include::personas/chloe-academic-portfolio.adoc[]
+
+<<<
+
+include::personas/raymond-mandated-compliance.adoc[]
+
+<<<
+
+== The Coordinator Spectrum (2 Proto-Personas)
+
+include::personas/marcus-high-volume-coordinator.adoc[]
+
+<<<
+
+include::personas/sarah-high-liability-director.adoc[]
+
+<<<
+
+== The Civic Governance Authority (1 Proto-Persona)
+
+include::personas/elena-civic-regional-moderator.adoc[]
+
+<<<
+
+== Comprehensive Strategic Tech Stack Matrix
+
+The table below maps each persona's operational needs directly to the technical architecture decisions made in the Kaiju codebase:
+
+[cols="2,2,3,3", options="header"]
+|===
+| Persona & Role | Primary Driver | Empathy Pain Point | Kaiju Tech Stack Alignment
+
+| *Maya Lin (24)* +
+`STANDARD_USER` (Public)
+| Spontaneous local impact in 2-3 hour weekend slots.
+| 8s mobile page load times, phantom shifts, mandatory account walls.
+| * *JTE SSR*: Sub-50ms TTFB & 0MB JS bundle. +
+* *PostGIS `ST_DWithin`*: Truthful geodesic radius. +
+* *STI `OPEN_DOOR`*: Immediate directions without booking. +
+* *`ProjectSearchCard` DTO*: Ultra-lean mobile wire payload.
+
+| *David Chen (31)* +
+`STANDARD_USER` (Specialist)
+| Professional skill application (GIS/Data) & cause dedication.
+| Relegated to manual busywork; distance search hiding regional causes.
+| * *`tags` & `shift_tags`*: Multi-tag faceted queries (`#gis`, `#cpr`). +
+* *`REGIONAL` STI*: Bypasses point radius for regional initiatives. +
+* *Volunteer Passport*: Reusable credential screening profile. +
+* *Keyset Shifts*: Sub-ms recurring schedule streaming.
+
+| *Chloe Torres (17)* +
+`STANDARD_USER` (Student)
+| 100 verified hours for college admissions & club group projects.
+| Lost paper logs; non-profits delaying hour verification.
+| * *Verified Hours Ledger*: Schema tracking verified hours & EIN. +
+* *Group Reservations*: Slot block holds with join tokens. +
+* *Digital Minor Consent*: Automated parental waiver e-signatures. +
+* *Common App PDF Generator*: Verifiable PDF certificates.
+
+| *Raymond Miller (35)* +
+`STANDARD_USER` (Mandated)
+| Court restitution & SNAP ABAWD monthly work compliance.
+| Turned away at door; lost paper logs risking probation violation.
+| * *Compliance Attribute Flags*: `accepts_court_mandated`, `snap_work_eligible`. +
+* *Tamper-Proof Audit Logging*: GPS geofenced check-in/out timestamps. +
+* *Court-Admissible PDF Export*: Official reports with EIN & QR token. +
+* *Flexible Keyset Shifts*: Evening/weekend shifts around hourly jobs.
+
+| *Marcus Vance (38)* +
+`ORG_ADMIN` (Operations)
+| Filling shift capacities; managing 5 hubs without spreadsheet chaos.
+| 30–50% volunteer no-shows; duplicate event creation; paper clipboards.
+| * *Compose Multiplatform Admin*: Desktop-grade calendar builder. +
+* *`project_locations` (1:N)*: 1 umbrella initiative, 10 addresses. +
+* *`/no-look` Endpoints*: Fast bulk ingestion for 500+ shifts. +
+* *Verified Status Bypass*: Auto-approval for trusted organizations.
+
+| *Dr. Sarah Al-Mansoor (42)* +
+`ORG_ADMIN` (Youth/Crisis)
+| Youth safeguarding; mandatory background checks; trauma training.
+| Unvetted walk-ins; lapsed credentials; catastrophic liability risk.
+| * *Gated Roster State Machine*: Shifts locked until `status = QUALIFIED`. +
+* *Micronaut Security & RBAC*: Tiered roles & qualification claims. +
+* *Credential Expiration Tracking*: Automated 60-day renewal alerts. +
+* *Transactional Audit Ledgers*: Append-only background & waiver logs.
+
+| *Elena Rostova (45)* +
+`REGION_DIRECTOR` (Civic)
+| Municipal safety; clearing review queue under 48h SLA; boundary integrity.
+| Review backlogs; ambiguous jurisdictional borders; stealth scope edits.
+| * *`administrative_regions` (DDD)*: Preserves civic authority. +
+* *48h Escalation Queue*: Hourly cron on partial index escalates. +
+* *`PENDING_UPDATE` Trigger*: Edits automatically re-trigger review. +
+* *Transactional Audit Ledgers*: Immutable append-only actor diffs.
+|===
+
+== Visual Architecture & Draw.io Diagram File
+
+The complete 8-page visual presentation is maintained at:
+`docs/human-strategy-personas.drawio`
+
+=== Page Index:
+* **Page 1: `1. Human Strategy Ecosystem`** — Full macro mapping of all 7 personas across the volunteer and coordinator spectrums, 4 technical architecture layers, and 4 human value loops.
+* **Page 2: `2. Maya - Spontaneous Local Volunteer`**
+* **Page 3: `3. David - Purpose & Skill Volunteer`**
+* **Page 4: `4. Chloe - Academic & Portfolio Volunteer`**
+* **Page 5: `5. Raymond - Mandated & Compliance Volunteer`**
+* **Page 6: `6. Marcus - High-Volume Coordinator`**
+* **Page 7: `7. Dr. Sarah - Specialized Director`**
+* **Page 8: `8. Elena - Civic Regional Moderator`**
+
+== Document Compilation & Export Options
+
+This AsciiDoc document can be exported to multiple formats using the tools configured in this repository:
+
+=== 1. Compiling to HTML5 with Custom CSS
+To generate the styled standalone HTML document:
+
+----
+asciidoc -a stylesheet=styles/human-strategy.css -o human-strategy.html human-strategy.adoc
+----
+Or with modern `asciidoctor`:
+
+----
+asciidoctor -a stylesheet=styles/human-strategy.css -a linkcss human-strategy.adoc
+----
+
+=== 2. Exporting to PDF
+To export to a publication-grade PDF:
+
+----
+a2x -f pdf -d book human-strategy.adoc
+# Or with asciidoctor-pdf:
+asciidoctor-pdf -a stylesheet=styles/human-strategy.css human-strategy.adoc
+----
+
+=== 3. Exporting to EPUB or DocBook
+
+----
+a2x -f epub human-strategy.adoc
+a2x -f docbook human-strategy.adoc
+----

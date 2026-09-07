@@ -1,0 +1,83 @@
+=== Chloe Torres — The Academic & Portfolio-Building Student Volunteer
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Chloe Torres (17)* -- [.persona-role-badge]#STANDARD_USER (Student / Club Officer)#
+
+[role="demographics-grid"]
+*Occupation:* High School Junior & Key Club Officer | *Location:* Suburban Metro | *Device:* iPhone 14 & Chromebook | *Goal:* 100 verified service hours & group projects
+
+*Bio & Context:*
+Chloe is an ambitious high school student preparing competitive college and scholarship applications. She needs 100 verified service hours for her National Honor Society and diploma seals. As her school's Key Club officer, she coordinates weekend group service projects for 15–20 classmates. She requires tamper-proof hour logging, digital parent waivers, group slot holds, and an exportable certified service transcript for university admissions portals.
+
+*Needs & Core Goals:*
+* Earn 100 verified service hours before December scholarship and college application deadlines.
+* Reserve blocks of 15–20 volunteer slots for high school club members to attend weekend service projects together.
+* Generate an official, tamper-proof PDF service transcript with organization tax IDs and supervisor sign-offs.
+* Secure digital endorsements from project directors highlighting her team coordination and leadership.
+
+*Frustrations & Obstacles:*
+* Paper verification forms getting coffee-stained, lost, or rejected by guidance counselors.
+* Arriving at a service site with 15 club members only to be told there's only enough work for 5 people.
+* Non-profit coordinators taking weeks to sign off on hours when scholarship submission deadlines are days away.
+* Underage students needing physical paper permission slips signed by parents because platforms lack digital minor consent.
+--
+
+<<<
+
+==== NN/g 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| * "I need to log 100 verified community service hours by December for my early college application." +
+* "Can I reserve 15 spots for our high school Key Club to volunteer together this Saturday?" +
+* "Does your app generate an official letter with the supervisor's signature and contact number?" +
+* "Do my parents have to sign a physical paper slip, or is there a digital waiver link I can text them?"
+
+| * _If this non-profit doesn't verify my hours before the deadline, all my weekend work won't count on my application._ +
+* _I hope our club members actually show up so I don't look unreliable in front of the volunteer coordinator._ +
+* _I want to do real leadership work that looks impressive on my college resume, not just hand out flyers._ +
+* _I need an easy way to export an official service transcript to upload directly to the Common App._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| * Filters projects for weekend group availability and student-friendly physical requirements. +
+* Reserves shift blocks for her club peers and distributes join tokens through club messaging channels. +
+* Dispatches digital parental consent links to underage students prior to event day. +
+* Scans on-site QR codes for check-in and immediately requests supervisor verification at shift end.
+
+| * *Ambitious:* Highly driven to achieve scholarship milestones and build an impressive civic portfolio. +
+* *Anxious:* Stressed about tight application deadlines and chasing down slow supervisor signatures. +
+* *Accountable:* Feels strong peer pressure to deliver organized, safe service opportunities for her club. +
+* *Proud:* Uplifted and validated when her certified transcript reaches the 100-hour achievement tier.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *Lost Paper Records:* Paper logs misplaced by counselors or organizers destroying months of documented service. +
+* *Group Booking Gaps:* Having to ask 15 teenagers to individually sign up before slots fill up. +
+* *Delayed Verification:* Non-profits taking weeks to confirm hours, causing students to miss scholarship deadlines.
+
+| * *Digital Service Transcript:* Instant export of certified, tamper-proof service records for college portals. +
+* *Group Reservation Holds:* Reserving slot blocks with shareable invite tokens for student clubs. +
+* *Digital Minor Consent:* Automated parental e-signatures eliminating physical paper slips.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for Chloe Torres (17)*
+
+[role="tech-grid"]
+* *Verified Hours Ledger:* Database schema stores exact verified hours, supervisor actor ID, and organization 501(c)(3) EIN for accredited reporting.
+* *Group Reservation Engine:* Allows club leaders like Chloe to hold blocks of slots with temporary reservation tokens for student peers.
+* *Digital Minor Waiver Pipeline:* Automated guardian SMS/email waiver signing satisfying COPPA and non-profit liability rules.
+* *PDF Transcript Generator:* Generates verifiable PDF completion certificates with unique cryptographic validation URLs for university admissions.
+--

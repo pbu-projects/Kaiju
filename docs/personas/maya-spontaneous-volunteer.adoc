@@ -1,0 +1,83 @@
+=== Maya Lin — The Spontaneous Local Volunteer
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Maya Lin (24)* -- [.persona-role-badge]#STANDARD_USER / Public Searcher#
+
+[role="demographics-grid"]
+*Occupation:* Marketing Specialist & Grad Student | *Location:* Salt Lake City / Urban Metro | *Device:* iPhone 15 (Cellular) | *Time Budget:* 2–3 hr weekend slots
+
+*Bio & Context:*
+Maya recently moved to the city and wants to connect with her neighborhood through weekend volunteering while fulfilling a 20-hour service requirement for her degree. Juggling corporate work and night classes, her availability is strictly bounded to specific weekend slots. She has zero patience for administrative paperwork, mandatory app downloads, or account creation walls just to view event details.
+
+*Needs & Core Goals:*
+* Discover meaningful community work within a 15-minute bike or transit radius.
+* Instantly distinguish between scheduled commitments (soup kitchen shifts) and flexible walk-in drives (coat donations).
+* Obtain verifiable digital proof of service hours for her university graduation requirement.
+* Arrive with zero ambiguity regarding parking, attire, tools, and check-in procedures.
+
+*Frustrations & Obstacles:*
+* Clunky non-profit websites taking 8+ seconds to load on mobile cellular browsers.
+* Being forced to submit a 5-page personal profile just to check donation drop-off hours.
+* Arriving at a venue only to discover the event was quietly rescheduled, cancelled, or overbooked.
+* Inaccurate map pins pointing to administrative headquarters rather than the actual work site.
+--
+
+<<<
+
+==== NN/g 4-Quadrant Empathy Map
+
+[cols="1,1", options="header", role="empathy-table"]
+|===
+| SAYS (Explicit Verbal Expressions)
+| THINKS (Unspoken Beliefs & Doubts)
+
+| * "I have three free hours this Saturday morning—is there anything close to me?" +
+* "Can someone officially verify my 20 hours for my university service requirement?" +
+* "Do I need to bring work gloves, or does the organization provide all safety gear?" +
+* "I don't want to create an account with a password just to see what time donations are accepted."
+
+| * _I hope this isn't disorganized like the last cleanup where we stood around for 45 minutes doing nothing._ +
+* _Is this neighborhood safe to walk to early on a Saturday? Where do I safely park?_ +
+* _Will anyone actually notice or care if I show up, or am I just an extra body in a corner?_ +
+* _I really want to help, but I cannot commit to a recurring 6-month weekly contract._
+
+| DOES (Observable Behaviors)
+| FEELS (Affective Emotional States)
+
+| * Searches for volunteer opportunities on her smartphone while riding transit. +
+* Toggles between Google Maps and transit apps to verify travel time before committing. +
+* Picks OPEN_DOOR walk-in drives during exam weeks and scheduled shifts when calendar permits. +
+* Abandons registration flows immediately if blocked by an aggressive login wall before seeing details.
+
+| * *Eager:* Genuinely motivated to make an authentic community impact and meet neighborhood peers. +
+* *Anxious:* Apprehensive about arrival logistics, unfamiliar venues, and parking confusion. +
+* *Impatient:* Irritated by sluggish web interfaces, infinite spinners, and redundant forms. +
+* *Proud:* Uplifted and empowered when her volunteer contribution produces tangible community results.
+|===
+
+[cols="1,1", options="header", role="pains-gains-table"]
+|===
+| CRITICAL PAINS & RISKS
+| DESIRED GAINS & SUCCESS METRICS
+
+| * *Phantom Shifts:* Traveling across town only to find a cancelled event or an overbooked room. +
+* *Mobile Latency:* Multi-megabyte JS/Wasm bundles freezing mobile browsers on transit. +
+* *Inaccurate Geocoding:* Map pins pointing to corporate offices rather than active work sites.
+
+| * *Sub-50ms Discovery:* Frictionless public web discovery with zero JavaScript bundle overhead. +
+* *Truthful Driving Distance:* Real PostGIS geodesic distance with clear site entry instructions. +
+* *Verified Digital Credential:* One-click certified service hour records for university portals.
+|===
+
+[role="tech-alignment-card"]
+--
+*Kaiju Tech Stack Alignment for Maya Lin (24)*
+
+[role="tech-grid"]
+* *JTE Server-Side Templates:* Compiles templates directly to Java bytecode, delivering sub-50ms TTFB and 0MB JavaScript download weight on mobile transit.
+* *PostGIS ST_DWithin Radius:* Calculates truthful geodesic distance from Maya's coordinates (GEOGRAPHY Point, 4326); eliminates fake boundary pins.
+* *STI Project Discriminator:* Automatically renders the correct UX: OPEN_DOOR provides directions/hours; STANDARD delivers a calendar shift picker.
+* *ProjectSearchCard DTO:* An immutable, compact @Serdeable record transmitting only 5 essential fields over the wire to maximize mobile battery and data efficiency.
+--
