@@ -91,7 +91,7 @@ include::personas/elena-civic-regional-moderator.adoc[]
 
 <<<
 
-== Comprehensive Strategic Tech Stack Matrix
+== Tech Stack
 
 Before detailing how the technical architecture aligns with specific human needs, it is critical to overview the core technologies driving the Kaiju platform:
 
