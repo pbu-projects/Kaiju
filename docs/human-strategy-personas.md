@@ -10,7 +10,7 @@
 
 ## Executive Summary: The Dual Human Spectrums & The Domain Chasm
 
-As established in [ARCHITECTURE_SYNTHESIS.md](../ARCHITECTURE_SYNTHESIS.md), the Kaiju platform has achieved an elite, high-performance foundation in **Phase 1: Spatial Discovery & Core Data**. Through PostgreSQL 17, PostGIS `GEOGRAPHY(Point, 4326)` and `Polygon` indexing, Fowler's Single Table Inheritance (STI), and Micronaut 5 compile-time dependency injection, the system excels at answering:
+As established in early architectural planning, the Kaiju platform has achieved an elite, high-performance foundation in **Phase 1: Spatial Discovery & Core Data**. Through PostgreSQL 17, PostGIS `GEOGRAPHY(Point, 4326)` and `Polygon` indexing, Fowler's Single Table Inheritance (STI), and Micronaut 5 compile-time dependency injection, the system excels at answering:
 > *"Where is an initiative located, what type of opportunity is it, and within which civic boundary does it reside?"*
 
 However, an enterprise volunteer management ecosystem encompasses **two distinct human spectrums**:
