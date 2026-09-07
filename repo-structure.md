@@ -1,3 +1,6 @@
+# Repository Structure
+
+```text
 kaiju/                            # The root repository folder
 ├── build.gradle.kts              # Root build configuration
 ├── settings.gradle.kts           # Root settings (single module)
@@ -25,3 +28,4 @@ kaiju/                            # The root repository folder
         ├── groovy/lol/pbu/       # Spock integration & unit tests
         └── resources/
             └── application-test.yml # Test environment configuration
+```

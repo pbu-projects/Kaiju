@@ -37,5 +37,5 @@ Backend service for Volunteer Monster.
 
 </details>
 
-- [Micronaut Documentation](https://docs.micronaut.io/5.0.5/guide/index.html)
+- [Micronaut Documentation](https://docs.micronaut.io/latest/guide/index.html)
 - [Micronaut Guides](https://guides.micronaut.io/index.html)
