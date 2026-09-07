@@ -16,6 +16,8 @@ out/
 
 # IDE & Editor
 .vscode/
+*.bkp
+.$*
 
 # Environment Variables
 .env
@@ -23,5 +25,6 @@ out/
 *.env
 
 # Python
+*.py
 __pycache__/
 *.py[cod]

@@ -7,6 +7,7 @@ Core business logic, security model, and moderation flows.
 Authentication is handled by [authentik](https://goauthentik.io/), which issues JSON Web Tokens (JWTs). Micronaut Security verifies tokens and enforces role-based authorization via `@Secured`.
 
 ### Role Hierarchy
+
 - **Platform Roles** (`users.role`):
   - `GLOBAL_ADMIN`: Full system access.
   - `REGION_ADMIN`: Administrative control over specific geographic territories.
