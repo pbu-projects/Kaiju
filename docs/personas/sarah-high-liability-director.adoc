@@ -1,4 +1,4 @@
-==== Dr. Sarah Al-Mansoor — The High-Liability Program Director
+==== Dr. Sarah Al-Mansoor - The High-Liability Program Director
 
 [role="persona-card"]
 --
@@ -29,43 +29,32 @@ Dr. Sarah oversees court-mandated youth mentoring, transitional foster youth pro
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map
 
-[cols="1,1", options="header", role="empathy-table"]
-|===
-| SAYS (Explicit Verbal Expressions)
-| THINKS (Unspoken Beliefs & Doubts)
 
-| 
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
 
-| * _A single safeguarding failure or unvetted individual could cause catastrophic harm to a child and destroy our mission._ +
-* _I feel guilty turning away eager people, but our duty of care to vulnerable clients must always come first._ +
-* _I waste thousands of dollars in background check fees on volunteers who ghost us during training._ +
+_No direct verbal statements recorded during initial onboarding._
+
+*DOES* _(Observable Behaviors)_
+
+_No direct field observations recorded._
+
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _A single safeguarding failure or unvetted individual could cause catastrophic harm to a child and destroy our mission._
+* _I feel guilty turning away eager people, but our duty of care to vulnerable clients must always come first._
+* _I waste thousands of dollars in background check fees on volunteers who ghost us during training._
 * _I need an automated system that locks shifts until all credentials, trainings, and waivers are verified._
 
-| DOES (Observable Behaviors)
-| FEELS (Affective Emotional States)
+*FEELS* _(Affective Emotional States)_
 
-| 
-
-| * *Vigilant:* Hyper-aware of legal liability, youth safeguarding, and institutional compliance. +
-* *Protective:* Fiercely devoted to shielding trauma survivors and minors from physical or emotional harm. +
-* *Cautious:* Skeptical of 'instant sign-up' features that sacrifice safety for user acquisition metrics. +
+* *Vigilant:* Hyper-aware of legal liability, youth safeguarding, and institutional compliance.
+* *Protective:* Fiercely devoted to shielding trauma survivors and minors from physical or emotional harm.
+* *Cautious:* Skeptical of 'instant sign-up' features that sacrifice safety for user acquisition metrics.
 * *Relieved:* Deeply reassured when technical guardrails guarantee that only 100% vetted volunteers access shifts.
-|===
-
-[cols="1,1", options="header", role="pains-gains-table"]
-|===
-| CRITICAL PAINS & RISKS
-| DESIRED GAINS & SUCCESS METRICS
-
-| * *Safeguarding Breach Risk:* Unauthorized or unvetted individuals gaining access to vulnerable populations. +
-* *Expired Credential Blind Spots:* Volunteers working with lapsed background checks or certifications. +
-* *Wasted Screening Capital:* Paying expensive background check fees for flaky volunteers who abandon the program.
-
-| * *Automated Qualification Gating:* Shifts automatically locked until background checks and training are certified. +
-* *Integrated Screening Pipeline:* Direct API verification of background clearances and identity records. +
-* *Audit-Ready Compliance Reports:* 1-click export of tamper-proof credential logs for grant and legal authorities.
-|===
-
+--

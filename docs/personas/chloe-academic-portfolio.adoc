@@ -1,4 +1,4 @@
-==== Chloe Torres — The Academic & Portfolio-Building Student Volunteer
+==== Chloe Torres - The Academic & Portfolio-Building Student Volunteer
 
 [role="persona-card"]
 --
@@ -29,43 +29,32 @@ Chloe is an ambitious high school student preparing competitive college and scho
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map
 
-[cols="1,1", options="header", role="empathy-table"]
-|===
-| SAYS (Explicit Verbal Expressions)
-| THINKS (Unspoken Beliefs & Doubts)
 
-| 
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
 
-| * _If this non-profit doesn't verify my hours before the deadline, all my weekend work won't count on my application._ +
-* _I hope our club members actually show up so I don't look unreliable in front of the volunteer coordinator._ +
-* _I want to do real leadership work that looks impressive on my college resume, not just hand out flyers._ +
+_No direct verbal statements recorded during initial onboarding._
+
+*DOES* _(Observable Behaviors)_
+
+_No direct field observations recorded._
+
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _If this non-profit doesn't verify my hours before the deadline, all my weekend work won't count on my application._
+* _I hope our club members actually show up so I don't look unreliable in front of the volunteer coordinator._
+* _I want to do real leadership work that looks impressive on my college resume, not just hand out flyers._
 * _I need an easy way to export an official service transcript to upload directly to the Common App._
 
-| DOES (Observable Behaviors)
-| FEELS (Affective Emotional States)
+*FEELS* _(Affective Emotional States)_
 
-| 
-
-| * *Ambitious:* Highly driven to achieve scholarship milestones and build an impressive civic portfolio. +
-* *Anxious:* Stressed about tight application deadlines and chasing down slow supervisor signatures. +
-* *Accountable:* Feels strong peer pressure to deliver organized, safe service opportunities for her club. +
+* *Ambitious:* Highly driven to achieve scholarship milestones and build an impressive civic portfolio.
+* *Anxious:* Stressed about tight application deadlines and chasing down slow supervisor signatures.
+* *Accountable:* Feels strong peer pressure to deliver organized, safe service opportunities for her club.
 * *Proud:* Uplifted and validated when her certified transcript reaches the 100-hour achievement tier.
-|===
-
-[cols="1,1", options="header", role="pains-gains-table"]
-|===
-| CRITICAL PAINS & RISKS
-| DESIRED GAINS & SUCCESS METRICS
-
-| * *Lost Paper Records:* Paper logs misplaced by counselors or organizers destroying months of documented service. +
-* *Group Booking Gaps:* Having to ask 15 teenagers to individually sign up before slots fill up. +
-* *Delayed Verification:* Non-profits taking weeks to confirm hours, causing students to miss scholarship deadlines.
-
-| * *Digital Service Transcript:* Instant export of certified, tamper-proof service records for college portals. +
-* *Group Reservation Holds:* Reserving slot blocks with shareable invite tokens for student clubs. +
-* *Digital Minor Consent:* Automated parental e-signatures eliminating physical paper slips.
-|===
-
+--

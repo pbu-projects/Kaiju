@@ -1,4 +1,4 @@
-==== David Chen — The Purpose-Driven & Skill-Building Volunteer
+==== David Chen - The Purpose-Driven & Skill-Building Volunteer
 
 [role="persona-card"]
 --
@@ -29,43 +29,32 @@ David has stable employment and wants to dedicate 5–10 hours every week to cau
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map
 
-[cols="1,1", options="header", role="empathy-table"]
-|===
-| SAYS (Explicit Verbal Expressions)
-| THINKS (Unspoken Beliefs & Doubts)
 
-| 
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
 
-| * _I don't want to waste my Saturdays doing manual busywork that a machine or general volunteer could do in 5 minutes._ +
-* _If this organization is disorganized during onboarding, their field operations will probably be chaotic too._ +
-* _I want this service experience on my resume to demonstrate community leadership in clean tech and public data._ +
+_No direct verbal statements recorded during initial onboarding._
+
+*DOES* _(Observable Behaviors)_
+
+_No direct field observations recorded._
+
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _I don't want to waste my Saturdays doing manual busywork that a machine or general volunteer could do in 5 minutes._
+* _If this organization is disorganized during onboarding, their field operations will probably be chaotic too._
+* _I want this service experience on my resume to demonstrate community leadership in clean tech and public data._
 * _I hope they respect my professional time and don't cancel specialized shifts after I've blocked out my calendar._
 
-| DOES (Observable Behaviors)
-| FEELS (Affective Emotional States)
+*FEELS* _(Affective Emotional States)_
 
-| 
-
-| * *Purpose-Driven:* Deeply compelled by moral mission, environmental stewardship, and community impact. +
-* *Selective:* Unwilling to squander finite professional bandwidth on chaotic, low-impact tasks. +
-* *Committed:* Highly dependable, accountable, and steadfast once aligned with a competent leadership team. +
+* *Purpose-Driven:* Deeply compelled by moral mission, environmental stewardship, and community impact.
+* *Selective:* Unwilling to squander finite professional bandwidth on chaotic, low-impact tasks.
+* *Committed:* Highly dependable, accountable, and steadfast once aligned with a competent leadership team.
 * *Fulfilled:* Deeply energized when high-skill contributions transform a non-profit's operational capacity.
-|===
-
-[cols="1,1", options="header", role="pains-gains-table"]
-|===
-| CRITICAL PAINS & RISKS
-| DESIRED GAINS & SUCCESS METRICS
-
-| * *Skill Underutilization:* Being relegated to manual busywork despite possessing high-demand technical capabilities. +
-* *Distance-Only Search:* Physical radius filters that exclude high-relevance regional initiatives across county borders. +
-* *Redundant Screening:* Repeating background checks and reference interviews for every new organization.
-
-| * *Deep Skill & Cause Taxonomy:* Fast faceted filtering by required competencies (#gis, #cpr) and causes (#wildlife). +
-* *Regional Initiative Access:* Joining geofenced polygon projects (REGIONAL STI) with remote or field components. +
-* *Verified Credential Passport:* Reusable digital clearances unlocking specialized, high-trust shifts instantly.
-|===
-
+--

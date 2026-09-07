@@ -1,4 +1,4 @@
-==== Raymond Miller — The Compliance & Mandated Service Volunteer
+==== Raymond Miller - The Compliance & Mandated Service Volunteer
 
 [role="persona-card"]
 --
@@ -29,43 +29,32 @@ Raymond is an hourly warehouse employee balancing a 40-hour court-ordered commun
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map
 
-[cols="1,1", options="header", role="empathy-table"]
-|===
-| SAYS (Explicit Verbal Expressions)
-| THINKS (Unspoken Beliefs & Doubts)
 
-| 
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
 
-| * _If I lose this food assistance or miss my court hours, my whole family will suffer._ +
-* _I feel judged when people ask why I'm volunteering; I just want to do honest hard work and clear my record._ +
-* _I hope the probation officer accepts this digital report without demanding a wet-ink rubber stamp._ +
+_No direct verbal statements recorded during initial onboarding._
+
+*DOES* _(Observable Behaviors)_
+
+_No direct field observations recorded._
+
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _If I lose this food assistance or miss my court hours, my whole family will suffer._
+* _I feel judged when people ask why I'm volunteering; I just want to do honest hard work and clear my record._
+* _I hope the probation officer accepts this digital report without demanding a wet-ink rubber stamp._
 * _I can't afford to waste bus fare traveling to a site that turns me away at the door._
 
-| DOES (Observable Behaviors)
-| FEELS (Affective Emotional States)
+*FEELS* _(Affective Emotional States)_
 
-| 
-
-| * *Pressured:* Constantly aware of legal deadlines and the severe consequences of non-compliance. +
-* *Vulnerable:* Afraid of bureaucratic delays causing benefit termination or probation revocation. +
-* *Dignified:* Proud of doing genuine, productive hard work to repay his civic obligation. +
+* *Pressured:* Constantly aware of legal deadlines and the severe consequences of non-compliance.
+* *Vulnerable:* Afraid of bureaucratic delays causing benefit termination or probation revocation.
+* *Dignified:* Proud of doing genuine, productive hard work to repay his civic obligation.
 * *Relieved:* Deeply grateful when verified hours are logged cleanly and court requirements are fulfilled.
-|===
-
-[cols="1,1", options="header", role="pains-gains-table"]
-|===
-| CRITICAL PAINS & RISKS
-| DESIRED GAINS & SUCCESS METRICS
-
-| * *Rejection at Venue:* Being turned away at the door because an organization silently bars court-mandated volunteers. +
-* *Probation Non-Compliance:* Paper logs rejected for formatting technicalities, risking bench warrants or fines. +
-* *Benefit Lapses:* Delays in monthly hour reporting causing SNAP food assistance to be abruptly suspended.
-
-| * *Compliance Search Filter:* Clear visibility into court-approved and SNAP-eligible non-profit opportunities. +
-* *GPS-Verified Check-in:* Incontestable timestamped attendance logs with supervisor verification IDs. +
-* *Court-Admissible Reports:* Official PDF summaries with organization tax IDs and verification tokens for judges.
-|===
-
+--

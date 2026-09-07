@@ -1,4 +1,4 @@
-==== Elena Rostova — The Civic Regional Moderator
+==== Elena Rostova - The Civic Regional Moderator
 
 [role="persona-card"]
 --
@@ -29,43 +29,32 @@ Elena oversees municipal volunteer services, community engagement initiatives, a
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map
 
-[cols="1,1", options="header", role="empathy-table"]
-|===
-| SAYS (Explicit Verbal Expressions)
-| THINKS (Unspoken Beliefs & Doubts)
 
-| 
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
 
-| * _If an unvetted group runs a hazardous project and a citizen gets injured, the city and platform bear liability._ +
-* _I don't want to be the bureaucratic bottleneck holding back passionate neighborhood volunteers._ +
-* _Is this project truly a public charity initiative, or is a private commercial business seeking free labor?_ +
+_No direct verbal statements recorded during initial onboarding._
+
+*DOES* _(Observable Behaviors)_
+
+_No direct field observations recorded._
+
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _If an unvetted group runs a hazardous project and a citizen gets injured, the city and platform bear liability._
+* _I don't want to be the bureaucratic bottleneck holding back passionate neighborhood volunteers._
+* _Is this project truly a public charity initiative, or is a private commercial business seeking free labor?_
 * _I need clear, binding PostGIS polygon containment checks, not vague text descriptions of service territories._
 
-| DOES (Observable Behaviors)
-| FEELS (Affective Emotional States)
+*FEELS* _(Affective Emotional States)_
 
-| 
-
-| * *Accountable:* Strongly weighs the legal, ethical, and public safety responsibilities of municipal governance. +
-* *Pressured:* Constantly aware of the ticking 48-hour SLA escalation clock and heavy seasonal volume. +
-* *Vigilant:* Skeptical of ambiguous descriptions, missing safety precautions, and unverified organizations. +
+* *Accountable:* Strongly weighs the legal, ethical, and public safety responsibilities of municipal governance.
+* *Pressured:* Constantly aware of the ticking 48-hour SLA escalation clock and heavy seasonal volume.
+* *Vigilant:* Skeptical of ambiguous descriptions, missing safety precautions, and unverified organizations.
 * *Gratified:* Proud when well-governed civic volunteer initiatives mobilize hundreds of residents safely.
-|===
-
-[cols="1,1", options="header", role="pains-gains-table"]
-|===
-| CRITICAL PAINS & RISKS
-| DESIRED GAINS & SUCCESS METRICS
-
-| * *Boundary Ambiguity:* Cross-jurisdictional projects lacking clear municipal liability boundaries. +
-* *Stealth Edits:* Organizers altering project scope post-approval without triggering municipal re-review. +
-* *SLA Queue Bottlenecks:* Ticking 48-hour escalation timers causing operational stress and review backlogs.
-
-| * *Automated Spatial Routing:* PostGIS boundary intersection automatically assigning projects to correct region. +
-* *Immutable Audit Trails:* Append-only transaction records capturing actor, timestamp, and status diff. +
-* *Automated 48h Escalation:* Scheduled partial index job escalating stalled projects without manual tracking.
-|===
-
+--
