@@ -1,4 +1,4 @@
-==== David Chen — The Purpose-Driven & Skill-Building Volunteer
+==== David Chen - The Purpose-Driven & Skill-Building Volunteer
 
 [role="persona-card"]
 --
@@ -29,8 +29,7 @@ David has stable employment and wants to dedicate 5–10 hours every week to cau
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map & Human Dynamics
+
 
 [role="columns-2"]
 --

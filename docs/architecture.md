@@ -13,8 +13,8 @@ Kaiju is a single-module Micronaut application under `lol.pbu.kaiju.*`:
 
 ## Frontend Strategy
 
-- **Public Web**: [JTE (Java Template Engine)](https://jte.gg/) compiles server-side templates directly to Java bytecode for fast response times. This provides a massive benefit for **SEO ranking** by serving clean, pre-rendered HTML to search crawlers.
-- **Admin Dashboards & Mobile**: [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) handles rich, interactive state in logged-in portals. By sharing UI logic across desktop, web, and mobile clients, it **saves significant dev time** and provides a **consistent experience between devices for admins**.
+- **Public Web**: [JTE (Java Template Engine)](https://jte.gg/) provides Server-Side Rendering (SSR) to improve SEO ranking and load times by serving pre-rendered HTML.
+- **Admin Dashboards & Mobile**: [Compose Multiplatform](https://www.jetbrains.com/lp/compose-multiplatform/) handles state in logged-in portals. It shares UI logic across desktop, web, and mobile clients to save dev time and provide a consistent experience between devices for admins.
 
 ## Backend Strategy
 
@@ -29,12 +29,10 @@ To maintain compatibility across both deployment targets:
 ### Deployment Targets
 
 **1. GraalVM Native Image (Community Edition)**
-Best suited for **short-lived, low GC-heavy work** such as background worker tasks or short-lived event handlers. Its instant startup and minimal memory footprint are ideal for services that need to scale rapidly or handle bursty, short-lived traffic.
+Used for background workers and short-lived event handlers to produce faster and leaner binaries.
 
 **2. HotSpot JVM (Eclipse Temurin Java 25 + Generational ZGC)**
-Best suited for the **core public API and spatial search services**. Processing large payloads from PostgreSQL spatial queries into JSON generates a massive amount of short-lived objects. HotSpot is the target for these services because:
-- **Low Latency:** Generational ZGC cleans up heavy JSON/DTO allocation loads with sub-millisecond pause times, preventing latency spikes.
-- **Peak Throughput:** The C2 JIT compiler actively optimizes long-running threads based on real-time traffic patterns, maximizing requests-per-second.
+Geared toward spatial query mapping. It provides higher throughput, low latency, and better garbage collection for heavy JSON/DTO allocation loads.
 
 *Note: If the project considers upgrading to Oracle GraalVM (the non-community version), this strategy ought to be reconsidered. Oracle GraalVM includes the G1 Garbage Collector and Profile-Guided Optimizations (PGO), which significantly narrows the throughput and latency gap for long-running stateful services.*
 
@@ -53,4 +51,4 @@ Rather than splitting data across isolated databases for each service, all servi
 
 It is important to distinguish where the spatial workload is processed:
 - **Geospatial Queries (JVM):** The Micronaut JVM orchestrates the data retrieval. It constructs the SQL queries, executes them against the database, and maps the resulting coordinate data into DTOs and JSON.
-- **Geospatial Math (Database):** **All** heavy mathematical spatial computation (e.g., distance calculations, radius filtering via `ST_DWithin`, bounding box intersections) is pushed down to the database. Rather than reinventing the wheel in Java, we lean into PostgreSQL and PostGIS—an already highly performant, C-based technology—which handles these computations efficiently using GiST indexes. This ensures the JVM never has to load unfiltered raw coordinates into memory to do math.
+- **Geospatial Math (Database):** Spatial computation (e.g., distance calculations, radius filtering via `ST_DWithin`, bounding box intersections) is handled directly in PostgreSQL via PostGIS. This avoids rewriting spatial logic in Java and keeps raw coordinates out of JVM memory.

@@ -14,7 +14,7 @@ v1.0, September 2026: Work-In-Progress Architectural & Human Strategy Specificat
 
 [abstract]
 --
-This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Employing structured empathy mapping and persona research practices, this document models 3 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
+This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Employing structured empathy mapping and persona research practices, this document models 7 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
 --
 
 == Executive Summary: The Dual Human Spectrums & The Domain Chasm
@@ -65,7 +65,7 @@ Each persona profile captures a comprehensive current-state experience across fo
 
 == Core Personas & Human Spectrums
 
-=== The Volunteer Spectrum (2 Proto-Personas)
+=== The Volunteer Spectrum (4 Proto-Personas)
 
 include::personas/maya-spontaneous-volunteer.adoc[]
 
@@ -75,13 +75,21 @@ include::personas/david-purpose-skill-volunteer.adoc[]
 
 <<<
 
-<<<
+include::personas/chloe-academic-portfolio.adoc[]
 
 <<<
 
-=== The Coordinator Spectrum
+include::personas/raymond-mandated-compliance.adoc[]
 
 <<<
+
+=== The Coordinator Spectrum (2 Proto-Personas)
+
+include::personas/marcus-high-volume-coordinator.adoc[]
+
+<<<
+
+include::personas/sarah-high-liability-director.adoc[]
 
 <<<
 
@@ -93,112 +101,12 @@ include::personas/elena-civic-regional-moderator.adoc[]
 
 == Tech Stack
 
-Before detailing how the technical architecture aligns with specific human needs, it is critical to overview the core technologies driving the Kaiju platform:
+* *PostgreSQL & PostGIS:* Handles spatial queries and math (distance calculations, radius filtering, polygon intersections) directly in the database to avoid rewriting spatial logic in Java.
+* *Micronaut Backend:* 
+** *HotSpot JVM (ZGC):* Geared toward spatial query mapping (higher throughput, low latency, and better garbage collection).
+** *GraalVM Native Image:* Used for everything else (background workers and event handlers) for faster and leaner binaries.
+* *Frontend Strategy:*
+** *JTE (Java Template Engine):* Server-Side Rendering (SSR) for the public web app to improve SEO ranking and load times.
+** *Compose Multiplatform:* Shares UI logic across desktop and mobile for administrative portals, saving dev time and providing a consistent experience.
 
-* *PostgreSQL & PostGIS for Heavy Geospatial Work:* Rather than reinventing the wheel by writing complex spatial mathematics in Java, we lean into PostgreSQL and PostGIS—an already highly performant, C-based technology. All heavy computations (distance calculations, radius filtering, polygon intersections) are pushed down to the database level.
-* *Micronaut Backend (HotSpot & GraalVM):* The platform leverages Micronaut's compile-time DI to run on two deployment targets. The *HotSpot JVM (ZGC)* handles the core API and heavy spatial query mapping, providing massive throughput and low latency for short-lived DTO allocations. *GraalVM Native Image* is utilized for background workers and short-lived event handlers where instant startup and low memory footprint are paramount.
-* *Frontend Dual-Strategy (JTE & Compose):* 
-** For the public-facing volunteer discovery web application, *JTE (Java Template Engine)* compiles templates to bytecode for blisteringly fast Server-Side Rendering (SSR). This provides a massive benefit for SEO ranking and frictionless instant access on mobile devices.
-** For the administrative portals, *Compose Multiplatform* is used. This saves significant dev time by sharing UI logic across desktop and mobile, while providing a highly consistent, interactive experience between devices for admins.
-
-The table below maps each persona's operational needs directly to these technical architecture decisions:
-
-[cols="2,2,3,3", options="header"]
-|===
-| Persona & Role | Primary Driver | Empathy Pain Point | Kaiju Tech Stack Alignment
-
-| *Maya Lin (24)* +
-`STANDARD_USER` (Public)
-| Spontaneous local impact in 2-3 hour weekend slots.
-| 8s mobile page load times, phantom shifts, mandatory account walls.
-| * *JTE SSR*: Sub-50ms TTFB & 0MB JS bundle. +
-* *PostGIS `ST_DWithin`*: Truthful geodesic radius. +
-* *STI `OPEN_DOOR`*: Immediate directions without booking. +
-* *`ProjectSearchCard` DTO*: Ultra-lean mobile wire payload.
-
-| *David Chen (31)* +
-`STANDARD_USER` (Specialist)
-| Professional skill application (GIS/Data) & cause dedication.
-| Relegated to manual busywork; distance search hiding regional causes.
-| * *`tags` & `shift_tags`*: Multi-tag faceted queries (`#gis`, `#cpr`). +
-* *`REGIONAL` STI*: Bypasses point radius for regional initiatives. +
-* *Volunteer Passport*: Reusable credential screening profile. +
-* *Keyset Shifts*: Sub-ms recurring schedule streaming.
-
-| *Elena Rostova (45)* +
-`REGION_DIRECTOR` (Civic)
-| Municipal safety; clearing review queue under 48h SLA; boundary integrity.
-| Review backlogs; ambiguous jurisdictional borders; stealth scope edits.
-| * *`administrative_regions` (DDD)*: Preserves civic authority. +
-* *48h Escalation Queue*: Hourly cron on partial index escalates. +
-* *`PENDING_UPDATE` Trigger*: Edits automatically re-trigger review. +
-* *Transactional Audit Ledgers*: Immutable append-only actor diffs.
-|===
-
-== Visual Architecture & Draw.io Diagram File
-
-The complete 8-page visual presentation is maintained at:
-`docs/human-strategy-personas.drawio`
-
-=== Page Index:
-* **Page 1: `1. Human Strategy Ecosystem`** — Full macro mapping of all 7 personas across the volunteer and coordinator spectrums, 4 technical architecture layers, and 4 human value loops.
-* **Page 2: `2. Maya - Spontaneous Local Volunteer`**
-* **Page 3: `3. David - Purpose & Skill Volunteer`**
-* **Page 4: `4. Chloe - Academic & Portfolio Volunteer`**
-* **Page 5: `5. Raymond - Mandated & Compliance Volunteer`**
-* **Page 6: `6. Marcus - High-Volume Coordinator`**
-* **Page 7: `7. Dr. Sarah - Specialized Director`**
-* **Page 8: `8. Elena - Civic Regional Moderator`**
-
-== Document Compilation & Export Options
-
-This AsciiDoc document can be exported to multiple formats using the tools configured in this repository:
-
-=== 1. Compiling to HTML5 with Custom CSS
-To generate the styled standalone HTML document:
-
-----
-asciidoc -a stylesheet=styles/human-strategy.css -o human-strategy.html human-strategy.adoc
-----
-Or with modern `asciidoctor`:
-
-----
-asciidoctor -a stylesheet=styles/human-strategy.css -a linkcss human-strategy.adoc
-----
-
-=== 2. Exporting to PDF (Publication-Grade - Recommended)
-
-The primary and recommended pipeline generates a publication-grade PDF using the JVM-native Asciidoctor PDF engine via Gradle:
-
-----
-./gradlew asciidoctorPdf
-----
-
-* *Artifact location*: `build/docs/asciidoctor-pdf/human-strategy.pdf`
-* *Design qualities*: Professional book layout, formal cover page, paginated Table of Contents with dot leaders, callout icons, clean table grid borders, and consistent chapter page breaks.
-
-=== 3. Browser-Based CSS PDF (Experimental Alternative)
-
-The document can alternatively be compiled using browser-based CSS (`styles/human-strategy.css`) via the Chromium-based `asciidoctor-web-pdf` engine:
-
-----
-# Using PowerShell helper:
-./scripts/render-web-pdf.ps1
-
-# Using Bash helper:
-./scripts/render-web-pdf.sh
-
-# Or directly via npx:
-npx asciidoctor-pdf docs/human-strategy.adoc -B docs -D build/docs/asciidoctor-web-pdf --preserve-html
-----
-
-* *Artifact location*: `build/docs/asciidoctor-web-pdf/human-strategy.pdf`
-* *Rendering notes*: While this pipeline allows leveraging browser-based CSS styling and Paged.js, the resulting output **does not look as good** as the native Asciidoctor PDF engine (lacks automatic TOC page numbers and dot leaders, table cell borders are unstyled, and multi-page table splits can be uneven). To avoid burdening the primary backend build with Node/Puppeteer dependencies, this task is kept outside `build.gradle.kts` in dedicated runner scripts.
-
-=== 4. Exporting to EPUB or DocBook
-
-----
-a2x -f epub human-strategy.adoc
-a2x -f docbook human-strategy.adoc
-----
 

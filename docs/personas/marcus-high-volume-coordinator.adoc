@@ -1,0 +1,60 @@
+==== Marcus Vance - The High-Volume Operations Coordinator
+
+[role="persona-card"]
+--
+[role="persona-title"]
+*Marcus Vance (38)* -- [.persona-role-badge]#ORG_ADMIN / ORG_MANAGER (Operations)#
+
+[role="demographics-grid"]
+*Occupation:* Volunteer Operations Coordinator (Metro Food Relief) | *Location:* Regional HQ | *Device:* Dual Desktop & iPad Tablet | *Scope:* 600+ monthly volunteer slots across 5 hubs
+
+*Bio & Context:*
+
+Marcus manages volunteer logistics for a metropolitan food rescue and urban agriculture non-profit. He coordinates over 600 monthly volunteer slots across 5 physical distribution warehouses and seasonal farm gleaning sites. Operating with a minimal staff, he spends excessive hours re-entering data between paper clipboards, Excel sheets, and municipal permits while battling a frustrating 30–50% volunteer no-show rate.
+
+*Needs & Core Goals:*
+
+* Fill 100% of shift capacity for critical assembly lines (e.g. Saturday emergency food boxes).
+* Eliminate the chronic 35% volunteer no-show rate through automated waitlists and reminders.
+* Manage multi-site initiatives under a single umbrella project without cloning identical records.
+* Maintain digital records of signed liability waivers and emergency contacts to shield the non-profit.
+
+*Frustrations & Obstacles:*
+
+* Volunteers RSVPing weeks in advance and ghosting on Saturday morning, starving packaging lines.
+* Spreadsheet desynchronization between office coordinators and on-site warehouse managers.
+* Re-typing the same project description, safety rules, and requirements 10 times for 10 distribution hubs.
+* Spending hours manually generating PDF service verification letters for high school students.
+--
+
+<<<
+
+
+
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
+
+_No direct verbal statements recorded during initial onboarding._
+
+*DOES* _(Observable Behaviors)_
+
+_No direct field observations recorded._
+
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _If volunteers don't show up on Saturday morning, vulnerable families don't get food boxes this week._
+* _I got into non-profit work to serve my community, but 70% of my time is spent on clerical data entry._
+* _I hope our regional moderation approval doesn't get stuck in civic review limbo before this weekend's drive._
+* _We desperately need a core cohort of vetted regulars rather than an endless churn of one-off tourists._
+
+*FEELS* _(Affective Emotional States)_
+
+* *Chronically Overwhelmed:* Constantly buried under administrative repetition, roster churn, and spreadsheets.
+* *Anxious:* Stressed on event mornings about shift capacity shortfalls and critical assembly bottlenecks.
+* *Protective:* Passionately committed to organizational liability compliance and volunteer physical safety.
+* *Mission-Driven:* Deeply gratified when distribution lines run smoothly and food reaches community members.
+--

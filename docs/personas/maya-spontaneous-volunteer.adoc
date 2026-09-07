@@ -1,4 +1,4 @@
-==== Maya Lin — The Spontaneous Local Volunteer
+==== Maya Lin - The Spontaneous Local Volunteer
 
 [role="persona-card"]
 --
@@ -29,8 +29,7 @@ Maya recently moved to the city and wants to connect with her neighborhood throu
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map & Human Dynamics
+
 
 [role="columns-2"]
 --

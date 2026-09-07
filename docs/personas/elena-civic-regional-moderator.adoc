@@ -1,4 +1,4 @@
-==== Elena Rostova — The Civic Regional Moderator
+==== Elena Rostova - The Civic Regional Moderator
 
 [role="persona-card"]
 --
@@ -29,8 +29,7 @@ Elena oversees municipal volunteer services, community engagement initiatives, a
 
 <<<
 
-[discrete]
-==== 4-Quadrant Empathy Map & Human Dynamics
+
 
 [role="columns-2"]
 --
