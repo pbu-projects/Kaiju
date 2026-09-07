@@ -5,9 +5,9 @@ micronaut:
     enabled: true
 datasources:
   default:
-    url: jdbc:postgresql://localhost:5432/postgres
-    username: postgres
-    password: ''
+    url: jdbc:postgresql://localhost:5432/volunteer_monster
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
     db-type: postgres
     schema-generate: NONE

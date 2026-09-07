@@ -22,6 +22,7 @@ out/
 # Environment Variables
 .env
 .env.*
+!.env.example
 *.env
 
 # Python

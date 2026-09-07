@@ -1,0 +1,115 @@
+# Production Strategy
+
+The Phase 1 backend is a functional POC with a sound data model, real Testcontainers integration tests, Flyway-managed migrations, and GraalVM native image support already wired. The gaps to production are additive hardening — no architectural rewrites required.
+
+Changes are grouped into four priority tiers.
+
+---
+
+## Open Decisions
+
+These need to be resolved before implementation begins, as they affect the shape of the service layer and schema.
+
+1. **Auth environment**: Authentik is running locally as a dev-environment placeholder (see `database/compose.yml`). It is **not** the intended production IdP — it should be swapped for any enterprise-grade OIDC provider (Okta, Auth0, Keycloak, Azure AD, etc.) before production. Micronaut Security consumes a standard JWKS endpoint, so the swap is a one-line config change (`micronaut.security.token.jwt.signatures.jwks.*.url`). No application code changes are required to switch providers.
+2. **Soft delete**: `projects` has `deleted_at` / `deleted_by` columns that are currently unused and unfiltered. Keep soft-delete (and add `WHERE deleted_at IS NULL` everywhere) or drop the columns and use hard delete?
+3. **Flyway naming**: Migrations use an empty prefix and `-` separator (`01-schema.sql`) rather than the Flyway default (`V1__schema.sql`). Renaming is cheap now, painful after a live DB exists. Preference?
+4. **Metrics sink**: Micrometer is collecting data but not exporting it. Target: Prometheus scrape endpoint, Datadog push, or other?
+
+---
+
+## P0 — Blocking (nothing ships without these)
+
+### Authentication & Authorization
+
+`micronaut-security` is a declared dependency but security is effectively disabled — no `micronaut.security` block in `application.yml`, and zero `@Secured` annotations exist across all 12 controllers. The entire API is publicly writable.
+
+- Enable JWT token validation in `application.yml` pointed at the Authentik JWKS endpoint.
+- Add `@Secured` annotations to all controllers. Public browse endpoints (project geo-search) get `IS_ANONYMOUS`; everything else requires `IS_AUTHENTICATED` at minimum, with write endpoints gated by role (`GLOBAL_ADMIN`, `ORG_ADMIN`, etc.).
+- Remove `PUT` and `DELETE` from `OrganizationAuditLogController` and `ProjectAuditLogController` — audit logs are append-only by design.
+- Remove `/no-look` DELETE/PUT variants, or gate them behind `GLOBAL_ADMIN` if retained for internal tooling.
+
+### Externalize Credentials
+
+`application.yml` has hardcoded `username: postgres` / `password: ''`. `database/compose.yml` has a plaintext password in source control. Replace with `${DB_USERNAME}` / `${DB_PASSWORD}` environment variable references and use Micronaut's secrets integration for production values.
+
+### CI Pipeline
+
+The only GitHub Actions workflow is a Lychee markdown link checker. Add a `ci.yml` workflow that runs on every PR:
+
+- `./gradlew test` (Testcontainers requires a Docker service in the runner)
+- `./gradlew dockerBuild` to verify the image builds cleanly
+- `./gradlew sonar` — SonarCloud is already configured in `build.gradle.kts` with project key `pbu-projects_Kaiju`; it just needs a workflow trigger and `SONAR_TOKEN` secret
+
+---
+
+## P1 — Must fix before first real traffic
+
+### Service Layer & Transactions
+
+Controllers currently call repositories directly with no `@Transactional` boundaries. This creates TOCTOU races on every `existsById()` + mutation pattern:
+
+```java
+// Current — two separate queries, no transaction
+if (!projectRepository.existsById(id)) { throw ... }
+return projectRepository.update(project.withId(id));
+```
+
+Introduce a `service/` package (one service per aggregate root: `ProjectService`, `OrganizationService`, `ShiftService`, `UserService`, `RegionService`) to own `@Transactional` boundaries and business rule enforcement (auto-approval logic, soft-delete filtering, audit log creation).
+
+### Soft Delete
+
+Either implement properly — add `WHERE deleted_at IS NULL` filters to all project queries and a `ProjectService.delete()` that sets the field rather than calling `deleteById()` — or drop the `deleted_at` / `deleted_by` columns in a migration and use hard delete. Currently deleted projects are returned in all queries including geo-search.
+
+### Structured Logging
+
+`logback.xml` uses an ANSI-color human-readable pattern. Replace with `logstash-logback-encoder` JSON output and add MDC fields (`requestId`, `userId`, `traceId`) for log aggregation.
+
+### Metrics Export
+
+Micrometer is collecting HTTP server and client observations but has no exporter configured. Wire a Prometheus scrape endpoint (`micronaut-micrometer-registry-prometheus`) or configure the appropriate push registry based on the infrastructure target.
+
+### CORS & Request Size Limits
+
+Add `micronaut.server.cors` and `micronaut.server.max-request-size` to `application.yml`.
+
+---
+
+## P2 — Should fix shortly after launch
+
+### Missing Database Indexes
+
+The geo-search query filters `WHERE p.status = 'ACTIVE'` with no index on `projects.status`. FK columns with no indexes:
+
+- `projects.organization_id`
+- `shifts.project_id`, `shifts.location_id`
+- `project_audit_logs.project_id`, `organization_audit_logs.organization_id`
+
+Add in the next Flyway migration.
+
+### N+1 on Audit Log List Query
+
+`OrganizationAuditLogRepository.findAll()` is missing `@Join("organization")` and `@Join("actor")` annotations that `findById()` already has. Without them, related entities either come back null or trigger per-row queries.
+
+### Project List Without Title Filter
+
+`ProjectController.getProjects()` has a required `title` query parameter — there is no way to list all projects without a filter. Add `@Nullable @QueryValue(required = false)` and a `findAll()` fallback.
+
+### HTTP-Layer Tests
+
+All controller tests inject the controller bean and call methods directly, bypassing the HTTP stack. Serialization errors, HTTP status codes, and error response body shapes are not tested. Convert at least one controller spec to use `@Client` / `HttpClient`, and add `401` / `403` smoke tests once auth is wired.
+
+### `GeometryFactory` Singleton
+
+`ProjectController.searchByLocation()` instantiates a `new GeometryFactory(new PrecisionModel(), 4326)` per request. Extract to a `@Singleton` bean.
+
+### Flyway Naming Convention
+
+If migrating to standard `V`-prefix naming (`V1__schema.sql`, `V2__indexes.sql`), do it now before any production DB exists. Update `sql-migration-prefix: V` and `sql-migration-separator: "__"` in `application.yml`.
+
+---
+
+## P3 — Nice to have
+
+- **Distributed tracing**: Add OpenTelemetry with a trace exporter (Jaeger locally, OTLP in production).
+- **`ProjectSearchCard` distance field**: The geo-search response currently returns `nextShiftStart` and `locationName` but not the computed distance from the search point. Callers need a second round-trip to display proximity.
+- **`micronaut-retry` cleanup**: Declared in `build.gradle.kts` but unused. Wire `@CircuitBreaker` on the DB connection or remove the dependency.
