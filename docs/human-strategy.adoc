@@ -14,7 +14,7 @@ v1.0, September 2026: Work-In-Progress Architectural & Human Strategy Specificat
 
 [abstract]
 --
-This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Employing structured empathy mapping and persona research practices, this document models 7 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
+This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Employing structured empathy mapping and persona research practices, this document models 3 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
 --
 
 == Executive Summary: The Dual Human Spectrums & The Domain Chasm
@@ -65,7 +65,7 @@ Each persona profile captures a comprehensive current-state experience across fo
 
 == Core Personas & Human Spectrums
 
-=== The Volunteer Spectrum (4 Proto-Personas)
+=== The Volunteer Spectrum (2 Proto-Personas)
 
 include::personas/maya-spontaneous-volunteer.adoc[]
 
@@ -75,21 +75,13 @@ include::personas/david-purpose-skill-volunteer.adoc[]
 
 <<<
 
-include::personas/chloe-academic-portfolio.adoc[]
+<<<
 
 <<<
 
-include::personas/raymond-mandated-compliance.adoc[]
+=== The Coordinator Spectrum
 
 <<<
-
-=== The Coordinator Spectrum (2 Proto-Personas)
-
-include::personas/marcus-high-volume-coordinator.adoc[]
-
-<<<
-
-include::personas/sarah-high-liability-director.adoc[]
 
 <<<
 

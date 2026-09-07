@@ -71,16 +71,6 @@ graph TD
 | **DOES** *(Observable Behaviors)* | |
 | **FEELS** *(Affective State)* | • ❤️ **Eager**: Genuinely motivated to make an authentic community impact and meet neighborhood peers.<br/>• ❤️ **Anxious**: Apprehensive about arrival logistics, unfamiliar venues, and parking confusion.<br/>• ❤️ **Impatient**: Irritated by sluggish web interfaces, infinite spinners, and redundant forms.<br/>• ❤️ **Proud**: Uplifted and empowered when her volunteer contribution produces tangible results. |
 
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *Phantom Shifts*: Traveling across town only to find a cancelled event or an overbooked room.
-  2. *Sluggish Web Performance*: Multi-megabyte JS/Wasm bundles freezing mobile browsers on transit.
-  3. *Inaccurate Geocoding*: Map pins pointing to corporate mailing offices rather than active field sites.
-* **Gains**:
-  1. *Sub-50ms Instant Browsing*: Frictionless public web discovery with zero JavaScript bundle overhead.
-  2. *Truthful Driving Distance*: Real PostGIS geodesic distance with clear site entry instructions.
-  3. *Verified Digital Credential*: One-click certified service hour records for school and employer.
 ---
 
 
@@ -102,144 +92,10 @@ graph TD
 | **DOES** *(Observable Behaviors)* | |
 | **FEELS** *(Affective State)* | • ❤️ **Purpose-Driven**: Deeply compelled by moral mission, environmental stewardship, and community impact.<br/>• ❤️ **Selective**: Unwilling to squander finite professional bandwidth on chaotic, low-impact tasks.<br/>• ❤️ **Committed**: Highly dependable, accountable, and steadfast once aligned with a competent leadership team.<br/>• ❤️ **Fulfilled**: Deeply energized when high-skill contributions transform a non-profit's operational capacity. |
 
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *Skill Underutilization*: Being relegated to manual busywork despite possessing high-demand technical capabilities.
-  2. *Distance-Only Search*: Physical radius filters that exclude high-relevance regional initiatives across county borders.
-  3. *Redundant Screening*: Repeating background checks and reference interviews for every new organization.
-* **Gains**:
-  1. *Deep Skill & Cause Taxonomy*: Fast faceted filtering by required competencies (`#gis`, `#cpr`) and causes (`#wildlife`).
-  2. *Regional Initiative Access*: Joining geofenced polygon projects (`REGIONAL` STI) with remote or field components.
-  3. *Verified Credential Passport*: Reusable digital clearances unlocking specialized, high-trust shifts instantly.
 ---
 
 
-## 3. Chloe Torres — The Academic & Portfolio-Building Student Volunteer
-
-### Proto-Persona Profile
-
-* **Archetype**: The Academic & Portfolio-Building Student Volunteer (`STANDARD_USER` — Student / Club Officer)
-* **Demographics**: 17 years old, High School Junior, Key Club Philanthropy Officer & National Honor Society candidate.
-* **Context**: Chloe is preparing competitive college and scholarship applications, aiming for a minimum of 100 verified service hours and leadership distinction. As a club officer, she coordinates weekend service events for 15–20 high school classmates. She needs indisputable documentation of her hours, supervisor sign-offs, group slot holds, and an exportable certified service transcript for university portals (e.g. Common Application).
-* **Tech Environment**: iPhone 14 & School Chromebook. Mobile native living on Instagram, TikTok, and Google Classroom.
-
-### 4-Quadrant Empathy Map
-
-| Quadrant | Observed & Internalized Insights |
-| :--- | :--- |
-| **SAYS** *(Verbal Quotes)* | |
-| **THINKS** *(Internalized Beliefs)* | • *💭 "If this non-profit doesn't verify my hours before the deadline, all my weekend work won't count on my application."*<br/>• *💭 "I hope our club members actually show up so I don't look unreliable in front of the volunteer coordinator."*<br/>• *💭 "I want to do real leadership work that looks impressive on my college resume, not just hand out flyers."*<br/>• *💭 "I need an easy way to export an official service transcript to upload directly to the Common App."* |
-| **DOES** *(Observable Behaviors)* | |
-| **FEELS** *(Affective State)* | • ❤️ **Ambitious**: Highly driven to achieve scholarship milestones and build an impressive civic portfolio.<br/>• ❤️ **Anxious**: Stressed about tight application deadlines and chasing down slow supervisor signatures.<br/>• ❤️ **Accountable**: Feels strong peer pressure to deliver organized, safe service opportunities for her club.<br/>• ❤️ **Proud**: Uplifted and validated when her certified transcript reaches the 100-hour achievement tier. |
-
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *Lost Paper Records*: Paper logs misplaced by counselors or organizers destroying months of documented service.
-  2. *Group Booking Gaps*: Having to ask 15 teenagers to individually sign up before slots fill up.
-  3. *Delayed Verification*: Non-profits taking weeks to confirm hours, causing students to miss scholarship deadlines.
-* **Gains**:
-  1. *Digital Service Transcript*: Instant export of certified, tamper-proof service records for college portals.
-  2. *Group Reservation Holds*: Reserving slot blocks with shareable invite tokens for student clubs.
-  3. *Digital Minor Consent*: Automated parental e-signatures eliminating physical paper slips.
----
-
-
-## 4. Raymond Miller — The Compliance & Mandated Service Volunteer
-
-### Proto-Persona Profile
-
-* **Archetype**: The Compliance & Mandated Service Volunteer (`STANDARD_USER` — Court / SNAP Mandated)
-* **Demographics**: 35 years old, Hourly warehouse employee balancing a 40-hour court-ordered community restitution requirement with monthly 20-hour SNAP ABAWD work requirements.
-* **Context**: Raymond must complete community service to avoid court sanctions (probation violation/fines) and maintain his family's SNAP food assistance benefits. He relies on public bus transit and hourly wages, meaning he cannot miss work and must find flexible evening or weekend service. His freedom and nutritional benefits depend on strictly compliant, tamper-proof, court-admissible documentation.
-* **Tech Environment**: Android smartphone on prepaid cellular plan; public library computers for printing. Obsessively monitors deadlines and hour countdowns.
-
-### 4-Quadrant Empathy Map
-
-| Quadrant | Observed & Internalized Insights |
-| :--- | :--- |
-| **SAYS** *(Verbal Quotes)* | |
-| **THINKS** *(Internalized Beliefs)* | • *💭 "If I lose this food assistance or miss my court hours, my whole family will suffer."*<br/>• *💭 "I feel judged when people ask why I'm volunteering; I just want to do honest hard work and clear my record."*<br/>• *💭 "I hope the probation officer accepts this digital report without demanding a wet-ink rubber stamp."*<br/>• *💭 "I can't afford to waste bus fare traveling to a site that turns me away at the door."* |
-| **DOES** *(Observable Behaviors)* | |
-| **FEELS** *(Affective State)* | • ❤️ **Pressured**: Constantly aware of legal deadlines and the severe consequences of non-compliance.<br/>• ❤️ **Vulnerable**: Afraid of bureaucratic delays causing benefit termination or probation revocation.<br/>• ❤️ **Dignified**: Proud of doing genuine, productive hard work to repay his civic obligation.<br/>• ❤️ **Relieved**: Deeply grateful when verified hours are logged cleanly and court requirements are fulfilled. |
-
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *Rejection at Venue*: Being turned away at the door because an organization silently bars court-mandated volunteers.
-  2. *Probation Non-Compliance*: Paper logs rejected for formatting technicalities, risking bench warrants or fines.
-  3. *Benefit Lapses*: Delays in monthly hour reporting causing SNAP food assistance to be abruptly suspended.
-* **Gains**:
-  1. *Compliance Search Filter*: Clear visibility into court-approved and SNAP-eligible non-profit opportunities.
-  2. *GPS-Verified Check-in*: Incontestable timestamped attendance logs with supervisor verification IDs.
-  3. *Court-Admissible Reports*: Official PDF summaries with organization tax IDs and verification tokens for judges.
----
-
-
-## 5. Marcus Vance — The High-Volume Operations Coordinator
-
-### Proto-Persona Profile
-
-* **Archetype**: The High-Volume Operations Coordinator (`ORG_ADMIN` / `ORG_MANAGER`)
-* **Demographics**: 38 years old, Volunteer Operations Coordinator at Metropolitan Food Relief. Works out of regional headquarters and warehouse distribution hubs.
-* **Context**: Marcus manages logistics for 600+ monthly volunteer slots across 5 physical distribution warehouses and seasonal farm gleaning sites. Operating with a lean team, he spends excessive hours re-entering data between paper clipboards, Excel sheets, and municipal permits, all while battling a demoralizing 30–50% volunteer no-show rate.
-* **Tech Environment**: Desktop power user in the office; field tablet user on-site. Needs keyboard-driven batch tools and instant CSV syncing.
-
-### 4-Quadrant Empathy Map
-
-| Quadrant | Observed & Internalized Insights |
-| :--- | :--- |
-| **SAYS** *(Verbal Quotes)* | |
-| **THINKS** *(Internalized Beliefs)* | • *💭 "If volunteers don't show up on Saturday morning, vulnerable families don't get food boxes this week."*<br/>• *💭 "I got into non-profit work to serve my community, but 70% of my time is spent on clerical data entry."*<br/>• *💭 "I hope our regional moderation approval doesn't get stuck in civic review limbo before this weekend's drive."*<br/>• *💭 "We desperately need a core cohort of vetted regulars rather than an endless churn of one-off tourists."* |
-| **DOES** *(Observable Behaviors)* | |
-| **FEELS** *(Affective State)* | • ❤️ **Chronically Overwhelmed**: Constantly buried under administrative repetition, roster churn, and spreadsheets.<br/>• ❤️ **Anxious**: Stressed on event mornings about shift capacity shortfalls and critical assembly bottlenecks.<br/>• ❤️ **Protective**: Passionately committed to organizational liability compliance and volunteer physical safety.<br/>• ❤️ **Mission-Driven**: Deeply gratified when distribution lines run smoothly and food reaches community members. |
-
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *30–50% No-Show Rates*: Chronic volunteer absenteeism crippling physical warehouse and harvest operations.
-  2. *Duplicate Data Entry*: Redundant project cloning across multiple physical addresses and distribution nodes.
-  3. *Liability Vulnerability*: Paper waivers lost or misplaced, risking catastrophic liability in injury claims.
-* **Gains**:
-  1. *Automated Waitlist Backfill*: Real-time promotion of standby volunteers when cancellations occur.
-  2. *1-to-Many Project Locations*: Creating one umbrella project linked to multiple physical locations.
-  3. *Digital Roster Check-In*: QR scanning and geofenced check-in eliminating paper clipboard transcription.
----
-
-
-## 6. Dr. Sarah Al-Mansoor — The High-Liability Program Director
-
-### Proto-Persona Profile
-
-* **Archetype**: The High-Liability & Safeguarding Director (`ORG_ADMIN` — Youth & Crisis)
-* **Demographics**: 42 years old, Program Director at Youth Horizons & Crisis Intervention. Secure government-compliant workstation and encrypted laptop.
-* **Context**: Dr. Sarah oversees court-mandated youth mentoring, transitional foster youth housing, and a 24/7 crisis intervention hotline. Her programs involve direct contact with vulnerable minors and individuals in trauma. She operates under strict state child protection laws, HIPAA/privacy rules, and insurance mandates. She cannot permit unvetted public sign-ups and requires rigorous background check pipelines, training certifications, and credential expiration tracking.
-* **Tech Environment**: Strict compliance focus: Role-Based Access Control (RBAC), multi-factor authentication, background check API integration, and audit reports.
-
-### 4-Quadrant Empathy Map
-
-| Quadrant | Observed & Internalized Insights |
-| :--- | :--- |
-| **SAYS** *(Verbal Quotes)* | |
-| **THINKS** *(Internalized Beliefs)* | • *💭 "A single safeguarding failure or unvetted individual could cause catastrophic harm to a child and destroy our mission."*<br/>• *💭 "I feel guilty turning away eager people, but our duty of care to vulnerable clients must always come first."*<br/>• *💭 "I waste thousands of dollars in background check fees on volunteers who ghost us during training."*<br/>• *💭 "I need an automated system that locks shifts until all credentials, trainings, and waivers are verified."* |
-| **DOES** *(Observable Behaviors)* | |
-| **FEELS** *(Affective State)* | • ❤️ **Vigilant**: Hyper-aware of legal liability, youth safeguarding, and institutional compliance.<br/>• ❤️ **Protective**: Fiercely devoted to shielding trauma survivors and minors from physical or emotional harm.<br/>• ❤️ **Cautious**: Skeptical of "instant sign-up" features that sacrifice safety for user acquisition metrics.<br/>• ❤️ **Relieved**: Deeply reassured when technical guardrails guarantee that only 100% vetted volunteers access shifts. |
-
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *Safeguarding Breach Risk*: Unauthorized or unvetted individuals gaining access to vulnerable populations.
-  2. *Expired Credential Blind Spots*: Volunteers working with lapsed background checks or certifications.
-  3. *Wasted Screening Capital*: Paying expensive background check fees for flaky volunteers who abandon the program.
-* **Gains**:
-  1. *Automated Qualification Gating*: Shifts automatically locked until background checks and training are certified.
-  2. *Integrated Screening Pipeline*: Direct API verification of background clearances and identity records.
-  3. *Audit-Ready Compliance Reports*: 1-click export of tamper-proof credential logs for grant and legal authorities.
----
-
-
-## 7. Elena Rostova — The Civic Regional Moderator
+## 3. Elena Rostova — The Civic Regional Moderator
 
 ### Proto-Persona Profile
 
@@ -256,17 +112,6 @@ graph TD
 | **THINKS** *(Internalized Beliefs)* | • *💭 "If an unvetted group runs a hazardous project and a citizen gets injured, the city and platform bear liability."*<br/>• *💭 "I don't want to be the bureaucratic bottleneck holding back passionate neighborhood volunteers."*<br/>• *💭 "Is this project truly a public charity initiative, or is a private commercial business seeking free labor?"*<br/>• *💭 "I need clear, binding PostGIS polygon containment checks, not vague text descriptions of service territories."* |
 | **DOES** *(Observable Behaviors)* | |
 | **FEELS** *(Affective State)* | • ❤️ **Accountable**: Strongly weighs the legal, ethical, and public safety responsibilities of municipal governance.<br/>• ❤️ **Pressured**: Constantly aware of the ticking 48-hour SLA escalation clock and heavy seasonal volume.<br/>• ❤️ **Vigilant**: Skeptical of ambiguous descriptions, missing safety precautions, and unverified organizations.<br/>• ❤️ **Gratified**: Proud when well-governed civic volunteer initiatives mobilize hundreds of residents safely. |
-
-### Critical Pains & Desired Gains
-
-* **Pains**:
-  1. *Boundary Ambiguity*: Cross-jurisdictional projects lacking clear municipal liability boundaries.
-  2. *Stealth Edits*: Organizers altering project scope post-approval without triggering municipal re-review.
-  3. *SLA Queue Bottlenecks*: Ticking 48-hour escalation timers causing operational stress and review backlogs.
-* **Gains**:
-  1. *Automated Spatial Routing*: PostGIS boundary intersection automatically assigning projects to the correct region.
-  2. *Immutable Audit Trails*: Append-only transaction records capturing actor, timestamp, and status diff.
-  3. *Automated 48h Escalation*: Scheduled partial index job escalating stalled projects without manual tracking.
 
 ---
 
