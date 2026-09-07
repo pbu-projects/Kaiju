@@ -26,17 +26,14 @@ Maya recently moved to the city and wants to connect with her neighborhood throu
 
 <<<
 
-==== NN/g 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
 |===
 | SAYS (Explicit Verbal Expressions)
 | THINKS (Unspoken Beliefs & Doubts)
 
-| * "I have three free hours this Saturday morning—is there anything close to me?" +
-* "Can someone officially verify my 20 hours for my university service requirement?" +
-* "Do I need to bring work gloves, or does the organization provide all safety gear?" +
-* "I don't want to create an account with a password just to see what time donations are accepted."
+| 
 
 | * _I hope this isn't disorganized like the last cleanup where we stood around for 45 minutes doing nothing._ +
 * _Is this neighborhood safe to walk to early on a Saturday? Where do I safely park?_ +
@@ -46,10 +43,7 @@ Maya recently moved to the city and wants to connect with her neighborhood throu
 | DOES (Observable Behaviors)
 | FEELS (Affective Emotional States)
 
-| * Searches for volunteer opportunities on her smartphone while riding transit. +
-* Toggles between Google Maps and transit apps to verify travel time before committing. +
-* Picks OPEN_DOOR walk-in drives during exam weeks and scheduled shifts when calendar permits. +
-* Abandons registration flows immediately if blocked by an aggressive login wall before seeing details.
+| 
 
 | * *Eager:* Genuinely motivated to make an authentic community impact and meet neighborhood peers. +
 * *Anxious:* Apprehensive about arrival logistics, unfamiliar venues, and parking confusion. +

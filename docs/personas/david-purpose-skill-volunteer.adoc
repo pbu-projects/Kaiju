@@ -26,17 +26,14 @@ David has stable employment and wants to dedicate 5–10 hours every week to cau
 
 <<<
 
-==== NN/g 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
 |===
 | SAYS (Explicit Verbal Expressions)
 | THINKS (Unspoken Beliefs & Doubts)
 
-| * "I have 10 hours a week to give, and I want to use my professional data/GIS skills where they're actually needed." +
-* "I'm happy to do a background check and complete an orientation—just give me the clear onboarding steps." +
-* "Why does search only show events 2 miles away? I'll gladly drive 30 miles for an endangered species habitat cleanup." +
-* "Is there a way to speak with the project director before committing to a 3-month recurring schedule?"
+| 
 
 | * _I don't want to waste my Saturdays doing manual busywork that a machine or general volunteer could do in 5 minutes._ +
 * _If this organization is disorganized during onboarding, their field operations will probably be chaotic too._ +
@@ -46,10 +43,7 @@ David has stable employment and wants to dedicate 5–10 hours every week to cau
 | DOES (Observable Behaviors)
 | FEELS (Affective Emotional States)
 
-| * Uses advanced faceted search filters: toggles cause tags (#wildlife, #stem) and skill tags (#gis, #data). +
-* Reads organization mission statements and past project audit histories before applying. +
-* Uploads professional credentials, clearances, and LinkedIn profile to his volunteer dossier. +
-* Commits to recurring weekly schedules or joins REGIONAL initiative waitlists across the county.
+| 
 
 | * *Purpose-Driven:* Deeply compelled by moral mission, environmental stewardship, and community impact. +
 * *Selective:* Unwilling to squander finite professional bandwidth on chaotic, low-impact tasks. +

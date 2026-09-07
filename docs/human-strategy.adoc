@@ -1,4 +1,4 @@
-= Comprehensive Human Strategy & NN/g Empathy Maps: Kaiju (Volunteer Monster)
+= Comprehensive Human Strategy & Empathy Maps: Kaiju (Volunteer Monster)
 Kaiju Architecture Team <team@pbu.lol>
 v1.0, September 2026: Work-In-Progress Architectural & Human Strategy Specification
 :doctype: book

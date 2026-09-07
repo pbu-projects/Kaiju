@@ -26,17 +26,14 @@ Chloe is an ambitious high school student preparing competitive college and scho
 
 <<<
 
-==== NN/g 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
 |===
 | SAYS (Explicit Verbal Expressions)
 | THINKS (Unspoken Beliefs & Doubts)
 
-| * "I need to log 100 verified community service hours by December for my early college application." +
-* "Can I reserve 15 spots for our high school Key Club to volunteer together this Saturday?" +
-* "Does your app generate an official letter with the supervisor's signature and contact number?" +
-* "Do my parents have to sign a physical paper slip, or is there a digital waiver link I can text them?"
+| 
 
 | * _If this non-profit doesn't verify my hours before the deadline, all my weekend work won't count on my application._ +
 * _I hope our club members actually show up so I don't look unreliable in front of the volunteer coordinator._ +
@@ -46,10 +43,7 @@ Chloe is an ambitious high school student preparing competitive college and scho
 | DOES (Observable Behaviors)
 | FEELS (Affective Emotional States)
 
-| * Filters projects for weekend group availability and student-friendly physical requirements. +
-* Reserves shift blocks for her club peers and distributes join tokens through club messaging channels. +
-* Dispatches digital parental consent links to underage students prior to event day. +
-* Scans on-site QR codes for check-in and immediately requests supervisor verification at shift end.
+| 
 
 | * *Ambitious:* Highly driven to achieve scholarship milestones and build an impressive civic portfolio. +
 * *Anxious:* Stressed about tight application deadlines and chasing down slow supervisor signatures. +

@@ -26,17 +26,14 @@ Dr. Sarah oversees court-mandated youth mentoring, transitional foster youth pro
 
 <<<
 
-==== NN/g 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
 |===
 | SAYS (Explicit Verbal Expressions)
 | THINKS (Unspoken Beliefs & Doubts)
 
-| * "We cannot legally permit a volunteer near our youth facility without an active, verified criminal background check." +
-* "I need to know which volunteers completed the 40-hour trauma-informed crisis training before scheduling them." +
-* "Why did this platform let an unvetted user sign up for a night shelter shift?" +
-* "Our grant funding requires an audited log of every volunteer's credentials and supervised contact hours."
+| 
 
 | * _A single safeguarding failure or unvetted individual could cause catastrophic harm to a child and destroy our mission._ +
 * _I feel guilty turning away eager people, but our duty of care to vulnerable clients must always come first._ +
@@ -46,10 +43,7 @@ Dr. Sarah oversees court-mandated youth mentoring, transitional foster youth pro
 | DOES (Observable Behaviors)
 | FEELS (Affective Emotional States)
 
-| * Sets project security prerequisites: toggles requires_background_check = TRUE and min_training_hours = 40. +
-* Reviews candidate application dossiers, references, and digital identity verifications in admin portal. +
-* Monitors credential expiration dashboards to alert volunteers 60 days before their background check expires. +
-* Locks shift self-registration behind private or gated qualification rosters.
+| 
 
 | * *Vigilant:* Hyper-aware of legal liability, youth safeguarding, and institutional compliance. +
 * *Protective:* Fiercely devoted to shielding trauma survivors and minors from physical or emotional harm. +

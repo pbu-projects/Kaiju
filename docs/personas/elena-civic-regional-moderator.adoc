@@ -26,17 +26,14 @@ Elena oversees municipal volunteer services, community engagement initiatives, a
 
 <<<
 
-==== NN/g 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
 |===
 | SAYS (Explicit Verbal Expressions)
 | THINKS (Unspoken Beliefs & Doubts)
 
-| * "Does this volunteer stream restoration project have clearance to dig near municipal storm drains?" +
-* "This event borders two municipalities; which city's emergency response is designated if an injury occurs?" +
-* "I have 8 projects in the queue that will auto-escalate to the state level in 6 hours if I don't triage them." +
-* "Who modified the youth safety requirements on this construction build after we already approved it?"
+| 
 
 | * _If an unvetted group runs a hazardous project and a citizen gets injured, the city and platform bear liability._ +
 * _I don't want to be the bureaucratic bottleneck holding back passionate neighborhood volunteers._ +
@@ -46,10 +43,7 @@ Elena oversees municipal volunteer services, community engagement initiatives, a
 | DOES (Observable Behaviors)
 | FEELS (Affective Emotional States)
 
-| * Logs into the regional moderation portal every morning to inspect incoming pending submissions. +
-* Cross-references submitted boundary polygons against municipal administrative boundaries in GIS viewers. +
-* Verifies IRS non-profit determination letters and organization verification statuses. +
-* Triggers administrative re-reviews whenever flagged projects submit material description or location changes.
+| 
 
 | * *Accountable:* Strongly weighs the legal, ethical, and public safety responsibilities of municipal governance. +
 * *Pressured:* Constantly aware of the ticking 48-hour SLA escalation clock and heavy seasonal volume. +

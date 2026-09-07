@@ -26,17 +26,14 @@ Raymond is an hourly warehouse employee balancing a 40-hour court-ordered commun
 
 <<<
 
-==== NN/g 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map
 
 [cols="1,1", options="header", role="empathy-table"]
 |===
 | SAYS (Explicit Verbal Expressions)
 | THINKS (Unspoken Beliefs & Doubts)
 
-| * "Does your organization explicitly accept court-ordered community service and SNAP work requirements?" +
-* "I have to submit this signed log to my probation officer by the 30th or I face a court hearing." +
-* "Do you have any evening or Sunday shifts so I don't have to miss my paid warehouse job?" +
-* "Can the supervisor sign off on my hours right at 4:00 PM before I catch the cross-town bus?"
+| 
 
 | * _If I lose this food assistance or miss my court hours, my whole family will suffer._ +
 * _I feel judged when people ask why I'm volunteering; I just want to do honest hard work and clear my record._ +
@@ -46,10 +43,7 @@ Raymond is an hourly warehouse employee balancing a 40-hour court-ordered commun
 | DOES (Observable Behaviors)
 | FEELS (Affective Emotional States)
 
-| * Filters specifically for projects flagged with accepts_court_mandated = TRUE and snap_eligible = TRUE. +
-* Prioritizes physical tasks (warehouse packing, trail clearing, sorting) that have no disqualifying restrictions. +
-* Uses GPS check-in/out on mobile to establish an immutable, verifiable electronic timestamp. +
-* Generates certified compliance reports directly from the app to show his probation officer and caseworker.
+| 
 
 | * *Pressured:* Constantly aware of legal deadlines and the severe consequences of non-compliance. +
 * *Vulnerable:* Afraid of bureaucratic delays causing benefit termination or probation revocation. +
