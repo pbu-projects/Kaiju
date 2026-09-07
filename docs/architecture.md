@@ -43,12 +43,14 @@ Best suited for the **core public API and spatial search services**. Processing 
 The architecture utilizes a single PostgreSQL database equipped with the PostGIS extension.
 
 ### Benefits of a Single Database
+
 Rather than splitting data across isolated databases for each service, all services connect to a single PostgreSQL instance. This provides several key benefits:
 - **Instant Cross-Domain Joins:** Services can natively join operational data (e.g., projects and shifts) directly to geographic locations in a single SQL query, avoiding slow and complex network-level joins.
 - **Data Integrity:** Strict foreign key constraints guarantee data consistency across different business domains without the need for distributed transactions.
 - **Operational Simplicity:** Managing a single, robust PostgreSQL database drastically reduces infrastructure overhead, backup complexity, and connection management.
 
 ### Spatial Queries vs. Spatial Math
+
 It is important to distinguish where the spatial workload is processed:
 - **Geospatial Queries (JVM):** The Micronaut JVM orchestrates the data retrieval. It constructs the SQL queries, executes them against the database, and maps the resulting coordinate data into DTOs and JSON.
 - **Geospatial Math (Database):** **All** mathematical spatial computation (e.g., distance calculations, radius filtering via `ST_DWithin`, bounding box intersections) is pushed down to the database. PostGIS, written in C, handles these computations highly efficiently using GiST indexes, ensuring the JVM never has to load unfiltered raw coordinates into memory to do math.
