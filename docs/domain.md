@@ -10,9 +10,9 @@ Authentication is handled by [authentik](https://goauthentik.io/), which issues 
 
 - **Platform Roles** (`users.role`):
   - `GLOBAL_ADMIN`: Full system access.
-  - `REGION_ADMIN`: Administrative control over specific geographic territories.
-  - `REGION_MODERATOR`: Reviews and approves regional project queues.
-  - `VOLUNTEER`: Standard user.
+  - `REGION_DIRECTOR`: Administrative control over specific geographic territories.
+  - `REGION_AGENT`: Reviews and approves regional project queues.
+  - `STANDARD_USER`: Standard user.
 - **Organization Roles** (`organization_users.role`):
   - `ORG_ADMIN`: Manages organization profile, members, and projects.
   - `ORG_MANAGER`: Creates and edits projects and shifts.

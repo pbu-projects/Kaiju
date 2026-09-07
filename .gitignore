@@ -28,3 +28,4 @@ out/
 *.py
 __pycache__/
 *.py[cod]
+bin/
