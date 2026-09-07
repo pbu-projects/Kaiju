@@ -93,7 +93,15 @@ include::personas/elena-civic-regional-moderator.adoc[]
 
 == Comprehensive Strategic Tech Stack Matrix
 
-The table below maps each persona's operational needs directly to the technical architecture decisions made in the Kaiju codebase:
+Before detailing how the technical architecture aligns with specific human needs, it is critical to overview the core technologies driving the Kaiju platform:
+
+* *PostgreSQL & PostGIS for Heavy Geospatial Work:* Rather than reinventing the wheel by writing complex spatial mathematics in Java, we lean into PostgreSQL and PostGIS—an already highly performant, C-based technology. All heavy computations (distance calculations, radius filtering, polygon intersections) are pushed down to the database level.
+* *Micronaut Backend (HotSpot & GraalVM):* The platform leverages Micronaut's compile-time DI to run on two deployment targets. The *HotSpot JVM (ZGC)* handles the core API and heavy spatial query mapping, providing massive throughput and low latency for short-lived DTO allocations. *GraalVM Native Image* is utilized for background workers and short-lived event handlers where instant startup and low memory footprint are paramount.
+* *Frontend Dual-Strategy (JTE & Compose):* 
+** For the public-facing volunteer discovery web application, *JTE (Java Template Engine)* compiles templates to bytecode for blisteringly fast Server-Side Rendering (SSR). This provides a massive benefit for SEO ranking and frictionless instant access on mobile devices.
+** For the administrative portals, *Compose Multiplatform* is used. This saves significant dev time by sharing UI logic across desktop and mobile, while providing a highly consistent, interactive experience between devices for admins.
+
+The table below maps each persona's operational needs directly to these technical architecture decisions:
 
 [cols="2,2,3,3", options="header"]
 |===
@@ -116,42 +124,6 @@ The table below maps each persona's operational needs directly to the technical 
 * *`REGIONAL` STI*: Bypasses point radius for regional initiatives. +
 * *Volunteer Passport*: Reusable credential screening profile. +
 * *Keyset Shifts*: Sub-ms recurring schedule streaming.
-
-| *Chloe Torres (17)* +
-`STANDARD_USER` (Student)
-| 100 verified hours for college admissions & club group projects.
-| Lost paper logs; non-profits delaying hour verification.
-| * *Verified Hours Ledger*: Schema tracking verified hours & EIN. +
-* *Group Reservations*: Slot block holds with join tokens. +
-* *Digital Minor Consent*: Automated parental waiver e-signatures. +
-* *Common App PDF Generator*: Verifiable PDF certificates.
-
-| *Raymond Miller (35)* +
-`STANDARD_USER` (Mandated)
-| Court restitution & SNAP ABAWD monthly work compliance.
-| Turned away at door; lost paper logs risking probation violation.
-| * *Compliance Attribute Flags*: `accepts_court_mandated`, `snap_work_eligible`. +
-* *Tamper-Proof Audit Logging*: GPS geofenced check-in/out timestamps. +
-* *Court-Admissible PDF Export*: Official reports with EIN & QR token. +
-* *Flexible Keyset Shifts*: Evening/weekend shifts around hourly jobs.
-
-| *Marcus Vance (38)* +
-`ORG_ADMIN` (Operations)
-| Filling shift capacities; managing 5 hubs without spreadsheet chaos.
-| 30–50% volunteer no-shows; duplicate event creation; paper clipboards.
-| * *Compose Multiplatform Admin*: Desktop-grade calendar builder. +
-* *`project_locations` (1:N)*: 1 umbrella initiative, 10 addresses. +
-* *`/no-look` Endpoints*: Fast bulk ingestion for 500+ shifts. +
-* *Verified Status Bypass*: Auto-approval for trusted organizations.
-
-| *Dr. Sarah Al-Mansoor (42)* +
-`ORG_ADMIN` (Youth/Crisis)
-| Youth safeguarding; mandatory background checks; trauma training.
-| Unvetted walk-ins; lapsed credentials; catastrophic liability risk.
-| * *Gated Roster State Machine*: Shifts locked until `status = QUALIFIED`. +
-* *Micronaut Security & RBAC*: Tiered roles & qualification claims. +
-* *Credential Expiration Tracking*: Automated 60-day renewal alerts. +
-* *Transactional Audit Ledgers*: Append-only background & waiver logs.
 
 | *Elena Rostova (45)* +
 `REGION_DIRECTOR` (Civic)
