@@ -125,6 +125,10 @@ tasks.named<org.asciidoctor.gradle.jvm.pdf.AsciidoctorPdfTask>("asciidoctorPdf")
     }
 }
 
+asciidoctorj {
+    requires(file("docs/pdf-column-converter.rb"))
+}
+
 tasks.register("lighthouse") {
     group = "verification"
     description = "Lighthouse Markdown audit: validates syntax, block rendering, and link integrity."

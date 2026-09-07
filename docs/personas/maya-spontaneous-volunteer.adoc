@@ -30,42 +30,46 @@ Maya recently moved to the city and wants to connect with her neighborhood throu
 <<<
 
 [discrete]
-==== 4-Quadrant Empathy Map
+==== 4-Quadrant Empathy Map & Human Dynamics
 
-[cols="1,1", options="header", role="empathy-table"]
-|===
-| SAYS (Explicit Verbal Expressions)
-| THINKS (Unspoken Beliefs & Doubts)
+[role="columns-2"]
+--
+*SAYS* _(Explicit Verbal Expressions)_
 
-| 
+_No direct verbal statements recorded during initial onboarding._
 
-| * _I hope this isn't disorganized like the last cleanup where we stood around for 45 minutes doing nothing._ +
-* _Is this neighborhood safe to walk to early on a Saturday? Where do I safely park?_ +
-* _Will anyone actually notice or care if I show up, or am I just an extra body in a corner?_ +
-* _I really want to help, but I cannot commit to a recurring 6-month weekly contract._
+*DOES* _(Observable Behaviors)_
 
-| DOES (Observable Behaviors)
-| FEELS (Affective Emotional States)
+_No direct field observations recorded._
 
-| 
+*CRITICAL PAINS & RISKS*
 
-| * *Eager:* Genuinely motivated to make an authentic community impact and meet neighborhood peers. +
-* *Anxious:* Apprehensive about arrival logistics, unfamiliar venues, and parking confusion. +
-* *Impatient:* Irritated by sluggish web interfaces, infinite spinners, and redundant forms. +
-* *Proud:* Uplifted and empowered when her volunteer contribution produces tangible community results.
-|===
-
-[cols="1,1", options="header", role="pains-gains-table"]
-|===
-| CRITICAL PAINS & RISKS
-| DESIRED GAINS & SUCCESS METRICS
-
-| * *Phantom Shifts:* Traveling across town only to find a cancelled event or an overbooked room. +
-* *Mobile Latency:* Multi-megabyte JS/Wasm bundles freezing mobile browsers on transit. +
+* *Phantom Shifts:* Traveling across town only to find a cancelled event or an overbooked room.
+* *Mobile Latency:* Multi-megabyte JS/Wasm bundles freezing mobile browsers on transit.
 * *Inaccurate Geocoding:* Map pins pointing to corporate offices rather than active work sites.
 
-| * *Sub-50ms Discovery:* Frictionless public web discovery with zero JavaScript bundle overhead. +
-* *Truthful Driving Distance:* Real PostGIS geodesic distance with clear site entry instructions. +
+[.column]
+<<<
+
+*THINKS* _(Unspoken Beliefs & Doubts)_
+
+* _I hope this isn't disorganized like the last cleanup where we stood around for 45 minutes doing nothing._
+* _Is this neighborhood safe to walk to early on a Saturday? Where do I safely park?_
+* _Will anyone actually notice or care if I show up, or am I just an extra body in a corner?_
+* _I really want to help, but I cannot commit to a recurring 6-month weekly contract._
+
+*FEELS* _(Affective Emotional States)_
+
+* *Eager:* Genuinely motivated to make an authentic community impact and meet neighborhood peers.
+* *Anxious:* Apprehensive about arrival logistics, unfamiliar venues, and parking confusion.
+* *Impatient:* Irritated by sluggish web interfaces, infinite spinners, and redundant forms.
+* *Proud:* Uplifted and empowered when her volunteer contribution produces tangible community results.
+
+*DESIRED GAINS & SUCCESS METRICS*
+
+* *Sub-50ms Discovery:* Frictionless public web discovery with zero JavaScript bundle overhead.
+* *Truthful Driving Distance:* Real PostGIS geodesic distance with clear site entry instructions.
 * *Verified Digital Credential:* One-click certified service hour records for university portals.
-|===
+--
+
 
