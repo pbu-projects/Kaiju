@@ -218,6 +218,10 @@ tasks.register("lighthouse") {
                     val fragment = if (parts.size > 1) parts[1].trim() else null
 
                     val targetFile = if (relFile.isEmpty()) file else parentDir.resolve(relFile).normalize()
+                    if (targetFile.name.startsWith(".env")) {
+                        errors.add("❌ [ERROR] $relPath:$lineNo [Link] Target path '$relFile' points to a gitignored environment file which does not exist in CI checkouts")
+                        continue
+                    }
                     if (!targetFile.exists()) {
                         errors.add("❌ [ERROR] $relPath:$lineNo [Link] Broken target path '$relFile' (does not exist on disk)")
                         continue

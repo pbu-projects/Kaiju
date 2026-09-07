@@ -215,7 +215,7 @@ Tests currently inject controller beans directly (`@Inject LocationController lo
 2. **Flyway Migration Packaging**:
    - In [application.yml#L19-L22](../src/main/resources/application.yml#L19-L22), replace `filesystem:database/init` with standard classpath migration (`classpath:db/migration`) so migrations execute reliably inside packaged container images.
 3. **Secret Hygiene**:
-   - Ensure local environment secrets in [.env#L1](../.env#L1) are properly excluded from version control via [.gitignore#L1-L27](../.gitignore#L1-L27).
+   - Ensure local environment secrets in `.env` are properly excluded from version control via [.gitignore#L1-L27](../.gitignore#L1-L27).
 
 ---
 
