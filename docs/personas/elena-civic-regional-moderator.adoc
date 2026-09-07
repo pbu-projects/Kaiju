@@ -65,13 +65,3 @@ Elena oversees municipal volunteer services, community engagement initiatives, a
 * *Automated 48h Escalation:* Scheduled partial index job escalating stalled projects without manual tracking.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for Elena Rostova (45)*
-
-[role="tech-grid"]
-* *administrative_regions (DDD):* Separates civic governance authority from operational project boundaries, preserving municipal jurisdiction integrity.
-* *48h Escalation Queue:* Partial index (idx_projects_pending_escalation) backs an hourly background job that auto-escalates stalled reviews to parent region.
-* *PENDING_UPDATE State Machine:* Material edits by non-admin organizers automatically flip status to PENDING_UPDATE, preventing unapproved changes to live events.
-* *project_audit_logs Ledger:* Immutable append-only ledger recording every CREATED, APPROVED, REJECTED, and EDITED state transition with actor ID.
---

@@ -65,13 +65,3 @@ Chloe is an ambitious high school student preparing competitive college and scho
 * *Digital Minor Consent:* Automated parental e-signatures eliminating physical paper slips.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for Chloe Torres (17)*
-
-[role="tech-grid"]
-* *Verified Hours Ledger:* Database schema stores exact verified hours, supervisor actor ID, and organization 501(c)(3) EIN for accredited reporting.
-* *Group Reservation Engine:* Allows club leaders like Chloe to hold blocks of slots with temporary reservation tokens for student peers.
-* *Digital Minor Waiver Pipeline:* Automated guardian SMS/email waiver signing satisfying COPPA and non-profit liability rules.
-* *PDF Transcript Generator:* Generates verifiable PDF completion certificates with unique cryptographic validation URLs for university admissions.
---

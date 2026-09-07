@@ -65,13 +65,3 @@ Raymond is an hourly warehouse employee balancing a 40-hour court-ordered commun
 * *Court-Admissible Reports:* Official PDF summaries with organization tax IDs and verification tokens for judges.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for Raymond Miller (35)*
-
-[role="tech-grid"]
-* *Compliance Attribute Flags:* Database schema flags (accepts_court_mandated, snap_work_eligible) on projects prevent wasted bus trips and rejection.
-* *Tamper-Proof Audit Logging:* project_audit_logs captures exact GPS geofenced check-in/out timestamps and supervisor actor IDs.
-* *Court-Admissible PDF Export:* Generates standardized official compliance documents with organization EIN, supervisor phone, and verification QR codes.
-* *Flexible Keyset Shift Schedules:* Filters for evening and weekend shift series, allowing hourly wage earners to fulfill hours without missing paid shifts.
---

@@ -65,13 +65,3 @@ Maya recently moved to the city and wants to connect with her neighborhood throu
 * *Verified Digital Credential:* One-click certified service hour records for university portals.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for Maya Lin (24)*
-
-[role="tech-grid"]
-* *JTE Server-Side Templates:* Compiles templates directly to Java bytecode, delivering sub-50ms TTFB and 0MB JavaScript download weight on mobile transit.
-* *PostGIS ST_DWithin Radius:* Calculates truthful geodesic distance from Maya's coordinates (GEOGRAPHY Point, 4326); eliminates fake boundary pins.
-* *STI Project Discriminator:* Automatically renders the correct UX: OPEN_DOOR provides directions/hours; STANDARD delivers a calendar shift picker.
-* *ProjectSearchCard DTO:* An immutable, compact @Serdeable record transmitting only 5 essential fields over the wire to maximize mobile battery and data efficiency.
---

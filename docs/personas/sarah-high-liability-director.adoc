@@ -65,13 +65,3 @@ Dr. Sarah oversees court-mandated youth mentoring, transitional foster youth pro
 * *Audit-Ready Compliance Reports:* 1-click export of tamper-proof credential logs for grant and legal authorities.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for Dr. Sarah Al-Mansoor (42)*
-
-[role="tech-grid"]
-* *Gated Roster State Machine:* Shifts evaluate volunteer qualification state (status = QUALIFIED) before allowing sign-up transactions, preventing unvetted access.
-* *Micronaut Security & RBAC:* Enforces strict tiered permissions across ORG_ADMIN, ORG_MANAGER, and verified volunteer role claims.
-* *Credential Expiration Tracking:* Database schema stores certification expiration dates, triggering automated alerts before clearances lapse.
-* *Transactional Audit Ledgers:* Immutable append-only ledger logs every background approval, waiver e-signature, and supervised hour for grant audits.
---

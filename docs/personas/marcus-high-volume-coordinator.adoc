@@ -65,13 +65,3 @@ Marcus manages volunteer logistics for a metropolitan food rescue and urban agri
 * *Digital Roster Check-In:* QR scanning and geofenced check-in eliminating paper clipboard transcription.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for Marcus Vance (38)*
-
-[role="tech-grid"]
-* *Compose Multiplatform Admin:* Provides Marcus with desktop-grade shift builders, drag-and-drop calendars, and batch roster tables without web UI lag.
-* *project_locations Bridge:* Enables Marcus to link 1 umbrella food drive to 10 physical distribution hubs, eliminating duplicate project cloning.
-* */no-look Ingestion Endpoints:* Bypasses redundant pre-flight existsById checks, allowing Marcus to sync 500+ shift slots from external systems in seconds.
-* *Verified Status Bypass:* Once Marcus's organization achieves VERIFIED status, his project updates publish instantly without waiting for moderation queues.
---

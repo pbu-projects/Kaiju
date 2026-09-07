@@ -81,15 +81,8 @@ graph TD
   1. *Sub-50ms Instant Browsing*: Frictionless public web discovery with zero JavaScript bundle overhead.
   2. *Truthful Driving Distance*: Real PostGIS geodesic distance with clear site entry instructions.
   3. *Verified Digital Credential*: One-click certified service hour records for school and employer.
-
-### Tech Stack Alignment for Maya
-
-* **JTE (Java Template Engine) SSR**: Compiles templates directly to Java bytecode. Delivers sub-50ms TTFB and zero JavaScript bundle weight, allowing Maya to discover projects instantly on cellular connections.
-* **PostGIS `ST_DWithin` & Geodesic Indexing**: Calculates truthful distance from Maya's coordinates (`GEOGRAPHY(Point, 4326)`). Eliminates inaccurate boundary pins.
-* **STI `project_type` Discriminator**: Automatically renders the correct interface: `OPEN_DOOR` displays map directions and operating hours; `STANDARD` displays calendar shift selection.
-* **`ProjectSearchCard` DTO**: An immutable, compact `@Serdeable` record transmitting only 5 lightweight fields over the mobile wire, maximizing battery and data efficiency.
-
 ---
+
 
 ## 2. David Chen — The Purpose-Driven & Skill-Building Volunteer
 
@@ -119,15 +112,8 @@ graph TD
   1. *Deep Skill & Cause Taxonomy*: Fast faceted filtering by required competencies (`#gis`, `#cpr`) and causes (`#wildlife`).
   2. *Regional Initiative Access*: Joining geofenced polygon projects (`REGIONAL` STI) with remote or field components.
   3. *Verified Credential Passport*: Reusable digital clearances unlocking specialized, high-trust shifts instantly.
-
-### Tech Stack Alignment for David
-
-* **`tags` & `shift_tags` Taxonomy**: Multi-tag faceted filtering on skills (`#gis`, `#carpentry`) and causes (`#wildlife`), matching David to high-skill opportunities.
-* **`REGIONAL` Project Discriminator**: Bypasses physical point radius limits to surface county/state-wide initiatives that need specialized remote or distributed contributors.
-* **Verified Volunteer Passport (Phase 3/4)**: Stores verified credential badges (background check clearance, CPR license) on `users` profile to unlock gated shifts.
-* **Keyset Scheduled Shifts**: Streams recurring multi-week shift series with sub-millisecond latency for seamless long-term schedule planning.
-
 ---
+
 
 ## 3. Chloe Torres — The Academic & Portfolio-Building Student Volunteer
 
@@ -157,15 +143,8 @@ graph TD
   1. *Digital Service Transcript*: Instant export of certified, tamper-proof service records for college portals.
   2. *Group Reservation Holds*: Reserving slot blocks with shareable invite tokens for student clubs.
   3. *Digital Minor Consent*: Automated parental e-signatures eliminating physical paper slips.
-
-### Tech Stack Alignment for Chloe
-
-* **Verified Service Hours Ledger**: Schema tracking verified hours, supervisor actor ID, and organization 501(c)(3) EIN for accredited reporting.
-* **Group Reservation Engine (`group_reservations`)**: Allows club leaders like Chloe to hold blocks of slots with temporary reservation tokens for student peers.
-* **Digital Minor Waiver Pipeline**: Automated guardian SMS/email waiver signing satisfying COPPA and non-profit liability rules.
-* **PDF Transcript Generator**: Generates verifiable PDF completion certificates with unique cryptographic validation URLs for university admissions.
-
 ---
+
 
 ## 4. Raymond Miller — The Compliance & Mandated Service Volunteer
 
@@ -195,15 +174,8 @@ graph TD
   1. *Compliance Search Filter*: Clear visibility into court-approved and SNAP-eligible non-profit opportunities.
   2. *GPS-Verified Check-in*: Incontestable timestamped attendance logs with supervisor verification IDs.
   3. *Court-Admissible Reports*: Official PDF summaries with organization tax IDs and verification tokens for judges.
-
-### Tech Stack Alignment for Raymond
-
-* **Compliance Attribute Flags**: Database schema flags (`accepts_court_mandated`, `snap_work_eligible`) on projects prevent wasted bus trips and rejection.
-* **Tamper-Proof Audit Logging**: `project_audit_logs` captures exact GPS geofenced check-in/out timestamps and supervisor actor IDs.
-* **Court-Admissible PDF Export**: Generates standardized official compliance documents with organization EIN, supervisor phone, and verification QR codes.
-* **Flexible Keyset Shift Schedules**: Filters for evening and weekend shift series, allowing hourly wage earners to fulfill hours without missing paid shifts.
-
 ---
+
 
 ## 5. Marcus Vance — The High-Volume Operations Coordinator
 
@@ -233,15 +205,8 @@ graph TD
   1. *Automated Waitlist Backfill*: Real-time promotion of standby volunteers when cancellations occur.
   2. *1-to-Many Project Locations*: Creating one umbrella project linked to multiple physical locations.
   3. *Digital Roster Check-In*: QR scanning and geofenced check-in eliminating paper clipboard transcription.
-
-### Tech Stack Alignment for Marcus
-
-* **Compose Multiplatform Admin Dashboard**: Provides Marcus with desktop-grade shift scheduling, drag-and-drop calendars, and batch roster tables with near-zero latency.
-* **`project_locations` (1-to-Many Bridge Table)**: Enables Marcus to link 1 umbrella initiative to 10 physical distribution warehouses, preventing duplicate project cloning.
-* **`/no-look` Endpoints (`ProjectController`, `LocationController`)**: Bypasses redundant pre-flight `existsById` queries, allowing Marcus to sync 500+ shift slots from external systems in seconds.
-* **Organization Verification Bypass (`verification_status = 'VERIFIED'`)**: Projects submitted by verified organizations bypass the regional moderation queue and publish immediately.
-
 ---
+
 
 ## 6. Dr. Sarah Al-Mansoor — The High-Liability Program Director
 
@@ -271,15 +236,8 @@ graph TD
   1. *Automated Qualification Gating*: Shifts automatically locked until background checks and training are certified.
   2. *Integrated Screening Pipeline*: Direct API verification of background clearances and identity records.
   3. *Audit-Ready Compliance Reports*: 1-click export of tamper-proof credential logs for grant and legal authorities.
-
-### Tech Stack Alignment for Dr. Sarah
-
-* **Gated Roster State Machine**: Shifts evaluate volunteer qualification state (`status = QUALIFIED`) before allowing sign-up transactions, preventing unvetted access.
-* **Micronaut Security & RBAC**: Enforces strict tiered permissions across `ORG_ADMIN`, `ORG_MANAGER`, and verified volunteer role claims.
-* **Credential Expiration Tracking**: Database schema stores certification expiration dates, triggering automated alerts before clearances lapse.
-* **Transactional Audit Ledgers**: Immutable append-only ledger logs every background approval, waiver e-signature, and supervised hour for grant audits.
-
 ---
+
 
 ## 7. Elena Rostova — The Civic Regional Moderator
 
@@ -310,14 +268,6 @@ graph TD
   2. *Immutable Audit Trails*: Append-only transaction records capturing actor, timestamp, and status diff.
   3. *Automated 48h Escalation*: Scheduled partial index job escalating stalled projects without manual tracking.
 
-### Tech Stack Alignment for Elena
-
-* **`administrative_regions` vs `boundaries` (DDD Separation)**: Separates human governance and civic authority from operational project perimeters, preserving municipal jurisdiction integrity.
-* **48-Hour Escalation Queue (`idx_projects_pending_escalation`)**: An indexed SQL query backed by an hourly cron job escalates projects unreviewed for 48 hours to the parent administrative region.
-* **`PENDING_UPDATE` State Machine Trigger**: Updates to active projects by non-admin organizers automatically flip status back to `PENDING_UPDATE`, preventing unapproved changes to live events.
-* **`project_audit_logs` & `organization_audit_logs`**: Immutable append-only ledgers capturing actor, timestamp, previous status, and new status within the same database transaction.
-* **Authentik RBAC (`REGION_DIRECTOR`, `REGION_AGENT`)**: Strict geographic `@Secured` role enforcement prevents moderators from approving or altering projects outside their legal territory.
-
 ---
 
 ## The 8-Page Draw.io Diagram Deliverable
@@ -325,18 +275,52 @@ graph TD
 The visual model is stored at:
 [`docs/human-strategy-personas.drawio`](./human-strategy-personas.drawio)
 
-### Diagram Breakdown:
+### Diagram Breakdown
 
 * **Page 1: `1. Human Strategy Ecosystem`** — Macro mapping of all 7 personas across the volunteer and coordinator spectrums, 4 technical architecture layers, and 4 human value loops.
-* **Page 2: `2. Maya - Spontaneous Local Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
-* **Page 3: `3. David - Purpose & Skill Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
-* **Page 4: `4. Chloe - Academic & Portfolio Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
-* **Page 5: `5. Raymond - Mandated & Compliance Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
-* **Page 6: `6. Marcus - High-Volume Coordinator`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
-* **Page 7: `7. Dr. Sarah - Specialized Director`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
-* **Page 8: `8. Elena - Civic Regional Moderator`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains + Tech stack alignment.
+* **Page 2: `2. Maya - Spontaneous Local Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
+* **Page 3: `3. David - Purpose & Skill Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
+* **Page 4: `4. Chloe - Academic & Portfolio Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
+* **Page 5: `5. Raymond - Mandated & Compliance Volunteer`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
+* **Page 6: `6. Marcus - High-Volume Coordinator`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
+* **Page 7: `7. Dr. Sarah - Specialized Director`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
+* **Page 8: `8. Elena - Civic Regional Moderator`** — Proto-persona card + 4-quadrant Empathy Map + Pains/Gains.
 
-### How to Open & Inspect:
+### How to Open & Inspect
 
 * **In VS Code / Cursor**: Click on [`docs/human-strategy-personas.drawio`](./human-strategy-personas.drawio) using the *Draw.io Integration* extension (`hediet.vscode-drawio`).
 * **In Web Browser**: Open [app.diagrams.net](https://app.diagrams.net/) and drag-and-drop the file.
+
+---
+
+## Document Compilation & PDF Export Options
+
+### 1. Publication-Grade Asciidoctor PDF (Recommended)
+
+The primary, publication-grade document generator runs natively on the JVM via Gradle:
+
+```bash
+./gradlew asciidoctorPdf
+```
+
+* **Output**: `build/docs/asciidoctor-pdf/human-strategy.pdf`
+* **Features**: Formats with formal chapter titling, cover page, paginated table of contents with dot leaders, callout icons, and clean table borders.
+
+### 2. Browser-Based CSS PDF (Experimental)
+
+The document can also be converted using browser-based CSS via the Chromium/Puppeteer engine (`asciidoctor-web-pdf`):
+
+```bash
+# Via PowerShell
+./scripts/render-web-pdf.ps1
+
+# Via Bash
+./scripts/render-web-pdf.sh
+
+# Or directly via npx
+npx asciidoctor-pdf docs/human-strategy.adoc -B docs -D build/docs/asciidoctor-web-pdf --preserve-html
+```
+
+* **Output**: `build/docs/asciidoctor-web-pdf/human-strategy.pdf`
+* **Caveats**: While this pipeline leverages web standards and CSS (`styles/human-strategy.css`), the output **does not look as good** as the native Asciidoctor PDF engine (lacks automatic TOC page numbering/leaders, table borders and column widths can be uneven, and page breaks are less predictable). To keep the backend Gradle build lean, this task is maintained as an auxiliary script outside `build.gradle.kts`.
+

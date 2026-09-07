@@ -65,13 +65,3 @@ David has stable employment and wants to dedicate 5–10 hours every week to cau
 * *Verified Credential Passport:* Reusable digital clearances unlocking specialized, high-trust shifts instantly.
 |===
 
-[role="tech-alignment-card"]
---
-*Kaiju Tech Stack Alignment for David Chen (31)*
-
-[role="tech-grid"]
-* *tags & shift_tags Taxonomy:* Enables multi-tag faceted filtering on skills (#gis, #carpentry) and causes (#wildlife), matching David to high-skill opportunities.
-* *REGIONAL Project Discriminator:* Bypasses physical point radius limits to surface county/state-wide initiatives that need specialized remote or distributed contributors.
-* *Verified Volunteer Passport:* Stores verified credential badges (background check clearance, CPR license) on users profile to unlock gated shifts.
-* *Keyset Scheduled Shifts:* Streams recurring multi-week shift series with sub-millisecond latency for seamless long-term schedule planning.
---

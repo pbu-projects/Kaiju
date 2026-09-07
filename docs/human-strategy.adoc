@@ -14,7 +14,7 @@ v1.0, September 2026: Work-In-Progress Architectural & Human Strategy Specificat
 
 [abstract]
 --
-This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Adhering to **Nielsen Norman Group (NN/g)** best practices, this document models 7 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
+This specification establishes the comprehensive **Human Strategy** for Kaiju (Volunteer Monster), grounding its Phase 1 PostGIS spatial foundation in real human behaviors, motivations, and operational constraints. Employing structured empathy mapping and persona research practices, this document models 7 Proto-Personas and their 4-Quadrant Empathy Maps (Says, Thinks, Does, Feels), addressing the dual spectrums of volunteerism: Spontaneous vs. Skilled & Academic/Mandated Volunteers, alongside High-Volume vs. High-Liability Non-Profit Programs.
 --
 
 == Executive Summary: The Dual Human Spectrums & The Domain Chasm
@@ -44,16 +44,24 @@ However, an enterprise volunteer ecosystem is governed by **two distinct human s
 Phase 1 established the *Spatial Catalog*. Phases 2, 3, and 4 must construct the *Human Half*: Capacity controls, automated waitlists, digital liability waivers, on-site QR attendance, and verified volunteer hour credentials.
 ====
 
-== Nielsen Norman Group (NN/g) Framework & Methodology
+== Empathy Mapping Framework & Methodology
 
-According to Nielsen Norman Group research standards:
-* **Proto-Personas**: Assumption-based archetypes synthesizing existing domain knowledge, organizational context, and behavioral observations before formal field studies.
-* **4-Quadrant Empathy Maps**: Capture a single user persona's current-state experience:
-** **SAYS**: Direct verbal statements, quotes, and explicit questions vocalized aloud.
-** **THINKS**: Unspoken anxieties, doubts, preoccupations, and internalized beliefs.
-** **DOES**: Concrete physical actions, workflows, workarounds, and observable habits.
-** **FEELS**: Emotional states, affective adjectives, cognitive fatigue, and emotional triumphs.
-** **PAINS & GAINS**: Synthesized obstacles (risks, wasted time) vs. desired outcomes (success metrics, relief).
+To ground system architecture in observable human behavior, this specification employs structured proto-persona modeling and 4-quadrant empathy maps:
+
+=== Proto-Personas
+Assumption-based archetypes synthesizing existing domain knowledge, organizational context, and behavioral observations prior to formal field studies. They ensure architecture and data models serve real workflows rather than hypothetical, elastic users.
+
+=== 4-Quadrant Empathy Architecture
+Each persona profile captures a comprehensive current-state experience across four key perspectives:
+
+* *SAYS (Explicit Verbal Expressions)*: Direct verbal statements, quotes, and explicit questions vocalized aloud.
+* *THINKS (Unspoken Beliefs & Doubts)*: Internalized anxieties, unspoken doubts, and operational preoccupations.
+* *DOES (Observable Behaviors)*: Concrete physical actions, daily workflows, manual workarounds, and observable habits.
+* *FEELS (Affective Emotional States)*: Emotional states, cognitive fatigue, professional pressures, and personal triumphs.
+
+=== Critical Pains & Desired Gains
+* *Critical Pains & Risks*: Synthesizes obstacles, liability exposure, and wasted operational bandwidth.
+* *Desired Gains & Success Metrics*: Articulates the measurable payoffs and relief provided by platform capabilities.
 
 == The Volunteer Spectrum (4 Proto-Personas)
 
@@ -192,18 +200,39 @@ Or with modern `asciidoctor`:
 asciidoctor -a stylesheet=styles/human-strategy.css -a linkcss human-strategy.adoc
 ----
 
-=== 2. Exporting to PDF
-To export to a publication-grade PDF:
+=== 2. Exporting to PDF (Publication-Grade - Recommended)
+
+The primary and recommended pipeline generates a publication-grade PDF using the JVM-native Asciidoctor PDF engine via Gradle:
 
 ----
-a2x -f pdf -d book human-strategy.adoc
-# Or with asciidoctor-pdf:
-asciidoctor-pdf -a stylesheet=styles/human-strategy.css human-strategy.adoc
+./gradlew asciidoctorPdf
 ----
 
-=== 3. Exporting to EPUB or DocBook
+* *Artifact location*: `build/docs/asciidoctor-pdf/human-strategy.pdf`
+* *Design qualities*: Professional book layout, formal cover page, paginated Table of Contents with dot leaders, callout icons, clean table grid borders, and consistent chapter page breaks.
+
+=== 3. Browser-Based CSS PDF (Experimental Alternative)
+
+The document can alternatively be compiled using browser-based CSS (`styles/human-strategy.css`) via the Chromium-based `asciidoctor-web-pdf` engine:
+
+----
+# Using PowerShell helper:
+./scripts/render-web-pdf.ps1
+
+# Using Bash helper:
+./scripts/render-web-pdf.sh
+
+# Or directly via npx:
+npx asciidoctor-pdf docs/human-strategy.adoc -B docs -D build/docs/asciidoctor-web-pdf --preserve-html
+----
+
+* *Artifact location*: `build/docs/asciidoctor-web-pdf/human-strategy.pdf`
+* *Rendering notes*: While this pipeline allows leveraging browser-based CSS styling and Paged.js, the resulting output **does not look as good** as the native Asciidoctor PDF engine (lacks automatic TOC page numbers and dot leaders, table cell borders are unstyled, and multi-page table splits can be uneven). To avoid burdening the primary backend build with Node/Puppeteer dependencies, this task is kept outside `build.gradle.kts` in dedicated runner scripts.
+
+=== 4. Exporting to EPUB or DocBook
 
 ----
 a2x -f epub human-strategy.adoc
 a2x -f docbook human-strategy.adoc
 ----
+
