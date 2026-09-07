@@ -10,7 +10,7 @@ Changes are grouped into four priority tiers.
 
 These need to be resolved before implementation begins, as they affect the shape of the service layer and schema.
 
-1. **Auth environment**: `micronaut-security` is declared and the role model exists. Is Authentik running in any environment yet, or do we need a local JWKS mock for dev/test?
+1. **Auth environment**: Authentik is running locally as a dev-environment placeholder (see `database/compose.yml`). It is **not** the intended production IdP — it should be swapped for any enterprise-grade OIDC provider (Okta, Auth0, Keycloak, Azure AD, etc.) before production. Micronaut Security consumes a standard JWKS endpoint, so the swap is a one-line config change (`micronaut.security.token.jwt.signatures.jwks.*.url`). No application code changes are required to switch providers.
 2. **Soft delete**: `projects` has `deleted_at` / `deleted_by` columns that are currently unused and unfiltered. Keep soft-delete (and add `WHERE deleted_at IS NULL` everywhere) or drop the columns and use hard delete?
 3. **Flyway naming**: Migrations use an empty prefix and `-` separator (`01-schema.sql`) rather than the Flyway default (`V1__schema.sql`). Renaming is cheap now, painful after a live DB exists. Preference?
 4. **Metrics sink**: Micrometer is collecting data but not exporting it. Target: Prometheus scrape endpoint, Datadog push, or other?

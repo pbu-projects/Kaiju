@@ -23,7 +23,12 @@ services:
       start_period: 20s
     restart: unless-stopped
 
-  # ── Authentik Database (separate PostgreSQL install) ──────────────────────
+  # ── Authentik (local dev IdP — replace with any OIDC provider in production) ──
+  # Authentik is used here as a lightweight local identity provider for development
+  # and testing. It is NOT the intended production IdP. Any OIDC-compliant provider
+  # (Okta, Auth0, Keycloak, Azure AD, etc.) can replace it — the only required change
+  # is the JWKS URL in application.yml:
+  #   micronaut.security.token.jwt.signatures.jwks.*.url
   authentik-db:
     image: postgres:16-alpine
     container_name: authentik_db
