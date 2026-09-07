@@ -2,10 +2,7 @@
 
 **Methodological Framework**: Nielsen Norman Group (NN/g) Persona Anatomy & 3-Part User Need Statement Standard  
 **Target Platform**: Kaiju (Volunteer Monster)  
-**Visual Artifacts**:
-* **Editable draw.io Diagram**: [user-needs-and-personas.drawio](./diagrams/user-needs-and-personas.drawio)
-* **High-Resolution Vector SVG**: [user-needs-and-personas.svg](./diagrams/user-needs-and-personas.svg)
-* **High-Resolution PNG Render**: [user-needs-and-personas.png](./diagrams/user-needs-and-personas.png)
+**Visual Artifacts**: *(diagram files not committed to repository)*
 
 ---
 
@@ -347,8 +344,4 @@ graph TD
 
 ## 6. Visual Board Index
 
-| Artifact | Type | Description |
-| :--- | :--- | :--- |
-| [user-needs-and-personas.drawio](./diagrams/user-needs-and-personas.drawio) | Draw.io XML | Editable vector diagram mapping the 4 personas, 5 operational themes, and 12 NN/g need statements. |
-| [user-needs-and-personas.svg](./diagrams/user-needs-and-personas.svg) | Scalable Vector | High-res vector export for crisp display in documentation and web browsers. |
-| [user-needs-and-personas.png](./diagrams/user-needs-and-personas.png) | PNG Image | Raster graphic embed for rapid desktop and mobile viewing. |
+*(Diagram files — `.drawio`, `.svg`, `.png` — were not committed to the repository.)*
