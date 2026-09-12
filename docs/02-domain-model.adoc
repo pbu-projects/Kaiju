@@ -1,0 +1,50 @@
+== Domain & Security
+
+Core business logic, security model, and moderation flows.
+
+=== Security & RBAC
+
+Authentication is handled by https://goauthentik.io/[authentik], which
+issues JSON Web Tokens (JWTs). Micronaut Security verifies tokens and
+enforces role-based authorization via `@Secured`.
+
+==== Role Hierarchy
+
+* *Platform Roles* (`users.role`):
+** `GLOBAL++_++ADMIN`: Full system access.
+** `REGION++_++DIRECTOR`: Administrative control over specific
+geographic territories.
+** `REGION++_++AGENT`: Reviews and approves regional project queues.
+** `STANDARD++_++USER`: Standard user.
+* *Organization Roles* (`organization++_++users.role`):
+** `ORG++_++ADMIN`: Manages organization profile, members, and projects.
+** `ORG++_++MANAGER`: Creates and edits projects and shifts.
+** `ORG++_++MEMBER`: Read/view access to organization internal data.
+
+=== Workspaces & Organizations
+
+Every project belongs to an organization (`projects.organization++_++id`
+is required). When an individual user creates a project without an
+organization, the system creates a personal workspace organization and
+assigns them `ORG++_++ADMIN`.
+
+=== Project Moderation & Escalation Queue
+
+[arabic]
+. *Auto-Approval*: Projects submitted by organizations with
+`verification++_++status = 'VERIFIED'` are automatically active.
+. *Regional Routing*: Unverified projects enter a moderation queue
+assigned to their spatial region (`managing++_++region++_++id`)
+determined by PostGIS boundary intersection.
+. *Escalation*: If unreviewed for 48 hours, background jobs escalate the
+project to the parent region.
+. *Re-Verification on Edit*: Updates to active projects by non-admin
+users flip status back to `PENDING++_++UPDATE` for review.
+
+=== Audit Logging
+
+High-liability state changes (organization verification, project
+approval, permission changes) record immutable entries in audit tables
+(`organization++_++audit++_++logs`, `project++_++audit++_++logs`)
+capturing the actor, timestamp, previous status, and new status within
+the same database transaction.

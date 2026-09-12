@@ -26,6 +26,8 @@ dependencies {
     implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.security:micronaut-security")
+    implementation("io.micronaut.security:micronaut-security-oauth2")
+    implementation("io.micronaut.security:micronaut-security-jwt")
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("io.micronaut.validation:micronaut-validation")
@@ -121,7 +123,7 @@ tasks.named<org.asciidoctor.gradle.jvm.pdf.AsciidoctorPdfTask>("asciidoctorPdf")
     setSourceDir(file("docs"))
     setOutputDir(layout.buildDirectory.dir("docs/asciidoctor-pdf").get().asFile)
     sources {
-        include("human-strategy.adoc")
+        include("index.adoc")
     }
 }
 

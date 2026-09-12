@@ -1,0 +1,16 @@
+== 0001. IdP-Agnostic Authentication and Authorization
+
+=== Context
+We are currently using Authentik for authentication and authorization. However, Authentik will not remain as the tool forever, and we assume another tool (like Okta, Keycloak, or Auth0) will replace it when budget allows or if it provides a better experience. Because of this likely future migration, we need to ensure that our application architecture doesn't tightly couple to Authentik's specific group, role, or authorization implementations. 
+
+=== Decision
+We will adopt an **IdP-Agnostic** approach for Authentication and Authorization:
+
+1. **Source of Truth (Roles in Database)**: The IdP (currently Authentik) will *only* be responsible for Authentication (verifying identity and issuing a JWT with a unique identifier like `email` or `sub`). Kaiju's database will be the sole source of truth for Authorization (RBAC, roles, permissions). We will map the JWT identifier to the user's roles inside the application using a custom Micronaut `AuthenticationMapper` or `TokenValidator`.
+2. **User Provisioning**: We will use Just-In-Time (JIT) provisioning. When a user logs in successfully via the IdP, the application checks if they exist in the `users` table. If not, it creates a record for them with a safe, default baseline role until an admin elevates them. This avoids relying on complex SCIM or webhook synchronizations from the IdP.
+3. **Data Syncing**: We will not attempt to synchronize database roles up to the IdP. The `02-users.sql` seed script will remain the source for local development database seeding. For local dev in Authentik, we simply need a few mock identities (matching the emails in the SQL script) that can successfully authenticate.
+
+=== Consequences
+* **Positive:** Migrating to a new IdP in the future will be trivial. We will only need to swap the OIDC issuer URL and ensure the new IdP provides the expected identifier claim. No complex group or role migrations will be necessary.
+* **Positive:** Less complex infrastructure code (Terraform, APIs) is required to manage Authentik locally, as it only needs basic user credentials.
+* **Negative:** We cannot manage application roles directly from the IdP's administrative UI. All role management must be done via the Kaiju application itself.

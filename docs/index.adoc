@@ -1,0 +1,18 @@
+= Kaiju Documentation
+:toc: left
+:toclevels: 3
+:doctype: book
+
+Welcome to the Kaiju project documentation.
+
+include::01-introduction.adoc[]
+
+include::02-domain-model.adoc[]
+
+include::03-architecture.adoc[]
+
+include::04-testing-strategy.adoc[]
+
+include::05-production-strategy.adoc[]
+
+include::adrs/index.adoc[]
