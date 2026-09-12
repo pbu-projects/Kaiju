@@ -1,0 +1,88 @@
+== Architecture & UI
+
+Overview of application structure, frontend rendering, and compilation
+standards.
+
+=== Application Structure
+
+Kaiju is a single-module Micronaut application under
+`lol.pbu.kaiju.++*++`:
+
+* *`controller`*: HTTP REST endpoints and web routing. Endpoints return
+DTOs/view models rather than raw database entities.
+* *`domain`*: Database entities, JTS spatial types (`Point`, `Polygon`),
+and lifecycle converters.
+* *`model`*: DTOs, request/response models, and enums.
+* *`repository`*: Micronaut Data JDBC repositories and custom spatial
+SQL queries.
+
+=== Frontend Strategy
+
+* *Public Web*: https://jte.gg/[JTE (Java Template Engine)] provides
+Server-Side Rendering (SSR) to improve SEO ranking and load times by
+serving pre-rendered HTML.
+* *Admin Dashboards & Mobile*:
+https://www.jetbrains.com/lp/compose-multiplatform/[Compose
+Multiplatform] handles state in logged-in portals. It shares UI logic
+across desktop, web, and mobile clients to save dev time and provide a
+consistent experience between devices for admins.
+
+=== Backend Strategy
+
+The backend uses Micronaut to provide a fast, reflection-free dependency
+injection framework, giving us the flexibility to deploy services using
+either GraalVM Native Image or a standard HotSpot JVM based on the
+workload.
+
+To maintain compatibility across both deployment targets: - Rely on
+compile-time dependency injection (`@Singleton`, `@Inject`,
+`@Controller`). - Avoid reflection and dynamic proxying at runtime. -
+Use immutable Java `record`s or immutable models for DTOs. - Keep
+dependencies reflection-free and lightweight.
+
+==== Deployment Targets
+
+*1. GraalVM Native Image (Community Edition)* Used for background
+workers and short-lived event handlers to produce faster and leaner
+binaries.
+
+*2. HotSpot JVM (Eclipse Temurin Java 25 {plus} Generational ZGC)*
+Geared toward spatial query mapping. It provides higher throughput, low
+latency, and better garbage collection for heavy JSON/DTO allocation
+loads.
+
+_Note: If the project considers upgrading to Oracle GraalVM (the
+non-community version), this strategy ought to be reconsidered. Oracle
+GraalVM includes the G1 Garbage Collector and Profile-Guided
+Optimizations (PGO), which significantly narrows the throughput and
+latency gap for long-running stateful services._
+
+=== Database Strategy & Spatial Math
+
+The architecture utilizes a single PostgreSQL database equipped with the
+PostGIS extension.
+
+==== Benefits of a Single Database
+
+Rather than splitting data across isolated databases for each service,
+all services connect to a single PostgreSQL instance. This provides
+several key benefits: - *Instant Cross-Domain Joins:* Services can
+natively join operational data (e.g., projects and shifts) directly to
+geographic locations in a single SQL query, avoiding slow and complex
+network-level joins. - *Data Integrity:* Strict foreign key constraints
+guarantee data consistency across different business domains without the
+need for distributed transactions. - *Operational Simplicity:* Managing
+a single, robust PostgreSQL database drastically reduces infrastructure
+overhead, backup complexity, and connection management.
+
+==== Spatial Queries vs. Spatial Math
+
+It is important to distinguish where the spatial workload is processed:
+- *Geospatial Queries (JVM):* The Micronaut JVM orchestrates the data
+retrieval. It constructs the SQL queries, executes them against the
+database, and maps the resulting coordinate data into DTOs and JSON. -
+*Geospatial Math (Database):* Spatial computation (e.g., distance
+calculations, radius filtering via `ST++_++DWithin`, bounding box
+intersections) is handled directly in PostgreSQL via PostGIS. This
+avoids rewriting spatial logic in Java and keeps raw coordinates out of
+JVM memory.

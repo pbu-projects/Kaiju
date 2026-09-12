@@ -1,0 +1,35 @@
+== Testing Guidelines
+
+We use https://spockframework.org/[Spock] and
+https://testcontainers.com/[Testcontainers] to validate behavior against
+real services.
+
+=== Core Practices
+
+* *Behavior-Driven Focus*: Test user journeys and edge cases rather than
+aiming for arbitrary line coverage numbers.
+* *Avoid Mocking*: Avoid mocks whenever a real dependency or sandbox can
+be spun up—test against real services (similar to how
+https://github.com/pbu-projects/z4j[z4j] tests API integrations against
+a real Zendesk sandbox).
+* *Data-Driven Tables*: Use Spock `@Unroll` and `where:` tables to test
+multiple inputs, boundary conditions, and failure modes cleanly within a
+single specification.
+* *Real Database Integration*: Tests run against a live PostgreSQL
+{plus} PostGIS container managed by Testcontainers.
+* *Transaction Isolation*: Use `@MicronautTest(transactional = true)` so
+each test rolls back changes automatically. Avoid manual database
+cleanup blocks.
+
+=== Spatial & Geocoding Test Rules
+
+* *Explicit Boundary Checks*: When testing radius searches
+(`ST++_++DWithin`) or region containment (`ST++_++Intersects`), always
+test both matching coordinates and out-of-bounds coordinates to prove
+exclusion.
+* *Deterministic Ordering*: When asserting on paginated queries, include
+a secondary deterministic sort (such as `ORDER BY id ASC`) to avoid
+tie-breaking flakiness.
+* *International Address Fixtures*: Test realistic global formats,
+including alphanumeric postal codes (UK/Canada) and locations without
+postal codes.

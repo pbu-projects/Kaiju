@@ -1,0 +1,5 @@
+== Architecture Decision Records
+
+This directory contains Architecture Decision Records (ADRs).
+
+include::0001-idp-agnostic-auth.adoc[]
