@@ -15,4 +15,6 @@ include::04-testing-strategy.adoc[]
 
 include::05-production-strategy.adoc[]
 
+include::06-security-matrix.adoc[]
+
 include::adrs/index.adoc[]
