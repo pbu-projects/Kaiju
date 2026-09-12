@@ -3,3 +3,7 @@ datasources:
     url: jdbc:tc:postgis:15-3.5:///volunteer_monster
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
     db-type: postgres
+
+micronaut:
+  security:
+    enabled: false

@@ -64,3 +64,22 @@ This matrix defines the specific permissions and notification routing for each r
 | Read-only
 | `SPONSOR`: New volunteer signups, messages, shift cancellations.
 |===
+
+=== Project Roles (Upcoming)
+
+[cols="1,1,1"]
+|===
+| Resource / Action | `PROJECT_SPONSOR` | Notifications
+
+| **Organization Profile**
+| No Access
+| None
+
+| **Projects (Listings)**
+| Read-only access to their assigned project listing
+| Alerts on their project's status changes
+
+| **Volunteers & Shifts**
+| **Primary Role**: Manage volunteers & maintain communication for their assigned project
+| New volunteer signups, messages, shift cancellations on their project
+|===

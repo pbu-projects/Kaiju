@@ -24,6 +24,9 @@ geographic territories.
 
 _Note: Admins superior to the project owner inherently inherit the owner's edit access._
 
+* *Project Roles* (`project++_++users.role` - To Be Implemented):
+** `PROJECT++_++SPONSOR`: Manages volunteers and maintains communication for a specific project.
+
 === Workspaces & Organizations
 
 Every project belongs to an organization (`projects.organization++_++id`
