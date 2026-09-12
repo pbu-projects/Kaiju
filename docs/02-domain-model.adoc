@@ -17,9 +17,12 @@ geographic territories.
 ** `REGION++_++AGENT`: Reviews and approves regional project queues.
 ** `STANDARD++_++USER`: Standard user.
 * *Organization Roles* (`organization++_++users.role`):
-** `ORG++_++ADMIN`: Manages organization profile, members, and projects.
+** `ORG++_++ADMIN` (Owner): Manages organization profile, members, and all projects.
 ** `ORG++_++MANAGER`: Creates and edits projects and shifts.
+** `ORG++_++SPONSOR`: Manages volunteers and maintains communication with volunteers.
 ** `ORG++_++MEMBER`: Read/view access to organization internal data.
+
+_Note: Admins superior to the project owner inherently inherit the owner's edit access._
 
 === Workspaces & Organizations
 

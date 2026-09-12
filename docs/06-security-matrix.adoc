@@ -1,0 +1,66 @@
+== Security & Rights Matrix
+
+This matrix defines the specific permissions and notification routing for each role. As a foundational rule, **admins superior to a project owner inherently inherit the owner's edit access** (e.g., if an `ORG_ADMIN` can edit a project, a `REGION_DIRECTOR` overseeing that region can also edit it).
+
+=== Platform Roles
+
+[cols="1,1,1,1,1,1"]
+|===
+| Resource / Action | `GLOBAL_ADMIN` | `REGION_DIRECTOR` | `REGION_AGENT` | `STANDARD_USER` | Notifications
+
+| **Users**
+| Can ban/delete any user
+| Read-only
+| Read-only
+| Self-manage only
+| `GLOBAL`: System security alerts. `DIRECTOR`/`AGENT`: Region alerts.
+
+| **Organizations**
+| Can verify/edit any Org
+| Can verify Orgs in region
+| Read-only
+| Read-only
+| Alerts on new unverified Organizations in jurisdiction.
+
+| **Regions**
+| Create polygons, assign Directors
+| Assign Agents to their region
+| Read-only
+| Read-only
+| Alerts on boundary shifts or leadership changes.
+
+| **Projects**
+| Can approve/edit/delete any
+| Can approve/edit/delete in region
+| Can approve/edit in region
+| Can create (if Org Member)
+| `GLOBAL`/`DIRECTOR`: Project escalation alerts (48h SLA). `AGENT`: Queue alerts.
+|===
+
+=== Organization Roles
+
+[cols="1,1,1,1,1,1"]
+|===
+| Resource / Action | `ORG_ADMIN` (Owner) | `ORG_MANAGER` | `ORG_SPONSOR` | `ORG_MEMBER` | Notifications
+
+| **Organization Profile**
+| Can edit profile & manage members
+| Read-only
+| Read-only
+| Read-only
+| Org verification success/failure emails.
+
+| **Projects (Listings)**
+| Maintain/Edit all Org projects
+| Maintain/Edit assigned projects
+| Read-only
+| Read-only
+| Alerts when project status changes (e.g., Active -> Pending).
+
+| **Volunteers & Shifts**
+| Can manage all
+| Can manage for their projects
+| **Primary Role**: Manage volunteers & maintain communication
+| Read-only
+| `SPONSOR`: New volunteer signups, messages, shift cancellations.
+|===
