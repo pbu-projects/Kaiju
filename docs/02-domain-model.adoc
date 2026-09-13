@@ -24,8 +24,14 @@ geographic territories.
 
 _Note: Admins superior to the project owner inherently inherit the owner's edit access._
 
-* *Project Roles* (`project++_++users.role` - To Be Implemented):
+* *Project Roles* (`project++_++users.role`):
 ** `PROJECT++_++SPONSOR`: Manages volunteers and maintains communication for a specific project.
+
+=== Volunteer Signups & History
+
+Users do not become "Project Users" when they sign up to volunteer. Instead, their attendance and history is tracked via the `shift_signups` table, which links their `users.id` to specific `shifts`. 
+* Statuses track their progression: `REGISTERED`, `CANCELLED`, `ATTENDED`, `NO_SHOW`.
+* This decouples administrative roles from volunteer execution tracking.
 
 === Workspaces & Organizations
 
