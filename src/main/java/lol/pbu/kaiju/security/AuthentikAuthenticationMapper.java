@@ -1,0 +1,63 @@
+package lol.pbu.kaiju.security;
+
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.security.authentication.AuthenticationResponse;
+import io.micronaut.security.oauth2.endpoint.authorization.state.State;
+import io.micronaut.security.oauth2.endpoint.token.response.OpenIdAuthenticationMapper;
+import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims;
+import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
+import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.model.UserRole;
+import lol.pbu.kaiju.repository.UserRepository;
+
+import java.time.OffsetDateTime;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
+
+@Named("authentik")
+@Singleton
+public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper {
+
+    private final UserRepository userRepository;
+
+    public AuthentikAuthenticationMapper(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    @NonNull
+    public org.reactivestreams.Publisher<AuthenticationResponse> createAuthenticationResponse(
+            @NonNull String providerName,
+            @NonNull OpenIdTokenResponse tokenResponse,
+            @NonNull OpenIdClaims openIdClaims,
+            @Nullable State state) {
+        
+        String email = openIdClaims.getEmail();
+        if (email == null || email.isBlank()) {
+            return reactor.core.publisher.Mono.just(AuthenticationResponse.failure("No email present in OpenID claims"));
+        }
+
+        // Just-In-Time Provisioning
+        Optional<User> optionalUser = userRepository.findByEmail(email);
+        User user;
+        if (optionalUser.isPresent()) {
+            user = optionalUser.get();
+        } else {
+            // Create the user as a STANDARD_USER
+            User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now());
+            user = userRepository.save(newUser);
+        }
+
+        // Map database role to Micronaut Security Context
+        // Using the user's UUID as the principal name is best practice since emails can change
+        return reactor.core.publisher.Mono.just(AuthenticationResponse.success(
+                user.id().toString(),
+                Collections.singletonList(user.role().name()),
+                Map.of("email", user.email())
+        ));
+    }
+}
