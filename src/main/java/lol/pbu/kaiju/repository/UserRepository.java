@@ -14,4 +14,6 @@ import java.util.UUID;
 public interface UserRepository extends PageableRepository<User, UUID> {
     @NonNull
     CursoredPage<User> findAll(@NonNull CursoredPageable pageable);
+
+    void updateRole(@io.micronaut.data.annotation.Id UUID id, lol.pbu.kaiju.model.UserRole role);
 }

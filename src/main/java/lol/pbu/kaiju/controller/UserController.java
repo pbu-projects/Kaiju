@@ -40,9 +40,9 @@ public class UserController {
     }
 
     /**
-     * Updates an existing user by its ID after validating that it exists.
+     * Updates an existing user by its ID.
+     * Prevents Mass Assignment by explicitly retaining the existing user's role and createdAt timestamp.
      * Throws 404 NOT_FOUND if the user does not exist.
-     * Refer to the sister method {@link #updateUserNoLook(UUID, User)} to update without validation.
      *
      * @param id   the ID of the user to update
      * @param user the updated user details
@@ -50,30 +50,22 @@ public class UserController {
      */
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body User user) {
-        if (!userRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "User not found");
-        }
-        return userRepository.update(user.withId(id));
-    }
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
-    /**
-     * Updates a user by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateUser(UUID, User)} to update with existence validation.
-     *
-     * @param id   the ID of the user to update
-     * @param user the updated user details
-     * @return the updated user
-     */
-    @Put("/{id}/no-look")
-    public User updateUserNoLook(@PathVariable UUID id, @Valid @Body User user) {
-        return userRepository.update(user.withId(id));
+        // Copy over allowed fields, but retain strictly controlled fields
+        User safeUpdate = new User(
+                id,
+                user.email(),
+                existingUser.role(), // Ignore the role from the request
+                existingUser.createdAt()
+        );
+        return userRepository.update(safeUpdate);
     }
 
     /**
      * Deletes a user by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the user does not exist.
-     * Refer to the sister method {@link #deleteUserNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the user to delete
      */
@@ -82,18 +74,6 @@ public class UserController {
         if (!userRepository.existsById(id)) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, "User not found");
         }
-        userRepository.deleteById(id);
-    }
-
-    /**
-     * Deletes a user by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteUser(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the user to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteUserNoLook(@PathVariable UUID id) {
         userRepository.deleteById(id);
     }
 }
