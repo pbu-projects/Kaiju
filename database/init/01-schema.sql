@@ -141,6 +141,16 @@ CREATE TABLE project_boundaries
     PRIMARY KEY (project_id, boundary_id)
 );
 
+CREATE TABLE project_users
+(
+    user_id    UUID REFERENCES users (id) ON DELETE CASCADE,
+    project_id UUID REFERENCES projects (id) ON DELETE CASCADE,
+    role       VARCHAR(50) NOT NULL CHECK (
+        role IN ('PROJECT_SPONSOR')
+        ),
+    PRIMARY KEY (user_id, project_id)
+);
+
 -- 9. SHIFTS & TAGS
 CREATE TABLE shifts
 (
@@ -150,6 +160,7 @@ CREATE TABLE shifts
     location_id UUID REFERENCES locations (id),
     start_time  TIMESTAMP WITH TIME ZONE NOT NULL,
     end_time    TIMESTAMP WITH TIME ZONE NOT NULL,
+    capacity    INTEGER, -- Null means unlimited
     CONSTRAINT enforce_virtual_location_logic CHECK (
         (
             is_virtual = TRUE
@@ -160,6 +171,18 @@ CREATE TABLE shifts
                 AND location_id IS NOT NULL
             )
         )
+);
+
+CREATE TABLE shift_signups
+(
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    shift_id   UUID        NOT NULL REFERENCES shifts (id) ON DELETE CASCADE,
+    user_id    UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    status     VARCHAR(50) NOT NULL DEFAULT 'REGISTERED' CHECK (
+        status IN ('REGISTERED', 'CANCELLED', 'ATTENDED', 'NO_SHOW')
+        ),
+    created_at TIMESTAMPTZ      DEFAULT NOW(),
+    UNIQUE (shift_id, user_id)
 );
 
 CREATE TABLE tags
