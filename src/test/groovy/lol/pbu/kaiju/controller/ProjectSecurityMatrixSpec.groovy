@@ -60,11 +60,15 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
 
         and: "the target geographic point"
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
+        org.locationtech.jts.geom.Geometry geom = new org.locationtech.jts.io.WKTReader().read(targetPointWkt)
+        lol.pbu.kaiju.domain.Location dummyLocation = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "Test", "123 Main", "Denver", "CO", "80202", "US", (org.locationtech.jts.geom.Point) geom)
+        lol.pbu.kaiju.domain.Organization dummyOrg = new lol.pbu.kaiju.domain.Organization(orgId, "Test Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.valueOf(orgStatus), null, null)
+        lol.pbu.kaiju.domain.Project dummyProject = new lol.pbu.kaiju.domain.Project(UUID.randomUUID(), dummyOrg, null, "Title", "Desc", lol.pbu.kaiju.model.ProjectType.CIVIC_INFRASTRUCTURE, lol.pbu.kaiju.model.ProjectStatus.PENDING, java.time.OffsetDateTime.now(), null, null, [dummyLocation], null)
 
         when: "the system evaluates the project creation request"
         def actualResult
         try {
-            actualResult = projectSecurityService.evaluateProjectCreation(userId, orgId, targetPointWkt)
+            actualResult = projectSecurityService.evaluateProjectCreation(userId, dummyProject)
         } catch (io.micronaut.http.exceptions.HttpStatusException e) {
             actualResult = null
         }

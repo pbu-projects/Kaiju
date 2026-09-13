@@ -44,29 +44,27 @@ public class ProjectController {
     @Post
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
     public Project addProject(@Valid @Body Project project, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+        if (project.organization() == null) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Organization is required");
+        }
+        
         UUID userId = UUID.fromString(principal.getName());
         
-        // Ensure status cannot be forced by client payload
-        lol.pbu.kaiju.model.ProjectStatus evaluatedStatus = lol.pbu.kaiju.model.ProjectStatus.PENDING;
-        
-        if (project.locations() != null && !project.locations().isEmpty()) {
-            // For now, evaluate against the primary location
-            org.locationtech.jts.geom.Point point = project.locations().get(0).geom();
-            String wkt = point != null ? point.toText() : "POINT(0 0)";
-            evaluatedStatus = securityService.evaluateProjectCreation(userId, project.organization().id(), wkt);
-        }
+        // Evaluate the entire project's locations securely
+        lol.pbu.kaiju.model.ProjectStatus evaluatedStatus = securityService.evaluateProjectCreation(userId, project);
 
+        // Fix ID hijacking (force null ID for creation), fix mass assignment (force tracking fields)
         Project secureProject = new Project(
-                project.id(),
+                null, // Force auto-generation
                 project.organization(),
                 project.managingRegion(),
                 project.title(),
                 project.description(),
                 project.projectType(),
                 evaluatedStatus,
-                project.createdAt(),
-                project.deletedAt(),
-                project.deletedBy(),
+                java.time.OffsetDateTime.now(),
+                null,
+                null,
                 project.locations(),
                 project.boundaries()
         );
@@ -76,30 +74,29 @@ public class ProjectController {
 
     /**
      * Updates an existing project by its ID after validating that it exists.
-     * Throws 404 NOT_FOUND if the project does not exist.
-     * Refer to the sister method {@link #updateProjectNoLook(UUID, Project)} to update without validation.
-     *
-     * @param id      the ID of the project to update
-     * @param project the updated project details
-     * @return the updated project
      */
     @Put("/{id}")
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
-    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project) {
+    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
         
-        // Prevent users from unilaterally modifying the status during an update
+        UUID userId = UUID.fromString(principal.getName());
+        if (!securityService.canModifyProject(userId, existing)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to modify this project");
+        }
+        
+        // Prevent users from unilaterally modifying the status during an update and fix mass assignment
         Project secureProject = new Project(
                 id,
-                project.organization(),
+                project.organization() != null ? project.organization() : existing.organization(),
                 project.managingRegion(),
                 project.title(),
                 project.description(),
                 project.projectType(),
-                existing.status(), // Retain existing status, don't let client force ACTIVE
-                project.createdAt(),
-                project.deletedAt(),
-                project.deletedBy(),
+                existing.status(), 
+                existing.createdAt(),
+                existing.deletedAt(),
+                existing.deletedBy(),
                 project.locations(),
                 project.boundaries()
         );
@@ -108,43 +105,38 @@ public class ProjectController {
 
     /**
      * Updates a project by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateProject(UUID, Project)} to update with existence validation.
-     *
-     * @param id      the ID of the project to update
-     * @param project the updated project details
-     * @return the updated project
      */
     @Put("/{id}/no-look")
+    @io.micronaut.security.annotation.Secured("isAuthenticated()")
     public Project updateProjectNoLook(@PathVariable UUID id, @Valid @Body Project project) {
-        return projectRepository.update(project.withId(id));
+        // Disabled for security, redirect to safe method
+        throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
     }
 
     /**
      * Deletes a project by its ID after validating that it exists.
-     * Throws 404 NOT_FOUND if the project does not exist.
-     * Refer to the sister method {@link #deleteProjectNoLook(UUID)} to delete without validation.
-     *
-     * @param id the ID of the project to delete
      */
     @Delete("/{id}")
-    public void deleteProject(@PathVariable UUID id) {
-        if (!projectRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found");
+    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    public void deleteProject(@PathVariable UUID id, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        
+        UUID userId = UUID.fromString(principal.getName());
+        if (!securityService.canModifyProject(userId, existing)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this project");
         }
+        
         projectRepository.deleteById(id);
     }
 
     /**
      * Deletes a project by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteProject(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the project to delete
      */
     @Delete("/{id}/no-look")
+    @io.micronaut.security.annotation.Secured("isAuthenticated()")
     public void deleteProjectNoLook(@PathVariable UUID id) {
-        projectRepository.deleteById(id);
+        // Disabled for security
+        throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
     }
 
     /**
