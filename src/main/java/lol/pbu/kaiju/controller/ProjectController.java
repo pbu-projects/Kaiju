@@ -138,8 +138,12 @@ public class ProjectController {
         // Ensure they have geographic jurisdiction to approve it
         securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
 
-        // Fetch the project and set to ACTIVE
+        // Fetch the project and validate its current state
         Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        
+        if (project.status() != lol.pbu.kaiju.model.ProjectStatus.PENDING) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING projects can be approved");
+        }
         
         return projectRepository.update(new Project(
                 project.id(),

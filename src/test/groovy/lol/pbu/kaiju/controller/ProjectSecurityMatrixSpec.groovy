@@ -20,14 +20,14 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
     static final String POINT_OUTSIDE = "POINT(-105.2705 40.0150)"  // Boulder, CO
 
     // Ground truth rules for verification
-    static String getGroundTruthExpectedState(String orgStatus, String userRole, String location) {
-        if (userRole == "REGION_AGENT") {
-            return location == "INSIDE_BOUNDARY" ? "AUTO_APPROVED" : "FORBIDDEN"
-        }
+    static lol.pbu.kaiju.model.ProjectStatus getGroundTruthExpectedState(String orgStatus, String userRole, String location) {
         if (orgStatus == "VERIFIED" && userRole == "ORG_MANAGER" && location == "INSIDE_BOUNDARY") {
-            return "AUTO_APPROVED"
+            return lol.pbu.kaiju.model.ProjectStatus.ACTIVE
         }
-        return "REQUIRES_REGIONAL_APPROVAL"
+        if (userRole == "REGION_AGENT") {
+            return location == "INSIDE_BOUNDARY" ? lol.pbu.kaiju.model.ProjectStatus.ACTIVE : null // null means FORBIDDEN
+        }
+        return lol.pbu.kaiju.model.ProjectStatus.PENDING
     }
 
     @Unroll
@@ -62,7 +62,12 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
 
         when: "the system evaluates the project creation request"
-        String actualResult = projectSecurityService.evaluateProjectCreation(userId, orgId, targetPointWkt)
+        def actualResult
+        try {
+            actualResult = projectSecurityService.evaluateProjectCreation(userId, orgId, targetPointWkt)
+        } catch (io.micronaut.http.exceptions.HttpStatusException e) {
+            actualResult = null
+        }
 
         then: "the project is placed into the correct state via PostGIS logic"
         actualResult == expectedApprovalState

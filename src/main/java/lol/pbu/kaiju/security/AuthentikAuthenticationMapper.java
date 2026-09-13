@@ -7,6 +7,8 @@ import io.micronaut.security.oauth2.endpoint.authorization.state.State;
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdAuthenticationMapper;
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims;
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
@@ -20,6 +22,7 @@ import java.util.Optional;
 
 @Named("authentik")
 @Singleton
+@ExecuteOn(TaskExecutors.IO)
 public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper {
 
     private final UserRepository userRepository;
@@ -41,15 +44,20 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             return reactor.core.publisher.Mono.just(AuthenticationResponse.failure("No email present in OpenID claims"));
         }
 
-        // Just-In-Time Provisioning
+        // Just-In-Time Provisioning with race condition fix
         Optional<User> optionalUser = userRepository.findByEmail(email);
         User user;
         if (optionalUser.isPresent()) {
             user = optionalUser.get();
         } else {
-            // Create the user as a STANDARD_USER
-            User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now());
-            user = userRepository.save(newUser);
+            try {
+                // Attempt to create the user as a STANDARD_USER
+                User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now());
+                user = userRepository.save(newUser);
+            } catch (io.micronaut.data.exceptions.DataAccessException e) {
+                // If another thread just created them, fetch again
+                user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Failed to fetch user after constraint violation", e));
+            }
         }
 
         // Map database role to Micronaut Security Context
