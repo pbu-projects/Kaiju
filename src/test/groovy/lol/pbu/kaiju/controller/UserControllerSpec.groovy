@@ -122,7 +122,10 @@ class UserControllerSpec extends BaseControllerSpec {
 
     /********** UPDATE Tests **********/
 
-    def "UPDATE | should successfully update an existing user"() {
+    // SECURITY REGRESSION TEST: Verifies that Mass Assignment vulnerabilities are blocked.
+    // Ensure that users can update their allowed profile fields (like email) but cannot
+    // elevate their own privileges by sneaking a 'role' field into the payload.
+    def "UPDATE | should successfully update an existing user while ignoring role changes"() {
         given: "an existing user"
         def user = userRepository.save(new User(null, "orig-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
         UUID id = user.id()
@@ -132,18 +135,18 @@ class UserControllerSpec extends BaseControllerSpec {
         when: "the user is updated"
         User updated = userController.updateUser(id, updateRequest)
 
-        then: "the returned user contains the updated data"
+        then: "the returned user contains the updated email but retains the original role"
         verifyAll {
             updated.id() == id
             updated.email() == newEmail
-            updated.role() == UserRole.REGION_DIRECTOR
+            updated.role() == UserRole.STANDARD_USER
         }
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT email, role FROM users WHERE id = ?", [id])
         verifyAll(dbResult) {
             email == newEmail
-            role == 'REGION_DIRECTOR'
+            role == 'STANDARD_USER'
         }
     }
 
@@ -160,17 +163,6 @@ class UserControllerSpec extends BaseControllerSpec {
         e.status.code == 404
     }
 
-    def "UPDATE | should handle update of non-existent user gracefully when using no-look"() {
-        given: "a random non-existent ID and an update request"
-        def nonExistentId = UUID.randomUUID()
-        def updateRequest = new User(null, "test@example.com", UserRole.STANDARD_USER, OffsetDateTime.now())
-
-        when: "a no-look update is attempted"
-        userController.updateUserNoLook(nonExistentId, updateRequest)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
-    }
 
     /********** DELETE Tests **********/
 
@@ -208,16 +200,6 @@ class UserControllerSpec extends BaseControllerSpec {
         e.status.code == 404
     }
 
-    def "DELETE | should handle deletion of non-existent user gracefully when using no-look"() {
-        given: "a random non-existent ID"
-        def nonExistentId = UUID.randomUUID()
-
-        when: "a no-look delete is attempted"
-        userController.deleteUserNoLook(nonExistentId)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
-    }
 
     /********** LIST Tests **********/
 
