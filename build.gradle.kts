@@ -4,7 +4,7 @@ plugins {
     id("com.gradleup.shadow") version "9.4.1"
     id("io.micronaut.aot") version "5.0.2"
     id("io.micronaut.test-resources") version "5.0.2"
-    id("org.sonarqube") version "5.1.0.4882"
+    id("org.sonarqube") version "latest.release"
     id("org.asciidoctor.jvm.pdf") version "4.0.2"
 }
 

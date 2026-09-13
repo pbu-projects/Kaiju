@@ -52,7 +52,7 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             } else {
                 try {
                     // Attempt to create the user as a STANDARD_USER
-                    User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now());
+                    User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now(java.time.ZoneId.systemDefault()));
                     user = userRepository.save(newUser);
                 } catch (io.micronaut.data.exceptions.DataAccessException e) {
                     // If another thread just created them, fetch again
