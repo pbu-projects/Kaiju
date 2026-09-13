@@ -2,10 +2,15 @@ package lol.pbu.kaiju.controller
 
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Unroll
+import jakarta.inject.Inject
+import lol.pbu.kaiju.security.ProjectSecurityService
 import java.util.UUID
 
 @MicronautTest(transactional = true)
 class ProjectSecurityMatrixSpec extends BaseControllerSpec {
+
+    @Inject
+    ProjectSecurityService projectSecurityService
 
     // Simplified polygon roughly tracing the civic boundary of Denver, Colorado
     static final String DENVER_WKT = "POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))"
@@ -14,7 +19,8 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
     static final String POINT_INSIDE = "POINT(-104.9903 39.7392)"   // Downtown Denver
     static final String POINT_OUTSIDE = "POINT(-105.2705 40.0150)"  // Boulder, CO
 
-    static String determineExpectedState(String orgStatus, String userRole, String location) {
+    // Ground truth rules for verification
+    static String getGroundTruthExpectedState(String orgStatus, String userRole, String location) {
         if (userRole == "REGION_AGENT") {
             return location == "INSIDE_BOUNDARY" ? "AUTO_APPROVED" : "FORBIDDEN"
         }
@@ -42,6 +48,9 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         sql.execute("INSERT INTO organizations (id, name, verification_status) VALUES (?, ?, ?)", 
             [orgId, "Test Org", orgStatus == "VERIFIED" ? "VERIFIED" : "UNVERIFIED"])
 
+        // Link the org to the region so we can test the civic boundary logic
+        sql.execute("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", [orgId, regionId])
+
         if (userRole == "ORG_MANAGER") {
             sql.execute("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", [userId, orgId])
         }
@@ -52,11 +61,10 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         and: "the target geographic point"
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
 
-        when: "the user attempts to create a project at that location"
-        // TODO: Call ProjectController once it's implemented. For now we calculate it to ensure the matrix generates correctly.
-        String actualResult = determineExpectedState(orgStatus, userRole, location)
+        when: "the system evaluates the project creation request"
+        String actualResult = projectSecurityService.evaluateProjectCreation(userId, orgId, targetPointWkt)
 
-        then: "the project is placed into the correct state"
+        then: "the project is placed into the correct state via PostGIS logic"
         actualResult == expectedApprovalState
 
         where:
@@ -66,6 +74,6 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
                 ["INSIDE_BOUNDARY", "OUTSIDE_BOUNDARY"]
         ].combinations()
         
-        expectedApprovalState = determineExpectedState(orgStatus, userRole, location)
+        expectedApprovalState = getGroundTruthExpectedState(orgStatus, userRole, location)
     }
 }

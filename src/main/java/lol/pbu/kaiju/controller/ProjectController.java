@@ -125,4 +125,35 @@ public class ProjectController {
         Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
         return projectRepository.searchByLocation(point, radiusMeters, pageable);
     }
+
+    /**
+     * Endpoint for Regional Admins to approve a pending project.
+     * The service layer enforces that the Regional Admin actually has geographic jurisdiction.
+     */
+    @Put("/{id}/status")
+    @io.micronaut.security.annotation.Secured({"REGION_AGENT", "REGION_DIRECTOR"})
+    public Project approveProject(@PathVariable UUID id, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+        UUID regionalAdminId = UUID.fromString(principal.getName());
+        
+        // Ensure they have geographic jurisdiction to approve it
+        securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
+
+        // Fetch the project and set to ACTIVE
+        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        
+        return projectRepository.update(new Project(
+                project.id(),
+                project.organization(),
+                project.managingRegion(),
+                project.title(),
+                project.description(),
+                project.projectType(),
+                lol.pbu.kaiju.model.ProjectStatus.ACTIVE,
+                project.createdAt(),
+                project.deletedAt(),
+                project.deletedBy(),
+                project.locations(),
+                project.boundaries()
+        ));
+    }
 }
