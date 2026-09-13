@@ -42,8 +42,36 @@ public class ProjectController {
     }
 
     @Post
-    public Project addProject(@Valid @Body Project project) {
-        return projectRepository.save(project);
+    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    public Project addProject(@Valid @Body Project project, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+        UUID userId = UUID.fromString(principal.getName());
+        
+        // Ensure status cannot be forced by client payload
+        lol.pbu.kaiju.model.ProjectStatus evaluatedStatus = lol.pbu.kaiju.model.ProjectStatus.PENDING;
+        
+        if (project.locations() != null && !project.locations().isEmpty()) {
+            // For now, evaluate against the primary location
+            org.locationtech.jts.geom.Point point = project.locations().get(0).geom();
+            String wkt = point != null ? point.toText() : "POINT(0 0)";
+            evaluatedStatus = securityService.evaluateProjectCreation(userId, project.organization().id(), wkt);
+        }
+
+        Project secureProject = new Project(
+                project.id(),
+                project.organization(),
+                project.managingRegion(),
+                project.title(),
+                project.description(),
+                project.projectType(),
+                evaluatedStatus,
+                project.createdAt(),
+                project.deletedAt(),
+                project.deletedBy(),
+                project.locations(),
+                project.boundaries()
+        );
+        
+        return projectRepository.save(secureProject);
     }
 
     /**
@@ -56,11 +84,26 @@ public class ProjectController {
      * @return the updated project
      */
     @Put("/{id}")
+    @io.micronaut.security.annotation.Secured("isAuthenticated()")
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project) {
-        if (!projectRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found");
-        }
-        return projectRepository.update(project.withId(id));
+        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        
+        // Prevent users from unilaterally modifying the status during an update
+        Project secureProject = new Project(
+                id,
+                project.organization(),
+                project.managingRegion(),
+                project.title(),
+                project.description(),
+                project.projectType(),
+                existing.status(), // Retain existing status, don't let client force ACTIVE
+                project.createdAt(),
+                project.deletedAt(),
+                project.deletedBy(),
+                project.locations(),
+                project.boundaries()
+        );
+        return projectRepository.update(secureProject);
     }
 
     /**

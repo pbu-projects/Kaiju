@@ -63,7 +63,7 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
             WHERE p.id = :projectId AND ST_Intersects(r.geom, l.geom)
             -- Check that ALL locations of the project are within the admin's region
             GROUP BY p.id
-            HAVING COUNT(l.id) = (
+            HAVING COUNT(DISTINCT l.id) = (
                 SELECT COUNT(*) FROM project_locations pl2 WHERE pl2.project_id = p.id
             )
         )

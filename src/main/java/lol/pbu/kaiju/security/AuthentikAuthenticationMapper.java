@@ -38,34 +38,35 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             @NonNull OpenIdTokenResponse tokenResponse,
             @NonNull OpenIdClaims openIdClaims,
             @Nullable State state) {
-        
-        String email = openIdClaims.getEmail();
-        if (email == null || email.isBlank()) {
-            return reactor.core.publisher.Mono.just(AuthenticationResponse.failure("No email present in OpenID claims"));
-        }
-
-        // Just-In-Time Provisioning with race condition fix
-        Optional<User> optionalUser = userRepository.findByEmail(email);
-        User user;
-        if (optionalUser.isPresent()) {
-            user = optionalUser.get();
-        } else {
-            try {
-                // Attempt to create the user as a STANDARD_USER
-                User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now());
-                user = userRepository.save(newUser);
-            } catch (io.micronaut.data.exceptions.DataAccessException e) {
-                // If another thread just created them, fetch again
-                user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Failed to fetch user after constraint violation", e));
+        return reactor.core.publisher.Mono.fromCallable(() -> {
+            String email = openIdClaims.getEmail();
+            if (email == null || email.isBlank()) {
+                return AuthenticationResponse.failure("No email present in OpenID claims");
             }
-        }
 
-        // Map database role to Micronaut Security Context
-        // Using the user's UUID as the principal name is best practice since emails can change
-        return reactor.core.publisher.Mono.just(AuthenticationResponse.success(
-                user.id().toString(),
-                Collections.singletonList(user.role().name()),
-                Map.of("email", user.email())
-        ));
+            // Just-In-Time Provisioning with race condition fix
+            Optional<User> optionalUser = userRepository.findByEmail(email);
+            User user;
+            if (optionalUser.isPresent()) {
+                user = optionalUser.get();
+            } else {
+                try {
+                    // Attempt to create the user as a STANDARD_USER
+                    User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now());
+                    user = userRepository.save(newUser);
+                } catch (io.micronaut.data.exceptions.DataAccessException e) {
+                    // If another thread just created them, fetch again
+                    user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Failed to fetch user after constraint violation", e));
+                }
+            }
+
+            // Map database role to Micronaut Security Context
+            // Using the user's UUID as the principal name is best practice since emails can change
+            return AuthenticationResponse.success(
+                    user.id().toString(),
+                    Collections.singletonList(user.role().name()),
+                    Map.of("email", user.email())
+            );
+        });
     }
 }
