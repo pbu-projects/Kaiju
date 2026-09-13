@@ -6,9 +6,6 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.io.WKTReader;
 
 import java.util.UUID;
 

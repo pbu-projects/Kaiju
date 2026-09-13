@@ -24,6 +24,7 @@ import java.util.UUID;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/projects")
 public class ProjectController {
+    private static final String PROJECT_NOT_FOUND = "Project not found";
 
     private final ProjectRepository projectRepository;
 
@@ -62,7 +63,7 @@ public class ProjectController {
                 project.description(),
                 project.projectType(),
                 evaluatedStatus,
-                java.time.OffsetDateTime.now(),
+                java.time.OffsetDateTime.now(java.time.ZoneId.systemDefault()),
                 null,
                 null,
                 project.locations(),
@@ -78,7 +79,7 @@ public class ProjectController {
     @Put("/{id}")
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
-        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
@@ -119,7 +120,7 @@ public class ProjectController {
     @Delete("/{id}")
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
     public void deleteProject(@PathVariable UUID id, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
-        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
@@ -174,7 +175,7 @@ public class ProjectController {
         securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
 
         // Fetch the project and validate its current state
-        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
         if (project.status() != lol.pbu.kaiju.model.ProjectStatus.PENDING) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING projects can be approved");
