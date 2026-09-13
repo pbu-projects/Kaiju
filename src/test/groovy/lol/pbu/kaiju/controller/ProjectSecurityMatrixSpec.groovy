@@ -61,9 +61,9 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         and: "the target geographic point"
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
         org.locationtech.jts.geom.Geometry geom = new org.locationtech.jts.io.WKTReader().read(targetPointWkt)
-        lol.pbu.kaiju.domain.Location dummyLocation = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "Test", "123 Main", "Denver", "CO", "80202", "US", (org.locationtech.jts.geom.Point) geom)
-        lol.pbu.kaiju.domain.Organization dummyOrg = new lol.pbu.kaiju.domain.Organization(orgId, "Test Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.valueOf(orgStatus), null, null)
-        lol.pbu.kaiju.domain.Project dummyProject = new lol.pbu.kaiju.domain.Project(UUID.randomUUID(), dummyOrg, null, "Title", "Desc", lol.pbu.kaiju.model.ProjectType.CIVIC_INFRASTRUCTURE, lol.pbu.kaiju.model.ProjectStatus.PENDING, java.time.OffsetDateTime.now(), null, null, [dummyLocation], null)
+        lol.pbu.kaiju.domain.Location dummyLocation = lol.pbu.kaiju.TestFixtures.createDummyLocation((org.locationtech.jts.geom.Point) geom)
+        lol.pbu.kaiju.domain.Organization dummyOrg = lol.pbu.kaiju.TestFixtures.createDummyOrganization(orgId, orgStatus)
+        lol.pbu.kaiju.domain.Project dummyProject = lol.pbu.kaiju.TestFixtures.createDummyProject(dummyOrg, dummyLocation)
 
         when: "the system evaluates the project creation request"
         def actualResult
@@ -83,6 +83,6 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
                 ["INSIDE_BOUNDARY", "OUTSIDE_BOUNDARY"]
         ].combinations()
         
-        expectedApprovalState = getGroundTruthExpectedState(orgStatus, userRole, location)
+        expectedApprovalState = ProjectSecurityMatrixSpec.getGroundTruthExpectedState(orgStatus, userRole, location)
     }
 }
