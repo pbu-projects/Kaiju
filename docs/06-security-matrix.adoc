@@ -6,7 +6,7 @@ This matrix defines the specific permissions and notification routing for each r
 
 [cols="1,1,1,1,1,1"]
 |===
-| Resource / Action | `GLOBAL_ADMIN` | `REGION_DIRECTOR` | `REGION_AGENT` | `STANDARD_USER` | Notifications
+| Resource / Action | `GLOBAL_ADMIN` | `REGION_DIRECTOR` | `REGION_AGENT` | `STANDARD_USER` (Volunteer) | Notifications
 
 | **Users**
 | Can ban/delete any user
@@ -33,8 +33,15 @@ This matrix defines the specific permissions and notification routing for each r
 | Can approve/edit/delete any
 | Can approve/edit/delete in region
 | Can approve/edit in region
-| Can create (if Org Member)
+| Can create & administer own projects (becomes `ORG_ADMIN` of personal workspace)
 | `GLOBAL`/`DIRECTOR`: Project escalation alerts (48h SLA). `AGENT`: Queue alerts.
+
+| **Volunteer Signups**
+| Read-only
+| Read-only in region
+| Read-only in region
+| Manage own shift signups & personal history
+| Email confirmations on own signups/cancellations.
 |===
 
 === Organization Roles
