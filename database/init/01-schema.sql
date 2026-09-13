@@ -75,6 +75,13 @@ CREATE TABLE region_users
     PRIMARY KEY (user_id, region_id)
 );
 
+CREATE TABLE organization_regions
+(
+    organization_id UUID REFERENCES organizations (id) ON DELETE CASCADE,
+    region_id       UUID REFERENCES administrative_regions (id) ON DELETE CASCADE,
+    PRIMARY KEY (organization_id, region_id)
+);
+
 -- pizza deliveries only
 CREATE TABLE locations
 (
