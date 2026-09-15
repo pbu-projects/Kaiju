@@ -8,6 +8,7 @@ import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 
 import java.util.UUID;
+import lol.pbu.kaiju.domain.Location;
 
 @Singleton
 public class ProjectSecurityService {
@@ -40,7 +41,7 @@ public class ProjectSecurityService {
         if (isOrgVerified && isOrgManager) {
             // Must be entirely within Org Region
             boolean allInOrgRegion = true;
-            for (lol.pbu.kaiju.domain.Location loc : project.locations()) {
+            for (Location loc : project.locations()) {
                 if (loc.geom() == null || !queryRepository.isPointInOrgRegion(organizationId, loc.geom().getX(), loc.geom().getY())) {
                     allInOrgRegion = false;
                     break;
@@ -55,7 +56,7 @@ public class ProjectSecurityService {
         boolean isRegionAgent = queryRepository.isRegionAgent(userId);
         if (isRegionAgent) {
             boolean allInAssignedRegion = true;
-            for (lol.pbu.kaiju.domain.Location loc : project.locations()) {
+            for (Location loc : project.locations()) {
                 if (loc.geom() == null || !queryRepository.isPointInAgentAssignedRegion(userId, loc.geom().getX(), loc.geom().getY())) {
                     allInAssignedRegion = false;
                     break;

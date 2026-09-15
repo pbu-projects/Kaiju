@@ -20,6 +20,9 @@ import org.locationtech.jts.geom.PrecisionModel;
 
 import java.util.Optional;
 import java.util.UUID;
+import lol.pbu.kaiju.model.ProjectStatus;
+import lol.pbu.kaiju.security.ProjectSecurityService;
+import java.security.Principal;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/projects")
@@ -44,7 +47,7 @@ public class ProjectController {
 
     @Post
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
-    public Project addProject(@Valid @Body Project project, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+    public Project addProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         if (project.organization() == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Organization is required");
         }
@@ -52,7 +55,7 @@ public class ProjectController {
         UUID userId = UUID.fromString(principal.getName());
         
         // Evaluate the entire project's locations securely
-        lol.pbu.kaiju.model.ProjectStatus evaluatedStatus = securityService.evaluateProjectCreation(userId, project);
+        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreation(userId, project);
 
         // Fix ID hijacking (force null ID for creation), fix mass assignment (force tracking fields)
         Project secureProject = new Project(
@@ -78,7 +81,7 @@ public class ProjectController {
      */
     @Put("/{id}")
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
-    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
@@ -119,7 +122,7 @@ public class ProjectController {
      */
     @Delete("/{id}")
     @io.micronaut.security.annotation.Secured("isAuthenticated()")
-    public void deleteProject(@PathVariable UUID id, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+    public void deleteProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
@@ -168,7 +171,7 @@ public class ProjectController {
      */
     @Put("/{id}/status")
     @io.micronaut.security.annotation.Secured({"REGION_AGENT", "REGION_DIRECTOR"})
-    public Project approveProject(@PathVariable UUID id, java.security.Principal principal, lol.pbu.kaiju.security.ProjectSecurityService securityService) {
+    public Project approveProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         
         // Ensure they have geographic jurisdiction to approve it
@@ -177,7 +180,7 @@ public class ProjectController {
         // Fetch the project and validate its current state
         Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
-        if (project.status() != lol.pbu.kaiju.model.ProjectStatus.PENDING) {
+        if (project.status() != ProjectStatus.PENDING) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING projects can be approved");
         }
         
@@ -188,7 +191,7 @@ public class ProjectController {
                 project.title(),
                 project.description(),
                 project.projectType(),
-                lol.pbu.kaiju.model.ProjectStatus.ACTIVE,
+                ProjectStatus.ACTIVE,
                 project.createdAt(),
                 project.deletedAt(),
                 project.deletedBy(),
