@@ -6,6 +6,7 @@ plugins {
     id("io.micronaut.test-resources") version "5.0.2"
     id("org.sonarqube") version "latest.release"
     id("org.asciidoctor.jvm.pdf") version "4.0.2"
+    id("jacoco")
 }
 
 version = project.properties["kaijuVersion"]!!
@@ -23,6 +24,9 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+
+    compileOnly("io.micronaut:micronaut-http-client")
+
     implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.security:micronaut-security")
@@ -33,22 +37,24 @@ dependencies {
     implementation("io.micronaut.validation:micronaut-validation")
     implementation("jakarta.validation:jakarta.validation-api")
     implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
-    compileOnly("io.micronaut:micronaut-http-client")
     implementation("org.postgresql:postgresql")
     implementation("io.micronaut:micronaut-retry")
     implementation("io.micronaut.reactor:micronaut-reactor-http-client")
     implementation("io.micronaut:micronaut-management")
     implementation("io.micronaut.micrometer:micronaut-micrometer-core")
     implementation("io.micronaut.micrometer:micronaut-micrometer-observation-http")
+
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.yaml:snakeyaml")
+
     testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-spock")
     testImplementation("org.apache.groovy:groovy-sql:${project.properties["groovySqlVersion"]}")
     testImplementation("net.datafaker:datafaker:${project.properties["datafakerVersion"]}")
+    testImplementation("ch.qos.logback:logback-classic")
 }
 
 
@@ -306,4 +312,13 @@ tasks.register("lighthouse") {
 
 tasks.named("check") {
     dependsOn("lighthouse")
+}
+
+tasks.jacocoTestReport {
+    reports {
+        xml.required.set(true)
+    }
+}
+tasks.test {
+    finalizedBy(tasks.jacocoTestReport)
 }
