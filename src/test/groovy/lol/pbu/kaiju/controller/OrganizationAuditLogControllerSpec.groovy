@@ -15,6 +15,7 @@ import lol.pbu.kaiju.repository.OrganizationAuditLogRepository
 import spock.lang.Unroll
 
 import java.time.OffsetDateTime
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
 
@@ -29,7 +30,7 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
         if (!orgRow) {
             throw new IllegalStateException("No organizations found in database to link audit log to.")
         }
-        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, VerificationStatus.UNVERIFIED, null, [])
+        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, UNVERIFIED, null, [])
     }
 
     private User getRandomUser() {

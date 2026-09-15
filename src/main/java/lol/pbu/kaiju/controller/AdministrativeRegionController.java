@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/administrative-regions")
@@ -42,7 +43,7 @@ public class AdministrativeRegionController {
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body AdministrativeRegion region) {
         if (!administrativeRegionRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
+            throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
         }
         return administrativeRegionRepository.update(region.withId(id));
     }
@@ -55,7 +56,7 @@ public class AdministrativeRegionController {
     @Delete("/{id}")
     public void deleteAdministrativeRegion(@PathVariable UUID id) {
         if (!administrativeRegionRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
+            throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
         }
         administrativeRegionRepository.deleteById(id);
     }

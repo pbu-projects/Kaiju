@@ -25,6 +25,7 @@ import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ProjectAuditLogControllerSpec extends BaseControllerSpec {
 
@@ -54,7 +55,7 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         if (!projectRow) {
             throw new IllegalStateException("No projects found in database to link audit log to.")
         }
-        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, UNVERIFIED, null, [])
         new Project(projectRow.id as UUID, org, null, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 

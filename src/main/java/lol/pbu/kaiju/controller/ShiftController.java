@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.ShiftRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/shifts")
@@ -51,7 +52,7 @@ public class ShiftController {
     @Put("/{id}")
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
         if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Shift not found");
+            throw new HttpStatusException(NOT_FOUND, "Shift not found");
         }
         return shiftRepository.update(shift.withId(id));
     }
@@ -80,7 +81,7 @@ public class ShiftController {
     @Delete("/{id}")
     public void deleteShift(@PathVariable UUID id) {
         if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Shift not found");
+            throw new HttpStatusException(NOT_FOUND, "Shift not found");
         }
         shiftRepository.deleteById(id);
     }

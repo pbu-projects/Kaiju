@@ -11,11 +11,12 @@ import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ShiftSpec extends Specification {
 
     private static Project createDummyProject() {
-        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, UNVERIFIED, null, [])
         return new Project(UUID.randomUUID(), org, null, "Dummy Project", "Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
     }
 

@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.UserRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/users")
@@ -51,7 +52,7 @@ public class UserController {
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body User user) {
         User existingUser = userRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
 
         // Copy over allowed fields, but retain strictly controlled fields
         User safeUpdate = new User(
@@ -72,7 +73,7 @@ public class UserController {
     @Delete("/{id}")
     public void deleteUser(@PathVariable UUID id) {
         if (!userRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "User not found");
+            throw new HttpStatusException(NOT_FOUND, "User not found");
         }
         userRepository.deleteById(id);
     }

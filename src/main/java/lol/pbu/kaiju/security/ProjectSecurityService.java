@@ -9,6 +9,9 @@ import lol.pbu.kaiju.repository.SecurityQueryRepository;
 
 import java.util.UUID;
 import lol.pbu.kaiju.domain.Location;
+import static io.micronaut.http.HttpStatus.FORBIDDEN;
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
+import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 
 @Singleton
 public class ProjectSecurityService {
@@ -26,12 +29,12 @@ public class ProjectSecurityService {
     public ProjectStatus evaluateProjectCreation(UUID userId, Project project) {
         UUID organizationId = project.organization() != null ? project.organization().id() : null;
         if (organizationId == null) {
-            return ProjectStatus.PENDING;
+            return PENDING;
         }
 
         // Check if project has no locations
         if (project.locations() == null || project.locations().isEmpty()) {
-            return ProjectStatus.PENDING; // Manual queue if no geographic bounds provided
+            return PENDING; // Manual queue if no geographic bounds provided
         }
 
         // 1. Check Org Manager permissions first
@@ -48,7 +51,7 @@ public class ProjectSecurityService {
                 }
             }
             if (allInOrgRegion) {
-                return ProjectStatus.ACTIVE; // AUTO_APPROVED
+                return ACTIVE; // AUTO_APPROVED
             }
         }
 
@@ -63,14 +66,14 @@ public class ProjectSecurityService {
                 }
             }
             if (allInAssignedRegion) {
-                return ProjectStatus.ACTIVE; // AUTO_APPROVED
+                return ACTIVE; // AUTO_APPROVED
             }
             // A Region Agent posting outside their boundary (and not as a valid Org Manager) is strictly forbidden
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "Region Agents cannot post outside their boundaries without Org Manager privileges");
+            throw new HttpStatusException(FORBIDDEN, "Region Agents cannot post outside their boundaries without Org Manager privileges");
         }
 
         // 3. Fallback to manual queue for Standard Users or Org Managers outside their bounds
-        return ProjectStatus.PENDING; // REQUIRES_REGIONAL_APPROVAL
+        return PENDING; // REQUIRES_REGIONAL_APPROVAL
     }
 
     /**
@@ -88,7 +91,7 @@ public class ProjectSecurityService {
     public void authorizeRegionalAdminApproval(UUID regionalAdminId, UUID projectId) {
         boolean hasJurisdiction = queryRepository.hasJurisdictionOverAllProjectLocations(regionalAdminId, projectId);
         if (!hasJurisdiction) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have geographic jurisdiction to approve this project.");
+            throw new HttpStatusException(FORBIDDEN, "You do not have geographic jurisdiction to approve this project.");
         }
     }
 }
