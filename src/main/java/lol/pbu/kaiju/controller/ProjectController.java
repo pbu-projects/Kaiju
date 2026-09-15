@@ -7,6 +7,7 @@ import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
@@ -46,7 +47,7 @@ public class ProjectController {
     }
 
     @Post
-    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    @Secured("isAuthenticated()")
     public Project addProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         if (project.organization() == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Organization is required");
@@ -80,7 +81,7 @@ public class ProjectController {
      * Updates an existing project by its ID after validating that it exists.
      */
     @Put("/{id}")
-    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    @Secured("isAuthenticated()")
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
@@ -111,7 +112,7 @@ public class ProjectController {
      * Updates a project by its ID without checking if it exists first.
      */
     @Put("/{id}/no-look")
-    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    @Secured("isAuthenticated()")
     public Project updateProjectNoLook(@PathVariable UUID id, @Valid @Body Project project) {
         // Disabled for security, redirect to safe method
         throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
@@ -121,7 +122,7 @@ public class ProjectController {
      * Deletes a project by its ID after validating that it exists.
      */
     @Delete("/{id}")
-    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    @Secured("isAuthenticated()")
     public void deleteProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
         
@@ -137,7 +138,7 @@ public class ProjectController {
      * Deletes a project by its ID without checking if it exists first.
      */
     @Delete("/{id}/no-look")
-    @io.micronaut.security.annotation.Secured("isAuthenticated()")
+    @Secured("isAuthenticated()")
     public void deleteProjectNoLook(@PathVariable UUID id) {
         // Disabled for security
         throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
@@ -170,7 +171,7 @@ public class ProjectController {
      * The service layer enforces that the Regional Admin actually has geographic jurisdiction.
      */
     @Put("/{id}/status")
-    @io.micronaut.security.annotation.Secured({"REGION_AGENT", "REGION_DIRECTOR"})
+    @Secured({"REGION_AGENT", "REGION_DIRECTOR"})
     public Project approveProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         
