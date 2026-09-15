@@ -6,6 +6,12 @@ import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpStatus;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
+import static io.micronaut.http.BAD_REQUEST;
+import static io.micronaut.http.FORBIDDEN;
+import static io.micronaut.http.METHOD_NOT_ALLOWED;
+import static lol.pbu.kaiju.model.ACTIVE;
+import static lol.pbu.kaiju.model.PENDING;
+
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.security.annotation.Secured;
@@ -51,7 +57,7 @@ public class ProjectController {
     @Secured("isAuthenticated()")
     public Project addProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         if (project.organization() == null) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Organization is required");
+            throw new HttpStatusException(BAD_REQUEST, "Organization is required");
         }
         
         UUID userId = UUID.fromString(principal.getName());
@@ -88,7 +94,7 @@ public class ProjectController {
         
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to modify this project");
+            throw new HttpStatusException(FORBIDDEN, "You do not have permission to modify this project");
         }
         
         // Prevent users from unilaterally modifying the status during an update and fix mass assignment
@@ -116,7 +122,7 @@ public class ProjectController {
     @Secured("isAuthenticated()")
     public Project updateProjectNoLook(@PathVariable UUID id, @Valid @Body Project project) {
         // Disabled for security, redirect to safe method
-        throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
+        throw new HttpStatusException(METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
     }
 
     /**
@@ -129,7 +135,7 @@ public class ProjectController {
         
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this project");
+            throw new HttpStatusException(FORBIDDEN, "You do not have permission to delete this project");
         }
         
         projectRepository.deleteById(id);
@@ -142,7 +148,7 @@ public class ProjectController {
     @Secured("isAuthenticated()")
     public void deleteProjectNoLook(@PathVariable UUID id) {
         // Disabled for security
-        throw new HttpStatusException(HttpStatus.METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
+        throw new HttpStatusException(METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
     }
 
     /**
@@ -182,8 +188,8 @@ public class ProjectController {
         // Fetch the project and validate its current state
         Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
-        if (project.status() != ProjectStatus.PENDING) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING projects can be approved");
+        if (project.status() != PENDING) {
+            throw new HttpStatusException(BAD_REQUEST, "Only PENDING projects can be approved");
         }
         
         return projectRepository.update(new Project(
@@ -193,7 +199,7 @@ public class ProjectController {
                 project.title(),
                 project.description(),
                 project.projectType(),
-                ProjectStatus.ACTIVE,
+                ACTIVE,
                 project.createdAt(),
                 project.deletedAt(),
                 project.deletedBy(),
