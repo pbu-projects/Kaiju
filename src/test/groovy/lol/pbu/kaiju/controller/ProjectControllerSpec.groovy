@@ -97,6 +97,21 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     @Unroll
+
+    def "CREATE | should throw HttpStatusException if organization is null"() {
+        given: "a manual controller instance to bypass validation interceptors"
+        def project = TestFixtures.createBasicProject(null, "Test Title", "Test Desc", STANDARD, DRAFT)
+        def controller = new ProjectController(projectRepository)
+
+        when:
+        controller.addProject(project, testPrincipal, projectSecurityService)
+
+        then:
+        def e = thrown(HttpStatusException)
+        e.status == io.micronaut.http.HttpStatus.BAD_REQUEST
+        e.message == "Organization is required"
+    }
+
     def "CREATE | should fail to save project with invalid data: #testCase"(String testCase, Project project) {
         when: "an attempt is made to add a project with invalid data"
         projectController.addProject(project, testPrincipal, projectSecurityService)
