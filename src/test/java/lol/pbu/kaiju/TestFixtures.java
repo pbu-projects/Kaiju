@@ -56,4 +56,21 @@ public class TestFixtures {
                 null
         );
     }
+
+    public static Project createBasicProject(Organization org, String title, String desc, ProjectType pType, ProjectStatus pStatus) {
+        return new Project(
+                null,
+                org,
+                null,
+                title,
+                desc,
+                pType,
+                pStatus,
+                OffsetDateTime.now(),
+                null,
+                null,
+                List.of(),
+                List.of()
+        );
+    }
 }

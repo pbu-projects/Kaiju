@@ -22,8 +22,10 @@ import spock.lang.Unroll
 import java.time.OffsetDateTime
 
 import static lol.pbu.kaiju.model.AuditAction.CREATED
-import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
-import static lol.pbu.kaiju.model.ProjectType.STANDARD
+import static ProjectStatus.DRAFT
+import static ProjectType.STANDARD
+import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.model.ProjectType
 
 class ProjectAuditLogControllerSpec extends BaseControllerSpec {
 

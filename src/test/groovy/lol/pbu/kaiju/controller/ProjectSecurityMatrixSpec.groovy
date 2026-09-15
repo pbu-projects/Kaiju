@@ -5,6 +5,12 @@ import spock.lang.Unroll
 import jakarta.inject.Inject
 import lol.pbu.kaiju.security.ProjectSecurityService
 import java.util.UUID
+import lol.pbu.kaiju.domain.Location
+import lol.pbu.kaiju.domain.Project
+import org.locationtech.jts.geom.Point
+import lol.pbu.kaiju.domain.Organization
+import lol.pbu.kaiju.TestFixtures
+import lol.pbu.kaiju.model.ProjectStatus
 
 @MicronautTest(transactional = true)
 class ProjectSecurityMatrixSpec extends BaseControllerSpec {
@@ -20,14 +26,14 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
     static final String POINT_OUTSIDE = "POINT(-105.2705 40.0150)"  // Boulder, CO
 
     // Ground truth rules for verification
-    static lol.pbu.kaiju.model.ProjectStatus getGroundTruthExpectedState(String orgStatus, String userRole, String location) {
+    static ProjectStatus getGroundTruthExpectedState(String orgStatus, String userRole, String location) {
         if (orgStatus == "VERIFIED" && userRole == "ORG_MANAGER" && location == "INSIDE_BOUNDARY") {
-            return lol.pbu.kaiju.model.ProjectStatus.ACTIVE
+            return ProjectStatus.ACTIVE
         }
         if (userRole == "REGION_AGENT") {
-            return location == "INSIDE_BOUNDARY" ? lol.pbu.kaiju.model.ProjectStatus.ACTIVE : null // null means FORBIDDEN
+            return location == "INSIDE_BOUNDARY" ? ProjectStatus.ACTIVE : null // null means FORBIDDEN
         }
-        return lol.pbu.kaiju.model.ProjectStatus.PENDING
+        return ProjectStatus.PENDING
     }
 
     @Unroll
@@ -61,9 +67,9 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         and: "the target geographic point"
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
         org.locationtech.jts.geom.Geometry geom = new org.locationtech.jts.io.WKTReader().read(targetPointWkt)
-        lol.pbu.kaiju.domain.Location dummyLocation = lol.pbu.kaiju.TestFixtures.createDummyLocation((org.locationtech.jts.geom.Point) geom)
-        lol.pbu.kaiju.domain.Organization dummyOrg = lol.pbu.kaiju.TestFixtures.createDummyOrganization(orgId, orgStatus)
-        lol.pbu.kaiju.domain.Project dummyProject = lol.pbu.kaiju.TestFixtures.createDummyProject(dummyOrg, dummyLocation)
+        Location dummyLocation = TestFixtures.createDummyLocation((Point) geom)
+        Organization dummyOrg = TestFixtures.createDummyOrganization(orgId, orgStatus)
+        Project dummyProject = TestFixtures.createDummyProject(dummyOrg, dummyLocation)
 
         when: "the system evaluates the project creation request"
         def actualResult
