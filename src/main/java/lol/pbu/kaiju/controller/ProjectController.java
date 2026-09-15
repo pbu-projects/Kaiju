@@ -5,6 +5,7 @@ import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpStatus;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.security.annotation.Secured;
@@ -83,7 +84,7 @@ public class ProjectController {
     @Put("/{id}")
     @Secured("isAuthenticated()")
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
-        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
+        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
@@ -124,7 +125,7 @@ public class ProjectController {
     @Delete("/{id}")
     @Secured("isAuthenticated()")
     public void deleteProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
-        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
+        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
@@ -179,7 +180,7 @@ public class ProjectController {
         securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
 
         // Fetch the project and validate its current state
-        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
+        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         if (project.status() != ProjectStatus.PENDING) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING projects can be approved");
