@@ -24,9 +24,9 @@ import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 
-import static ProjectStatus.ACTIVE
-import static ProjectStatus.DRAFT
-import static ProjectType.STANDARD
+import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
+import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
+import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import java.util.UUID
 import lol.pbu.kaiju.security.ProjectSecurityService
 import java.security.Principal

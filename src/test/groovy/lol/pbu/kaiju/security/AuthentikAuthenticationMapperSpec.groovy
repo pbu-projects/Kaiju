@@ -1,5 +1,7 @@
 package lol.pbu.kaiju.security
 
+import reactor.core.publisher.Mono
+
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
