@@ -5,7 +5,6 @@
 
 Welcome to the Kaiju project documentation.
 
-include::01-introduction.adoc[]
 
 include::02-domain-model.adoc[]
 
