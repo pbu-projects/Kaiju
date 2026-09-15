@@ -36,6 +36,24 @@ class ProjectControllerSpec extends BaseControllerSpec {
     @Inject
     ProjectController projectController
 
+    
+
+    
+    @Shared
+    lol.pbu.kaiju.security.ProjectSecurityService projectSecurityService = new lol.pbu.kaiju.security.ProjectSecurityService(null) {
+        @Override
+        lol.pbu.kaiju.model.ProjectStatus evaluateProjectCreation(java.util.UUID userId, lol.pbu.kaiju.domain.Project project) {
+            return lol.pbu.kaiju.model.ProjectStatus.DRAFT
+        }
+        @Override
+        boolean canModifyProject(java.util.UUID userId, lol.pbu.kaiju.domain.Project project) {
+            return true
+        }
+    }
+
+    @Shared
+    java.security.Principal testPrincipal = new java.security.Principal() { @Override String getName() { return "00000000-0000-0000-0000-000000000000" } }
+
     @Shared
     Faker faker = new Faker()
 
@@ -52,10 +70,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "CREATE | should successfully save a valid project"() {
         given: "a new valid project"
         def org = getRandomOrganization()
-        def newProject = new Project(null, org, null, "Test Project ${faker.company().name()}", "Test Description ${faker.lorem().paragraph()}", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def newProject = lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "Test Project ${faker.company().name()}" as String, "Test Description ${faker.lorem().paragraph()}" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus)
 
         when: "the project is added"
-        Project saved = projectController.addProject(newProject)
+        Project saved = projectController.addProject(newProject, testPrincipal, projectSecurityService)
 
         then: "the project is persisted with a generated ID"
         verifyAll {
@@ -78,7 +96,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     @Unroll
     def "CREATE | should fail to save project with invalid data: #testCase"(String testCase, Project project) {
         when: "an attempt is made to add a project with invalid data"
-        projectController.addProject(project)
+        projectController.addProject(project, testPrincipal, projectSecurityService)
 
         then: "an exception is thrown"
         thrown(ValidationException)
@@ -105,7 +123,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
             return invalidCases.collect { invalidCase ->
                 def props = new HashMap(validData)
                 props[invalidCase.field] = invalidCase.value
-                def proj = new Project(null, props.organization as Organization, null, props.title as String, props.description as String, props.projectType as ProjectType, props.status as ProjectStatus, OffsetDateTime.now(), null, null, [], [])
+                def proj = lol.pbu.kaiju.TestFixtures.createBasicProject(props.organization as Organization as lol.pbu.kaiju.domain.Organization, props.title as String as String, props.description as String as String, props.projectType as ProjectType as lol.pbu.kaiju.model.ProjectType, props.status as ProjectStatus as lol.pbu.kaiju.model.ProjectStatus)
                 [invalidCase.caseName, proj]
             }
         }()
@@ -116,7 +134,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve an existing project by ID"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.addProject(new Project(null, org, null, "Test Project Read", "Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], []))
+        def project = projectController.addProject(lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "Test Project Read" as String, "Description" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus), testPrincipal, projectSecurityService)
         UUID id = project.id()
 
         when: "the project is requested by its ID"
@@ -141,7 +159,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve projects by title"() {
         given: "an existing project's title from the database"
         def org = getRandomOrganization()
-        def project = projectController.addProject(new Project(null, org, null, "Searchable Title ${faker.number().digits(5)}", "Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], []))
+        def project = projectController.addProject(lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "Searchable Title ${faker.number().digits(5)}" as String, "Description" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus), testPrincipal, projectSecurityService)
         def targetTitle = project.title()
 
         when: "projects are searched by this title"
@@ -159,21 +177,21 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing project"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.addProject(new Project(null, org, null, "Original Project Title", "Original Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], []))
+        def project = projectController.addProject(lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "Original Project Title" as String, "Original Description" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus), testPrincipal, projectSecurityService)
         UUID id = project.id()
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description ${faker.lorem().paragraph()}"
-        def updateRequest = new Project(null, org, null, newTitle, newDescription, STANDARD, ACTIVE, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, newTitle as String, newDescription as String, STANDARD as lol.pbu.kaiju.model.ProjectType, ACTIVE as lol.pbu.kaiju.model.ProjectStatus)
 
         when: "the project is updated"
-        Project updated = projectController.updateProject(id, updateRequest)
+        Project updated = projectController.updateProject(id, updateRequest, testPrincipal, projectSecurityService)
 
-        then: "the returned project contains the updated data"
+        then: "the returned project contains the updated data but status remains unchanged"
         verifyAll {
             updated.id() == id
             updated.title() == newTitle
             updated.description() == newDescription
-            updated.status() == ACTIVE
+            updated.status() == DRAFT
         }
 
         and: "the changes are persisted in the database"
@@ -181,7 +199,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         verifyAll(dbResult) {
             title == newTitle
             description == newDescription
-            status == 'ACTIVE'
+            status == 'DRAFT'
         }
     }
 
@@ -189,10 +207,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = new Project(null, org, null, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "New Title" as String, "New Description" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus)
 
         when: "an update is attempted"
-        projectController.updateProject(nonExistentId, updateRequest)
+        projectController.updateProject(nonExistentId, updateRequest, testPrincipal, projectSecurityService)
 
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
@@ -203,13 +221,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = new Project(null, org, null, "New Title", "New Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def updateRequest = lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "New Title" as String, "New Description" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus)
 
         when: "a no-look update is attempted"
         projectController.updateProjectNoLook(nonExistentId, updateRequest)
 
-        then: "no exception is thrown"
-        noExceptionThrown()
+        then: "a 405 is returned"
+        def e = thrown(io.micronaut.http.exceptions.HttpStatusException)
+        e.status == io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
     }
 
     /********** DELETE Tests **********/
@@ -217,13 +236,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "DELETE | should remove an existing project"() {
         given: "a new project to be deleted"
         def org = getRandomOrganization()
-        def tempProject = new Project(null, org, null, "Temporary Project to Delete", "Temporary Description", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
-        def saved = projectController.addProject(tempProject)
+        def tempProject = lol.pbu.kaiju.TestFixtures.createBasicProject(org as lol.pbu.kaiju.domain.Organization, "Temporary Project to Delete" as String, "Temporary Description" as String, STANDARD as lol.pbu.kaiju.model.ProjectType, DRAFT as lol.pbu.kaiju.model.ProjectStatus)
+        def saved = projectController.addProject(tempProject, testPrincipal, projectSecurityService)
         UUID id = saved.id()
         assert projectRepository.existsById(id)
 
         when: "the project is deleted"
-        projectController.deleteProject(id)
+        projectController.deleteProject(id, testPrincipal, projectSecurityService)
 
         then: "the project no longer exists in the repository or database"
         verifyAll {
@@ -237,7 +256,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def nonExistentId = UUID.randomUUID()
 
         when: "a delete is attempted"
-        projectController.deleteProject(nonExistentId)
+        projectController.deleteProject(nonExistentId, testPrincipal, projectSecurityService)
 
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
@@ -251,8 +270,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
         when: "a no-look delete is attempted"
         projectController.deleteProjectNoLook(nonExistentId)
 
-        then: "no exception is thrown"
-        noExceptionThrown()
+        then: "a 405 is returned"
+        def e = thrown(io.micronaut.http.exceptions.HttpStatusException)
+        e.status == io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
     }
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
