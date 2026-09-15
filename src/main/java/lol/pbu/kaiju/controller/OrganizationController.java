@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.OrganizationRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/organizations")
@@ -51,7 +52,7 @@ public class OrganizationController {
     @Put("/{id}")
     public Organization updateOrganization(@PathVariable UUID id, @Valid @Body Organization organization) {
         if (!organizationRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization not found");
+            throw new HttpStatusException(NOT_FOUND, "Organization not found");
         }
         return organizationRepository.update(organization.withId(id));
     }
@@ -80,7 +81,7 @@ public class OrganizationController {
     @Delete("/{id}")
     public void deleteOrganization(@PathVariable UUID id) {
         if (!organizationRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization not found");
+            throw new HttpStatusException(NOT_FOUND, "Organization not found");
         }
         organizationRepository.deleteById(id);
     }

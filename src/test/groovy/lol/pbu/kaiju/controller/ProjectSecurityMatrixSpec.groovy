@@ -11,6 +11,8 @@ import org.locationtech.jts.geom.Point
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.TestFixtures
 import lol.pbu.kaiju.model.ProjectStatus
+import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING
 
 @MicronautTest(transactional = true)
 class ProjectSecurityMatrixSpec extends BaseControllerSpec {
@@ -28,12 +30,12 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
     // Ground truth rules for verification
     static ProjectStatus getGroundTruthExpectedState(String orgStatus, String userRole, String location) {
         if (orgStatus == "VERIFIED" && userRole == "ORG_MANAGER" && location == "INSIDE_BOUNDARY") {
-            return ProjectStatus.ACTIVE
+            return ACTIVE
         }
         if (userRole == "REGION_AGENT") {
-            return location == "INSIDE_BOUNDARY" ? ProjectStatus.ACTIVE : null // null means FORBIDDEN
+            return location == "INSIDE_BOUNDARY" ? ACTIVE : null // null means FORBIDDEN
         }
-        return ProjectStatus.PENDING
+        return PENDING
     }
 
     @Unroll

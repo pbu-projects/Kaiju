@@ -11,6 +11,8 @@ import org.locationtech.jts.geom.Point;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
+import static lol.pbu.kaiju.model.ProjectType.STANDARD;
 
 public class TestFixtures {
     
@@ -47,8 +49,8 @@ public class TestFixtures {
                 null,
                 "Title",
                 "Desc",
-                ProjectType.STANDARD,
-                ProjectStatus.PENDING,
+                STANDARD,
+                PENDING,
                 OffsetDateTime.now(),
                 null,
                 null,

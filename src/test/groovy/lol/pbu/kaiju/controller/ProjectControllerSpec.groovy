@@ -30,6 +30,9 @@ import java.util.UUID
 import lol.pbu.kaiju.security.ProjectSecurityService
 import java.security.Principal
 import lol.pbu.kaiju.TestFixtures
+import static io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
+import static io.micronaut.http.HttpStatus.BAD_REQUEST
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ProjectControllerSpec extends BaseControllerSpec {
 
@@ -46,7 +49,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     ProjectSecurityService projectSecurityService = new ProjectSecurityService(null) {
         @Override
         ProjectStatus evaluateProjectCreation(UUID userId, Project project) {
-            return ProjectStatus.DRAFT
+            return DRAFT
         }
         @Override
         boolean canModifyProject(UUID userId, Project project) {
@@ -65,7 +68,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         if (!orgRow) {
             throw new IllegalStateException("No organizations found in database to link project to.")
         }
-        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, VerificationStatus.UNVERIFIED, null, [])
+        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, UNVERIFIED, null, [])
     }
 
     /********** CREATE Tests **********/
@@ -108,7 +111,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then:
         def e = thrown(HttpStatusException)
-        e.status == io.micronaut.http.HttpStatus.BAD_REQUEST
+        e.status == BAD_REQUEST
         e.message == "Organization is required"
     }
 
@@ -121,7 +124,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         where:
         [testCase, project] << {
-            def dummyOrg = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+            def dummyOrg = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, UNVERIFIED, null, [])
 
             def validData = [organization: dummyOrg,
                              title       : "Valid Title",
@@ -246,7 +249,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "a 405 is returned"
         def e = thrown(io.micronaut.http.exceptions.HttpStatusException)
-        e.status == io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
+        e.status == METHOD_NOT_ALLOWED
     }
 
     /********** DELETE Tests **********/
@@ -290,7 +293,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "a 405 is returned"
         def e = thrown(io.micronaut.http.exceptions.HttpStatusException)
-        e.status == io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
+        e.status == METHOD_NOT_ALLOWED
     }
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {

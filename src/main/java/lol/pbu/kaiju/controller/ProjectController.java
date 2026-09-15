@@ -6,11 +6,11 @@ import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.http.HttpStatus;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
-import static io.micronaut.http.BAD_REQUEST;
-import static io.micronaut.http.FORBIDDEN;
-import static io.micronaut.http.METHOD_NOT_ALLOWED;
-import static lol.pbu.kaiju.model.ACTIVE;
-import static lol.pbu.kaiju.model.PENDING;
+import static io.micronaut.http.HttpStatus.BAD_REQUEST;
+import static io.micronaut.http.HttpStatus.FORBIDDEN;
+import static io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED;
+import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;

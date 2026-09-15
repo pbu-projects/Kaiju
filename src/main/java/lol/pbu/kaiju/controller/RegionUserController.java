@@ -14,6 +14,7 @@ import lol.pbu.kaiju.repository.RegionUserRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/region-users")
@@ -44,7 +45,7 @@ public class RegionUserController {
     public RegionUser updateRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId, @Valid @Body RegionUser user) {
         RegionUserId id = new RegionUserId(userId, regionId);
         if (!regionUserRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Region user not found");
+            throw new HttpStatusException(NOT_FOUND, "Region user not found");
         }
         return regionUserRepository.update(user.withId(id));
     }
@@ -58,7 +59,7 @@ public class RegionUserController {
     public void deleteRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId) {
         RegionUserId id = new RegionUserId(userId, regionId);
         if (!regionUserRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Region user not found");
+            throw new HttpStatusException(NOT_FOUND, "Region user not found");
         }
         regionUserRepository.deleteById(id);
     }

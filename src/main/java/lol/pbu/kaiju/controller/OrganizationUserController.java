@@ -14,6 +14,7 @@ import lol.pbu.kaiju.repository.OrganizationUserRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/organization-users")
@@ -44,7 +45,7 @@ public class OrganizationUserController {
     public OrganizationUser updateOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId, @Valid @Body OrganizationUser user) {
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
         if (!organizationUserRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found");
+            throw new HttpStatusException(NOT_FOUND, "Organization user not found");
         }
         return organizationUserRepository.update(user.withId(id));
     }
@@ -58,7 +59,7 @@ public class OrganizationUserController {
     public void deleteOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId) {
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
         if (!organizationUserRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found");
+            throw new HttpStatusException(NOT_FOUND, "Organization user not found");
         }
         organizationUserRepository.deleteById(id);
     }

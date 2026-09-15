@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/project-audit-logs")
@@ -51,7 +52,7 @@ public class ProjectAuditLogController {
     @Put("/{id}")
     public ProjectAuditLog updateProjectAuditLog(@PathVariable UUID id, @Valid @Body ProjectAuditLog log) {
         if (!projectAuditLogRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project audit log not found");
+            throw new HttpStatusException(NOT_FOUND, "Project audit log not found");
         }
         return projectAuditLogRepository.update(log.withId(id));
     }
@@ -80,7 +81,7 @@ public class ProjectAuditLogController {
     @Delete("/{id}")
     public void deleteProjectAuditLog(@PathVariable UUID id) {
         if (!projectAuditLogRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project audit log not found");
+            throw new HttpStatusException(NOT_FOUND, "Project audit log not found");
         }
         projectAuditLogRepository.deleteById(id);
     }

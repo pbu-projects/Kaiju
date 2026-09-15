@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.TagRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/tags")
@@ -51,7 +52,7 @@ public class TagController {
     @Put("/{id}")
     public Tag updateTag(@PathVariable UUID id, @Valid @Body Tag tag) {
         if (!tagRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Tag not found");
+            throw new HttpStatusException(NOT_FOUND, "Tag not found");
         }
         return tagRepository.update(tag.withId(id));
     }
@@ -80,7 +81,7 @@ public class TagController {
     @Delete("/{id}")
     public void deleteTag(@PathVariable UUID id) {
         if (!tagRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Tag not found");
+            throw new HttpStatusException(NOT_FOUND, "Tag not found");
         }
         tagRepository.deleteById(id);
     }

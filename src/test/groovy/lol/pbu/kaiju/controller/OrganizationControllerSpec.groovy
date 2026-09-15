@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class OrganizationControllerSpec extends BaseControllerSpec {
 
@@ -35,7 +36,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "https://${faker.internet().domainName()}",
                 null,
                 true,
-                VerificationStatus.UNVERIFIED,
+                UNVERIFIED,
                 null,
                 []
         )
@@ -91,7 +92,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                         props.websiteUrl as String,
                         null,
                         true,
-                        VerificationStatus.UNVERIFIED,
+                        UNVERIFIED,
                         null,
                         []
                 )
@@ -104,7 +105,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing organization by ID"() {
         given: "an existing organization"
-        def org = organizationRepository.save(new Organization(null, "Test Organization Read", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, []))
+        def org = organizationRepository.save(new Organization(null, "Test Organization Read", "https://example.com", null, true, UNVERIFIED, null, []))
         UUID id = org.id()
 
         when: "the organization is requested by its ID"
@@ -130,11 +131,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing organization"() {
         given: "an existing organization"
-        def org = organizationRepository.save(new Organization(null, "Original Org Name", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, []))
+        def org = organizationRepository.save(new Organization(null, "Original Org Name", "https://example.com", null, true, UNVERIFIED, null, []))
         UUID id = org.id()
         def newName = "Updated ${faker.company().name()}"
         def newUrl = "https://${faker.internet().domainName()}"
-        def updateRequest = new Organization(null, newName, newUrl, null, true, VerificationStatus.UNVERIFIED, null, [])
+        def updateRequest = new Organization(null, newName, newUrl, null, true, UNVERIFIED, null, [])
 
         when: "the organization is updated"
         Organization updated = organizationController.updateOrganization(id, updateRequest)
@@ -157,7 +158,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "UPDATE | should fail to update a non-existent organization"() {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, [])
+        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, UNVERIFIED, null, [])
 
         when: "an update is attempted"
         organizationController.updateOrganization(nonExistentId, updateRequest)
@@ -170,7 +171,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "UPDATE | should handle update of non-existent organization gracefully when using no-look"() {
         given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, VerificationStatus.UNVERIFIED, null, [])
+        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, UNVERIFIED, null, [])
 
         when: "a no-look update is attempted"
         organizationController.updateOrganizationNoLook(nonExistentId, updateRequest)
@@ -189,7 +190,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "https://example.org",
                 null,
                 true,
-                VerificationStatus.UNVERIFIED,
+                UNVERIFIED,
                 null,
                 []
         )

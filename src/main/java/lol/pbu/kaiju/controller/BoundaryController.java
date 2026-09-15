@@ -13,6 +13,7 @@ import lol.pbu.kaiju.repository.BoundaryRepository;
 
 import java.util.Optional;
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/boundaries")
@@ -51,7 +52,7 @@ public class BoundaryController {
     @Put("/{id}")
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
         if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Boundary not found");
+            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
         }
         return boundaryRepository.update(boundary.withId(id));
     }
@@ -80,7 +81,7 @@ public class BoundaryController {
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id) {
         if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Boundary not found");
+            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
         }
         boundaryRepository.deleteById(id);
     }

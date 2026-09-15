@@ -12,6 +12,7 @@ import lol.pbu.kaiju.model.RoleUpdateRequest;
 import lol.pbu.kaiju.repository.UserRepository;
 
 import java.util.UUID;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/admin/users")
@@ -35,7 +36,7 @@ public class AdminUserController {
     @Put("/{id}/role")
     public User updateUserRole(@PathVariable UUID id, @Valid @Body RoleUpdateRequest request) {
         if (!userRepository.existsById(id)) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "User not found");
+            throw new HttpStatusException(NOT_FOUND, "User not found");
         }
         userRepository.updateRole(id, request.role());
         return userRepository.findById(id).orElseThrow();
