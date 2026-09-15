@@ -22,7 +22,6 @@ import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import java.time.OffsetDateTime
 
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
