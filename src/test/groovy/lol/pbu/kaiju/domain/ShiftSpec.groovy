@@ -7,8 +7,8 @@ import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 
-import static ProjectStatus.DRAFT
-import static ProjectType.STANDARD
+import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
+import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 
