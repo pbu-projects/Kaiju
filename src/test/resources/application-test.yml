@@ -10,3 +10,8 @@ micronaut:
     oauth2:
       enabled: false
 
+test-resources:
+  containers:
+    keycloak:
+      enabled: false
+
