@@ -7,3 +7,6 @@ datasources:
 micronaut:
   security:
     enabled: false
+    oauth2:
+      enabled: false
+

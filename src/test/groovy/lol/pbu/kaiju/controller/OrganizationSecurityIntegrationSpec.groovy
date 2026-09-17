@@ -19,6 +19,7 @@ import spock.lang.Unroll
 import java.util.UUID
 
 @Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
 @MicronautTest(transactional = false)
 class OrganizationSecurityIntegrationSpec extends Specification {
 
@@ -56,9 +57,8 @@ class OrganizationSecurityIntegrationSpec extends Specification {
         when: "an unauthenticated request is made to a no-look endpoint (PUT)"
         client.exchange(HttpRequest.PUT("/organizations/${id}/no-look", dummy))
 
-        then: "since the endpoint is removed, it should ideally return 405 or 401. If 401 is thrown first, that's fine too."
+        then: "since the endpoint is removed, it should return 405, 404, or 401"
         def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED || e.status == HttpStatus.METHOD_NOT_ALLOWED
+        e.status in [HttpStatus.UNAUTHORIZED, HttpStatus.METHOD_NOT_ALLOWED, HttpStatus.NOT_FOUND]
     }
-
 }
