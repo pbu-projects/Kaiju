@@ -45,7 +45,6 @@ public class OrganizationController {
     /**
      * Updates an existing organization by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the organization does not exist.
-     * Refer to the sister method {@link #updateOrganizationNoLook(UUID, Organization)} to update without validation.
      *
      * @param id           the ID of the organization to update
      * @param organization the updated organization details
@@ -73,7 +72,6 @@ public class OrganizationController {
     /**
      * Deletes an organization by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the organization does not exist.
-     * Refer to the sister method {@link #deleteOrganizationNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the organization to delete
      */

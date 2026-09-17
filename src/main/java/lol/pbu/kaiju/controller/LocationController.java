@@ -45,7 +45,6 @@ public class LocationController {
     /**
      * Updates an existing location by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the location does not exist.
-     * Refer to the sister method {@link #updateLocationNoLook(UUID, Location)} to update without validation.
      *
      * @param id       the ID of the location to update
      * @param location the updated location details
@@ -53,8 +52,9 @@ public class LocationController {
      */
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
-        Location existing = locationRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Location not found"));
+        if (!locationRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, "Location not found");
+        }
         
         Location securePayload = new Location(
                 id,
@@ -73,7 +73,6 @@ public class LocationController {
     /**
      * Deletes a location by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the location does not exist.
-     * Refer to the sister method {@link #deleteByIdNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the location to delete
      */

@@ -45,7 +45,6 @@ public class ProjectAuditLogController {
     /**
      * Updates an existing project audit log by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the project audit log does not exist.
-     * Refer to the sister method {@link #updateProjectAuditLogNoLook(UUID, ProjectAuditLog)} to update without validation.
      *
      * @param id  the ID of the project audit log to update
      * @param log the updated project audit log details
@@ -63,7 +62,6 @@ public class ProjectAuditLogController {
     /**
      * Deletes a project audit log by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the project audit log does not exist.
-     * Refer to the sister method {@link #deleteProjectAuditLogNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the project audit log to delete
      */

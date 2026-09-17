@@ -45,7 +45,6 @@ public class ShiftController {
     /**
      * Updates an existing shift by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the shift does not exist.
-     * Refer to the sister method {@link #updateShiftNoLook(UUID, Shift)} to update without validation.
      *
      * @param id    the ID of the shift to update
      * @param shift the updated shift details
@@ -53,8 +52,9 @@ public class ShiftController {
      */
     @Put("/{id}")
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
-        Shift existing = shiftRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
+        if (!shiftRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, "Shift not found");
+        }
         
         Shift securePayload = new Shift(
                 id,
@@ -72,7 +72,6 @@ public class ShiftController {
     /**
      * Deletes a shift by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the shift does not exist.
-     * Refer to the sister method {@link #deleteShiftNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the shift to delete
      */

@@ -7,7 +7,6 @@ import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import io.micronaut.context.annotation.Property
 import jakarta.inject.Inject
@@ -22,9 +21,6 @@ import java.util.UUID
 @Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class OrganizationSecurityIntegrationSpec extends Specification {
-
-    @Inject
-    EmbeddedServer embeddedServer
 
     @Inject
     @Client("/")

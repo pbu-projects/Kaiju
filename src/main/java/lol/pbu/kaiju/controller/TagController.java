@@ -45,7 +45,6 @@ public class TagController {
     /**
      * Updates an existing tag by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the tag does not exist.
-     * Refer to the sister method {@link #updateTagNoLook(UUID, Tag)} to update without validation.
      *
      * @param id  the ID of the tag to update
      * @param tag the updated tag details
@@ -53,8 +52,9 @@ public class TagController {
      */
     @Put("/{id}")
     public Tag updateTag(@PathVariable UUID id, @Valid @Body Tag tag) {
-        Tag existing = tagRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Tag not found"));
+        if (!tagRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, "Tag not found");
+        }
         
         Tag securePayload = new Tag(
                 id,
@@ -67,7 +67,6 @@ public class TagController {
     /**
      * Deletes a tag by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the tag does not exist.
-     * Refer to the sister method {@link #deleteTagNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the tag to delete
      */

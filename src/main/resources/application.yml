@@ -40,8 +40,6 @@ flyway:
       sql-migration-separator: "-"
 test-resources:
   containers:
-    keycloak:
-      enabled: false
     postgres:
       image-name: postgis/postgis:15-3.5
       db-name: volunteer_monster

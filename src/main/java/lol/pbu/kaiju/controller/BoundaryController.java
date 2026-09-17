@@ -45,7 +45,6 @@ public class BoundaryController {
     /**
      * Updates an existing boundary by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the boundary does not exist.
-     * Refer to the sister method {@link #updateBoundaryNoLook(UUID, Boundary)} to update without validation.
      *
      * @param id       the ID of the boundary to update
      * @param boundary the updated boundary details
@@ -53,8 +52,9 @@ public class BoundaryController {
      */
     @Put("/{id}")
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
-        Boundary existing = boundaryRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Boundary not found"));
+        if (!boundaryRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
+        }
         
         Boundary securePayload = new Boundary(
                 id,
@@ -68,7 +68,6 @@ public class BoundaryController {
     /**
      * Deletes a boundary by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the boundary does not exist.
-     * Refer to the sister method {@link #deleteBoundaryNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the boundary to delete
      */
