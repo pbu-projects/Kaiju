@@ -7,3 +7,11 @@ datasources:
 micronaut:
   security:
     enabled: false
+    oauth2:
+      enabled: false
+
+test-resources:
+  containers:
+    keycloak:
+      enabled: false
+

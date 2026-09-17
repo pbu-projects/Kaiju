@@ -4,6 +4,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
+import io.micronaut.serde.annotation.Serdeable;
 import io.micronaut.data.annotation.Relation;
 import io.micronaut.data.annotation.sql.JoinColumn;
 import io.micronaut.data.annotation.sql.JoinTable;
@@ -18,6 +19,7 @@ import java.util.UUID;
 
 import static io.micronaut.data.annotation.Relation.Kind.ONE_TO_MANY;
 
+@Serdeable
 @MappedEntity("organizations")
 public record Organization(
         @Id

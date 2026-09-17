@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/locations")
 public class LocationController {
 
@@ -43,7 +45,6 @@ public class LocationController {
     /**
      * Updates an existing location by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the location does not exist.
-     * Refer to the sister method {@link #updateLocationNoLook(UUID, Location)} to update without validation.
      *
      * @param id       the ID of the location to update
      * @param location the updated location details
@@ -54,27 +55,24 @@ public class LocationController {
         if (!locationRepository.existsById(id)) {
             throw new HttpStatusException(NOT_FOUND, "Location not found");
         }
-        return locationRepository.update(location.withId(id));
+        
+        Location securePayload = new Location(
+                id,
+                location.name(),
+                location.addressLine(),
+                location.city(),
+                location.stateProvince(),
+                location.postalCode(),
+                location.countryCode(),
+                location.geom()
+        );
+        return locationRepository.update(securePayload);
     }
 
-    /**
-     * Updates a location by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateLocation(UUID, Location)} to update with existence validation.
-     *
-     * @param id       the ID of the location to update
-     * @param location the updated location details
-     * @return the updated location
-     */
-    @Put("/{id}/no-look")
-    public Location updateLocationNoLook(@PathVariable UUID id, @Valid @Body Location location) {
-        return locationRepository.update(location.withId(id));
-    }
 
     /**
      * Deletes a location by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the location does not exist.
-     * Refer to the sister method {@link #deleteByIdNoLook(UUID)} to delete without validation.
      *
      * @param id the ID of the location to delete
      */
@@ -86,15 +84,4 @@ public class LocationController {
         locationRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a location by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteById(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the location to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteByIdNoLook(@PathVariable UUID id) {
-        locationRepository.deleteById(id);
-    }
 }
