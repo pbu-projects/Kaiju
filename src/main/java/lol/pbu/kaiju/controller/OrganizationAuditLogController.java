@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/organization-audit-logs")
 public class OrganizationAuditLogController {
 
@@ -48,21 +50,11 @@ public class OrganizationAuditLogController {
         return organizationAuditLogRepository.update(log.withId(id));
     }
 
-    @Put("/{id}/no-look")
-    public OrganizationAuditLog updateOrganizationAuditLogNoLook(@PathVariable UUID id, @Valid @Body OrganizationAuditLog log) {
-        return organizationAuditLogRepository.update(log.withId(id));
-    }
-
     @Delete("/{id}")
     public void deleteOrganizationAuditLog(@PathVariable UUID id) {
         if (!organizationAuditLogRepository.existsById(id)) {
             throw new HttpStatusException(NOT_FOUND, "Organization audit log not found");
         }
-        organizationAuditLogRepository.deleteById(id);
-    }
-
-    @Delete("/{id}/no-look")
-    public void deleteOrganizationAuditLogNoLook(@PathVariable UUID id) {
         organizationAuditLogRepository.deleteById(id);
     }
 }

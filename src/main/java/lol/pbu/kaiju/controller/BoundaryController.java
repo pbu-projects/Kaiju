@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/boundaries")
 public class BoundaryController {
 
@@ -51,25 +53,19 @@ public class BoundaryController {
      */
     @Put("/{id}")
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
-        if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
-        }
+        Boundary existing = boundaryRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Boundary not found"));
+        
+        Boundary securePayload = new Boundary(
+                id,
+                boundary.name(),
+                boundary.geom()
+        );
+        return boundaryRepository.update(securePayload);
+    }
         return boundaryRepository.update(boundary.withId(id));
     }
 
-    /**
-     * Updates a boundary by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateBoundary(UUID, Boundary)} to update with existence validation.
-     *
-     * @param id       the ID of the boundary to update
-     * @param boundary the updated boundary details
-     * @return the updated boundary
-     */
-    @Put("/{id}/no-look")
-    public Boundary updateBoundaryNoLook(@PathVariable UUID id, @Valid @Body Boundary boundary) {
-        return boundaryRepository.update(boundary.withId(id));
-    }
 
     /**
      * Deletes a boundary by its ID after validating that it exists.
@@ -86,15 +82,4 @@ public class BoundaryController {
         boundaryRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a boundary by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteBoundary(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the boundary to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteBoundaryNoLook(@PathVariable UUID id) {
-        boundaryRepository.deleteById(id);
-    }
 }

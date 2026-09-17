@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/shifts")
 public class ShiftController {
 
@@ -51,25 +53,23 @@ public class ShiftController {
      */
     @Put("/{id}")
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
-        if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Shift not found");
-        }
+        Shift existing = shiftRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
+        
+        Shift securePayload = new Shift(
+                id,
+                shift.project(),
+                shift.isVirtual(),
+                shift.location(),
+                shift.startTime(),
+                shift.endTime(),
+                shift.tags()
+        );
+        return shiftRepository.update(securePayload);
+    }
         return shiftRepository.update(shift.withId(id));
     }
 
-    /**
-     * Updates a shift by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateShift(UUID, Shift)} to update with existence validation.
-     *
-     * @param id    the ID of the shift to update
-     * @param shift the updated shift details
-     * @return the updated shift
-     */
-    @Put("/{id}/no-look")
-    public Shift updateShiftNoLook(@PathVariable UUID id, @Valid @Body Shift shift) {
-        return shiftRepository.update(shift.withId(id));
-    }
 
     /**
      * Deletes a shift by its ID after validating that it exists.
@@ -86,15 +86,4 @@ public class ShiftController {
         shiftRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a shift by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteShift(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the shift to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteShiftNoLook(@PathVariable UUID id) {
-        shiftRepository.deleteById(id);
-    }
 }

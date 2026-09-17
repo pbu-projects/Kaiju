@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/organizations")
 public class OrganizationController {
 
@@ -51,25 +53,22 @@ public class OrganizationController {
      */
     @Put("/{id}")
     public Organization updateOrganization(@PathVariable UUID id, @Valid @Body Organization organization) {
-        if (!organizationRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization not found");
-        }
-        return organizationRepository.update(organization.withId(id));
+        Organization existing = organizationRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Organization not found"));
+        
+        Organization secureOrganization = new Organization(
+                id,
+                organization.name(),
+                organization.websiteUrl(),
+                organization.parentId(),
+                organization.isPublic(),
+                existing.verificationStatus(),
+                existing.verificationExpiresAt(),
+                existing.locations()
+        );
+        return organizationRepository.update(secureOrganization);
     }
 
-    /**
-     * Updates an organization by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateOrganization(UUID, Organization)} to update with existence validation.
-     *
-     * @param id           the ID of the organization to update
-     * @param organization the updated organization details
-     * @return the updated organization
-     */
-    @Put("/{id}/no-look")
-    public Organization updateOrganizationNoLook(@PathVariable UUID id, @Valid @Body Organization organization) {
-        return organizationRepository.update(organization.withId(id));
-    }
 
     /**
      * Deletes an organization by its ID after validating that it exists.
@@ -86,15 +85,4 @@ public class OrganizationController {
         organizationRepository.deleteById(id);
     }
 
-    /**
-     * Deletes an organization by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteOrganization(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the organization to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteOrganizationNoLook(@PathVariable UUID id) {
-        organizationRepository.deleteById(id);
-    }
 }

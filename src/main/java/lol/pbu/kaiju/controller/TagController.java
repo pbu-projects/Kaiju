@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/tags")
 public class TagController {
 
@@ -51,25 +53,18 @@ public class TagController {
      */
     @Put("/{id}")
     public Tag updateTag(@PathVariable UUID id, @Valid @Body Tag tag) {
-        if (!tagRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Tag not found");
-        }
+        Tag existing = tagRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Tag not found"));
+        
+        Tag securePayload = new Tag(
+                id,
+                tag.name()
+        );
+        return tagRepository.update(securePayload);
+    }
         return tagRepository.update(tag.withId(id));
     }
 
-    /**
-     * Updates a tag by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateTag(UUID, Tag)} to update with existence validation.
-     *
-     * @param id  the ID of the tag to update
-     * @param tag the updated tag details
-     * @return the updated tag
-     */
-    @Put("/{id}/no-look")
-    public Tag updateTagNoLook(@PathVariable UUID id, @Valid @Body Tag tag) {
-        return tagRepository.update(tag.withId(id));
-    }
 
     /**
      * Deletes a tag by its ID after validating that it exists.
@@ -86,15 +81,4 @@ public class TagController {
         tagRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a tag by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteTag(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the tag to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteTagNoLook(@PathVariable UUID id) {
-        tagRepository.deleteById(id);
-    }
 }

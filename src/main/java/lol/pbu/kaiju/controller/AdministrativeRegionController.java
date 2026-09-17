@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/administrative-regions")
 public class AdministrativeRegionController {
 
@@ -48,21 +50,11 @@ public class AdministrativeRegionController {
         return administrativeRegionRepository.update(region.withId(id));
     }
 
-    @Put("/{id}/no-look")
-    public AdministrativeRegion updateAdministrativeRegionNoLook(@PathVariable UUID id, @Valid @Body AdministrativeRegion region) {
-        return administrativeRegionRepository.update(region.withId(id));
-    }
-
     @Delete("/{id}")
     public void deleteAdministrativeRegion(@PathVariable UUID id) {
         if (!administrativeRegionRepository.existsById(id)) {
             throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
         }
-        administrativeRegionRepository.deleteById(id);
-    }
-
-    @Delete("/{id}/no-look")
-    public void deleteAdministrativeRegionNoLook(@PathVariable UUID id) {
         administrativeRegionRepository.deleteById(id);
     }
 }

@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/project-audit-logs")
 public class ProjectAuditLogController {
 
@@ -57,19 +59,6 @@ public class ProjectAuditLogController {
         return projectAuditLogRepository.update(log.withId(id));
     }
 
-    /**
-     * Updates a project audit log by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #updateProjectAuditLog(UUID, ProjectAuditLog)} to update with existence validation.
-     *
-     * @param id  the ID of the project audit log to update
-     * @param log the updated project audit log details
-     * @return the updated project audit log
-     */
-    @Put("/{id}/no-look")
-    public ProjectAuditLog updateProjectAuditLogNoLook(@PathVariable UUID id, @Valid @Body ProjectAuditLog log) {
-        return projectAuditLogRepository.update(log.withId(id));
-    }
 
     /**
      * Deletes a project audit log by its ID after validating that it exists.
@@ -86,15 +75,4 @@ public class ProjectAuditLogController {
         projectAuditLogRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a project audit log by its ID without checking if it exists first.
-     * This method is provided because standard repositories do not throw an error if the ID does not already exist.
-     * Refer to the sister method {@link #deleteProjectAuditLog(UUID)} to delete with existence validation.
-     *
-     * @param id the ID of the project audit log to delete
-     */
-    @Delete("/{id}/no-look")
-    public void deleteProjectAuditLogNoLook(@PathVariable UUID id) {
-        projectAuditLogRepository.deleteById(id);
-    }
 }

@@ -4,6 +4,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -16,6 +17,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured("isAuthenticated()")
 @Controller("/users")
 public class UserController {
 
@@ -51,17 +53,16 @@ public class UserController {
      */
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body User user) {
-        User existingUser = userRepository.findById(id)
+        User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
-
-        // Copy over allowed fields, but retain strictly controlled fields
-        User safeUpdate = new User(
+        
+        User securePayload = new User(
                 id,
                 user.email(),
-                existingUser.role(), // Ignore the role from the request
-                existingUser.createdAt()
+                user.role(),
+                existing.createdAt()
         );
-        return userRepository.update(safeUpdate);
+        return userRepository.update(securePayload);
     }
 
     /**

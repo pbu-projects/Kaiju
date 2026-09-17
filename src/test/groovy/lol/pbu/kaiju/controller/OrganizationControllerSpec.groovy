@@ -13,7 +13,7 @@ import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
-import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
+import static lol.pbu.kaiju.model.VerificationStatus.*
 
 class OrganizationControllerSpec extends BaseControllerSpec {
 
@@ -168,16 +168,28 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         e.status.code == 404
     }
 
-    def "UPDATE | should handle update of non-existent organization gracefully when using no-look"() {
-        given: "a random non-existent ID and an update request"
-        def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, UNVERIFIED, null, [])
 
-        when: "a no-look update is attempted"
-        organizationController.updateOrganizationNoLook(nonExistentId, updateRequest)
+    @Unroll
+    def "UPDATE | should prevent mass assignment vulnerabilities: #testCase"(String testCase, Organization updatePayload, boolean shouldNameChange, VerificationStatus expectedStatus) {
+        given: "an existing organization"
+        def org = organizationRepository.save(new Organization(null, "Original Name", "https://example.com", null, true, UNVERIFIED, null, []))
+        UUID id = org.id()
 
-        then: "no exception is thrown"
-        noExceptionThrown()
+        when: "an update is submitted"
+        Organization updated = organizationController.updateOrganization(id, updatePayload)
+
+        then: "the safe fields are updated correctly"
+        updated.name() == (shouldNameChange ? updatePayload.name() : "Original Name")
+
+        and: "the sensitive fields are NOT updated"
+        updated.verificationStatus() == expectedStatus
+
+        where:
+        testCase                           | updatePayload                                                                                                           || shouldNameChange | expectedStatus
+        "Change safe field only"           | new Organization(null, "New Name", "https://example.com", null, true, UNVERIFIED, null, [])                             || true             | UNVERIFIED
+        "Attempt to escalate verification" | new Organization(null, "Original Name", "https://example.com", null, true, VERIFIED, null, [])                          || false            | UNVERIFIED
+        "Change safe and attempt escalate" | new Organization(null, "Hacked Name", "https://example.com", null, true, VERIFIED, null, [])                            || true             | UNVERIFIED
+        "Attempt to set REVOKED"          | new Organization(null, "Original Name", "https://example.com", null, true, REVOKED, null, [])                          || false            | UNVERIFIED
     }
 
     /********** DELETE Tests **********/
@@ -218,17 +230,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
         e.status.code == 404
-    }
-
-    def "DELETE | should handle deletion of non-existent organization gracefully when using no-look"() {
-        given: "a random non-existent ID"
-        def nonExistentId = UUID.randomUUID()
-
-        when: "a no-look delete is attempted"
-        organizationController.deleteOrganizationNoLook(nonExistentId)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
     }
 
     /********** LIST Tests **********/
