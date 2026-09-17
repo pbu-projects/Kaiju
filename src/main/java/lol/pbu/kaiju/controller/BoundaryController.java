@@ -63,8 +63,6 @@ public class BoundaryController {
         );
         return boundaryRepository.update(securePayload);
     }
-        return boundaryRepository.update(boundary.withId(id));
-    }
 
 
     /**

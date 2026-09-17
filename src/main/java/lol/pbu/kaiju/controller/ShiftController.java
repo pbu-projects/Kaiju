@@ -67,8 +67,6 @@ public class ShiftController {
         );
         return shiftRepository.update(securePayload);
     }
-        return shiftRepository.update(shift.withId(id));
-    }
 
 
     /**

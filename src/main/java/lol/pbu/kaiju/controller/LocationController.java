@@ -68,8 +68,6 @@ public class LocationController {
         );
         return locationRepository.update(securePayload);
     }
-        return locationRepository.update(location.withId(id));
-    }
 
 
     /**

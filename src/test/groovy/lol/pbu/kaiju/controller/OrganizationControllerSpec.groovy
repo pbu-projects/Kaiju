@@ -13,7 +13,9 @@ import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
-import static lol.pbu.kaiju.model.VerificationStatus.*
+import static lol.pbu.kaiju.model.VerificationStatus.REVOKED
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
+import static lol.pbu.kaiju.model.VerificationStatus.VERIFIED
 
 class OrganizationControllerSpec extends BaseControllerSpec {
 
@@ -167,6 +169,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def e = thrown(HttpStatusException)
         e.status.code == 404
     }
+
 
 
     @Unroll

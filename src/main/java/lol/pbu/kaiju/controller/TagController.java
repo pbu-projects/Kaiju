@@ -62,8 +62,6 @@ public class TagController {
         );
         return tagRepository.update(securePayload);
     }
-        return tagRepository.update(tag.withId(id));
-    }
 
 
     /**

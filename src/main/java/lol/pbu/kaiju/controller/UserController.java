@@ -53,16 +53,17 @@ public class UserController {
      */
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body User user) {
-        User existing = userRepository.findById(id)
+        User existingUser = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
-        
-        User securePayload = new User(
+
+        // Copy over allowed fields, but retain strictly controlled fields
+        User safeUpdate = new User(
                 id,
                 user.email(),
-                user.role(),
-                existing.createdAt()
+                existingUser.role(), // Ignore the role from the request
+                existingUser.createdAt()
         );
-        return userRepository.update(securePayload);
+        return userRepository.update(safeUpdate);
     }
 
     /**
