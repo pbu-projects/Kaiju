@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lol.pbu.kaiju.model.UserRole;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -24,7 +23,7 @@ public record User(
         String email,
 
         @NotNull(message = "User role is required.")
-        UserRole role,
+        String role,
         OffsetDateTime createdAt
 ) {
     /**

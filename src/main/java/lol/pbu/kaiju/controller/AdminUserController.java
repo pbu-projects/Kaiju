@@ -1,5 +1,5 @@
 package lol.pbu.kaiju.controller;
-import static lol.pbu.kaiju.security.SecurityRoles.GLOBAL_ADMIN;
+import static lol.pbu.kaiju.model.UserRole.GLOBAL_ADMIN;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.scheduling.TaskExecutors;

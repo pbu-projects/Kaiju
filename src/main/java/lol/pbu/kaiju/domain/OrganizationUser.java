@@ -3,7 +3,6 @@ package lol.pbu.kaiju.domain;
 import io.micronaut.data.annotation.EmbeddedId;
 import io.micronaut.data.annotation.MappedEntity;
 import jakarta.validation.constraints.NotNull;
-import lol.pbu.kaiju.model.OrganizationUserRole;
 
 @MappedEntity("organization_users")
 public record OrganizationUser(
@@ -11,7 +10,7 @@ public record OrganizationUser(
         OrganizationUserId id,
 
         @NotNull(message = "Organization user role is required.")
-        OrganizationUserRole role
+        String role
 ) {
     /**
      * Instead of using setters, this method gives the opportunity to take an existing composite ID and assign that to

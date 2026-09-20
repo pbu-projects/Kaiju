@@ -1,11 +1,9 @@
 package lol.pbu.kaiju.model;
 
-import io.micronaut.serde.annotation.Serdeable;
-
-@Serdeable
-public enum UserRole {
-    GLOBAL_ADMIN,
-    REGION_DIRECTOR,
-    REGION_AGENT,
-    STANDARD_USER
+public final class UserRole {
+    private UserRole() {}
+    public static final String GLOBAL_ADMIN = "GLOBAL_ADMIN";
+    public static final String REGION_DIRECTOR = "REGION_DIRECTOR";
+    public static final String REGION_AGENT = "REGION_AGENT";
+    public static final String STANDARD_USER = "STANDARD_USER";
 }

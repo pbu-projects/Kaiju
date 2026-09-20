@@ -10,14 +10,13 @@ import lol.pbu.kaiju.domain.User;
 
 import java.util.UUID;
 import io.micronaut.data.annotation.Id;
-import lol.pbu.kaiju.model.UserRole;
 
 @JdbcRepository(dialect = Dialect.POSTGRES)
 public interface UserRepository extends PageableRepository<User, UUID> {
     @NonNull
     CursoredPage<User> findAll(@NonNull CursoredPageable pageable);
 
-    void updateRole(@Id UUID id, UserRole role);
+    void updateRole(@Id UUID id, String role);
 
     java.util.Optional<User> findByEmail(String email);
 }

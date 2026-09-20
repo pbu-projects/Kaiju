@@ -1,9 +1,7 @@
 package lol.pbu.kaiju.model;
 
-import io.micronaut.serde.annotation.Serdeable;
-
-@Serdeable
-public enum RegionUserRole {
-    REGION_DIRECTOR,
-    REGION_AGENT
+public final class RegionUserRole {
+    private RegionUserRole() {}
+    public static final String REGION_DIRECTOR = "REGION_DIRECTOR";
+    public static final String REGION_AGENT = "REGION_AGENT";
 }

@@ -12,7 +12,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.model.UserRole;
+
 import lol.pbu.kaiju.repository.UserRepository;
 
 import java.time.OffsetDateTime;
@@ -52,7 +52,7 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             } else {
                 try {
                     // Attempt to create the user as a STANDARD_USER
-                    User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now(java.time.ZoneId.systemDefault()));
+                    User newUser = new User(null, email, lol.pbu.kaiju.model.UserRole.STANDARD_USER, OffsetDateTime.now(java.time.ZoneId.systemDefault()));
                     user = userRepository.save(newUser);
                 } catch (io.micronaut.data.exceptions.DataAccessException e) {
                     // If another thread just created them, fetch again
@@ -64,7 +64,7 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             // Using the user's UUID as the principal name is best practice since emails can change
             return AuthenticationResponse.success(
                     user.id().toString(),
-                    Collections.singletonList(user.role().name()),
+                    Collections.singletonList(user.role()),
                     Map.of("email", user.email())
             );
         });

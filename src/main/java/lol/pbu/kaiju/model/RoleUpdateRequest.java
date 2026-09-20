@@ -6,5 +6,5 @@ import jakarta.validation.constraints.NotNull;
 @Serdeable
 public record RoleUpdateRequest(
         @NotNull(message = "Role is required.")
-        UserRole role
+        String role
 ) {}

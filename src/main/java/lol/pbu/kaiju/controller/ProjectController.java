@@ -1,7 +1,7 @@
 package lol.pbu.kaiju.controller;
-import static lol.pbu.kaiju.security.SecurityRoles.IS_AUTHENTICATED;
-import static lol.pbu.kaiju.security.SecurityRoles.REGION_AGENT;
-import static lol.pbu.kaiju.security.SecurityRoles.REGION_DIRECTOR;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.model.UserRole.REGION_AGENT;
+import static lol.pbu.kaiju.model.UserRole.REGION_DIRECTOR;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;

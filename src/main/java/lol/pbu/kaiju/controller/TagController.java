@@ -1,5 +1,5 @@
 package lol.pbu.kaiju.controller;
-import static lol.pbu.kaiju.security.SecurityRoles.IS_AUTHENTICATED;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
