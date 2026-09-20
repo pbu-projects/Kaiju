@@ -1,13 +1,11 @@
 package lol.pbu.kaiju.controller;
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
-import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.repository.OrganizationRepository;
@@ -15,7 +13,10 @@ import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
+
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
+import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 @ExecuteOn(BLOCKING)
 @Secured(IS_AUTHENTICATED)

@@ -7,13 +7,14 @@ import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
+import lol.pbu.kaiju.TestFixtures
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectSearchCard
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
-import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.ProjectRepository
+import lol.pbu.kaiju.security.ProjectSecurityService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -22,16 +23,12 @@ import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import java.security.Principal
 
+import static io.micronaut.http.HttpStatus.BAD_REQUEST
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import java.util.UUID
-import lol.pbu.kaiju.security.ProjectSecurityService
-import java.security.Principal
-import lol.pbu.kaiju.TestFixtures
-import static io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
-import static io.micronaut.http.HttpStatus.BAD_REQUEST
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ProjectControllerSpec extends BaseControllerSpec {

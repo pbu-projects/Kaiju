@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -11,7 +10,6 @@ import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
-import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.ShiftRepository
 import spock.lang.Unroll
 
@@ -21,8 +19,6 @@ import java.time.OffsetDateTime
 import static java.time.temporal.ChronoUnit.SECONDS
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import lol.pbu.kaiju.model.ProjectStatus
-import lol.pbu.kaiju.model.ProjectType
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ShiftControllerSpec extends BaseControllerSpec {

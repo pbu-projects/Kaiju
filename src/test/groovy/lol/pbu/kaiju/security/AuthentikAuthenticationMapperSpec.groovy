@@ -1,7 +1,5 @@
 package lol.pbu.kaiju.security
 
-import reactor.core.publisher.Mono
-
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
@@ -13,7 +11,6 @@ import lol.pbu.kaiju.repository.UserRepository
 import spock.lang.Specification
 
 import java.time.OffsetDateTime
-import java.util.UUID
 
 @MicronautTest(transactional = true)
 class AuthentikAuthenticationMapperSpec extends Specification {

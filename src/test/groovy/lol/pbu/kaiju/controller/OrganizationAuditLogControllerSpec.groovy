@@ -9,12 +9,11 @@ import jakarta.validation.ValidationException
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.OrganizationAuditLog
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.model.UserRole
-import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.OrganizationAuditLogRepository
 import spock.lang.Unroll
 
 import java.time.OffsetDateTime
+
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class OrganizationAuditLogControllerSpec extends BaseControllerSpec {

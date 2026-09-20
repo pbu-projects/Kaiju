@@ -1,38 +1,35 @@
 package lol.pbu.kaiju.controller;
-import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
-import static lol.pbu.kaiju.model.UserRole.REGION_AGENT;
-import static lol.pbu.kaiju.model.UserRole.REGION_DIRECTOR;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
-
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
-import static io.micronaut.http.HttpStatus.BAD_REQUEST;
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
-import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
-
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.security.annotation.Secured;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectSearchCard;
+import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
+import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
-import lol.pbu.kaiju.model.ProjectStatus;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import java.security.Principal;
+
+import static io.micronaut.http.HttpStatus.*;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
+import static lol.pbu.kaiju.model.UserRole.REGION_AGENT;
+import static lol.pbu.kaiju.model.UserRole.REGION_DIRECTOR;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/projects")

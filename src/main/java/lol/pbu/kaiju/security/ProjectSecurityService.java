@@ -1,17 +1,17 @@
 package lol.pbu.kaiju.security;
 
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import jakarta.inject.Singleton;
-import lol.pbu.kaiju.model.ProjectStatus;
+import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
+import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 
 import java.util.UUID;
-import lol.pbu.kaiju.domain.Location;
+
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 
 @Singleton
 public class ProjectSecurityService {
@@ -42,15 +42,7 @@ public class ProjectSecurityService {
         boolean isOrgManager = queryRepository.isOrgManager(userId, organizationId);
 
         if (isOrgVerified && isOrgManager) {
-            // Must be entirely within Org Region
-            boolean allInOrgRegion = true;
-            for (Location loc : project.locations()) {
-                if (loc.geom() == null || !queryRepository.isPointInOrgRegion(organizationId, loc.geom().getX(), loc.geom().getY())) {
-                    allInOrgRegion = false;
-                    break;
-                }
-            }
-            if (allInOrgRegion) {
+            if (areAllLocationsInOrgRegion(project, organizationId)) {
                 return ACTIVE; // AUTO_APPROVED
             }
         }
@@ -58,14 +50,7 @@ public class ProjectSecurityService {
         // 2. Check if user is a REGION_AGENT
         boolean isRegionAgent = queryRepository.isRegionAgent(userId);
         if (isRegionAgent) {
-            boolean allInAssignedRegion = true;
-            for (Location loc : project.locations()) {
-                if (loc.geom() == null || !queryRepository.isPointInAgentAssignedRegion(userId, loc.geom().getX(), loc.geom().getY())) {
-                    allInAssignedRegion = false;
-                    break;
-                }
-            }
-            if (allInAssignedRegion) {
+            if (areAllLocationsInAssignedRegion(project, userId)) {
                 return ACTIVE; // AUTO_APPROVED
             }
             // A Region Agent posting outside their boundary (and not as a valid Org Manager) is strictly forbidden
@@ -74,6 +59,24 @@ public class ProjectSecurityService {
 
         // 3. Fallback to manual queue for Standard Users or Org Managers outside their bounds
         return PENDING; // REQUIRES_REGIONAL_APPROVAL
+    }
+
+    private boolean areAllLocationsInOrgRegion(Project project, UUID organizationId) {
+        for (Location loc : project.locations()) {
+            if (loc.geom() == null || !queryRepository.isPointInOrgRegion(organizationId, loc.geom().getX(), loc.geom().getY())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean areAllLocationsInAssignedRegion(Project project, UUID userId) {
+        for (Location loc : project.locations()) {
+            if (loc.geom() == null || !queryRepository.isPointInAgentAssignedRegion(userId, loc.geom().getX(), loc.geom().getY())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
