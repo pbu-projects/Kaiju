@@ -53,24 +53,7 @@ public class ShiftController implements ControllerUtils {
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
         checkExists(shiftRepository, id);
         
-        // We explicitly instantiate a new Shift rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        // We explicitly instantiate a new Shift rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        Shift securePayload = new Shift(
-                id,
-                shift.project(),
-                shift.isVirtual(),
-                shift.location(),
-                shift.startTime(),
-                shift.endTime(),
-                shift.tags()
-        );
-        return shiftRepository.update(securePayload);
+        return shiftRepository.update(shift.withId(id));
     }
 
 

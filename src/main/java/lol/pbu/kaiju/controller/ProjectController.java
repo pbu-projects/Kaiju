@@ -95,7 +95,7 @@ public class ProjectController {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
-        if (securityService.canModifyProject(userId, existing)) {
+        if (!securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to modify this project");
         }
         
@@ -127,7 +127,7 @@ public class ProjectController {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
-        if (securityService.canModifyProject(userId, existing)) {
+        if (!securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to delete this project");
         }
         

@@ -55,25 +55,7 @@ public class LocationController implements ControllerUtils {
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
         checkExists(locationRepository, id);
         
-        // We explicitly instantiate a new Location rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        // We explicitly instantiate a new Location rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        Location securePayload = new Location(
-                id,
-                location.name(),
-                location.addressLine(),
-                location.city(),
-                location.stateProvince(),
-                location.postalCode(),
-                location.countryCode(),
-                location.geom()
-        );
-        return locationRepository.update(securePayload);
+        return locationRepository.update(location.withId(id));
     }
 
 

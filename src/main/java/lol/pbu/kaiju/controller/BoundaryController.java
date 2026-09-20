@@ -54,16 +54,7 @@ public class BoundaryController implements ControllerUtils {
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
         checkExists(boundaryRepository, id);
         
-        // We explicitly instantiate a new Boundary rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        Boundary securePayload = new Boundary(
-                id,
-                boundary.name(),
-                boundary.geom()
-        );
-        return boundaryRepository.update(securePayload);
+        return boundaryRepository.update(boundary.withId(id));
     }
 
 

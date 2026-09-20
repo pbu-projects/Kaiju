@@ -53,19 +53,7 @@ public class TagController implements ControllerUtils {
     public Tag updateTag(@PathVariable UUID id, @Valid @Body Tag tag) {
         checkExists(tagRepository, id);
         
-        // We explicitly instantiate a new Tag rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        // We explicitly instantiate a new Tag rather than using a wither method.
-        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
-        // field (like createdAt) is added later, a wither method would blindly copy
-        // the user's unvalidated payload.
-        Tag securePayload = new Tag(
-                id,
-                tag.name()
-        );
-        return tagRepository.update(securePayload);
+        return tagRepository.update(tag.withId(id));
     }
 
 
