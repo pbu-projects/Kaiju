@@ -1,4 +1,5 @@
 package lol.pbu.kaiju.controller;
+import lol.pbu.kaiju.util.ExistenceValidator;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -10,6 +11,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.repository.BoundaryRepository;
+
 
 import java.util.Optional;
 import java.util.UUID;
@@ -52,6 +54,10 @@ public class BoundaryController implements ExistenceValidator {
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
         checkExists(boundaryRepository, id);
         
+        // We explicitly instantiate a new Boundary rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
         Boundary securePayload = new Boundary(
                 id,
                 boundary.name(),

@@ -10,6 +10,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.OrganizationAuditLog;
 import lol.pbu.kaiju.repository.OrganizationAuditLogRepository;
+import lol.pbu.kaiju.util.ExistenceValidator;
 
 import java.util.Optional;
 import java.util.UUID;

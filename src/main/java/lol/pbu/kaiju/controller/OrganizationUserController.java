@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.OrganizationUser;
 import lol.pbu.kaiju.domain.OrganizationUserId;
 import lol.pbu.kaiju.repository.OrganizationUserRepository;
+import lol.pbu.kaiju.util.ExistenceValidator;
 
 import java.util.Optional;
 import java.util.UUID;

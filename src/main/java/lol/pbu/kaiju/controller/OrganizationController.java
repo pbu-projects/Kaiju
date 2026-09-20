@@ -3,7 +3,6 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
@@ -12,6 +11,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.repository.OrganizationRepository;
+import lol.pbu.kaiju.util.ExistenceValidator;
 
 import java.util.Optional;
 import java.util.UUID;

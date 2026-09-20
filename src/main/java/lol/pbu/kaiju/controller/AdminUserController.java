@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.RoleUpdateRequest;
 import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.util.ExistenceValidator;
 
 import java.util.UUID;
 

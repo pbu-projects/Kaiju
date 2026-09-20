@@ -1,4 +1,5 @@
 package lol.pbu.kaiju.controller;
+import lol.pbu.kaiju.util.ExistenceValidator;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -52,6 +53,14 @@ public class ShiftController implements ExistenceValidator {
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
         checkExists(shiftRepository, id);
         
+        // We explicitly instantiate a new Shift rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
+        // We explicitly instantiate a new Shift rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
         Shift securePayload = new Shift(
                 id,
                 shift.project(),

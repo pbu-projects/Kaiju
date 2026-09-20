@@ -1,4 +1,5 @@
 package lol.pbu.kaiju.controller;
+import lol.pbu.kaiju.util.ExistenceValidator;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -10,6 +11,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.repository.LocationRepository;
+
 
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +55,14 @@ public class LocationController implements ExistenceValidator {
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
         checkExists(locationRepository, id);
         
+        // We explicitly instantiate a new Location rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
+        // We explicitly instantiate a new Location rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
         Location securePayload = new Location(
                 id,
                 location.name(),

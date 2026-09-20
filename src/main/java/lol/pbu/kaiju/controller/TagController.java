@@ -1,4 +1,5 @@
 package lol.pbu.kaiju.controller;
+import lol.pbu.kaiju.util.ExistenceValidator;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -52,6 +53,14 @@ public class TagController implements ExistenceValidator {
     public Tag updateTag(@PathVariable UUID id, @Valid @Body Tag tag) {
         checkExists(tagRepository, id);
         
+        // We explicitly instantiate a new Tag rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
+        // We explicitly instantiate a new Tag rather than using a wither method.
+        // This manual mapping prevents mass-assignment vulnerabilities. If a protected
+        // field (like createdAt) is added later, a wither method would blindly copy
+        // the user's unvalidated payload.
         Tag securePayload = new Tag(
                 id,
                 tag.name()

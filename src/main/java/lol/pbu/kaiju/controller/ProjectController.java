@@ -7,7 +7,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
-import io.micronaut.http.HttpStatus;
+
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.http.HttpStatus.BAD_REQUEST;
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
@@ -95,7 +95,7 @@ public class ProjectController {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
-        if (!securityService.canModifyProject(userId, existing)) {
+        if (securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to modify this project");
         }
         
@@ -127,7 +127,7 @@ public class ProjectController {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
-        if (!securityService.canModifyProject(userId, existing)) {
+        if (securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to delete this project");
         }
         
