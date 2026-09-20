@@ -76,7 +76,7 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         when: "the system evaluates the project creation request"
         def actualResult
         try {
-            actualResult = projectSecurityService.evaluateProjectCreation(userId, dummyProject)
+            actualResult = projectSecurityService.evaluateProjectCreationByUser(userId, dummyProject)
         } catch (io.micronaut.http.exceptions.HttpStatusException e) {
             actualResult = null
         }

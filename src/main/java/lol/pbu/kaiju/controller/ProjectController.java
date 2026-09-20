@@ -54,17 +54,16 @@ public class ProjectController {
 
     @Post
     @Secured(IS_AUTHENTICATED)
-    public Project addProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
+    public Project submitProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         if (project.organization() == null) {
             throw new HttpStatusException(BAD_REQUEST, "Organization is required");
         }
         
-        UUID userId = UUID.fromString(principal.getName());
+        UUID submitterId = UUID.fromString(principal.getName());
         
         // Evaluate the entire project's locations securely
-        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreation(userId, project);
+        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreationByUser(submitterId, project);
 
-        // Fix ID hijacking (force null ID for creation), fix mass assignment (force tracking fields)
         Project secureProject = new Project(
                 null, // Force auto-generation
                 project.organization(),

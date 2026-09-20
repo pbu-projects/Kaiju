@@ -38,14 +38,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
     ProjectController projectController
-
-    
-
     
     @Shared
     ProjectSecurityService projectSecurityService = new ProjectSecurityService(null) {
         @Override
-        ProjectStatus evaluateProjectCreation(UUID userId, Project project) {
+        ProjectStatus evaluateProjectCreationByUser(UUID userId, Project project) {
             return DRAFT
         }
         @Override
@@ -76,7 +73,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def newProject = TestFixtures.createBasicProject(org as Organization, "Test Project ${faker.company().name()}" as String, "Test Description ${faker.lorem().paragraph()}" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
 
         when: "the project is added"
-        Project saved = projectController.addProject(newProject, testPrincipal, projectSecurityService)
+        Project saved = projectController.submitProject(newProject, testPrincipal, projectSecurityService)
 
         then: "the project is persisted with a generated ID"
         verifyAll {
@@ -104,7 +101,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def controller = new ProjectController(projectRepository)
 
         when:
-        controller.addProject(project, testPrincipal, projectSecurityService)
+        controller.submitProject(project, testPrincipal, projectSecurityService)
 
         then:
         def e = thrown(HttpStatusException)
@@ -114,7 +111,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should fail to save project with invalid data: #testCase"(String testCase, Project project) {
         when: "an attempt is made to add a project with invalid data"
-        projectController.addProject(project, testPrincipal, projectSecurityService)
+        projectController.submitProject(project, testPrincipal, projectSecurityService)
 
         then: "an exception is thrown"
         thrown(ValidationException)
@@ -152,7 +149,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve an existing project by ID"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.addProject(TestFixtures.createBasicProject(org as Organization, "Test Project Read" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
+        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Test Project Read" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
         UUID id = project.id()
 
         when: "the project is requested by its ID"
@@ -177,7 +174,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve projects by title"() {
         given: "an existing project's title from the database"
         def org = getRandomOrganization()
-        def project = projectController.addProject(TestFixtures.createBasicProject(org as Organization, "Searchable Title ${faker.number().digits(5)}" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
+        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Searchable Title ${faker.number().digits(5)}" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
         def targetTitle = project.title()
 
         when: "projects are searched by this title"
@@ -195,7 +192,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing project"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.addProject(TestFixtures.createBasicProject(org as Organization, "Original Project Title" as String, "Original Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
+        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Original Project Title" as String, "Original Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
         UUID id = project.id()
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description ${faker.lorem().paragraph()}"
@@ -241,7 +238,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a new project to be deleted"
         def org = getRandomOrganization()
         def tempProject = TestFixtures.createBasicProject(org as Organization, "Temporary Project to Delete" as String, "Temporary Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
-        def saved = projectController.addProject(tempProject, testPrincipal, projectSecurityService)
+        def saved = projectController.submitProject(tempProject, testPrincipal, projectSecurityService)
         UUID id = saved.id()
         assert projectRepository.existsById(id)
 

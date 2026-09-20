@@ -1,7 +1,5 @@
 package lol.pbu.kaiju.security;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.authentication.AuthenticationResponse;
@@ -13,6 +11,8 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.repository.UserRepository;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.time.OffsetDateTime;

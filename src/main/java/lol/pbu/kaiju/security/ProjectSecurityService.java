@@ -26,7 +26,7 @@ public class ProjectSecurityService {
      * Core Security Matrix logic that evaluates if a user can create a project at a specific location,
      * and whether it should be AUTO_APPROVED or placed in the REQUIRES_REGIONAL_APPROVAL queue.
      */
-    public ProjectStatus evaluateProjectCreation(UUID userId, Project project) {
+    public ProjectStatus evaluateProjectCreationByUser(UUID userId, Project project) {
         UUID organizationId = project.organization() != null ? project.organization().id() : null;
         if (organizationId == null) {
             return PENDING;
@@ -38,13 +38,10 @@ public class ProjectSecurityService {
         }
 
         // 1. Check Org Manager permissions first
-        boolean isOrgVerified = queryRepository.isOrgVerified(organizationId);
-        boolean isOrgManager = queryRepository.isOrgManager(userId, organizationId);
-
-        if (isOrgVerified && isOrgManager) {
-            if (areAllLocationsInOrgRegion(project, organizationId)) {
-                return ACTIVE; // AUTO_APPROVED
-            }
+        if (queryRepository.isOrgVerified(organizationId) &&
+                queryRepository.isOrgManager(userId, organizationId) &&
+                areAllLocationsInOrgRegion(project, organizationId)) {
+            return ACTIVE; // AUTO_APPROVED
         }
 
         // 2. Check if user is a REGION_AGENT

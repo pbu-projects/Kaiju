@@ -1,11 +1,11 @@
 package lol.pbu.kaiju.repository;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.data.annotation.Join;
 import io.micronaut.data.annotation.Query;
 import io.micronaut.data.annotation.TypeDef;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
 import io.micronaut.data.model.DataType;
-import io.micronaut.data.model.query.builder.sql.Dialect;
 import io.micronaut.data.repository.PageableRepository;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.JtsPointConverter;
@@ -15,12 +15,15 @@ import org.locationtech.jts.geom.Point;
 import java.util.Optional;
 import java.util.UUID;
 
-@JdbcRepository(dialect = Dialect.POSTGRES)
+import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
+
+@JdbcRepository(dialect = POSTGRES)
 public interface ProjectRepository extends PageableRepository<Project, UUID>{
 
     @Override
     @Join("organization")
-    Optional<Project> findById(UUID id);
+    @NonNull
+    Optional<Project> findById(@NonNull UUID id);
 
     @Join("organization")
     io.micronaut.data.model.CursoredPage<Project> findByTitle(String title, io.micronaut.data.model.CursoredPageable pageable);
