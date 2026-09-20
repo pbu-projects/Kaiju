@@ -1,11 +1,10 @@
 package lol.pbu.kaiju.controller;
+import static lol.pbu.kaiju.security.SecurityRoles.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
 import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
@@ -14,10 +13,9 @@ import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 
 import java.util.Optional;
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/administrative-regions")
 public class AdministrativeRegionController implements ExistenceValidator {
 

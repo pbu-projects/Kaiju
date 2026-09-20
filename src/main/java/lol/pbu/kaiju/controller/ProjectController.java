@@ -1,4 +1,7 @@
 package lol.pbu.kaiju.controller;
+import static lol.pbu.kaiju.security.SecurityRoles.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.security.SecurityRoles.REGION_AGENT;
+import static lol.pbu.kaiju.security.SecurityRoles.REGION_DIRECTOR;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
@@ -8,7 +11,6 @@ import io.micronaut.http.HttpStatus;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.http.HttpStatus.BAD_REQUEST;
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED;
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 
@@ -54,7 +56,7 @@ public class ProjectController {
     }
 
     @Post
-    @Secured("isAuthenticated()")
+    @Secured(IS_AUTHENTICATED)
     public Project addProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         if (project.organization() == null) {
             throw new HttpStatusException(BAD_REQUEST, "Organization is required");
@@ -88,7 +90,7 @@ public class ProjectController {
      * Updates an existing project by its ID after validating that it exists.
      */
     @Put("/{id}")
-    @Secured("isAuthenticated()")
+    @Secured(IS_AUTHENTICATED)
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
@@ -120,7 +122,7 @@ public class ProjectController {
      * Deletes a project by its ID after validating that it exists.
      */
     @Delete("/{id}")
-    @Secured("isAuthenticated()")
+    @Secured(IS_AUTHENTICATED)
     public void deleteProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
@@ -160,7 +162,7 @@ public class ProjectController {
      * The service layer enforces that the Regional Admin actually has geographic jurisdiction.
      */
     @Put("/{id}/status")
-    @Secured({"REGION_AGENT", "REGION_DIRECTOR"})
+    @Secured({REGION_AGENT, REGION_DIRECTOR})
     public Project approveProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         

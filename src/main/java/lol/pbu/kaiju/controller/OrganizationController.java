@@ -1,4 +1,5 @@
 package lol.pbu.kaiju.controller;
+import static lol.pbu.kaiju.security.SecurityRoles.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
@@ -17,7 +18,7 @@ import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/organizations")
 public class OrganizationController implements ExistenceValidator {
 
