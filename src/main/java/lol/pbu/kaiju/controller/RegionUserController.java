@@ -20,7 +20,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/region-users")
-public class RegionUserController {
+public class RegionUserController implements ExistenceValidator {
 
     private final RegionUserRepository regionUserRepository;
 
@@ -46,28 +46,15 @@ public class RegionUserController {
     @Put("/{userId}/{regionId}")
     public RegionUser updateRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId, @Valid @Body RegionUser user) {
         RegionUserId id = new RegionUserId(userId, regionId);
-        if (!regionUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Region user not found");
-        }
+        checkExists(regionUserRepository, id);
         return regionUserRepository.update(user.withId(id));
     }
 
-    @Put("/{userId}/{regionId}/no-look")
-    public RegionUser updateRegionUserNoLook(@PathVariable UUID userId, @PathVariable UUID regionId, @Valid @Body RegionUser user) {
-        return regionUserRepository.update(user.withId(new RegionUserId(userId, regionId)));
-    }
-
-    @Delete("/{userId}/{regionId}")
+@Delete("/{userId}/{regionId}")
     public void deleteRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId) {
         RegionUserId id = new RegionUserId(userId, regionId);
-        if (!regionUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Region user not found");
-        }
+        checkExists(regionUserRepository, id);
         regionUserRepository.deleteById(id);
     }
 
-    @Delete("/{userId}/{regionId}/no-look")
-    public void deleteRegionUserNoLook(@PathVariable UUID userId, @PathVariable UUID regionId) {
-        regionUserRepository.deleteById(new RegionUserId(userId, regionId));
-    }
 }

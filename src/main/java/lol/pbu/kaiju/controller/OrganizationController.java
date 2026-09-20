@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/organizations")
-public class OrganizationController {
+public class OrganizationController implements ExistenceValidator {
 
     private final OrganizationRepository organizationRepository;
 
@@ -77,9 +77,7 @@ public class OrganizationController {
      */
     @Delete("/{id}")
     public void deleteOrganization(@PathVariable UUID id) {
-        if (!organizationRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization not found");
-        }
+        checkExists(organizationRepository, id);
         organizationRepository.deleteById(id);
     }
 

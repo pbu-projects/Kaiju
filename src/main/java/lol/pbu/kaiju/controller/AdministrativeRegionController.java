@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/administrative-regions")
-public class AdministrativeRegionController {
+public class AdministrativeRegionController implements ExistenceValidator {
 
     private final AdministrativeRegionRepository administrativeRegionRepository;
 
@@ -44,17 +44,13 @@ public class AdministrativeRegionController {
 
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body AdministrativeRegion region) {
-        if (!administrativeRegionRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
-        }
+        checkExists(administrativeRegionRepository, id);
         return administrativeRegionRepository.update(region.withId(id));
     }
 
     @Delete("/{id}")
     public void deleteAdministrativeRegion(@PathVariable UUID id) {
-        if (!administrativeRegionRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
-        }
+        checkExists(administrativeRegionRepository, id);
         administrativeRegionRepository.deleteById(id);
     }
 }

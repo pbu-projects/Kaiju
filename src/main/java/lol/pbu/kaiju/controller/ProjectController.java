@@ -115,15 +115,6 @@ public class ProjectController {
         return projectRepository.update(secureProject);
     }
 
-    /**
-     * Updates a project by its ID without checking if it exists first.
-     */
-    @Put("/{id}/no-look")
-    @Secured("isAuthenticated()")
-    public Project updateProjectNoLook(@PathVariable UUID id, @Valid @Body Project project) {
-        // Disabled for security, redirect to safe method
-        throw new HttpStatusException(METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
-    }
 
     /**
      * Deletes a project by its ID after validating that it exists.
@@ -141,15 +132,6 @@ public class ProjectController {
         projectRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a project by its ID without checking if it exists first.
-     */
-    @Delete("/{id}/no-look")
-    @Secured("isAuthenticated()")
-    public void deleteProjectNoLook(@PathVariable UUID id) {
-        // Disabled for security
-        throw new HttpStatusException(METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
-    }
 
     /**
      * Searches active projects by their closest location coordinates within a given radius.

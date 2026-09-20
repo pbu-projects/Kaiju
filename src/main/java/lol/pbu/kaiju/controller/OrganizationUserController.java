@@ -20,7 +20,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/organization-users")
-public class OrganizationUserController {
+public class OrganizationUserController implements ExistenceValidator {
 
     private final OrganizationUserRepository organizationUserRepository;
 
@@ -46,28 +46,16 @@ public class OrganizationUserController {
     @Put("/{userId}/{organizationId}")
     public OrganizationUser updateOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId, @Valid @Body OrganizationUser user) {
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        if (!organizationUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization user not found");
-        }
+        checkExists(organizationUserRepository, id);
         return organizationUserRepository.update(user.withId(id));
     }
 
-    @Put("/{userId}/{organizationId}/no-look")
-    public OrganizationUser updateOrganizationUserNoLook(@PathVariable UUID userId, @PathVariable UUID organizationId, @Valid @Body OrganizationUser user) {
-        return organizationUserRepository.update(user.withId(new OrganizationUserId(userId, organizationId)));
-    }
+
 
     @Delete("/{userId}/{organizationId}")
     public void deleteOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId) {
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        if (!organizationUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization user not found");
-        }
+        checkExists(organizationUserRepository, id);
         organizationUserRepository.deleteById(id);
-    }
-
-    @Delete("/{userId}/{organizationId}/no-look")
-    public void deleteOrganizationUserNoLook(@PathVariable UUID userId, @PathVariable UUID organizationId) {
-        organizationUserRepository.deleteById(new OrganizationUserId(userId, organizationId));
     }
 }

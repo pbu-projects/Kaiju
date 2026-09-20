@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/tags")
-public class TagController {
+public class TagController implements ExistenceValidator {
 
     private final TagRepository tagRepository;
 
@@ -52,9 +52,7 @@ public class TagController {
      */
     @Put("/{id}")
     public Tag updateTag(@PathVariable UUID id, @Valid @Body Tag tag) {
-        if (!tagRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Tag not found");
-        }
+        checkExists(tagRepository, id);
         
         Tag securePayload = new Tag(
                 id,
@@ -72,9 +70,7 @@ public class TagController {
      */
     @Delete("/{id}")
     public void deleteTag(@PathVariable UUID id) {
-        if (!tagRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Tag not found");
-        }
+        checkExists(tagRepository, id);
         tagRepository.deleteById(id);
     }
 

@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/users")
-public class UserController {
+public class UserController implements ExistenceValidator {
 
     private final UserRepository userRepository;
 
@@ -74,9 +74,7 @@ public class UserController {
      */
     @Delete("/{id}")
     public void deleteUser(@PathVariable UUID id) {
-        if (!userRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "User not found");
-        }
+        checkExists(userRepository, id);
         userRepository.deleteById(id);
     }
 }

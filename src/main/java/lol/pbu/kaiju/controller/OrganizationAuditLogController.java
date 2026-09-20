@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/organization-audit-logs")
-public class OrganizationAuditLogController {
+public class OrganizationAuditLogController implements ExistenceValidator {
 
     private final OrganizationAuditLogRepository organizationAuditLogRepository;
 
@@ -44,17 +44,13 @@ public class OrganizationAuditLogController {
 
     @Put("/{id}")
     public OrganizationAuditLog updateOrganizationAuditLog(@PathVariable UUID id, @Valid @Body OrganizationAuditLog log) {
-        if (!organizationAuditLogRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization audit log not found");
-        }
+        checkExists(organizationAuditLogRepository, id);
         return organizationAuditLogRepository.update(log.withId(id));
     }
 
     @Delete("/{id}")
     public void deleteOrganizationAuditLog(@PathVariable UUID id) {
-        if (!organizationAuditLogRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization audit log not found");
-        }
+        checkExists(organizationAuditLogRepository, id);
         organizationAuditLogRepository.deleteById(id);
     }
 }

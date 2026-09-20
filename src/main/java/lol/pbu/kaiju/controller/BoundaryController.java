@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/boundaries")
-public class BoundaryController {
+public class BoundaryController implements ExistenceValidator {
 
     private final BoundaryRepository boundaryRepository;
 
@@ -52,9 +52,7 @@ public class BoundaryController {
      */
     @Put("/{id}")
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
-        if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
-        }
+        checkExists(boundaryRepository, id);
         
         Boundary securePayload = new Boundary(
                 id,
@@ -73,9 +71,7 @@ public class BoundaryController {
      */
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id) {
-        if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
-        }
+        checkExists(boundaryRepository, id);
         boundaryRepository.deleteById(id);
     }
 

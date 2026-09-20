@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/shifts")
-public class ShiftController {
+public class ShiftController implements ExistenceValidator {
 
     private final ShiftRepository shiftRepository;
 
@@ -52,9 +52,7 @@ public class ShiftController {
      */
     @Put("/{id}")
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
-        if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Shift not found");
-        }
+        checkExists(shiftRepository, id);
         
         Shift securePayload = new Shift(
                 id,
@@ -77,9 +75,7 @@ public class ShiftController {
      */
     @Delete("/{id}")
     public void deleteShift(@PathVariable UUID id) {
-        if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Shift not found");
-        }
+        checkExists(shiftRepository, id);
         shiftRepository.deleteById(id);
     }
 

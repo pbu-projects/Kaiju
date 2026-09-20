@@ -19,7 +19,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured("isAuthenticated()")
 @Controller("/locations")
-public class LocationController {
+public class LocationController implements ExistenceValidator {
 
     private final LocationRepository locationRepository;
 
@@ -52,9 +52,7 @@ public class LocationController {
      */
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
-        if (!locationRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Location not found");
-        }
+        checkExists(locationRepository, id);
         
         Location securePayload = new Location(
                 id,
@@ -78,9 +76,7 @@ public class LocationController {
      */
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id) {
-        if (!locationRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Location not found");
-        }
+        checkExists(locationRepository, id);
         locationRepository.deleteById(id);
     }
 
