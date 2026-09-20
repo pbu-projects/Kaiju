@@ -11,7 +11,7 @@ import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.OrganizationUser;
 import lol.pbu.kaiju.domain.OrganizationUserId;
 import lol.pbu.kaiju.repository.OrganizationUserRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organization-users")
-public class OrganizationUserController implements ExistenceValidator {
+public class OrganizationUserController implements ControllerUtils {
 
     private final OrganizationUserRepository organizationUserRepository;
 

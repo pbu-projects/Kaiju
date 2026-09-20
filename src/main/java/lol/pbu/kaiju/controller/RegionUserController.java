@@ -11,7 +11,7 @@ import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.RegionUser;
 import lol.pbu.kaiju.domain.RegionUserId;
 import lol.pbu.kaiju.repository.RegionUserRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -19,7 +19,7 @@ import java.util.UUID;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/region-users")
-public class RegionUserController implements ExistenceValidator {
+public class RegionUserController implements ControllerUtils {
 
     private final RegionUserRepository regionUserRepository;
 

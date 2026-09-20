@@ -1,24 +1,24 @@
 package lol.pbu.kaiju.controller;
+import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.*;
 import io.micronaut.security.annotation.Secured;
-import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.OrganizationAuditLog;
 import lol.pbu.kaiju.repository.OrganizationAuditLogRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organization-audit-logs")
-public class OrganizationAuditLogController implements ExistenceValidator {
+public class OrganizationAuditLogController implements ControllerUtils {
 
     private final OrganizationAuditLogRepository organizationAuditLogRepository;
 

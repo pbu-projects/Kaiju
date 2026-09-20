@@ -1,22 +1,22 @@
 package lol.pbu.kaiju.controller;
+import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static lol.pbu.kaiju.model.UserRole.GLOBAL_ADMIN;
 
 import io.micronaut.http.annotation.*;
-import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.RoleUpdateRequest;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.UUID;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(BLOCKING)
 @Controller("/admin/users")
 @Secured(GLOBAL_ADMIN)
-public class AdminUserController implements ExistenceValidator {
+public class AdminUserController implements ControllerUtils {
 
     private final UserRepository userRepository;
 

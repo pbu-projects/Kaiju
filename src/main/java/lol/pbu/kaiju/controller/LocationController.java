@@ -1,5 +1,5 @@
 package lol.pbu.kaiju.controller;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -20,7 +20,7 @@ import java.util.UUID;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/locations")
-public class LocationController implements ExistenceValidator {
+public class LocationController implements ControllerUtils {
 
     private final LocationRepository locationRepository;
 

@@ -10,7 +10,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.ProjectAuditLog;
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/project-audit-logs")
-public class ProjectAuditLogController implements ExistenceValidator {
+public class ProjectAuditLogController implements ControllerUtils {
 
     private final ProjectAuditLogRepository projectAuditLogRepository;
 

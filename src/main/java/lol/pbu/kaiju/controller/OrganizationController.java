@@ -1,4 +1,5 @@
 package lol.pbu.kaiju.controller;
+import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -6,21 +7,20 @@ import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.*;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.repository.OrganizationRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organizations")
-public class OrganizationController implements ExistenceValidator {
+public class OrganizationController implements ControllerUtils {
 
     private final OrganizationRepository organizationRepository;
 

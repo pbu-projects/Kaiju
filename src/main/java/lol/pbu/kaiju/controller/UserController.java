@@ -11,7 +11,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +20,7 @@ import static io.micronaut.http.HttpStatus.NOT_FOUND;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/users")
-public class UserController implements ExistenceValidator {
+public class UserController implements ControllerUtils {
 
     private final UserRepository userRepository;
 

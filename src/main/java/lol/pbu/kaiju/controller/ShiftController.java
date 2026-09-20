@@ -1,5 +1,5 @@
 package lol.pbu.kaiju.controller;
-import lol.pbu.kaiju.util.ExistenceValidator;
+import lol.pbu.kaiju.util.ControllerUtils;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 import io.micronaut.data.model.CursoredPage;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/shifts")
-public class ShiftController implements ExistenceValidator {
+public class ShiftController implements ControllerUtils {
 
     private final ShiftRepository shiftRepository;
 
