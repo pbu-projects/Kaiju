@@ -54,3 +54,23 @@ This test plan outlines the scenarios required to validate the migration to the 
 - [ ] **Delete Active Project (Admin):** A `GLOBAL_ADMIN` deletes an `ACTIVE` project.
   - **Expected:** `200 OK`.
 
+
+## 7. Organization & Regional Role Distinctions (Vertical IDOR)
+**Objective:** Verify granular access differences between levels of administration within the same hierarchy.
+- [ ] **Regional Deletions:** A `REGION_AGENT` attempts to delete a project in their region (`403 Forbidden`). A `REGION_DIRECTOR` attempts the same (`200 OK`).
+- [ ] **Org Verification:** A `REGION_AGENT` attempts to verify an Organization (`403 Forbidden`). A `REGION_DIRECTOR` attempts to verify an Organization in their region (`200 OK`).
+- [ ] **Org Manager vs Admin Scope:** An `ORG_MANAGER` attempts to edit an org project *not* explicitly assigned to them (`403 Forbidden`). An `ORG_ADMIN` attempts the same (`200 OK`).
+- [ ] **Org Sponsor Limitations:** An `ORG_SPONSOR` attempts to edit project parameters (`403 Forbidden`), but can manage volunteers (`200 OK`).
+
+## 8. Cross-Organization IDOR (Horizontal Access)
+**Objective:** Ensure organizational boundaries are strictly enforced for organization-level administrators.
+- [ ] **Cross-Org Modification:** An `ORG_ADMIN` for "Org A" attempts to edit the profile or manage users for "Org B".
+  - **Expected:** `403 Forbidden`.
+
+## 9. Untested Business Workflows & Edge Cases
+**Objective:** Ensure remaining functional workflows are secured according to the matrix.
+- [ ] **Virtual Project Geography Injection:** An attacker attempts to add geographic locations to an already `ACTIVE` virtual project.
+  - **Expected:** Update is rejected, or the project is demoted to `PENDING` for regional review.
+- [ ] **Project Reassignment:** A `STANDARD_USER` attempts to reassign a project's ownership.
+  - **Expected:** `403 Forbidden` (Only applicable admins can reassign).
+- [ ] **User Management/Banning:** A `REGION_DIRECTOR` attempts to ban or delete a user (`403 Forbidden`). A `GLOBAL_ADMIN` attempts the same (`200 OK`).
