@@ -40,7 +40,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     ProjectController projectController
     
     @Shared
-    ProjectSecurityService projectSecurityService = new ProjectSecurityService(null) {
+    ProjectSecurityService projectSecurityService = new ProjectSecurityService(null, null) {
         @Override
         ProjectStatus evaluateProjectCreationByUser(UUID userId, Project project) {
             return DRAFT
