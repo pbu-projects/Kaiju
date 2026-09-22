@@ -7,7 +7,7 @@ import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+
 
 import java.util.UUID;
 
