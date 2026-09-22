@@ -1,11 +1,11 @@
 package lol.pbu.kaiju.repository;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.repository.PageableRepository;
 import lol.pbu.kaiju.domain.Tag;
+import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
