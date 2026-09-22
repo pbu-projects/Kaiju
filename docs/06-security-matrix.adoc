@@ -59,7 +59,7 @@ This matrix defines the specific permissions and notification routing for each r
 
 | **Projects (Listings)**
 | Maintain/Edit all Org projects
-| Maintain/Edit assigned projects
+| Maintain/Edit all Org projects (Assignment scoping is handled via Layer 2 algorithms, not base RBAC)
 | Read-only
 | Read-only
 | Alerts when project status changes (e.g., Active -> Pending).

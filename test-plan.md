@@ -59,7 +59,6 @@ This test plan outlines the scenarios required to validate the migration to the 
 **Objective:** Verify granular access differences between levels of administration within the same hierarchy.
 - [ ] **Regional Deletions:** A `REGION_AGENT` attempts to delete a project in their region (`403 Forbidden`). A `REGION_DIRECTOR` attempts the same (`200 OK`).
 - [ ] **Org Verification:** A `REGION_AGENT` attempts to verify an Organization (`403 Forbidden`). A `REGION_DIRECTOR` attempts to verify an Organization in their region (`200 OK`).
-- [ ] **Org Manager vs Admin Scope:** An `ORG_MANAGER` attempts to edit an org project *not* explicitly assigned to them (`403 Forbidden`). An `ORG_ADMIN` attempts the same (`200 OK`).
 - [ ] **Org Sponsor Limitations:** An `ORG_SPONSOR` attempts to edit project parameters (`403 Forbidden`), but can manage volunteers (`200 OK`).
 
 ## 8. Cross-Organization IDOR (Horizontal Access)
