@@ -82,4 +82,28 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         and: "their new database UUID was used as the session ID"
         response.getAuthentication().get().getName() == dbUser.id().toString()
     }
+
+    def "should recover gracefully when a concurrent insert causes a DataAccessException"() {
+        given: "a user who is pre-created in db to simulate a race condition"
+        String email = "race-${UUID.randomUUID()}@example.com"
+        User preExisting = userRepository.save(new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now()))
+
+        and: "a mock UserRepository that simulates a constraint violation on save, then finds the user"
+        UserRepository mockRepo = Mock()
+        mockRepo.findByEmail(email) >>> [Optional.empty(), Optional.of(preExisting)]
+        mockRepo.save(_) >> { throw new io.micronaut.data.exceptions.DataAccessException("duplicate key") }
+
+        and: "a mapper using the mock repository"
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockRepo)
+        OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login during the race condition"
+        def publisher = testMapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = reactor.core.publisher.Mono.from(publisher).block()
+
+        then: "authentication succeeds by recovering the user from the second fetch"
+        response.isAuthenticated()
+        response.getAuthentication().get().getName() == preExisting.id().toString()
+    }
 }
