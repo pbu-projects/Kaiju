@@ -7,7 +7,6 @@ import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.security.Permission;
 
 import java.util.UUID;
@@ -86,7 +85,7 @@ public class ProjectSecurityService {
      * Simple implementation: Must be Org Manager of the project's org.
      */
     public boolean canModifyProject(UUID userId, Project project) {
-        var user = userRepository.findById(userId).orElseThrow();
+        var user = userRepository.findById(userId).orElseThrow(() -> new io.micronaut.http.exceptions.HttpStatusException(io.micronaut.http.HttpStatus.NOT_FOUND, "User not found"));
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
@@ -99,7 +98,7 @@ public class ProjectSecurityService {
      * Enforces that only a REGION_AGENT whose boundary intersects ALL project locations can approve it.
      */
     public void authorizeRegionalAdminApproval(UUID regionalAdminId, UUID projectId) {
-        var user = userRepository.findById(regionalAdminId).orElseThrow();
+        var user = userRepository.findById(regionalAdminId).orElseThrow(() -> new io.micronaut.http.exceptions.HttpStatusException(io.micronaut.http.HttpStatus.NOT_FOUND, "User not found"));
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return;
         }

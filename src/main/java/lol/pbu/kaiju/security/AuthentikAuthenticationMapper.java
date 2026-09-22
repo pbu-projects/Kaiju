@@ -16,7 +16,6 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.time.OffsetDateTime;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -58,7 +57,7 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
                     user = userRepository.save(newUser);
                 } catch (io.micronaut.data.exceptions.DataAccessException e) {
                     // If another thread just created them, fetch again
-                    user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("Failed to fetch user after constraint violation", e));
+                    user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalStateException("Failed to fetch user after constraint violation", e));
                 }
             }
 
