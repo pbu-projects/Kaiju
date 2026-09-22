@@ -53,7 +53,7 @@ class UserControllerSpec extends BaseControllerSpec {
         verifyAll(result) {
             saved.id() == id
             saved.email() == email
-            saved.role() == role
+            saved.role().name() == role
         }
     }
 
@@ -86,7 +86,7 @@ class UserControllerSpec extends BaseControllerSpec {
                 def u = new User(
                         null,
                         props.email as String,
-                        props.role as String,
+                        props.role as UserRole,
                         OffsetDateTime.now()
                 )
                 [invalidCase.caseName, u]

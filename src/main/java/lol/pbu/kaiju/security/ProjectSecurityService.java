@@ -6,6 +6,9 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
+import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.model.UserRole;
+import lol.pbu.kaiju.security.Permission;
 
 import java.util.UUID;
 
@@ -17,9 +20,11 @@ import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 public class ProjectSecurityService {
 
     private final SecurityQueryRepository queryRepository;
+    private final UserRepository userRepository;
 
-    public ProjectSecurityService(SecurityQueryRepository queryRepository) {
+    public ProjectSecurityService(SecurityQueryRepository queryRepository, UserRepository userRepository) {
         this.queryRepository = queryRepository;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -81,6 +86,11 @@ public class ProjectSecurityService {
      * Simple implementation: Must be Org Manager of the project's org.
      */
     public boolean canModifyProject(UUID userId, Project project) {
+        var user = userRepository.findById(userId).orElseThrow();
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return true;
+        }
+        
         if (project.organization() == null) return false;
         return queryRepository.isOrgManager(userId, project.organization().id());
     }
@@ -89,6 +99,11 @@ public class ProjectSecurityService {
      * Enforces that only a REGION_AGENT whose boundary intersects ALL project locations can approve it.
      */
     public void authorizeRegionalAdminApproval(UUID regionalAdminId, UUID projectId) {
+        var user = userRepository.findById(regionalAdminId).orElseThrow();
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return;
+        }
+
         boolean hasJurisdiction = queryRepository.hasJurisdictionOverAllProjectLocations(regionalAdminId, projectId);
         if (!hasJurisdiction) {
             throw new HttpStatusException(FORBIDDEN, "You do not have geographic jurisdiction to approve this project.");

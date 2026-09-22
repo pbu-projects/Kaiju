@@ -10,6 +10,7 @@ import org.jspecify.annotations.NonNull;
 
 import java.util.Optional;
 import java.util.UUID;
+import lol.pbu.kaiju.model.UserRole;
 
 import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
 
@@ -18,7 +19,7 @@ public interface UserRepository extends PageableRepository<User, UUID> {
     @NonNull
     CursoredPage<User> findAll(@NonNull CursoredPageable pageable);
 
-    void updateRole(@Id UUID id, String role);
+    void updateRole(@Id UUID id, UserRole role);
 
     Optional<User> findByEmail(String email);
 }

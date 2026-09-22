@@ -1,6 +1,7 @@
 package lol.pbu.kaiju.domain;
 
 import io.micronaut.data.annotation.EmbeddedId;
+import lol.pbu.kaiju.model.RegionUserRole;
 import io.micronaut.data.annotation.MappedEntity;
 import jakarta.validation.constraints.NotNull;
 
@@ -10,7 +11,7 @@ public record RegionUser(
         RegionUserId id,
 
         @NotNull(message = "Region user role is required.")
-        String role
+        RegionUserRole role
 ) {
     /**
      * Instead of using setters, this method gives the opportunity to take an existing composite ID and assign that to

@@ -28,8 +28,8 @@ import static io.micronaut.http.HttpStatus.*;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
-import static lol.pbu.kaiju.model.UserRole.REGION_AGENT;
-import static lol.pbu.kaiju.model.UserRole.REGION_DIRECTOR;
+import static lol.pbu.kaiju.security.Permission.PROJECT_APPROVE_CLAIM;
+
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/projects")
@@ -158,7 +158,7 @@ public class ProjectController {
      * The service layer enforces that the Regional Admin actually has geographic jurisdiction.
      */
     @Put("/{id}/status")
-    @Secured({REGION_AGENT, REGION_DIRECTOR})
+    @Secured(PROJECT_APPROVE_CLAIM)
     public Project approveProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         

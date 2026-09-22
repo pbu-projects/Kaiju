@@ -37,7 +37,7 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
         if (!userRow) {
             throw new IllegalStateException("No users found in database to link audit log to.")
         }
-        new User(userRow.id as UUID, userRow.email as String, userRow.role as String, OffsetDateTime.now())
+        new User(userRow.id as UUID, userRow.email as String, lol.pbu.kaiju.model.UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
     }
 
     /********** CREATE Tests **********/

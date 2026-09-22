@@ -1,6 +1,8 @@
 package lol.pbu.kaiju.model;
 
-public final class ProjectUserRole {
-    private ProjectUserRole() {}
-    public static final String PROJECT_SPONSOR = "PROJECT_SPONSOR";
+import io.micronaut.serde.annotation.Serdeable;
+
+@Serdeable
+public enum ProjectUserRole {
+    PROJECT_SPONSOR
 }

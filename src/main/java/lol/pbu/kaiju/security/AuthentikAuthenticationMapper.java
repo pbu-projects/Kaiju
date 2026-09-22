@@ -66,7 +66,7 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             // Using the user's UUID as the principal name is best practice since emails can change
             return AuthenticationResponse.success(
                     user.id().toString(),
-                    Collections.singletonList(user.role()),
+                    user.role().getPermissions().stream().map(Permission::getClaim).toList(),
                     Map.of("email", user.email())
             );
         });

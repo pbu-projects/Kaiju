@@ -15,11 +15,11 @@ import lol.pbu.kaiju.util.ControllerUtils;
 import java.util.UUID;
 
 import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
-import static lol.pbu.kaiju.model.UserRole.GLOBAL_ADMIN;
+import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 @ExecuteOn(BLOCKING)
 @Controller("/admin/users")
-@Secured(GLOBAL_ADMIN)
+@Secured(SYSTEM_ADMIN_CLAIM)
 public class AdminUserController implements ControllerUtils {
 
     private final UserRepository userRepository;

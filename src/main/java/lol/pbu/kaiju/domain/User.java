@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import lol.pbu.kaiju.model.UserRole;
 
 @MappedEntity("users")
 public record User(
@@ -23,7 +24,7 @@ public record User(
         String email,
 
         @NotNull(message = "User role is required.")
-        String role,
+        UserRole role,
         OffsetDateTime createdAt
 ) {
     /**

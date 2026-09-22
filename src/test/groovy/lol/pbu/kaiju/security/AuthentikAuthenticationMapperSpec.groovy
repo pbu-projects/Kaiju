@@ -52,7 +52,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         then: "it logs them in with their actual database role"
         response.isAuthenticated()
         response.getAuthentication().get().getName() == existingUser.id().toString()
-        response.getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
+        response.getAuthentication().get().getRoles().contains("system:admin")
         response.getAuthentication().get().getAttributes().get("email") == email
     }
 
@@ -71,7 +71,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
         then: "the authentication is successful and assigned the default role"
         response.isAuthenticated()
-        response.getAuthentication().get().getRoles().contains("STANDARD_USER")
+        response.getAuthentication().get().getRoles().contains("project:create")
         response.getAuthentication().get().getAttributes().get("email") == email
         
         and: "the user was actually physically persisted into the real PostGIS database"
