@@ -223,3 +223,4 @@ CREATE INDEX idx_shifts_pagination ON shifts (start_time, id);
 CREATE INDEX idx_boundaries_geom ON boundaries USING GIST (geom);
 CREATE INDEX idx_admin_regions_geom ON administrative_regions USING GIST (geom);
 CREATE INDEX idx_org_users_lookup ON organization_users (user_id, organization_id);
+CREATE INDEX idx_organizations_name_trgm ON organizations USING GIN (name gin_trgm_ops);
