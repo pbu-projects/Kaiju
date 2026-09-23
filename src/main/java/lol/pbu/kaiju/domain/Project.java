@@ -52,7 +52,7 @@ public record Project(
 
         @Relation(MANY_TO_MANY)
         @JoinTable(name = "project_locations")
-        List<Location> locations,
+        List<Location> locations, //can be empty if the project is a virtual one
 
         @Relation(MANY_TO_MANY)
         @JoinTable(name = "project_boundaries")

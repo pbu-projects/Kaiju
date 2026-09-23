@@ -132,17 +132,6 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         e.status.code == 404
     }
 
-    def "UPDATE | should handle update of non-existent gracefully when using no-look"() {
-        given: "a non-existent composite ID and update request"
-        def updateRequest = new RegionUser(new RegionUserId(UUID.randomUUID(), UUID.randomUUID()), RegionUserRole.REGION_DIRECTOR)
-
-        when: "a no-look update is attempted"
-        regionUserController.updateRegionUserNoLook(UUID.randomUUID(), UUID.randomUUID(), updateRequest)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
-    }
-
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing region user"() {
@@ -176,18 +165,6 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
         e.status.code == 404
-    }
-
-    def "DELETE | should handle deletion of non-existent region user gracefully when using no-look"() {
-        given: "a random non-existent user and region ID"
-        def nonExistentUserId = UUID.randomUUID()
-        def nonExistentRegionId = UUID.randomUUID()
-
-        when: "a no-look delete is attempted"
-        regionUserController.deleteRegionUserNoLook(nonExistentUserId, nonExistentRegionId)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
     }
 
     /********** LIST Tests **********/

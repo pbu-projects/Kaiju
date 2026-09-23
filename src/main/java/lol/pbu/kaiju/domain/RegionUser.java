@@ -1,9 +1,9 @@
 package lol.pbu.kaiju.domain;
 
 import io.micronaut.data.annotation.EmbeddedId;
+import lol.pbu.kaiju.model.RegionUserRole;
 import io.micronaut.data.annotation.MappedEntity;
 import jakarta.validation.constraints.NotNull;
-import lol.pbu.kaiju.model.RegionUserRole;
 
 @MappedEntity("region_users")
 public record RegionUser(

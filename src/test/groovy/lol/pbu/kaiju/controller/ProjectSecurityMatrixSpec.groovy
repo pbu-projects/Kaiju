@@ -1,16 +1,16 @@
 package lol.pbu.kaiju.controller
 
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import spock.lang.Unroll
 import jakarta.inject.Inject
-import lol.pbu.kaiju.security.ProjectSecurityService
-import java.util.UUID
-import lol.pbu.kaiju.domain.Location
-import lol.pbu.kaiju.domain.Project
-import org.locationtech.jts.geom.Point
-import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.TestFixtures
+import lol.pbu.kaiju.domain.Location
+import lol.pbu.kaiju.domain.Organization
+import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.security.ProjectSecurityService
+import org.locationtech.jts.geom.Point
+import spock.lang.Unroll
+
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING
 
@@ -76,7 +76,7 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         when: "the system evaluates the project creation request"
         def actualResult
         try {
-            actualResult = projectSecurityService.evaluateProjectCreation(userId, dummyProject)
+            actualResult = projectSecurityService.evaluateProjectCreationByUser(userId, dummyProject)
         } catch (io.micronaut.http.exceptions.HttpStatusException e) {
             actualResult = null
         }

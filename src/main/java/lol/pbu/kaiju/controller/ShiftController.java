@@ -2,24 +2,24 @@ package lol.pbu.kaiju.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.repository.ShiftRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
+
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/shifts")
-public class ShiftController {
+public class ShiftController implements ControllerUtils {
 
     private final ShiftRepository shiftRepository;
 
@@ -52,20 +52,9 @@ public class ShiftController {
      */
     @Put("/{id}")
     public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift) {
-        if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Shift not found");
-        }
+        checkExists(shiftRepository, id);
         
-        Shift securePayload = new Shift(
-                id,
-                shift.project(),
-                shift.isVirtual(),
-                shift.location(),
-                shift.startTime(),
-                shift.endTime(),
-                shift.tags()
-        );
-        return shiftRepository.update(securePayload);
+        return shiftRepository.update(shift.withId(id));
     }
 
 
@@ -77,9 +66,7 @@ public class ShiftController {
      */
     @Delete("/{id}")
     public void deleteShift(@PathVariable UUID id) {
-        if (!shiftRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Shift not found");
-        }
+        checkExists(shiftRepository, id);
         shiftRepository.deleteById(id);
     }
 

@@ -1,7 +1,5 @@
 package lol.pbu.kaiju.security
 
-import reactor.core.publisher.Mono
-
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
@@ -13,7 +11,6 @@ import lol.pbu.kaiju.repository.UserRepository
 import spock.lang.Specification
 
 import java.time.OffsetDateTime
-import java.util.UUID
 
 @MicronautTest(transactional = true)
 class AuthentikAuthenticationMapperSpec extends Specification {
@@ -55,7 +52,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         then: "it logs them in with their actual database role"
         response.isAuthenticated()
         response.getAuthentication().get().getName() == existingUser.id().toString()
-        response.getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
+        response.getAuthentication().get().getRoles().contains("system:admin")
         response.getAuthentication().get().getAttributes().get("email") == email
     }
 
@@ -74,7 +71,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
         then: "the authentication is successful and assigned the default role"
         response.isAuthenticated()
-        response.getAuthentication().get().getRoles().contains("STANDARD_USER")
+        response.getAuthentication().get().getRoles().contains("project:create")
         response.getAuthentication().get().getAttributes().get("email") == email
         
         and: "the user was actually physically persisted into the real PostGIS database"
@@ -84,5 +81,29 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         
         and: "their new database UUID was used as the session ID"
         response.getAuthentication().get().getName() == dbUser.id().toString()
+    }
+
+    def "should recover gracefully when a concurrent insert causes a DataAccessException"() {
+        given: "a user who is pre-created in db to simulate a race condition"
+        String email = "race-${UUID.randomUUID()}@example.com"
+        User preExisting = userRepository.save(new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now()))
+
+        and: "a mock UserRepository that simulates a constraint violation on save, then finds the user"
+        UserRepository mockRepo = Mock()
+        mockRepo.findByEmail(email) >>> [Optional.empty(), Optional.of(preExisting)]
+        mockRepo.save(_) >> { throw new io.micronaut.data.exceptions.DataAccessException("duplicate key") }
+
+        and: "a mapper using the mock repository"
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockRepo)
+        OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login during the race condition"
+        def publisher = testMapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = reactor.core.publisher.Mono.from(publisher).block()
+
+        then: "authentication succeeds by recovering the user from the second fetch"
+        response.isAuthenticated()
+        response.getAuthentication().get().getName() == preExisting.id().toString()
     }
 }

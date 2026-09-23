@@ -1,23 +1,26 @@
 package lol.pbu.kaiju.controller;
 
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.*;
-import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.Put;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.RoleUpdateRequest;
 import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
+import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
+
+@ExecuteOn(BLOCKING)
 @Controller("/admin/users")
-@Secured("GLOBAL_ADMIN")
-public class AdminUserController {
+@Secured(SYSTEM_ADMIN_CLAIM)
+public class AdminUserController implements ControllerUtils {
 
     private final UserRepository userRepository;
 
@@ -35,9 +38,7 @@ public class AdminUserController {
      */
     @Put("/{id}/role")
     public User updateUserRole(@PathVariable UUID id, @Valid @Body RoleUpdateRequest request) {
-        if (!userRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "User not found");
-        }
+        checkExists(userRepository, id);
         userRepository.updateRole(id, request.role());
         return userRepository.findById(id).orElseThrow();
     }

@@ -24,6 +24,7 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+    annotationProcessor("ch.qos.logback:logback-classic")
 
     compileOnly("io.micronaut:micronaut-http-client")
 

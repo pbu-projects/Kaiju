@@ -3,9 +3,10 @@ package lol.pbu.kaiju.controller
 import groovy.sql.Sql
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import javax.sql.DataSource
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.sql.DataSource
 
 @MicronautTest(transactional = true)
 class BaseControllerSpec extends Specification {

@@ -141,17 +141,6 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         e.status.code == 404
     }
 
-    def "UPDATE | should handle update of non-existent gracefully when using no-look"() {
-        given: "a non-existent composite ID and update request"
-        def updateRequest = new OrganizationUser(new OrganizationUserId(UUID.randomUUID(), UUID.randomUUID()), OrganizationUserRole.ORG_ADMIN)
-
-        when: "a no-look update is attempted"
-        organizationUserController.updateOrganizationUserNoLook(UUID.randomUUID(), UUID.randomUUID(), updateRequest)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
-    }
-
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing organization user"() {
@@ -185,18 +174,6 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
         e.status.code == 404
-    }
-
-    def "DELETE | should handle deletion of non-existent organization user gracefully when using no-look"() {
-        given: "a random non-existent user and organization ID"
-        def nonExistentUserId = UUID.randomUUID()
-        def nonExistentOrgId = UUID.randomUUID()
-
-        when: "a no-look delete is attempted"
-        organizationUserController.deleteOrganizationUserNoLook(nonExistentUserId, nonExistentOrgId)
-
-        then: "no exception is thrown"
-        noExceptionThrown()
     }
 
     /********** LIST Tests **********/

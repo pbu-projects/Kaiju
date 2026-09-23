@@ -2,25 +2,25 @@ package lol.pbu.kaiju.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.OrganizationUser;
 import lol.pbu.kaiju.domain.OrganizationUserId;
 import lol.pbu.kaiju.repository.OrganizationUserRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
+
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/organization-users")
-public class OrganizationUserController {
+public class OrganizationUserController implements ControllerUtils {
 
     private final OrganizationUserRepository organizationUserRepository;
 
@@ -46,28 +46,16 @@ public class OrganizationUserController {
     @Put("/{userId}/{organizationId}")
     public OrganizationUser updateOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId, @Valid @Body OrganizationUser user) {
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        if (!organizationUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization user not found");
-        }
+        checkExists(organizationUserRepository, id);
         return organizationUserRepository.update(user.withId(id));
     }
 
-    @Put("/{userId}/{organizationId}/no-look")
-    public OrganizationUser updateOrganizationUserNoLook(@PathVariable UUID userId, @PathVariable UUID organizationId, @Valid @Body OrganizationUser user) {
-        return organizationUserRepository.update(user.withId(new OrganizationUserId(userId, organizationId)));
-    }
+
 
     @Delete("/{userId}/{organizationId}")
     public void deleteOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId) {
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        if (!organizationUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Organization user not found");
-        }
+        checkExists(organizationUserRepository, id);
         organizationUserRepository.deleteById(id);
-    }
-
-    @Delete("/{userId}/{organizationId}/no-look")
-    public void deleteOrganizationUserNoLook(@PathVariable UUID userId, @PathVariable UUID organizationId) {
-        organizationUserRepository.deleteById(new OrganizationUserId(userId, organizationId));
     }
 }

@@ -7,13 +7,14 @@ import io.micronaut.data.model.Sort
 import io.micronaut.http.exceptions.HttpStatusException
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
+import lol.pbu.kaiju.TestFixtures
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectSearchCard
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
-import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.ProjectRepository
+import lol.pbu.kaiju.security.ProjectSecurityService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -22,16 +23,12 @@ import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import java.security.Principal
 
+import static io.micronaut.http.HttpStatus.BAD_REQUEST
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import java.util.UUID
-import lol.pbu.kaiju.security.ProjectSecurityService
-import java.security.Principal
-import lol.pbu.kaiju.TestFixtures
-import static io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED
-import static io.micronaut.http.HttpStatus.BAD_REQUEST
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ProjectControllerSpec extends BaseControllerSpec {
@@ -41,14 +38,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
     ProjectController projectController
-
-    
-
     
     @Shared
-    ProjectSecurityService projectSecurityService = new ProjectSecurityService(null) {
+    ProjectSecurityService projectSecurityService = new ProjectSecurityService(null, null) {
         @Override
-        ProjectStatus evaluateProjectCreation(UUID userId, Project project) {
+        ProjectStatus evaluateProjectCreationByUser(UUID userId, Project project) {
             return DRAFT
         }
         @Override
@@ -79,7 +73,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def newProject = TestFixtures.createBasicProject(org as Organization, "Test Project ${faker.company().name()}" as String, "Test Description ${faker.lorem().paragraph()}" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
 
         when: "the project is added"
-        Project saved = projectController.addProject(newProject, testPrincipal, projectSecurityService)
+        Project saved = projectController.submitProject(newProject, testPrincipal, projectSecurityService)
 
         then: "the project is persisted with a generated ID"
         verifyAll {
@@ -107,7 +101,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def controller = new ProjectController(projectRepository)
 
         when:
-        controller.addProject(project, testPrincipal, projectSecurityService)
+        controller.submitProject(project, testPrincipal, projectSecurityService)
 
         then:
         def e = thrown(HttpStatusException)
@@ -117,7 +111,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should fail to save project with invalid data: #testCase"(String testCase, Project project) {
         when: "an attempt is made to add a project with invalid data"
-        projectController.addProject(project, testPrincipal, projectSecurityService)
+        projectController.submitProject(project, testPrincipal, projectSecurityService)
 
         then: "an exception is thrown"
         thrown(ValidationException)
@@ -155,7 +149,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve an existing project by ID"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.addProject(TestFixtures.createBasicProject(org as Organization, "Test Project Read" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
+        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Test Project Read" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
         UUID id = project.id()
 
         when: "the project is requested by its ID"
@@ -180,7 +174,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve projects by title"() {
         given: "an existing project's title from the database"
         def org = getRandomOrganization()
-        def project = projectController.addProject(TestFixtures.createBasicProject(org as Organization, "Searchable Title ${faker.number().digits(5)}" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
+        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Searchable Title ${faker.number().digits(5)}" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
         def targetTitle = project.title()
 
         when: "projects are searched by this title"
@@ -198,7 +192,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing project"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.addProject(TestFixtures.createBasicProject(org as Organization, "Original Project Title" as String, "Original Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
+        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Original Project Title" as String, "Original Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal, projectSecurityService)
         UUID id = project.id()
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description ${faker.lorem().paragraph()}"
@@ -238,27 +232,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status.code == 404
     }
 
-    def "UPDATE | should handle update of non-existent project gracefully when using no-look"() {
-        given: "a random non-existent ID and an update request"
-        def nonExistentId = UUID.randomUUID()
-        def org = getRandomOrganization()
-        def updateRequest = TestFixtures.createBasicProject(org as Organization, "New Title" as String, "New Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
-
-        when: "a no-look update is attempted"
-        projectController.updateProjectNoLook(nonExistentId, updateRequest)
-
-        then: "a 405 is returned"
-        def e = thrown(io.micronaut.http.exceptions.HttpStatusException)
-        e.status == METHOD_NOT_ALLOWED
-    }
-
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing project"() {
         given: "a new project to be deleted"
         def org = getRandomOrganization()
         def tempProject = TestFixtures.createBasicProject(org as Organization, "Temporary Project to Delete" as String, "Temporary Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
-        def saved = projectController.addProject(tempProject, testPrincipal, projectSecurityService)
+        def saved = projectController.submitProject(tempProject, testPrincipal, projectSecurityService)
         UUID id = saved.id()
         assert projectRepository.existsById(id)
 
@@ -282,18 +262,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
         e.status.code == 404
-    }
-
-    def "DELETE | should handle deletion of non-existent project gracefully when using no-look"() {
-        given: "a random non-existent ID"
-        def nonExistentId = UUID.randomUUID()
-
-        when: "a no-look delete is attempted"
-        projectController.deleteProjectNoLook(nonExistentId)
-
-        then: "a 405 is returned"
-        def e = thrown(io.micronaut.http.exceptions.HttpStatusException)
-        e.status == METHOD_NOT_ALLOWED
     }
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {

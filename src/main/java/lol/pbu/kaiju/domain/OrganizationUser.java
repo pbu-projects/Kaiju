@@ -1,9 +1,9 @@
 package lol.pbu.kaiju.domain;
 
 import io.micronaut.data.annotation.EmbeddedId;
+import lol.pbu.kaiju.model.OrganizationUserRole;
 import io.micronaut.data.annotation.MappedEntity;
 import jakarta.validation.constraints.NotNull;
-import lol.pbu.kaiju.model.OrganizationUserRole;
 
 @MappedEntity("organization_users")
 public record OrganizationUser(

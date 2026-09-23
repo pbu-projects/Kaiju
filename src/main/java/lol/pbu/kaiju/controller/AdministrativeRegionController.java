@@ -2,24 +2,24 @@ package lol.pbu.kaiju.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+
+@ExecuteOn(BLOCKING)
+@Secured(IS_AUTHENTICATED)
 @Controller("/administrative-regions")
-public class AdministrativeRegionController {
+public class AdministrativeRegionController implements ControllerUtils {
 
     private final AdministrativeRegionRepository administrativeRegionRepository;
 
@@ -44,17 +44,13 @@ public class AdministrativeRegionController {
 
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body AdministrativeRegion region) {
-        if (!administrativeRegionRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
-        }
+        checkExists(administrativeRegionRepository, id);
         return administrativeRegionRepository.update(region.withId(id));
     }
 
     @Delete("/{id}")
     public void deleteAdministrativeRegion(@PathVariable UUID id) {
-        if (!administrativeRegionRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Administrative region not found");
-        }
+        checkExists(administrativeRegionRepository, id);
         administrativeRegionRepository.deleteById(id);
     }
 }

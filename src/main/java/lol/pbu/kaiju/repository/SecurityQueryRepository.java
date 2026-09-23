@@ -2,13 +2,14 @@ package lol.pbu.kaiju.repository;
 
 import io.micronaut.data.annotation.Query;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
-import io.micronaut.data.model.query.builder.sql.Dialect;
 import io.micronaut.data.repository.GenericRepository;
 import lol.pbu.kaiju.domain.User;
 
 import java.util.UUID;
 
-@JdbcRepository(dialect = Dialect.POSTGRES)
+import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
+
+@JdbcRepository(dialect = POSTGRES)
 public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
 
     @Query("""

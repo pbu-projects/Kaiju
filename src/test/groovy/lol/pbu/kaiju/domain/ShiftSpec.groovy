@@ -1,7 +1,6 @@
 package lol.pbu.kaiju.domain
 
 import jakarta.validation.ValidationException
-import lol.pbu.kaiju.model.VerificationStatus
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -9,8 +8,6 @@ import java.time.OffsetDateTime
 
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import lol.pbu.kaiju.model.ProjectStatus
-import lol.pbu.kaiju.model.ProjectType
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ShiftSpec extends Specification {

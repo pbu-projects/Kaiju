@@ -4,6 +4,6 @@ import io.micronaut.serde.annotation.Serdeable;
 
 @Serdeable
 public enum RegionUserRole {
-    REGION_DIRECTOR,
-    REGION_AGENT
+    REGION_AGENT,
+    REGION_DIRECTOR
 }

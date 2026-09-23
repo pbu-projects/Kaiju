@@ -2,24 +2,24 @@ package lol.pbu.kaiju.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.repository.BoundaryRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
+
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/boundaries")
-public class BoundaryController {
+public class BoundaryController implements ControllerUtils {
 
     private final BoundaryRepository boundaryRepository;
 
@@ -52,16 +52,9 @@ public class BoundaryController {
      */
     @Put("/{id}")
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body Boundary boundary) {
-        if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
-        }
+        checkExists(boundaryRepository, id);
         
-        Boundary securePayload = new Boundary(
-                id,
-                boundary.name(),
-                boundary.geom()
-        );
-        return boundaryRepository.update(securePayload);
+        return boundaryRepository.update(boundary.withId(id));
     }
 
 
@@ -73,9 +66,7 @@ public class BoundaryController {
      */
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id) {
-        if (!boundaryRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
-        }
+        checkExists(boundaryRepository, id);
         boundaryRepository.deleteById(id);
     }
 

@@ -4,33 +4,32 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
-import io.micronaut.http.HttpStatus;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
-import static io.micronaut.http.HttpStatus.BAD_REQUEST;
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static io.micronaut.http.HttpStatus.METHOD_NOT_ALLOWED;
-import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
-import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
-
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.security.annotation.Secured;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectSearchCard;
+import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
+import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
-import lol.pbu.kaiju.model.ProjectStatus;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import java.security.Principal;
+
+import static io.micronaut.http.HttpStatus.*;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
+import static lol.pbu.kaiju.security.Permission.PROJECT_APPROVE_CLAIM;
+
 
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Controller("/projects")
@@ -54,18 +53,17 @@ public class ProjectController {
     }
 
     @Post
-    @Secured("isAuthenticated()")
-    public Project addProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
+    @Secured(IS_AUTHENTICATED)
+    public Project submitProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         if (project.organization() == null) {
             throw new HttpStatusException(BAD_REQUEST, "Organization is required");
         }
         
-        UUID userId = UUID.fromString(principal.getName());
+        UUID submitterId = UUID.fromString(principal.getName());
         
         // Evaluate the entire project's locations securely
-        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreation(userId, project);
+        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreationByUser(submitterId, project);
 
-        // Fix ID hijacking (force null ID for creation), fix mass assignment (force tracking fields)
         Project secureProject = new Project(
                 null, // Force auto-generation
                 project.organization(),
@@ -88,7 +86,7 @@ public class ProjectController {
      * Updates an existing project by its ID after validating that it exists.
      */
     @Put("/{id}")
-    @Secured("isAuthenticated()")
+    @Secured(IS_AUTHENTICATED)
     public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
@@ -115,21 +113,12 @@ public class ProjectController {
         return projectRepository.update(secureProject);
     }
 
-    /**
-     * Updates a project by its ID without checking if it exists first.
-     */
-    @Put("/{id}/no-look")
-    @Secured("isAuthenticated()")
-    public Project updateProjectNoLook(@PathVariable UUID id, @Valid @Body Project project) {
-        // Disabled for security, redirect to safe method
-        throw new HttpStatusException(METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
-    }
 
     /**
      * Deletes a project by its ID after validating that it exists.
      */
     @Delete("/{id}")
-    @Secured("isAuthenticated()")
+    @Secured(IS_AUTHENTICATED)
     public void deleteProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
@@ -141,15 +130,6 @@ public class ProjectController {
         projectRepository.deleteById(id);
     }
 
-    /**
-     * Deletes a project by its ID without checking if it exists first.
-     */
-    @Delete("/{id}/no-look")
-    @Secured("isAuthenticated()")
-    public void deleteProjectNoLook(@PathVariable UUID id) {
-        // Disabled for security
-        throw new HttpStatusException(METHOD_NOT_ALLOWED, "Use /projects/{id} instead");
-    }
 
     /**
      * Searches active projects by their closest location coordinates within a given radius.
@@ -178,7 +158,7 @@ public class ProjectController {
      * The service layer enforces that the Regional Admin actually has geographic jurisdiction.
      */
     @Put("/{id}/status")
-    @Secured({"REGION_AGENT", "REGION_DIRECTOR"})
+    @Secured(PROJECT_APPROVE_CLAIM)
     public Project approveProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         

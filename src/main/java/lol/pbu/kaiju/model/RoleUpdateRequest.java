@@ -1,6 +1,7 @@
 package lol.pbu.kaiju.model;
 
 import io.micronaut.serde.annotation.Serdeable;
+
 import jakarta.validation.constraints.NotNull;
 
 @Serdeable

@@ -2,25 +2,25 @@ package lol.pbu.kaiju.controller;
 
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.RegionUser;
 import lol.pbu.kaiju.domain.RegionUserId;
 import lol.pbu.kaiju.repository.RegionUserRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
+
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/region-users")
-public class RegionUserController {
+public class RegionUserController implements ControllerUtils {
 
     private final RegionUserRepository regionUserRepository;
 
@@ -46,28 +46,15 @@ public class RegionUserController {
     @Put("/{userId}/{regionId}")
     public RegionUser updateRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId, @Valid @Body RegionUser user) {
         RegionUserId id = new RegionUserId(userId, regionId);
-        if (!regionUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Region user not found");
-        }
+        checkExists(regionUserRepository, id);
         return regionUserRepository.update(user.withId(id));
     }
 
-    @Put("/{userId}/{regionId}/no-look")
-    public RegionUser updateRegionUserNoLook(@PathVariable UUID userId, @PathVariable UUID regionId, @Valid @Body RegionUser user) {
-        return regionUserRepository.update(user.withId(new RegionUserId(userId, regionId)));
-    }
-
-    @Delete("/{userId}/{regionId}")
+@Delete("/{userId}/{regionId}")
     public void deleteRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId) {
         RegionUserId id = new RegionUserId(userId, regionId);
-        if (!regionUserRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Region user not found");
-        }
+        checkExists(regionUserRepository, id);
         regionUserRepository.deleteById(id);
     }
 
-    @Delete("/{userId}/{regionId}/no-look")
-    public void deleteRegionUserNoLook(@PathVariable UUID userId, @PathVariable UUID regionId) {
-        regionUserRepository.deleteById(new RegionUserId(userId, regionId));
-    }
 }

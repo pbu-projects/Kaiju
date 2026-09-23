@@ -1,7 +1,5 @@
 package lol.pbu.kaiju.controller
 
-
-
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -13,8 +11,6 @@ import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.ProjectAuditLog
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.AuditAction
-import lol.pbu.kaiju.model.UserRole
-import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import spock.lang.Unroll
 
@@ -23,8 +19,6 @@ import java.time.OffsetDateTime
 import static lol.pbu.kaiju.model.AuditAction.CREATED
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import lol.pbu.kaiju.model.ProjectStatus
-import lol.pbu.kaiju.model.ProjectType
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 class ProjectAuditLogControllerSpec extends BaseControllerSpec {
@@ -64,7 +58,7 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         if (!userRow) {
             throw new IllegalStateException("No users found in database to link audit log to.")
         }
-        new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
+        new User(userRow.id as UUID, userRow.email as String, lol.pbu.kaiju.model.UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
     }
 
     /********** CREATE Tests **********/

@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -13,9 +12,8 @@ import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
-import static lol.pbu.kaiju.model.VerificationStatus.REVOKED
-import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
-import static lol.pbu.kaiju.model.VerificationStatus.VERIFIED
+
+import static lol.pbu.kaiju.model.VerificationStatus.*
 
 class OrganizationControllerSpec extends BaseControllerSpec {
 

@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -8,13 +9,10 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.micronaut.context.annotation.Property
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.model.VerificationStatus
 import spock.lang.Specification
-
-import java.util.UUID
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.oauth2.enabled", value = "false")

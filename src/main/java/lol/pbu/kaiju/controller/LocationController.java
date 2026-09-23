@@ -3,23 +3,24 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.*;
-import io.micronaut.security.annotation.Secured;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.repository.LocationRepository;
+import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
+import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+
 
 @ExecuteOn(TaskExecutors.BLOCKING)
-@Secured("isAuthenticated()")
+@Secured(IS_AUTHENTICATED)
 @Controller("/locations")
-public class LocationController {
+public class LocationController implements ControllerUtils {
 
     private final LocationRepository locationRepository;
 
@@ -52,21 +53,9 @@ public class LocationController {
      */
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body Location location) {
-        if (!locationRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Location not found");
-        }
+        checkExists(locationRepository, id);
         
-        Location securePayload = new Location(
-                id,
-                location.name(),
-                location.addressLine(),
-                location.city(),
-                location.stateProvince(),
-                location.postalCode(),
-                location.countryCode(),
-                location.geom()
-        );
-        return locationRepository.update(securePayload);
+        return locationRepository.update(location.withId(id));
     }
 
 
@@ -78,9 +67,7 @@ public class LocationController {
      */
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id) {
-        if (!locationRepository.existsById(id)) {
-            throw new HttpStatusException(NOT_FOUND, "Location not found");
-        }
+        checkExists(locationRepository, id);
         locationRepository.deleteById(id);
     }
 
