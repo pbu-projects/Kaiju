@@ -199,17 +199,17 @@ public class ProjectController {
     @Secured(PROJECT_APPROVE_CLAIM)
     public Project approveProject(@PathVariable UUID id, Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
-        
-        // Ensure they have geographic jurisdiction to approve it
-        securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
 
-        // Fetch the project and validate its current state
+        // Fetch the project and validate its current state first
         Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
-        
+
         if (project.status() != PENDING) {
             throw new HttpStatusException(BAD_REQUEST, "Only PENDING projects can be approved");
         }
-        
+
+        // Ensure they have geographic jurisdiction to approve it
+        securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
+
         return projectRepository.update(new Project(
                 project.id(),
                 project.organization(),

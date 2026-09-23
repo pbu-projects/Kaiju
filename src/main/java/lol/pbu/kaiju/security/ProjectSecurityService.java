@@ -135,17 +135,37 @@ public class ProjectSecurityService {
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
-        return project.id() != null && queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id());
+        if (project.id() == null) {
+            return false;
+        }
+        long locationCount = queryRepository.countProjectLocations(project.id());
+        if (locationCount == 0) {
+            return user.role() == UserRole.REGION_DIRECTOR && queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id());
+        }
+        return queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id());
     }
 
     /**
-     * Enforces that only a REGION_AGENT whose boundary intersects ALL project locations can approve it.
+     * Enforces that a regional administrator (or global admin) has jurisdiction to approve a project.
+     * For projects with locations, verifies that admin's region intersects ALL project locations.
+     * For virtual projects (zero locations), permits REGION_DIRECTOR whose region contains the org/managing region.
      */
     public void authorizeRegionalAdminApproval(@NonNull UUID regionalAdminId, @NonNull UUID projectId) {
         var user = userRepository.findById(regionalAdminId)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return;
+        }
+
+        long locationCount = queryRepository.countProjectLocations(projectId);
+        if (locationCount == 0) {
+            if (user.role() == UserRole.REGION_AGENT) {
+                throw new HttpStatusException(FORBIDDEN, "Region Agents do not have jurisdiction to approve virtual projects.");
+            }
+            if (user.role() == UserRole.REGION_DIRECTOR && queryRepository.isVirtualProjectInDirectorJurisdiction(regionalAdminId, projectId)) {
+                return;
+            }
+            throw new HttpStatusException(FORBIDDEN, "You do not have geographic jurisdiction to approve this virtual project.");
         }
 
         boolean hasJurisdiction = queryRepository.hasJurisdictionOverAllProjectLocations(regionalAdminId, projectId);

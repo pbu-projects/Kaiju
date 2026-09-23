@@ -45,9 +45,9 @@ This test plan outlines the scenarios required to validate the migration to the 
 ## 5. Virtual Projects (Zero Locations)
 
 **Objective:** Ensure projects with no physical locations are properly managed and not subjected to flawed geographic SQL checks.
-- [ ] **Global/Director Approval of Virtual Project:** A `GLOBAL_ADMIN` or properly scoped `REGION_DIRECTOR` approves a virtual project.
+- [x] **Global/Director Approval of Virtual Project:** A `GLOBAL_ADMIN` or properly scoped `REGION_DIRECTOR` approves a virtual project.
   - **Expected:** `200 OK`.
-- [ ] **Local Agent Rejection on Virtual Project:** A geographically-bound `REGION_AGENT` attempts to approve a virtual project (which lacks geography).
+- [x] **Local Agent Rejection on Virtual Project:** A geographically-bound `REGION_AGENT` attempts to approve a virtual project (which lacks geography).
   - **Expected:** `403 Forbidden` (They do not have global jurisdiction).
 
 ## 6. Lifecycle Actions (Deletions)

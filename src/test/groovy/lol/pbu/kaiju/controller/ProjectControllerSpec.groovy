@@ -27,6 +27,7 @@ import spock.lang.Unroll
 
 import java.security.Principal
 
+import io.micronaut.http.HttpStatus
 import static io.micronaut.http.HttpStatus.BAD_REQUEST
 import static io.micronaut.http.HttpStatus.FORBIDDEN
 import static io.micronaut.http.HttpStatus.NOT_FOUND
@@ -703,5 +704,116 @@ class ProjectControllerSpec extends BaseControllerSpec {
         'PENDING'  | true        | ['B']
         'FLAGGED'  | true        | ['B']
         'REJECTED' | true        | ['B']
+    }
+
+    /********** APPROVE Tests **********/
+
+    def "APPROVE | should allow GLOBAL_ADMIN to approve a virtual project"() {
+        given: "an organization and a pending virtual project (no locations)"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Approve Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Virtual Approve Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "a GLOBAL_ADMIN user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-appr-${UUID.randomUUID()}@example.com".toString())
+
+        when: "the GLOBAL_ADMIN approves the project"
+        Project approved = projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "the project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+
+        and: "the status is persisted in the database"
+        def inDb = sql.firstRow("SELECT status FROM projects WHERE id = ?", [projId])
+        inDb.status == 'ACTIVE'
+    }
+
+    def "APPROVE | should allow REGION_DIRECTOR to approve a virtual project when org is in their region"() {
+        given: "a region, organization in that region, and pending virtual project"
+        def regId = UUID.randomUUID()
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Approve Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Director Org', true)", orgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Director Virtual Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "a REGION_DIRECTOR of that region"
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-appr-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+
+        when: "the REGION_DIRECTOR approves the virtual project"
+        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+
+        then: "the project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+    }
+
+    def "APPROVE | should reject REGION_AGENT approval of virtual project with 403 Forbidden"() {
+        given: "an organization and pending virtual project"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Agent VOrg', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Agent VProj', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "a REGION_AGENT user"
+        def agentId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_AGENT')", agentId, "agent-appr-${UUID.randomUUID()}@example.com".toString())
+
+        when: "the REGION_AGENT attempts to approve the virtual project"
+        projectController.approveProject(projId, createPrincipal(agentId))
+
+        then: "a 403 Forbidden is thrown"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "APPROVE | should reject approval of non-existent project with 404 Not Found"() {
+        given: "a random project ID and an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-404-${UUID.randomUUID()}@example.com".toString())
+
+        when: "approving a non-existent project"
+        projectController.approveProject(UUID.randomUUID(), createPrincipal(adminId))
+
+        then: "a 404 Not Found is thrown"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "APPROVE | should reject approval of already ACTIVE project with 400 Bad Request"() {
+        given: "an already ACTIVE project"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Active Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Already Active', 'Desc', 'STANDARD', 'ACTIVE', NOW())
+        """, projId, orgId)
+
+        and: "an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-active-${UUID.randomUUID()}@example.com".toString())
+
+        when: "attempting to approve an ACTIVE project"
+        projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "a 400 Bad Request is thrown"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.BAD_REQUEST
     }
 }
