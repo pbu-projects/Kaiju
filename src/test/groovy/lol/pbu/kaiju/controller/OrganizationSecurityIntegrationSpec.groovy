@@ -51,4 +51,23 @@ class OrganizationSecurityIntegrationSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.status in [HttpStatus.UNAUTHORIZED, HttpStatus.METHOD_NOT_ALLOWED, HttpStatus.NOT_FOUND]
     }
+
+    def "Security | should reject unauthenticated access to /organizations/search-by-name"() {
+        when: "an unauthenticated request is made to search organizations by name"
+        client.exchange(HttpRequest.GET("/organizations/search-by-name?name=test").accept(MediaType.APPLICATION_JSON_TYPE))
+
+        then: "an UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "Security | should reject unauthenticated access to /organizations/search-by-location"() {
+        when: "an unauthenticated request is made to search organizations by location"
+        client.exchange(HttpRequest.GET("/organizations/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=5000").accept(MediaType.APPLICATION_JSON_TYPE))
+
+        then: "an UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 }
+
