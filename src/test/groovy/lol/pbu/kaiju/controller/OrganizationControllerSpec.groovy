@@ -545,5 +545,244 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         multiWildcardResults.content.isEmpty()
         emptyQuotesResults.content.isEmpty()
     }
+
+    /********** EXHAUSTIVE QUERY VARIATIONS & EDGE CASES **********/
+
+    def "SEARCH BY NAME | exhaustive syntax permutations: quote variations, padding, and mismatched quotes"() {
+        given: "an organization in database"
+        def orgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", orgId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
+
+        when: "searching with leading/trailing spaces outside quotes: '  \"The Salvation Army\"  '"
+        def resPaddedQuotes = organizationController.searchByName('  "The Salvation Army"  ', false, Pageable.from(0, 10))
+
+        and: "searching with spaces inside quotes: '\"  The Salvation Army  \"'"
+        def resSpacesInside = organizationController.searchByName('"  The Salvation Army  "', false, Pageable.from(0, 10))
+
+        and: "searching with single-quote character only: '\'' and '\"'"
+        def resSingleQuoteOnly = organizationController.searchByName("'", false, Pageable.from(0, 10))
+        def resDoubleQuoteOnly = organizationController.searchByName('"', false, Pageable.from(0, 10))
+
+        and: "searching with empty quotes containing whitespace: '\"   \"' and '\'   \''"
+        def resEmptyDoubleWithSpaces = organizationController.searchByName('"   "', false, Pageable.from(0, 10))
+        def resEmptySingleWithSpaces = organizationController.searchByName("'   '", false, Pageable.from(0, 10))
+
+        and: "searching with mismatched opening quote: '\"The Salvation Army'"
+        def resMismatchedDoubleStart = organizationController.searchByName('"The Salvation Army', false, Pageable.from(0, 10))
+
+        and: "searching with mismatched closing quote: 'The Salvation Army\"'"
+        def resMismatchedDoubleEnd = organizationController.searchByName('The Salvation Army"', false, Pageable.from(0, 10))
+
+        and: "searching with mismatched opening single quote: '\'The Salvation Army'"
+        def resMismatchedSingleStart = organizationController.searchByName("'The Salvation Army", false, Pageable.from(0, 10))
+
+        and: "searching with mismatched closing single quote: 'The Salvation Army\''"
+        def resMismatchedSingleEnd = organizationController.searchByName("The Salvation Army'", false, Pageable.from(0, 10))
+
+        and: "searching with exact=true AND quoted together"
+        def resExactAndQuoted = organizationController.searchByName('"The Salvation Army"', true, Pageable.from(0, 10))
+
+        then: "exact quote variations return strictly the single exact parent org"
+        resPaddedQuotes.content.size() == 1
+        resPaddedQuotes.content[0].id() == orgId
+
+        resSpacesInside.content.size() == 1
+        resSpacesInside.content[0].id() == orgId
+
+        resExactAndQuoted.content.size() == 1
+        resExactAndQuoted.content[0].id() == orgId
+
+        and: "single quote characters and empty quote queries return empty pages"
+        resSingleQuoteOnly.content.isEmpty()
+        resDoubleQuoteOnly.content.isEmpty()
+        resEmptyDoubleWithSpaces.content.isEmpty()
+        resEmptySingleWithSpaces.content.isEmpty()
+
+        and: "mismatched quotes gracefully fall back to ranked search and surface parent org at top"
+        !resMismatchedDoubleStart.content.isEmpty()
+        resMismatchedDoubleStart.content[0].id() == orgId
+
+        !resMismatchedDoubleEnd.content.isEmpty()
+        resMismatchedDoubleEnd.content[0].id() == orgId
+
+        !resMismatchedSingleStart.content.isEmpty()
+        resMismatchedSingleStart.content[0].id() == orgId
+
+        !resMismatchedSingleEnd.content.isEmpty()
+        resMismatchedSingleEnd.content[0].id() == orgId
+    }
+
+    def "SEARCH BY NAME | exhaustive typo permutations: subtle misspellings and transposed letters"() {
+        given: "Salvation Army parent organization"
+        def parentId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", parentId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
+
+        when: "searching with transposed 'v' and 't': 'Salavtion Army'"
+        def resTransposedVt = organizationController.searchByName("Salavtion Army", false, Pageable.from(0, 10))
+
+        and: "searching with transposed 'm' and 'r': 'Salvation Amry'"
+        def resTransposedMr = organizationController.searchByName("Salvation Amry", false, Pageable.from(0, 10))
+
+        and: "searching with typo and article: 'The Slavation Army'"
+        def resTypoWithArticle = organizationController.searchByName("The Slavation Army", false, Pageable.from(0, 10))
+
+        then: "all typo variations successfully find The Salvation Army via trigram similarity"
+        !resTransposedVt.content.isEmpty()
+        resTransposedVt.content[0].id() == parentId
+
+        !resTransposedMr.content.isEmpty()
+        resTransposedMr.content[0].id() == parentId
+
+        !resTypoWithArticle.content.isEmpty()
+        resTypoWithArticle.content[0].id() == parentId
+    }
+
+    def "SEARCH BY NAME | article normalization with 'An' and 'A' leading articles"() {
+        given: "organizations with 'An' and 'A' prefixes"
+        def orgAnId = UUID.randomUUID()
+        def orgAId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'An Organization Example', true, 'VERIFIED')", orgAnId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'A Better Tomorrow Foundation', true, 'VERIFIED')", orgAId)
+
+        when: "searching without the leading article"
+        def resAn = organizationController.searchByName("Organization Example", false, Pageable.from(0, 10))
+        def resA = organizationController.searchByName("Better Tomorrow Foundation", false, Pageable.from(0, 10))
+
+        then: "article normalization correctly ranks the parent entity at the top"
+        !resAn.content.isEmpty()
+        resAn.content[0].id() == orgAnId
+
+        !resA.content.isEmpty()
+        resA.content[0].id() == orgAId
+    }
+
+    def "SEARCH BY NAME | literal SQL wildcard characters (% and _) in organization names"() {
+        given: "organizations with literal % and _ in their names"
+        def orgPercentId = UUID.randomUUID()
+        def orgUnderscoreId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, '100% Volunteer Initiative', true, 'VERIFIED')", orgPercentId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Special_Ops Outreach', true, 'VERIFIED')", orgUnderscoreId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'SpecialXOps Outreach', true, 'VERIFIED')", UUID.randomUUID())
+
+        when: "searching for literal '100%'"
+        def resPercent = organizationController.searchByName("100%", false, Pageable.from(0, 10))
+
+        and: "searching for literal 'Special_Ops'"
+        def resUnderscore = organizationController.searchByName("Special_Ops", false, Pageable.from(0, 10))
+
+        then: "literal percent matches only the organization containing '100%'"
+        resPercent.content.size() == 1
+        resPercent.content[0].id() == orgPercentId
+
+        and: "literal underscore does not expand as a single-character wildcard (SpecialXOps is not matched)"
+        resUnderscore.content.size() == 1
+        resUnderscore.content[0].id() == orgUnderscoreId
+    }
+
+    def "SEARCH BY NAME | exhaustive cluster branch and keyword queries"() {
+        given: "a rich cluster of diverse Salvation Army organizations"
+        def parentId = UUID.randomUUID()
+        def denverId = UUID.randomUUID()
+        def auroraId = UUID.randomUUID()
+        def springsId = UUID.randomUUID()
+        def intermountainId = UUID.randomUUID()
+        def storeId = UUID.randomUUID()
+        def disasterId = UUID.randomUUID()
+        def friendsId = UUID.randomUUID()
+
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", parentId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", denverId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Aurora Corps Community Center', true, 'VERIFIED')", auroraId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Colorado Springs Corps', true, 'VERIFIED')", springsId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army Intermountain Division', true, 'VERIFIED')", intermountainId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Family Store', true, 'VERIFIED')", storeId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Emergency Disaster Services', true, 'VERIFIED')", disasterId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Friends of The Salvation Army', true, 'VERIFIED')", friendsId)
+
+        when: "searching for 'Denver'"
+        def resDenver = organizationController.searchByName("Denver", false, Pageable.from(0, 10))
+
+        and: "searching for 'Aurora'"
+        def resAurora = organizationController.searchByName("Aurora", false, Pageable.from(0, 10))
+
+        and: "searching for 'Colorado Springs'"
+        def resSprings = organizationController.searchByName("Colorado Springs", false, Pageable.from(0, 10))
+
+        and: "searching for 'Intermountain'"
+        def resIntermountain = organizationController.searchByName("Intermountain", false, Pageable.from(0, 10))
+
+        and: "searching for 'Family Store'"
+        def resStore = organizationController.searchByName("Family Store", false, Pageable.from(0, 10))
+
+        and: "searching for 'Emergency Disaster'"
+        def resDisaster = organizationController.searchByName("Emergency Disaster", false, Pageable.from(0, 10))
+
+        and: "searching for 'Friends of'"
+        def resFriends = organizationController.searchByName("Friends of", false, Pageable.from(0, 10))
+
+        then: "each specific query accurately isolates its target entity at the top of results"
+        resDenver.content[0].id() == denverId
+        resAurora.content[0].id() == auroraId
+        resSprings.content[0].id() == springsId
+        resIntermountain.content[0].id() == intermountainId
+        resStore.content[0].id() == storeId
+        resDisaster.content[0].id() == disasterId
+        resFriends.content[0].id() == friendsId
+    }
+
+    def "PAGINATION & SORTING | normalizePageable and getOrganizations branch coverage"() {
+        given: "organizations exist"
+        def orgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org Alpha', true, 'VERIFIED')", orgId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org Beta', true, 'VERIFIED')", UUID.randomUUID())
+
+        when: "calling getOrganizations with null pageable"
+        def resGetOrgsNull = organizationController.getOrganizations(null)
+
+        and: "calling getOrganizations with unpaged pageable"
+        def resGetOrgsUnpaged = organizationController.getOrganizations(CursoredPageable.from(Sort.of(Sort.Order.asc("name"))).withoutPaging())
+
+        and: "calling searchByName with null pageable"
+        def resNameNullPageable = organizationController.searchByName("Paging Test Org", false, null)
+
+        and: "calling searchByName with Pageable.unpaged()"
+        def resNameUnpaged = organizationController.searchByName("Paging Test Org", false, Pageable.unpaged())
+
+        and: "calling searchByName with client-specified sort (which should be stripped to preserve relevance order)"
+        def sortedPageable = Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
+        def resNameWithSort = organizationController.searchByName("Paging Test Org", false, sortedPageable)
+
+        and: "calling searchByNameExact with client-specified sort (where stripSort is false)"
+        def resExactWithSort = organizationController.searchByName('"Paging Test Org Alpha"', false, sortedPageable)
+
+        and: "calling searchByLocation with null, unpaged, and sorted pageables"
+        def resLocNull = organizationController.searchByLocation(-104.99, 39.74, 50000, null)
+        def resLocUnpaged = organizationController.searchByLocation(-104.99, 39.74, 50000, Pageable.unpaged())
+        def resLocSorted = organizationController.searchByLocation(-104.99, 39.74, 50000, sortedPageable)
+
+        and: "calling searchByRegion with null, unpaged, and sorted pageables"
+        def regionId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Paging Region', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", regionId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regionId)
+        def resRegionNull = organizationController.searchByRegion(regionId, null)
+        def resRegionUnpaged = organizationController.searchByRegion(regionId, Pageable.unpaged())
+        def resRegionSorted = organizationController.searchByRegion(regionId, sortedPageable)
+
+        then: "all permutations execute successfully with defaults"
+        !resGetOrgsNull.content.isEmpty()
+        !resGetOrgsUnpaged.content.isEmpty()
+        !resNameNullPageable.content.isEmpty()
+        !resNameUnpaged.content.isEmpty()
+        !resNameWithSort.content.isEmpty()
+        !resExactWithSort.content.isEmpty()
+        resLocNull != null
+        resLocUnpaged != null
+        resLocSorted != null
+        !resRegionNull.content.isEmpty()
+        !resRegionUnpaged.content.isEmpty()
+        !resRegionSorted.content.isEmpty()
+    }
 }
 

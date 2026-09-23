@@ -88,10 +88,10 @@ public class OrganizationController implements ControllerUtils {
         }
 
         if (exact || isQuoted) {
-            Pageable effectivePageable = normalizePageable(pageable, false);
+            Pageable effectivePageable = normalizePageable(pageable);
             return organizationRepository.searchByNameExact(unquoted, effectivePageable);
         } else {
-            Pageable effectivePageable = normalizePageable(pageable, true);
+            Pageable effectivePageable = normalizePageable(pageable);
             String escapedTerm = escapeSqlLike(unquoted);
             String canonicalTerm = extractCanonicalTerm(unquoted);
             String escapedCanonical = escapeSqlLike(canonicalTerm);
@@ -131,7 +131,7 @@ public class OrganizationController implements ControllerUtils {
             @QueryValue @Positive @Max(500000) double radiusMeters,
             @Valid Pageable pageable
     ) {
-        Pageable effectivePageable = normalizePageable(pageable, true);
+        Pageable effectivePageable = normalizePageable(pageable);
         GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
         return organizationRepository.searchByLocation(point, radiusMeters, effectivePageable);
@@ -150,15 +150,15 @@ public class OrganizationController implements ControllerUtils {
             @QueryValue @NonNull UUID regionId,
             @Valid Pageable pageable
     ) {
-        Pageable effectivePageable = normalizePageable(pageable, true);
+        Pageable effectivePageable = normalizePageable(pageable);
         return organizationRepository.searchByRegion(regionId, effectivePageable);
     }
 
-    private Pageable normalizePageable(Pageable pageable, boolean stripSort) {
+    private Pageable normalizePageable(Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
             return Pageable.from(0, 20);
         }
-        if (stripSort && !pageable.getSort().getOrderBy().isEmpty()) {
+        if (!pageable.getSort().getOrderBy().isEmpty()) {
             return Pageable.from(pageable.getNumber(), pageable.getSize());
         }
         return pageable;
