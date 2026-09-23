@@ -38,6 +38,7 @@ import org.locationtech.jts.geom.PrecisionModel;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -261,7 +262,7 @@ public class ProjectController {
                 approvedProject,
                 actor,
                 AuditAction.APPROVED,
-                OffsetDateTime.now()
+                OffsetDateTime.now(ZoneOffset.UTC)
         ));
 
         return approvedProject;
