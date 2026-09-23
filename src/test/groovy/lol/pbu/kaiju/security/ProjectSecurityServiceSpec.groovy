@@ -43,8 +43,6 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canModifyProject returns true for GLOBAL_ADMIN without any org lookup"() {
         given:
         User admin = saveUser(UserRole.GLOBAL_ADMIN)
-        // Load a real project from the db
-        def project = sql.firstRow("SELECT * FROM projects WHERE id = ?::uuid", [projectId.toString()])
 
         expect:
         // A global admin on any project (even one with no org match) can modify it
