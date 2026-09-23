@@ -27,6 +27,7 @@ import spock.lang.Unroll
 
 import java.security.Principal
 
+import io.micronaut.http.HttpStatus
 import static io.micronaut.http.HttpStatus.BAD_REQUEST
 import static io.micronaut.http.HttpStatus.FORBIDDEN
 import static io.micronaut.http.HttpStatus.NOT_FOUND
@@ -49,6 +50,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
     OrganizationRepository organizationRepository
+
+    @Inject
+    lol.pbu.kaiju.repository.UserRepository userRepository
+
+    @Inject
+    lol.pbu.kaiju.repository.ProjectAuditLogRepository projectAuditLogRepository
 
     def setupSpec() {
         executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'test-principal@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
@@ -110,7 +117,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "CREATE | should throw HttpStatusException if organization is null"() {
         given: "a manual controller instance to bypass validation interceptors"
         def project = TestFixtures.createBasicProject(null, "Test Title", "Test Desc", STANDARD, DRAFT)
-        def controller = new ProjectController(projectRepository, realProjectSecurityService, organizationRepository)
+        def controller = new ProjectController(projectRepository, realProjectSecurityService, organizationRepository, userRepository, projectAuditLogRepository)
 
         when:
         controller.submitProject(project, testPrincipal)
@@ -704,4 +711,236 @@ class ProjectControllerSpec extends BaseControllerSpec {
         'FLAGGED'  | true        | ['B']
         'REJECTED' | true        | ['B']
     }
+
+    /********** APPROVE Tests **********/
+
+    def "APPROVE | should allow GLOBAL_ADMIN to approve a virtual project"() {
+        given: "an organization and a pending virtual project (no locations)"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Approve Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Virtual Approve Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "a GLOBAL_ADMIN user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-appr-${UUID.randomUUID()}@example.com".toString())
+
+        when: "the GLOBAL_ADMIN approves the project"
+        Project approved = projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "the project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+
+        and: "the status is persisted in the database"
+        def inDb = sql.firstRow("SELECT status FROM projects WHERE id = ?", [projId])
+        inDb.status == 'ACTIVE'
+    }
+
+    def "APPROVE | should allow REGION_DIRECTOR to approve a virtual project when org is in their region"() {
+        given: "a region, organization in that region, and pending virtual project"
+        def regId = UUID.randomUUID()
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Approve Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Director Org', true, 'VERIFIED')", orgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Director Virtual Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "a REGION_DIRECTOR of that region"
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-appr-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+
+        when: "the REGION_DIRECTOR approves the virtual project"
+        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+
+        then: "the project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+    }
+
+    def "APPROVE | should reject REGION_AGENT approval of virtual project with 403 Forbidden"() {
+        given: "an organization and pending virtual project"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Agent VOrg', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Agent VProj', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "a REGION_AGENT user"
+        def agentId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_AGENT')", agentId, "agent-appr-${UUID.randomUUID()}@example.com".toString())
+
+        when: "the REGION_AGENT attempts to approve the virtual project"
+        projectController.approveProject(projId, createPrincipal(agentId))
+
+        then: "a 403 Forbidden is thrown"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "APPROVE | should reject approval of non-existent project with 404 Not Found"() {
+        given: "a random project ID and an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-404-${UUID.randomUUID()}@example.com".toString())
+
+        when: "approving a non-existent project"
+        projectController.approveProject(UUID.randomUUID(), createPrincipal(adminId))
+
+        then: "a 404 Not Found is thrown"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "APPROVE | should reject approval of already ACTIVE project with 400 Bad Request"() {
+        given: "an already ACTIVE project"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Active Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Already Active', 'Desc', 'STANDARD', 'ACTIVE', NOW())
+        """, projId, orgId)
+
+        and: "an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-active-${UUID.randomUUID()}@example.com".toString())
+
+        when: "attempting to approve an ACTIVE project"
+        projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "a 400 Bad Request is thrown"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "APPROVE | should allow approving a PENDING_UPDATE project"() {
+        given: "a project in PENDING_UPDATE status"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'PendingUpdate Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Pending Update Proj', 'Desc', 'STANDARD', 'PENDING_UPDATE', NOW())
+        """, projId, orgId)
+
+        and: "an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-pu-${UUID.randomUUID()}@example.com".toString())
+
+        when: "approving the PENDING_UPDATE project"
+        Project approved = projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "the project transitions to ACTIVE"
+        approved.status() == ACTIVE
+    }
+
+    def "APPROVE | should reject approval of soft-deleted project with 404 Not Found"() {
+        given: "a soft-deleted pending project"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Deleted Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at, deleted_at)
+            VALUES (?, ?, 'Deleted Proj', 'Desc', 'STANDARD', 'PENDING', NOW(), NOW())
+        """, projId, orgId)
+
+        and: "an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-del-${UUID.randomUUID()}@example.com".toString())
+
+        when: "attempting to approve a deleted project"
+        projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "a 404 Not Found is thrown preventing resurrection"
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "APPROVE | should write audit log record on approval"() {
+        given: "a pending project and an admin"
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Audit Org', true)", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Audit Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+
+        and: "an admin user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-log-${UUID.randomUUID()}@example.com".toString())
+
+        when: "approving the project"
+        projectController.approveProject(projId, createPrincipal(adminId))
+
+        then: "a project_audit_logs record is written"
+        def auditRow = sql.firstRow("SELECT action, actor_id FROM project_audit_logs WHERE project_id = ?", [projId])
+        auditRow != null
+        auditRow.action == 'APPROVED'
+        auditRow.actor_id == adminId
+    }
+
+    def "APPROVE | should allow REGION_DIRECTOR to approve physical project with locations inside their region"() {
+        given: "a region, organization, location inside that region, and physical project"
+        def regId = UUID.randomUUID()
+        def orgId = UUID.randomUUID()
+        def locId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Phys Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Phys Org', true)", orgId)
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Phys Loc', 'St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", locId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Phys Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId)
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, locId)
+
+        and: "a REGION_DIRECTOR assigned to that region"
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-phys-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+
+        when: "the REGION_DIRECTOR approves the physical project"
+        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+
+        then: "the physical project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+    }
+
+    def "APPROVE | should allow REGION_DIRECTOR to approve virtual project assigned via managing_region_id"() {
+        given: "a region, verified organization, and virtual project explicitly assigned via managing_region_id"
+        def regId = UUID.randomUUID()
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Managing Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Managing Reg Org', true, 'VERIFIED')", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, ?, 'Virtual Assigned Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId, regId)
+
+        and: "a REGION_DIRECTOR assigned to that managing region"
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-mgr-appr-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+
+        when: "the REGION_DIRECTOR approves the virtual project"
+        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+
+        then: "the project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+    }
 }
+

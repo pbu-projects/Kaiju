@@ -4,30 +4,48 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
+import io.micronaut.transaction.annotation.Transactional;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
+import lol.pbu.kaiju.domain.ProjectAuditLog;
+import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.model.AuditAction;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
+import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
+import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.ProjectSecurityService;
+import org.jspecify.annotations.NonNull;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
 import java.security.Principal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.*;
+import static io.micronaut.http.HttpStatus.BAD_REQUEST;
+import static io.micronaut.http.HttpStatus.FORBIDDEN;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
@@ -42,15 +60,21 @@ public class ProjectController {
     private final ProjectRepository projectRepository;
     private final ProjectSecurityService securityService;
     private final OrganizationRepository organizationRepository;
+    private final UserRepository userRepository;
+    private final ProjectAuditLogRepository projectAuditLogRepository;
 
     public ProjectController(
             ProjectRepository projectRepository,
             ProjectSecurityService securityService,
-            OrganizationRepository organizationRepository
+            OrganizationRepository organizationRepository,
+            UserRepository userRepository,
+            ProjectAuditLogRepository projectAuditLogRepository
     ) {
         this.projectRepository = projectRepository;
         this.securityService = securityService;
         this.organizationRepository = organizationRepository;
+        this.userRepository = userRepository;
+        this.projectAuditLogRepository = projectAuditLogRepository;
     }
 
     @Get
@@ -197,20 +221,26 @@ public class ProjectController {
      */
     @Put("/{id}/status")
     @Secured(PROJECT_APPROVE_CLAIM)
-    public Project approveProject(@PathVariable UUID id, Principal principal) {
+    @Transactional
+    @NonNull
+    public Project approveProject(@PathVariable @NonNull UUID id, @NonNull Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
-        
+
+        // Fetch the project and validate its current state first
+        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
+
+        if (project.deletedAt() != null) {
+            throw new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND);
+        }
+
+        if (project.status() != PENDING && project.status() != ProjectStatus.PENDING_UPDATE) {
+            throw new HttpStatusException(BAD_REQUEST, "Only PENDING or PENDING_UPDATE projects can be approved");
+        }
+
         // Ensure they have geographic jurisdiction to approve it
         securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
 
-        // Fetch the project and validate its current state
-        Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
-        
-        if (project.status() != PENDING) {
-            throw new HttpStatusException(BAD_REQUEST, "Only PENDING projects can be approved");
-        }
-        
-        return projectRepository.update(new Project(
+        Project approvedProject = projectRepository.update(new Project(
                 project.id(),
                 project.organization(),
                 project.managingRegion(),
@@ -224,5 +254,17 @@ public class ProjectController {
                 project.locations(),
                 project.boundaries()
         ));
+
+        User actor = userRepository.findById(regionalAdminId)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+        projectAuditLogRepository.save(new ProjectAuditLog(
+                null,
+                approvedProject,
+                actor,
+                AuditAction.APPROVED,
+                OffsetDateTime.now(ZoneOffset.UTC)
+        ));
+
+        return approvedProject;
     }
 }
