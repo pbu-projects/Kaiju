@@ -40,7 +40,7 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
     @Query("""
         SELECT EXISTS (
             SELECT 1 FROM organization_users 
-            WHERE user_id = :userId AND organization_id = :organizationId AND role = 'ORG_MANAGER'
+            WHERE user_id = :userId AND organization_id = :organizationId AND role IN ('ORG_MANAGER', 'ORG_ADMIN')
         )
     """)
     boolean isOrgManager(UUID userId, UUID organizationId);

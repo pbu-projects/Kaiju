@@ -10,6 +10,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
+import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
@@ -21,6 +22,7 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 
 import java.security.Principal;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -94,11 +96,23 @@ public class ProjectController {
         if (!securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to modify this project");
         }
+
+        Organization targetOrg = existing.organization();
+        if (project.organization() != null) {
+            UUID targetOrgId = project.organization().id();
+            UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
+            if (!Objects.equals(targetOrgId, existingOrgId)) {
+                if (targetOrgId == null || !securityService.canAssignToOrganization(userId, targetOrgId)) {
+                    throw new HttpStatusException(FORBIDDEN, "You do not have permission to reassign this project to the specified organization");
+                }
+                targetOrg = project.organization();
+            }
+        }
         
         // Prevent users from unilaterally modifying the status during an update and fix mass assignment
         Project secureProject = new Project(
                 id,
-                project.organization() != null ? project.organization() : existing.organization(),
+                targetOrg,
                 project.managingRegion(),
                 project.title(),
                 project.description(),

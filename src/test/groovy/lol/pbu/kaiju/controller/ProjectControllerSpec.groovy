@@ -26,6 +26,7 @@ import spock.lang.Unroll
 import java.security.Principal
 
 import static io.micronaut.http.HttpStatus.BAD_REQUEST
+import static io.micronaut.http.HttpStatus.FORBIDDEN
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
@@ -38,6 +39,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
     ProjectController projectController
+
+    @Inject
+    ProjectSecurityService realProjectSecurityService
     
     @Shared
     ProjectSecurityService projectSecurityService = new ProjectSecurityService(null, null) {
@@ -49,10 +53,23 @@ class ProjectControllerSpec extends BaseControllerSpec {
         boolean canModifyProject(UUID userId, Project project) {
             return true
         }
+        @Override
+        boolean canAssignToOrganization(UUID userId, UUID organizationId) {
+            return true
+        }
     }
 
     @Shared
     Principal testPrincipal = new Principal() { @Override String getName() { return "00000000-0000-0000-0000-000000000000" } }
+
+    Principal createPrincipal(UUID userId) {
+        new Principal() {
+            @Override
+            String getName() {
+                return userId.toString()
+            }
+        }
+    }
 
     @Shared
     Faker faker = new Faker()
@@ -230,6 +247,174 @@ class ProjectControllerSpec extends BaseControllerSpec {
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpStatusException)
         e.status.code == 404
+    }
+
+    def "UPDATE | should reject reassignment to another organization when user is not a manager of destination org"() {
+        given: "two organizations Org A and Org B"
+        def orgAId = UUID.randomUUID()
+        def orgBId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
+
+        and: "a user who is an ORG_MANAGER of Org A only"
+        def userId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-a-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgAId)
+
+        and: "a project belonging to Org A"
+        def projectId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Project in Org A', 'Desc', 'STANDARD', 'DRAFT', NOW())
+        """, projectId, orgAId)
+
+        and: "an update payload attempting to reassign the project to Org B"
+        def orgB = new Organization(orgBId, "Org B", null, null, true, UNVERIFIED, null, [])
+        def updateRequest = TestFixtures.createBasicProject(orgB, "Hijacked Title", "Hijacked Desc", STANDARD, DRAFT)
+
+        when: "the Org Manager attempts to reassign the project to Org B"
+        projectController.updateProject(projectId, updateRequest, createPrincipal(userId), realProjectSecurityService)
+
+        then: "the request is rejected with 403 Forbidden"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message.contains("permission to reassign")
+
+        and: "the project in the database remains assigned to Org A"
+        def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
+        projectInDb.organization_id == orgAId
+        projectInDb.title == 'Project in Org A'
+    }
+
+    def "UPDATE | should allow legitimate update by Org Manager preserving existing organization"() {
+        given: "an organization Org A"
+        def orgAId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
+
+        and: "a user who is an ORG_MANAGER of Org A"
+        def userId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-legit-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgAId)
+
+        and: "a project belonging to Org A"
+        def projectId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Initial Title', 'Initial Desc', 'STANDARD', 'DRAFT', NOW())
+        """, projectId, orgAId)
+
+        and: "an update payload preserving Org A with updated title and description"
+        def orgA = new Organization(orgAId, "Org A", null, null, true, UNVERIFIED, null, [])
+        def updateRequest = TestFixtures.createBasicProject(orgA, "Legit Updated Title", "Legit Updated Desc", STANDARD, DRAFT)
+
+        when: "the Org Manager updates the project"
+        Project updated = projectController.updateProject(projectId, updateRequest, createPrincipal(userId), realProjectSecurityService)
+
+        then: "the update succeeds"
+        updated.id() == projectId
+        updated.title() == "Legit Updated Title"
+        updated.description() == "Legit Updated Desc"
+
+        and: "the database reflects the updated fields while organization remains Org A"
+        def projectInDb = sql.firstRow("SELECT organization_id, title, description FROM projects WHERE id = ?", [projectId])
+        projectInDb.organization_id == orgAId
+        projectInDb.title == "Legit Updated Title"
+        projectInDb.description == "Legit Updated Desc"
+    }
+
+    def "UPDATE | should fail validation when organization is null in payload"() {
+        given: "an organization Org A"
+        def orgAId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
+
+        and: "a user who is an ORG_MANAGER of Org A"
+        def userId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-null-org-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgAId)
+
+        and: "a project belonging to Org A"
+        def projectId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Initial Title', 'Initial Desc', 'STANDARD', 'DRAFT', NOW())
+        """, projectId, orgAId)
+
+        and: "an update payload with null organization"
+        def updateRequest = TestFixtures.createBasicProject(null, "Updated Title With Null Org", "Desc", STANDARD, DRAFT)
+
+        when: "the Org Manager attempts to update the project with a null organization"
+        projectController.updateProject(projectId, updateRequest, createPrincipal(userId), realProjectSecurityService)
+
+        then: "validation fails because organization is required on Project"
+        thrown(ValidationException)
+    }
+
+    def "UPDATE | should allow project reassignment to another organization when user is GLOBAL_ADMIN"() {
+        given: "two organizations Org A and Org B"
+        def orgAId = UUID.randomUUID()
+        def orgBId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
+
+        and: "a GLOBAL_ADMIN user"
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-${UUID.randomUUID()}@example.com".toString())
+
+        and: "a project belonging to Org A"
+        def projectId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Original Title', 'Original Desc', 'STANDARD', 'DRAFT', NOW())
+        """, projectId, orgAId)
+
+        and: "an update payload reassigning the project to Org B"
+        def orgB = new Organization(orgBId, "Org B", null, null, true, UNVERIFIED, null, [])
+        def updateRequest = TestFixtures.createBasicProject(orgB, "Admin Updated Title", "Admin Updated Desc", STANDARD, DRAFT)
+
+        when: "the Global Admin reassigns the project to Org B"
+        Project updated = projectController.updateProject(projectId, updateRequest, createPrincipal(adminId), realProjectSecurityService)
+
+        then: "the update succeeds"
+        updated.id() == projectId
+        updated.title() == "Admin Updated Title"
+
+        and: "the project is reassigned to Org B in the database"
+        def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
+        projectInDb.organization_id == orgBId
+        projectInDb.title == "Admin Updated Title"
+    }
+
+    def "UPDATE | should allow project reassignment when user is manager of destination org"() {
+        given: "two organizations Org A and Org B"
+        def orgAId = UUID.randomUUID()
+        def orgBId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
+
+        and: "a user who is an ORG_MANAGER of both Org A and Org B"
+        def dualManagerId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", dualManagerId, "dual-mgr-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", dualManagerId, orgAId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", dualManagerId, orgBId)
+
+        and: "a project belonging to Org A"
+        def projectId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Dual Mgr Project', 'Desc', 'STANDARD', 'DRAFT', NOW())
+        """, projectId, orgAId)
+
+        and: "an update payload reassigning the project to Org B"
+        def orgB = new Organization(orgBId, "Org B", null, null, true, UNVERIFIED, null, [])
+        def updateRequest = TestFixtures.createBasicProject(orgB, "Reassigned by Dual Manager", "Desc", STANDARD, DRAFT)
+
+        when: "the dual manager reassigns the project to Org B"
+        Project updated = projectController.updateProject(projectId, updateRequest, createPrincipal(dualManagerId), realProjectSecurityService)
+
+        then: "the update succeeds and project is reassigned to Org B"
+        updated.id() == projectId
+        def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
+        projectInDb.organization_id == orgBId
     }
 
     /********** DELETE Tests **********/

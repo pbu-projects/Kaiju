@@ -3,6 +3,7 @@ package lol.pbu.kaiju.security;
 import io.micronaut.http.exceptions.HttpStatusException;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.Location;
+import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
@@ -92,6 +93,32 @@ public class ProjectSecurityService {
         
         if (project.organization() == null) return false;
         return queryRepository.isOrgManager(userId, project.organization().id());
+    }
+
+    /**
+     * Helper to verify if a user is allowed to assign/reassign a project to an organization.
+     * Must be Org Manager of the target organization or have SYSTEM_ADMIN permission.
+     */
+    public boolean canAssignToOrganization(UUID userId, UUID organizationId) {
+        var user = userRepository.findById(userId).orElseThrow(() -> new io.micronaut.http.exceptions.HttpStatusException(io.micronaut.http.HttpStatus.NOT_FOUND, "User not found"));
+        if (organizationId == null) {
+            return false;
+        }
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return true;
+        }
+        return queryRepository.isOrgManager(userId, organizationId);
+    }
+
+    /**
+     * Helper to verify if a user is allowed to assign/reassign a project to an organization.
+     * Must be Org Manager of the target organization or have SYSTEM_ADMIN permission.
+     */
+    public boolean canAssignToOrganization(UUID userId, Organization organization) {
+        if (organization == null) {
+            return false;
+        }
+        return canAssignToOrganization(userId, organization.id());
     }
 
     /**

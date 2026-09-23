@@ -137,4 +137,53 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         HttpStatusException e = thrown()
         e.status == HttpStatus.NOT_FOUND
     }
+
+    def "canAssignToOrganization returns true for GLOBAL_ADMIN without any org lookup"() {
+        given:
+        User admin = saveUser(UserRole.GLOBAL_ADMIN)
+
+        expect:
+        service.canAssignToOrganization(admin.id(), UUID.randomUUID()) == true
+    }
+
+    def "canAssignToOrganization returns true when user is org manager of target org"() {
+        given:
+        User user = saveUser(UserRole.STANDARD_USER)
+        UUID targetOrg = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Target Org', true)", targetOrg)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", user.id(), targetOrg)
+
+        expect:
+        service.canAssignToOrganization(user.id(), targetOrg) == true
+        service.canAssignToOrganization(user.id(), new lol.pbu.kaiju.domain.Organization(targetOrg, "Target Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED, null, [])) == true
+    }
+
+    def "canAssignToOrganization returns false when user is not org manager of target org"() {
+        given:
+        User user = saveUser(UserRole.STANDARD_USER)
+        UUID targetOrg = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Target Org', true)", targetOrg)
+
+        expect:
+        service.canAssignToOrganization(user.id(), targetOrg) == false
+    }
+
+    def "canAssignToOrganization returns false when organizationId or organization is null"() {
+        given:
+        User user = saveUser(UserRole.STANDARD_USER)
+
+        expect:
+        service.canAssignToOrganization(user.id(), (UUID) null) == false
+        service.canAssignToOrganization(user.id(), (lol.pbu.kaiju.domain.Organization) null) == false
+        service.canAssignToOrganization(user.id(), new lol.pbu.kaiju.domain.Organization(null, "No ID Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED, null, [])) == false
+    }
+
+    def "canAssignToOrganization throws NOT_FOUND when user does not exist"() {
+        when:
+        service.canAssignToOrganization(UUID.randomUUID(), UUID.randomUUID())
+
+        then:
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.NOT_FOUND
+    }
 }
