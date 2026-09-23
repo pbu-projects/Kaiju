@@ -5,6 +5,7 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
+import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
@@ -108,23 +109,37 @@ public class ProjectSecurityService {
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
-        if (user.role().hasPermission(Permission.PROJECT_UPDATE) &&
-                (user.role().hasPermission(Permission.PROJECT_APPROVE) || user.role().hasPermission(Permission.REGION_MANAGE))) {
-            if (project.id() != null) {
-                long locationCount = queryRepository.countProjectLocations(project.id());
-                if (locationCount == 0) {
-                    if (user.role().hasPermission(Permission.REGION_MANAGE) && queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id())) {
-                        return true;
-                    }
-                } else if (queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id())) {
-                    return true;
-                }
-            }
+        if (canRegionalAdminModifyProject(user, project.id())) {
+            return true;
         }
         if (project.organization() == null) {
             return false;
         }
         return queryRepository.isOrgManager(userId, project.organization().id());
+    }
+
+    private boolean canRegionalAdminModifyProject(User user, UUID projectId) {
+        if (!user.role().hasPermission(Permission.PROJECT_UPDATE)) {
+            return false;
+        }
+        boolean hasRegionalRole = user.role().hasPermission(Permission.PROJECT_APPROVE)
+                || user.role().hasPermission(Permission.REGION_MANAGE);
+        if (!hasRegionalRole) {
+            return false;
+        }
+        return hasProjectJurisdiction(user, projectId);
+    }
+
+    private boolean hasProjectJurisdiction(User user, UUID projectId) {
+        if (projectId == null) {
+            return false;
+        }
+        long locationCount = queryRepository.countProjectLocations(projectId);
+        if (locationCount == 0) {
+            return user.role().hasPermission(Permission.REGION_MANAGE)
+                    && queryRepository.isVirtualProjectInDirectorJurisdiction(user.id(), projectId);
+        }
+        return queryRepository.hasJurisdictionOverAllProjectLocations(user.id(), projectId);
     }
 
     /**
@@ -141,14 +156,7 @@ public class ProjectSecurityService {
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
-        if (project.id() == null) {
-            return false;
-        }
-        long locationCount = queryRepository.countProjectLocations(project.id());
-        if (locationCount == 0) {
-            return user.role().hasPermission(Permission.REGION_MANAGE) && queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id());
-        }
-        return queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id());
+        return hasProjectJurisdiction(user, project.id());
     }
 
     /**
