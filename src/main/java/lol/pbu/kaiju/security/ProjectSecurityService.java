@@ -6,7 +6,6 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectStatus;
-import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;

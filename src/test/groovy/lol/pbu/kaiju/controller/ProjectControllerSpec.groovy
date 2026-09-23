@@ -917,4 +917,30 @@ class ProjectControllerSpec extends BaseControllerSpec {
         approved.id() == projId
         approved.status() == ACTIVE
     }
+
+    def "APPROVE | should allow REGION_DIRECTOR to approve virtual project assigned via managing_region_id"() {
+        given: "a region, verified organization, and virtual project explicitly assigned via managing_region_id"
+        def regId = UUID.randomUUID()
+        def orgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Managing Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Managing Reg Org', true, 'VERIFIED')", orgId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, ?, 'Virtual Assigned Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, orgId, regId)
+
+        and: "a REGION_DIRECTOR assigned to that managing region"
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-mgr-appr-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+
+        when: "the REGION_DIRECTOR approves the virtual project"
+        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+
+        then: "the project transitions to ACTIVE"
+        approved.id() == projId
+        approved.status() == ACTIVE
+    }
 }
+

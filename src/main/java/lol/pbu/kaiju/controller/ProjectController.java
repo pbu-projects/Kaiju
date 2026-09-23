@@ -16,10 +16,12 @@ import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
+import io.micronaut.transaction.annotation.Transactional;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.ProjectAuditLog;
+import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.AuditAction;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
@@ -218,6 +220,7 @@ public class ProjectController {
      */
     @Put("/{id}/status")
     @Secured(PROJECT_APPROVE_CLAIM)
+    @Transactional
     @NonNull
     public Project approveProject(@PathVariable @NonNull UUID id, @NonNull Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
@@ -251,15 +254,15 @@ public class ProjectController {
                 project.boundaries()
         ));
 
-        userRepository.findById(regionalAdminId).ifPresent(actor ->
-                projectAuditLogRepository.save(new ProjectAuditLog(
-                        null,
-                        approvedProject,
-                        actor,
-                        AuditAction.APPROVED,
-                        OffsetDateTime.now()
-                ))
-        );
+        User actor = userRepository.findById(regionalAdminId)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+        projectAuditLogRepository.save(new ProjectAuditLog(
+                null,
+                approvedProject,
+                actor,
+                AuditAction.APPROVED,
+                OffsetDateTime.now()
+        ));
 
         return approvedProject;
     }
