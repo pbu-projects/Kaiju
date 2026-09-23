@@ -77,8 +77,8 @@ This test plan outlines the scenarios required to validate the migration to the 
 ## 9. Untested Business Workflows & Edge Cases
 
 **Objective:** Ensure remaining functional workflows are secured according to the matrix.
-- [ ] **Virtual Project Geography Injection:** An attacker attempts to add geographic locations to an already `ACTIVE` virtual project.
+- [x] **Virtual Project Geography Injection:** An attacker attempts to add geographic locations to an already `ACTIVE` virtual project.
   - **Expected:** Update is rejected, or the project is demoted to `PENDING` for regional review.
-- [ ] **Project Reassignment:** A `STANDARD_USER` attempts to reassign a project's ownership.
+- [x] **Project Reassignment:** A `STANDARD_USER` attempts to reassign a project's ownership.
   - **Expected:** `403 Forbidden` (Only applicable admins can reassign).
 - [ ] **User Management/Banning:** A `REGION_DIRECTOR` attempts to ban or delete a user (`403 Forbidden`). A `GLOBAL_ADMIN` attempts the same (`200 OK`).

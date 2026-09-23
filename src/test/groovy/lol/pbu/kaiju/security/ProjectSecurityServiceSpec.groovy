@@ -137,4 +137,112 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         HttpStatusException e = thrown()
         e.status == HttpStatus.NOT_FOUND
     }
+
+    def "canReassignProject returns true for GLOBAL_ADMIN without any jurisdiction check"() {
+        given:
+        User admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def project = new lol.pbu.kaiju.domain.Project(
+                projectId, null, null, "Title", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                OffsetDateTime.now(), null, null, [], []
+        )
+
+        expect:
+        service.canReassignProject(admin.id(), project) == true
+    }
+
+    def "canReassignProject returns false for STANDARD_USER even if org manager"() {
+        given: "a standard user who is an org manager"
+        User user = saveUser(UserRole.STANDARD_USER)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", user.id(), orgId)
+        def project = new lol.pbu.kaiju.domain.Project(
+                projectId, null, null, "Title", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                OffsetDateTime.now(), null, null, [], []
+        )
+
+        expect:
+        service.canReassignProject(user.id(), project) == false
+    }
+
+    def "canReassignProject returns false for REGION_AGENT without jurisdiction"() {
+        given: "a regional agent with no jurisdiction over the project"
+        User agent = saveUser(UserRole.REGION_AGENT)
+        def project = new lol.pbu.kaiju.domain.Project(
+                projectId, null, null, "Title", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                OffsetDateTime.now(), null, null, [], []
+        )
+
+        expect:
+        service.canReassignProject(agent.id(), project) == false
+    }
+
+    def "canReassignProject throws NOT_FOUND when user does not exist"() {
+        given:
+        def project = new lol.pbu.kaiju.domain.Project(
+                projectId, null, null, "Title", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                OffsetDateTime.now(), null, null, [], []
+        )
+
+        when:
+        service.canReassignProject(UUID.randomUUID(), project)
+
+        then:
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "areAllLocationsInOrgRegion returns false when locations is null or empty"() {
+        given:
+        def projectNoLocs = new lol.pbu.kaiju.domain.Project(
+                projectId, null, null, "Title", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                OffsetDateTime.now(), null, null, [], []
+        )
+        def projectNullLocs = new lol.pbu.kaiju.domain.Project(
+                projectId, null, null, "Title", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                OffsetDateTime.now(), null, null, null, []
+        )
+
+        expect:
+        service.areAllLocationsInOrgRegion(projectNoLocs, orgId) == false
+        service.areAllLocationsInOrgRegion(projectNullLocs, orgId) == false
+    }
+
+    def "areAllLocationsInOrgRegion evaluates geographic boundaries correctly"() {
+        given: "a region and an organization mapped to it"
+        def testRegionId = UUID.randomUUID()
+        def testOrgId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom) 
+            VALUES (?, 'Denver Area', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
+        """, testRegionId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Geo Org', true)", testOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, testRegionId)
+
+        and: "locations inside and outside the region"
+        def geomFactory = new org.locationtech.jts.geom.GeometryFactory(new org.locationtech.jts.geom.PrecisionModel(), 4326)
+        def insidePoint = geomFactory.createPoint(new org.locationtech.jts.geom.Coordinate(-104.9903, 39.7392))
+        def outsidePoint = geomFactory.createPoint(new org.locationtech.jts.geom.Coordinate(-105.2705, 40.0150))
+        def insideLoc = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "Inside", "123 St", "Denver", "CO", "80202", "US", insidePoint)
+        def outsideLoc = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "Outside", "456 St", "Boulder", "CO", "80302", "US", outsidePoint)
+
+        def projectInside = new lol.pbu.kaiju.domain.Project(
+                UUID.randomUUID(), null, null, "Inside", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.ACTIVE,
+                OffsetDateTime.now(), null, null, [insideLoc], []
+        )
+        def projectOutside = new lol.pbu.kaiju.domain.Project(
+                UUID.randomUUID(), null, null, "Outside", "Desc",
+                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.ACTIVE,
+                OffsetDateTime.now(), null, null, [outsideLoc], []
+        )
+
+        expect:
+        service.areAllLocationsInOrgRegion(projectInside, testOrgId) == true
+        service.areAllLocationsInOrgRegion(projectOutside, testOrgId) == false
+    }
 }
