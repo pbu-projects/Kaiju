@@ -154,7 +154,7 @@ public class OrganizationController implements ControllerUtils {
         return organizationRepository.searchByRegion(regionId, effectivePageable);
     }
 
-    private Pageable normalizePageable(Pageable pageable) {
+    private @NonNull Pageable normalizePageable(@Nullable Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
             return Pageable.from(0, 20);
         }

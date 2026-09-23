@@ -640,22 +640,30 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "SEARCH BY NAME | article normalization with 'An' and 'A' leading articles"() {
-        given: "organizations with 'An' and 'A' prefixes"
+        given: "organizations with 'An' and 'A' prefixes alongside competing prefix organizations"
         def orgAnId = UUID.randomUUID()
         def orgAId = UUID.randomUUID()
+        def compAnId = UUID.randomUUID()
+        def compAId = UUID.randomUUID()
+
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'An Organization Example', true, 'VERIFIED')", orgAnId)
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'A Better Tomorrow Foundation', true, 'VERIFIED')", orgAId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Organization Example Regional Branch', true, 'VERIFIED')", compAnId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Better Tomorrow Foundation Network', true, 'VERIFIED')", compAId)
 
         when: "searching without the leading article"
         def resAn = organizationController.searchByName("Organization Example", false, Pageable.from(0, 10))
         def resA = organizationController.searchByName("Better Tomorrow Foundation", false, Pageable.from(0, 10))
 
-        then: "article normalization correctly ranks the parent entity at the top"
-        !resAn.content.isEmpty()
+        then: "article normalization correctly ranks the parent entity with stripped article above the competitor"
+        resAn.content.size() == 2
         resAn.content[0].id() == orgAnId
+        resAn.content[1].id() == compAnId
 
-        !resA.content.isEmpty()
+        and: "second article query similarly elevates the canonical parent entity"
+        resA.content.size() == 2
         resA.content[0].id() == orgAId
+        resA.content[1].id() == compAId
     }
 
     def "SEARCH BY NAME | literal SQL wildcard characters (% and _) in organization names"() {
@@ -722,7 +730,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         and: "searching for 'Friends of'"
         def resFriends = organizationController.searchByName("Friends of", false, Pageable.from(0, 10))
 
+        and: "searching for 'Salvation Army' ranks parent organization at top"
+        def resParent = organizationController.searchByName("Salvation Army", false, Pageable.from(0, 10))
+
         then: "each specific query accurately isolates its target entity at the top of results"
+        resParent.content[0].id() == parentId
         resDenver.content[0].id() == denverId
         resAurora.content[0].id() == auroraId
         resSprings.content[0].id() == springsId
@@ -733,10 +745,20 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "PAGINATION & SORTING | normalizePageable and getOrganizations branch coverage"() {
-        given: "organizations exist"
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org Alpha', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org Beta', true, 'VERIFIED')", UUID.randomUUID())
+        given: "organizations, locations, and regions exist"
+        def org1Id = UUID.randomUUID()
+        def org2Id = UUID.randomUUID()
+        // Equal-length names (17 chars) ensure that native tie-breaker (o.name ASC) directly contradicts client DESC sort
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org 1', true, 'VERIFIED')", org1Id)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org 2', true, 'VERIFIED')", org2Id)
+
+        def locId = UUID.randomUUID()
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Paging Test Loc', '100 Main St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))", locId)
+        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", org1Id, locId)
+
+        def regionId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Paging Region', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", regionId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org1Id, regionId)
 
         when: "calling getOrganizations with null pageable"
         def resGetOrgsNull = organizationController.getOrganizations(null)
@@ -750,12 +772,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         and: "calling searchByName with Pageable.unpaged()"
         def resNameUnpaged = organizationController.searchByName("Paging Test Org", false, Pageable.unpaged())
 
-        and: "calling searchByName with client-specified sort (which should be stripped to preserve relevance order)"
+        and: "calling searchByName with client-specified sort (which should be stripped to preserve native relevance order)"
         def sortedPageable = Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
         def resNameWithSort = organizationController.searchByName("Paging Test Org", false, sortedPageable)
 
-        and: "calling searchByNameExact with client-specified sort (where stripSort is false)"
-        def resExactWithSort = organizationController.searchByName('"Paging Test Org Alpha"', false, sortedPageable)
+        and: "calling searchByNameExact with client-specified sort (which strips sort to prevent duplicate ORDER BY)"
+        def resExactWithSort = organizationController.searchByName('"Paging Test Org 1"', false, sortedPageable)
 
         and: "calling searchByLocation with null, unpaged, and sorted pageables"
         def resLocNull = organizationController.searchByLocation(-104.99, 39.74, 50000, null)
@@ -763,9 +785,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resLocSorted = organizationController.searchByLocation(-104.99, 39.74, 50000, sortedPageable)
 
         and: "calling searchByRegion with null, unpaged, and sorted pageables"
-        def regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Paging Region', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", regionId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regionId)
         def resRegionNull = organizationController.searchByRegion(regionId, null)
         def resRegionUnpaged = organizationController.searchByRegion(regionId, Pageable.unpaged())
         def resRegionSorted = organizationController.searchByRegion(regionId, sortedPageable)
@@ -775,14 +794,29 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         !resGetOrgsUnpaged.content.isEmpty()
         !resNameNullPageable.content.isEmpty()
         !resNameUnpaged.content.isEmpty()
-        !resNameWithSort.content.isEmpty()
-        !resExactWithSort.content.isEmpty()
-        resLocNull != null
-        resLocUnpaged != null
-        resLocSorted != null
+
+        and: "searchByName with client DESC sort strips the client sort and maintains native relevance ASC tie-breaking"
+        resNameWithSort.content*.name() == ['Paging Test Org 1', 'Paging Test Org 2']
+
+        and: "searchByNameExact with client sort strips sort and matches the exact target entity"
+        resExactWithSort.content.size() == 1
+        resExactWithSort.content[0].id() == org1Id
+
+        and: "searchByLocation returns matching organization across null, unpaged, and sorted pageables"
+        !resLocNull.content.isEmpty()
+        resLocNull.content[0].id() == org1Id
+        !resLocUnpaged.content.isEmpty()
+        resLocUnpaged.content[0].id() == org1Id
+        !resLocSorted.content.isEmpty()
+        resLocSorted.content[0].id() == org1Id
+
+        and: "searchByRegion returns matching organization across null, unpaged, and sorted pageables"
         !resRegionNull.content.isEmpty()
+        resRegionNull.content[0].id() == org1Id
         !resRegionUnpaged.content.isEmpty()
+        resRegionUnpaged.content[0].id() == org1Id
         !resRegionSorted.content.isEmpty()
+        resRegionSorted.content[0].id() == org1Id
     }
 }
 
