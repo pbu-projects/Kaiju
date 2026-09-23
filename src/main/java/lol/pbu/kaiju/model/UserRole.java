@@ -20,6 +20,7 @@ public enum UserRole {
             Permission.PROJECT_UPDATE,
             Permission.PROJECT_DELETE,
             Permission.PROJECT_APPROVE,
+            Permission.PROJECT_REASSIGN,
             Permission.ORG_READ
     )),
     REGION_DIRECTOR(Set.of(
@@ -28,6 +29,7 @@ public enum UserRole {
             Permission.PROJECT_UPDATE,
             Permission.PROJECT_DELETE,
             Permission.PROJECT_APPROVE,
+            Permission.PROJECT_REASSIGN,
             Permission.ORG_READ,
             Permission.REGION_MANAGE
     )),
@@ -37,6 +39,7 @@ public enum UserRole {
             Permission.PROJECT_UPDATE,
             Permission.PROJECT_DELETE,
             Permission.PROJECT_APPROVE,
+            Permission.PROJECT_REASSIGN,
             Permission.ORG_READ,
             Permission.ORG_EDIT,
             Permission.ORG_MANAGE_USERS,

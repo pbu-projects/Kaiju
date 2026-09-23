@@ -6,6 +6,7 @@ public enum Permission {
     PROJECT_UPDATE(Permission.PROJECT_UPDATE_CLAIM),
     PROJECT_DELETE(Permission.PROJECT_DELETE_CLAIM),
     PROJECT_APPROVE(Permission.PROJECT_APPROVE_CLAIM),
+    PROJECT_REASSIGN(Permission.PROJECT_REASSIGN_CLAIM),
     ORG_READ(Permission.ORG_READ_CLAIM),
     ORG_EDIT(Permission.ORG_EDIT_CLAIM),
     ORG_MANAGE_USERS(Permission.ORG_MANAGE_USERS_CLAIM),
@@ -18,6 +19,7 @@ public enum Permission {
     public static final String PROJECT_UPDATE_CLAIM = "project:update";
     public static final String PROJECT_DELETE_CLAIM = "project:delete";
     public static final String PROJECT_APPROVE_CLAIM = "project:approve";
+    public static final String PROJECT_REASSIGN_CLAIM = "project:reassign";
     public static final String ORG_READ_CLAIM = "org:read";
     public static final String ORG_EDIT_CLAIM = "org:edit";
     public static final String ORG_MANAGE_USERS_CLAIM = "org:manage_users";

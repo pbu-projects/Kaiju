@@ -14,6 +14,7 @@ import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
+import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.locationtech.jts.geom.Coordinate;
@@ -39,9 +40,17 @@ public class ProjectController {
     private static final String PROJECT_NOT_FOUND = "Project not found";
 
     private final ProjectRepository projectRepository;
+    private final ProjectSecurityService securityService;
+    private final OrganizationRepository organizationRepository;
 
-    public ProjectController(ProjectRepository projectRepository) {
+    public ProjectController(
+            ProjectRepository projectRepository,
+            ProjectSecurityService securityService,
+            OrganizationRepository organizationRepository
+    ) {
         this.projectRepository = projectRepository;
+        this.securityService = securityService;
+        this.organizationRepository = organizationRepository;
     }
 
     @Get
@@ -56,7 +65,7 @@ public class ProjectController {
 
     @Post
     @Secured(IS_AUTHENTICATED)
-    public Project submitProject(@Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
+    public Project submitProject(@Valid @Body Project project, Principal principal) {
         if (project.organization() == null) {
             throw new HttpStatusException(BAD_REQUEST, "Organization is required");
         }
@@ -89,7 +98,7 @@ public class ProjectController {
      */
     @Put("/{id}")
     @Secured(IS_AUTHENTICATED)
-    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal, ProjectSecurityService securityService) {
+    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
@@ -98,14 +107,29 @@ public class ProjectController {
         }
 
         Organization targetOrg = existing.organization();
+        UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
+
         if (project.organization() != null) {
-            UUID targetOrgId = project.organization().id();
-            UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
-            if (!Objects.equals(targetOrgId, existingOrgId)) {
-                if (targetOrgId == null || !securityService.canAssignToOrganization(userId, targetOrgId)) {
-                    throw new HttpStatusException(FORBIDDEN, "You do not have permission to reassign this project to the specified organization");
+            UUID requestedOrgId = project.organization().id();
+            if (!Objects.equals(requestedOrgId, existingOrgId)) {
+                if (!securityService.canReassignProject(userId, existing)) {
+                    throw new HttpStatusException(FORBIDDEN, "You do not have permission to reassign this project to another organization");
                 }
-                targetOrg = project.organization();
+                if (requestedOrgId == null) {
+                    throw new HttpStatusException(NOT_FOUND, "Target organization not found");
+                }
+                targetOrg = organizationRepository.findById(requestedOrgId)
+                        .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Target organization not found"));
+            }
+        }
+
+        ProjectStatus newStatus = existing.status();
+        boolean locationsModified = !Objects.equals(project.locations(), existing.locations());
+        boolean reassigned = !Objects.equals(targetOrg != null ? targetOrg.id() : null, existingOrgId);
+
+        if (locationsModified || reassigned) {
+            if (existing.status() == ACTIVE && (targetOrg == null || !securityService.areAllLocationsInOrgRegion(project, targetOrg.id()))) {
+                newStatus = PENDING;
             }
         }
         
@@ -117,7 +141,7 @@ public class ProjectController {
                 project.title(),
                 project.description(),
                 project.projectType(),
-                existing.status(), 
+                newStatus, 
                 existing.createdAt(),
                 existing.deletedAt(),
                 existing.deletedBy(),
@@ -133,7 +157,7 @@ public class ProjectController {
      */
     @Delete("/{id}")
     @Secured(IS_AUTHENTICATED)
-    public void deleteProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
+    public void deleteProject(@PathVariable UUID id, Principal principal) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
         
         UUID userId = UUID.fromString(principal.getName());
@@ -173,7 +197,7 @@ public class ProjectController {
      */
     @Put("/{id}/status")
     @Secured(PROJECT_APPROVE_CLAIM)
-    public Project approveProject(@PathVariable UUID id, Principal principal, ProjectSecurityService securityService) {
+    public Project approveProject(@PathVariable UUID id, Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         
         // Ensure they have geographic jurisdiction to approve it
