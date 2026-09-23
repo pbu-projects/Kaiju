@@ -102,7 +102,7 @@ public class OrganizationController implements ControllerUtils {
                     escapedCanonical,
                     effectivePageable
             );
-            if (results.getContent().isEmpty()) {
+            if (results.getTotalSize() == 0) {
                 return organizationRepository.searchByNameFuzzy(
                         unquoted,
                         canonicalTerm,
@@ -150,7 +150,7 @@ public class OrganizationController implements ControllerUtils {
             @QueryValue @NonNull UUID regionId,
             @Valid Pageable pageable
     ) {
-        Pageable effectivePageable = normalizePageable(pageable, false);
+        Pageable effectivePageable = normalizePageable(pageable, true);
         return organizationRepository.searchByRegion(regionId, effectivePageable);
     }
 
