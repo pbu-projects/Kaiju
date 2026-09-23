@@ -110,9 +110,16 @@ public class ProjectSecurityService {
             return true;
         }
         if (user.role().hasPermission(Permission.PROJECT_UPDATE) &&
-                (user.role() == UserRole.REGION_AGENT || user.role() == UserRole.REGION_DIRECTOR)) {
-            if (project.id() != null && queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id())) {
-                return true;
+                (user.role().hasPermission(Permission.PROJECT_APPROVE) || user.role().hasPermission(Permission.REGION_MANAGE))) {
+            if (project.id() != null) {
+                long locationCount = queryRepository.countProjectLocations(project.id());
+                if (locationCount == 0) {
+                    if (user.role().hasPermission(Permission.REGION_MANAGE) && queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id())) {
+                        return true;
+                    }
+                } else if (queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id())) {
+                    return true;
+                }
             }
         }
         if (project.organization() == null) {
@@ -140,7 +147,7 @@ public class ProjectSecurityService {
         }
         long locationCount = queryRepository.countProjectLocations(project.id());
         if (locationCount == 0) {
-            return user.role() == UserRole.REGION_DIRECTOR && queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id());
+            return user.role().hasPermission(Permission.REGION_MANAGE) && queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id());
         }
         return queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id());
     }
@@ -159,10 +166,10 @@ public class ProjectSecurityService {
 
         long locationCount = queryRepository.countProjectLocations(projectId);
         if (locationCount == 0) {
-            if (user.role() == UserRole.REGION_AGENT) {
+            if (!user.role().hasPermission(Permission.REGION_MANAGE)) {
                 throw new HttpStatusException(FORBIDDEN, "Region Agents do not have jurisdiction to approve virtual projects.");
             }
-            if (user.role() == UserRole.REGION_DIRECTOR && queryRepository.isVirtualProjectInDirectorJurisdiction(regionalAdminId, projectId)) {
+            if (queryRepository.isVirtualProjectInDirectorJurisdiction(regionalAdminId, projectId)) {
                 return;
             }
             throw new HttpStatusException(FORBIDDEN, "You do not have geographic jurisdiction to approve this virtual project.");

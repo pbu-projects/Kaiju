@@ -4,6 +4,7 @@ import io.micronaut.data.annotation.Query;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
 import io.micronaut.data.repository.GenericRepository;
 import lol.pbu.kaiju.domain.User;
+import org.jspecify.annotations.NonNull;
 
 import java.util.UUID;
 
@@ -69,10 +70,10 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
             )
         )
     """)
-    boolean hasJurisdictionOverAllProjectLocations(UUID regionalAdminId, UUID projectId);
+    boolean hasJurisdictionOverAllProjectLocations(@NonNull UUID regionalAdminId, @NonNull UUID projectId);
 
     @Query("SELECT COUNT(*) FROM project_locations WHERE project_id = :projectId")
-    long countProjectLocations(UUID projectId);
+    long countProjectLocations(@NonNull UUID projectId);
 
     @Query("""
         SELECT EXISTS (
@@ -82,14 +83,18 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
               AND (
                   (p.managing_region_id IS NOT NULL AND ru.region_id = p.managing_region_id)
                   OR (
-                      p.organization_id IS NOT NULL
+                      p.managing_region_id IS NULL
+                      AND p.organization_id IS NOT NULL
                       AND EXISTS (
                           SELECT 1 FROM organization_regions or_reg
-                          WHERE or_reg.organization_id = p.organization_id AND or_reg.region_id = ru.region_id
+                          JOIN organizations o ON o.id = or_reg.organization_id
+                          WHERE or_reg.organization_id = p.organization_id
+                            AND or_reg.region_id = ru.region_id
+                            AND o.verification_status = 'VERIFIED'
                       )
                   )
               )
         )
     """)
-    boolean isVirtualProjectInDirectorJurisdiction(UUID regionalAdminId, UUID projectId);
+    boolean isVirtualProjectInDirectorJurisdiction(@NonNull UUID regionalAdminId, @NonNull UUID projectId);
 }

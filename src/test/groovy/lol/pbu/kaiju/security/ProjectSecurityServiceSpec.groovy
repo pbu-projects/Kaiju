@@ -255,7 +255,7 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         def regId = UUID.randomUUID()
         def vOrgId = UUID.randomUUID()
         executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Virtual Org', true)", vOrgId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Virtual Org', true, 'VERIFIED')", vOrgId)
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, regId)
 
         and: "a virtual project belonging to that organization (zero locations in project_locations)"
@@ -342,5 +342,110 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         expect:
         queryRepository.hasJurisdictionOverAllProjectLocations(director.id(), pId) == true
         service.canReassignProject(director.id(), new lol.pbu.kaiju.domain.Project(pId, null, null, "Loc Project", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])) == true
+    }
+
+    def "canModifyProject allows REGION_DIRECTOR to modify a virtual project in their region"() {
+        given: "a region, verified organization in that region, and virtual project"
+        def regId = UUID.randomUUID()
+        def vOrgId = UUID.randomUUID()
+        def vProjId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Mod Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Mod Org', true, 'VERIFIED')", vOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, regId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Virtual Mod Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, vProjId, vOrgId)
+
+        and: "a REGION_DIRECTOR of that region"
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
+
+        and: "domain entity representation"
+        def orgEntity = new lol.pbu.kaiju.domain.Organization(vOrgId, "Mod Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.VERIFIED, null, [])
+        def projEntity = new lol.pbu.kaiju.domain.Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+
+        expect:
+        service.canModifyProject(director.id(), projEntity) == true
+    }
+
+    def "canModifyProject denies REGION_DIRECTOR on virtual project outside their region"() {
+        given: "a region, organization in a different region, and virtual project"
+        def dirRegId = UUID.randomUUID()
+        def otherRegId = UUID.randomUUID()
+        def vOrgId = UUID.randomUUID()
+        def vProjId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Dir Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", dirRegId)
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Other Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", otherRegId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Other Org', true, 'VERIFIED')", vOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, otherRegId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Virtual Mod Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, vProjId, vOrgId)
+
+        and: "a REGION_DIRECTOR of Dir Reg"
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), dirRegId)
+
+        def orgEntity = new lol.pbu.kaiju.domain.Organization(vOrgId, "Other Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.VERIFIED, null, [])
+        def projEntity = new lol.pbu.kaiju.domain.Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+
+        expect:
+        service.canModifyProject(director.id(), projEntity) == false
+    }
+
+    def "isVirtualProjectInDirectorJurisdiction enforces managing_region_id precedence over organization_regions"() {
+        given: "two regions A and B"
+        def regAId = UUID.randomUUID()
+        def regBId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Region A', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regAId)
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Region B', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regBId)
+
+        and: "an organization with presence in both Region A and Region B"
+        def orgMultiId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Multi Org', true, 'VERIFIED')", orgMultiId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgMultiId, regAId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgMultiId, regBId)
+
+        and: "a virtual project explicitly assigned to Region A via managing_region_id"
+        def projAId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, ?, 'Project specifically in Region A', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projAId, orgMultiId, regAId)
+
+        and: "directors for Region A and Region B"
+        def dirA = saveUser(UserRole.REGION_DIRECTOR)
+        def dirB = saveUser(UserRole.REGION_DIRECTOR)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", dirA.id(), regAId)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", dirB.id(), regBId)
+
+        expect: "Director A has jurisdiction because managing_region_id matches Region A"
+        queryRepository.isVirtualProjectInDirectorJurisdiction(dirA.id(), projAId) == true
+
+        and: "Director B is denied despite org presence in Region B, because managing_region_id takes precedence"
+        queryRepository.isVirtualProjectInDirectorJurisdiction(dirB.id(), projAId) == false
+    }
+
+    def "isVirtualProjectInDirectorJurisdiction rejects unverified organizations"() {
+        given: "a region and an UNVERIFIED organization in that region"
+        def regId = UUID.randomUUID()
+        def unverifiedOrgId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Unverified Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Unverified Org', true, 'UNVERIFIED')", unverifiedOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", unverifiedOrgId, regId)
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Unverified Org Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, unverifiedOrgId)
+
+        and: "a director of that region"
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
+
+        expect: "unverified organization virtual project cannot be approved by director"
+        queryRepository.isVirtualProjectInDirectorJurisdiction(director.id(), projId) == false
     }
 }
