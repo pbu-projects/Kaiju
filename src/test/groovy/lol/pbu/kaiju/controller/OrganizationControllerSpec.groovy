@@ -430,5 +430,120 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         results.content[0].id() == orgNearId
         results.content[1].id() == orgMidId
     }
+
+    def "SEARCH BY NAME | fuzzy trigram search should tolerate typos like 'Slavation Army'"() {
+        given: "a cluster of Salvation Army organizations and an unrelated org"
+        def parentId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", parentId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Family Store', true, 'VERIFIED')", UUID.randomUUID())
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Red Cross Society', true, 'VERIFIED')", UUID.randomUUID())
+
+        when: "searching with a typo: 'Slavation Army'"
+        Page<Organization> results = organizationController.searchByName("Slavation Army", false, Pageable.from(0, 10))
+
+        then: "The Salvation Army is matched via trigram similarity and ranked first"
+        !results.content.isEmpty()
+        results.content[0].id() == parentId
+        results.content[0].name() == "The Salvation Army"
+        results.content.every { it.name().contains("Salvation Army") }
+    }
+
+    def "SEARCH BY REGION | should return organizations operating within the specified administrative region"() {
+        given: "two administrative regions"
+        def region1Id = UUID.randomUUID()
+        def region2Id = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Colorado Region', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", region1Id)
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Utah Region', ST_GeographyFromText('POLYGON((-114 37, -109 37, -109 42, -114 42, -114 37))'))", region2Id)
+
+        and: "organizations assigned to different regions"
+        def org1Id = UUID.randomUUID()
+        def org2Id = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Colorado Food Bank', true, 'VERIFIED')", org1Id)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Utah Food Bank', true, 'VERIFIED')", org2Id)
+
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org1Id, region1Id)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org2Id, region2Id)
+
+        when: "searching for organizations in Region 1"
+        Page<Organization> results = organizationController.searchByRegion(region1Id, Pageable.from(0, 10))
+
+        then: "only the organization operating in Region 1 is returned"
+        results.content.size() == 1
+        results.content[0].id() == org1Id
+        results.content[0].name() == "Colorado Food Bank"
+    }
+
+    def "SEARCH SECURITY | should NOT return private organizations in name, location, or region search"() {
+        given: "a private organization and a public organization with similar names"
+        def publicOrgId = UUID.randomUUID()
+        def privateOrgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Confidential Shelter Public', true, 'VERIFIED')", publicOrgId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Confidential Shelter Private', false, 'VERIFIED')", privateOrgId)
+
+        and: "locations and regions assigned to both"
+        def locPublicId = UUID.randomUUID()
+        def locPrivateId = UUID.randomUUID()
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Pub', '1 St', 'City', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))", locPublicId)
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Priv', '2 St', 'City', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))", locPrivateId)
+        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", publicOrgId, locPublicId)
+        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", privateOrgId, locPrivateId)
+
+        def regionId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Test Region Private', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", regionId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", publicOrgId, regionId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", privateOrgId, regionId)
+
+        when: "searching by name"
+        def nameResults = organizationController.searchByName("Confidential Shelter", false, Pageable.from(0, 10))
+
+        and: "searching by location"
+        def locResults = organizationController.searchByLocation(-104.99, 39.74, 5000, Pageable.from(0, 10))
+
+        and: "searching by region"
+        def regionResults = organizationController.searchByRegion(regionId, Pageable.from(0, 10))
+
+        then: "private organization is never returned in any search endpoint"
+        nameResults.content.collect { it.id() } == [publicOrgId]
+        locResults.content.collect { it.id() } == [publicOrgId]
+        regionResults.content.collect { it.id() } == [publicOrgId]
+    }
+
+    def "SEARCH SECURITY | should NOT return unverified, suspended, or revoked organizations"() {
+        given: "organizations in various verification statuses"
+        def verifiedId = UUID.randomUUID()
+        def unverifiedId = UUID.randomUUID()
+        def suspendedId = UUID.randomUUID()
+        def revokedId = UUID.randomUUID()
+
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Verified', true, 'VERIFIED')", verifiedId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Unverified', true, 'UNVERIFIED')", unverifiedId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Suspended', true, 'SUSPENDED')", suspendedId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Revoked', true, 'REVOKED')", revokedId)
+
+        when: "searching by name"
+        def results = organizationController.searchByName("Charity Org", false, Pageable.from(0, 10))
+
+        then: "only the verified organization is returned"
+        results.content.collect { it.id() } == [verifiedId]
+    }
+
+    def "SEARCH SECURITY | SQL wildcard queries ('%', '_', '%%') should return empty page rather than dumping table"() {
+        given: "some organizations exist in the database"
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Wildcard Test Org A', true, 'VERIFIED')", UUID.randomUUID())
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Wildcard Test Org B', true, 'VERIFIED')", UUID.randomUUID())
+
+        when: "searching with wildcard characters"
+        def percentResults = organizationController.searchByName("%", false, Pageable.from(0, 10))
+        def underscoreResults = organizationController.searchByName("_", false, Pageable.from(0, 10))
+        def multiWildcardResults = organizationController.searchByName(" %_% ", false, Pageable.from(0, 10))
+        def emptyQuotesResults = organizationController.searchByName('""', false, Pageable.from(0, 10))
+
+        then: "all wildcard-only and empty quote queries return empty results"
+        percentResults.content.isEmpty()
+        underscoreResults.content.isEmpty()
+        multiWildcardResults.content.isEmpty()
+        emptyQuotesResults.content.isEmpty()
+    }
 }
 

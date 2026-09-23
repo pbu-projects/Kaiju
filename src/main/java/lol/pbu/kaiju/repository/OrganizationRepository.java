@@ -27,35 +27,88 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         SELECT o.id, o.name, o.website_url, o.parent_id, o.is_public, o.verification_status, o.verification_expires_at
         FROM organizations o
         WHERE LOWER(TRIM(o.name)) = LOWER(TRIM(:searchTerm))
+          AND o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
         ORDER BY o.name ASC
     """, countQuery = """
         SELECT COUNT(*)
         FROM organizations o
         WHERE LOWER(TRIM(o.name)) = LOWER(TRIM(:searchTerm))
+          AND o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
     """)
-    Page<Organization> searchByNameExact(String searchTerm, Pageable pageable);
+    Page<Organization> searchByNameExact(@NonNull String searchTerm, @NonNull Pageable pageable);
 
     @Query(value = """
         SELECT o.id, o.name, o.website_url, o.parent_id, o.is_public, o.verification_status, o.verification_expires_at
         FROM organizations o
-        WHERE LOWER(o.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))
+        WHERE o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
+          AND (
+              LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedTerm, '%')) ESCAPE '\\'
+              OR LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedCanonical, '%')) ESCAPE '\\'
+          )
         ORDER BY
             CASE
                 WHEN LOWER(TRIM(o.name)) = LOWER(TRIM(:searchTerm)) THEN 0
-                WHEN LOWER(TRIM(REGEXP_REPLACE(o.name, '^(The|A|An)\\s+', '', 'i'))) = LOWER(TRIM(REGEXP_REPLACE(:searchTerm, '^(The|A|An)\\s+', '', 'i'))) THEN 0
-                WHEN LOWER(REGEXP_REPLACE(o.name, '^(The|A|An)\\s+', '', 'i')) LIKE LOWER(CONCAT(REGEXP_REPLACE(TRIM(:searchTerm), '^(The|A|An)\\s+', '', 'i'), '%')) THEN 1
-                WHEN LOWER(o.name) LIKE LOWER(CONCAT(TRIM(:searchTerm), '%')) THEN 1
-                WHEN LOWER(o.name) LIKE LOWER(CONCAT('% ', TRIM(:searchTerm), '%')) THEN 2
-                ELSE 3
-            END,
+                WHEN LOWER(TRIM(o.name)) = LOWER(TRIM(:canonicalTerm)) THEN 0
+                WHEN LOWER(TRIM(REGEXP_REPLACE(o.name, '^(The|A|An)\\s+', '', 'i'))) = LOWER(TRIM(:canonicalTerm)) THEN 0
+                WHEN LOWER(REGEXP_REPLACE(o.name, '^(The|A|An)\\s+', '', 'i')) LIKE LOWER(CONCAT(:escapedCanonical, '%')) ESCAPE '\\' THEN 1
+                WHEN LOWER(o.name) LIKE LOWER(CONCAT(:escapedTerm, '%')) ESCAPE '\\' THEN 1
+                WHEN LOWER(o.name) LIKE LOWER(CONCAT('% ', :escapedTerm, '%')) ESCAPE '\\' THEN 2
+                WHEN LOWER(o.name) LIKE LOWER(CONCAT('% ', :escapedCanonical, '%')) ESCAPE '\\' THEN 2
+                WHEN LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedTerm, '%')) ESCAPE '\\' THEN 3
+                WHEN LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedCanonical, '%')) ESCAPE '\\' THEN 3
+                ELSE 4
+            END ASC,
             LENGTH(REGEXP_REPLACE(o.name, '^(The|A|An)\\s+', '', 'i')) ASC,
             o.name ASC
     """, countQuery = """
         SELECT COUNT(*)
         FROM organizations o
-        WHERE LOWER(o.name) LIKE LOWER(CONCAT('%', :searchTerm, '%'))
+        WHERE o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
+          AND (
+              LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedTerm, '%')) ESCAPE '\\'
+              OR LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedCanonical, '%')) ESCAPE '\\'
+          )
     """)
-    Page<Organization> searchByNameRanked(String searchTerm, Pageable pageable);
+    Page<Organization> searchByNameRanked(
+            @NonNull String searchTerm,
+            @NonNull String escapedTerm,
+            @NonNull String canonicalTerm,
+            @NonNull String escapedCanonical,
+            @NonNull Pageable pageable
+    );
+
+    @Query(value = """
+        SELECT o.id, o.name, o.website_url, o.parent_id, o.is_public, o.verification_status, o.verification_expires_at
+        FROM organizations o
+        WHERE o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
+          AND (
+              similarity(LOWER(o.name), LOWER(:searchTerm)) >= 0.3
+              OR similarity(LOWER(o.name), LOWER(:canonicalTerm)) >= 0.3
+          )
+        ORDER BY
+            GREATEST(similarity(LOWER(o.name), LOWER(:searchTerm)), similarity(LOWER(o.name), LOWER(:canonicalTerm))) DESC,
+            LENGTH(REGEXP_REPLACE(o.name, '^(The|A|An)\\s+', '', 'i')) ASC,
+            o.name ASC
+    """, countQuery = """
+        SELECT COUNT(*)
+        FROM organizations o
+        WHERE o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
+          AND (
+              similarity(LOWER(o.name), LOWER(:searchTerm)) >= 0.3
+              OR similarity(LOWER(o.name), LOWER(:canonicalTerm)) >= 0.3
+          )
+    """)
+    Page<Organization> searchByNameFuzzy(
+            @NonNull String searchTerm,
+            @NonNull String canonicalTerm,
+            @NonNull Pageable pageable
+    );
 
     @Query(value = """
         SELECT o.id, o.name, o.website_url, o.parent_id, o.is_public, o.verification_status, o.verification_expires_at
@@ -67,6 +120,8 @@ public interface OrganizationRepository extends PageableRepository<Organization,
             INNER JOIN organization_locations ol ON o.id = ol.organization_id
             INNER JOIN locations l ON ol.location_id = l.id
             WHERE ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
+              AND o.is_public = TRUE
+              AND o.verification_status = 'VERIFIED'
             ORDER BY o.id, ST_Distance(l.geom, CAST(:point AS geography)) ASC
         ) o
         ORDER BY o.distance ASC
@@ -76,11 +131,31 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         INNER JOIN organization_locations ol ON o.id = ol.organization_id
         INNER JOIN locations l ON ol.location_id = l.id
         WHERE ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
+          AND o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
     """)
     Page<Organization> searchByLocation(
-            @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class) Point point,
+            @NonNull @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class) Point point,
             double radiusMeters,
-            Pageable pageable
+            @NonNull Pageable pageable
     );
+
+    @Query(value = """
+        SELECT o.id, o.name, o.website_url, o.parent_id, o.is_public, o.verification_status, o.verification_expires_at
+        FROM organizations o
+        INNER JOIN organization_regions org_r ON o.id = org_r.organization_id
+        WHERE org_r.region_id = :regionId
+          AND o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
+        ORDER BY o.name ASC
+    """, countQuery = """
+        SELECT COUNT(*)
+        FROM organizations o
+        INNER JOIN organization_regions org_r ON o.id = org_r.organization_id
+        WHERE org_r.region_id = :regionId
+          AND o.is_public = TRUE
+          AND o.verification_status = 'VERIFIED'
+    """)
+    Page<Organization> searchByRegion(@NonNull UUID regionId, @NonNull Pageable pageable);
 }
 
