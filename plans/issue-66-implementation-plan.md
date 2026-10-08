@@ -1,10 +1,10 @@
-# Technical Implementation Plan: Issue #66 — Release 0.1.4: Security Verification & Client Contract Handoff
+# Technical Implementation Plan: Issue #66 — Release 0.0.6: Security Verification & Client Contract Handoff
 
 ## 1. Issue Overview and Scope
 
-Release 0.1.4 establishes the security verification foundation, tenant isolation guarantees, concurrency race-condition hardening, offline spatial timezone resolution, and client contract stability for the Kaiju platform. This release transitions the platform from preliminary prototype CRUD functionality into an enterprise-grade, multi-tenant civic engagement engine ready for frontend and mobile client handoff.
+Release 0.0.6 establishes the security verification foundation, tenant isolation guarantees, concurrency race-condition hardening, offline spatial timezone resolution, and client contract stability for the Kaiju platform. This release transitions the platform from preliminary prototype CRUD functionality into an enterprise-grade, multi-tenant civic engagement engine ready for frontend and mobile client handoff.
 
-### Audited Issues in Release 0.1.4
+### Audited Issues in Release 0.0.6
 
 * **Issue #59: Testing: End-to-End IAM Token Integration & OIDC Claim Verification Tests**: Implement Spock integration tests with authentic RS256 token signing (via Nimbus JOSE/JWT) validated against an in-process WireMock JWKS endpoint. Verifies claim extraction, principal creation, database role synchronization, key rotation handling, and strict rejection (HTTP 401 Unauthorized) of expired, tampered, or rogue-signed tokens.
 * **Issue #60: Testing: Automated 403 Forbidden & Privilege Containment Regression Suite across CRUD Controllers**: Comprehensive negative authorization matrix verifying every endpoint across all controllers. Enforces that anonymous callers receive HTTP 401 Unauthorized and authenticated callers lacking necessary roles or granular permissions receive HTTP 403 Forbidden.
@@ -944,7 +944,7 @@ import io.swagger.v3.oas.annotations.servers.Server;
 @OpenAPIDefinition(
         info = @Info(
                 title = "Kaiju Civic Engine API",
-                version = "0.1.4",
+                version = "0.0.6",
                 description = "High-performance spatial volunteer management and civic engagement engine",
                 contact = @Contact(name = "Peanut Butter Unicorn", url = "https://kaiju.pbu.lol")
         ),
@@ -1611,7 +1611,7 @@ class ClientContractVerificationSpec extends Specification {
 
     def "OpenAPI | Generated AOT spec exists and validates against OpenAPI 3.0 schema contract"() {
         given: "the compiled OpenAPI YAML specification"
-        File specFile = new File("build/classes/java/main/META-INF/swagger/kaiju-0.1.4.yml")
+        File specFile = new File("build/classes/java/main/META-INF/swagger/kaiju-0.0.6.yml")
         if (!specFile.exists()) {
             specFile = new File("docs/openapi.yaml")
         }
@@ -1625,7 +1625,7 @@ class ClientContractVerificationSpec extends Specification {
         then: "metadata and core endpoints are strictly declared"
         spec.openapi.startsWith("3.0")
         spec.info.title == "Kaiju Civic Engine API"
-        spec.info.version == "0.1.4"
+        spec.info.version == "0.0.6"
 
         and: "critical client routes are present in the contract"
         Map paths = spec.paths as Map

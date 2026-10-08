@@ -1,10 +1,10 @@
-# Technical Implementation Plan: Issue #65 — Release 0.1.3: Transactional Services & Concurrency
+# Technical Implementation Plan: Issue #65 — Release 0.0.5: Transactional Services & Concurrency
 
 ## 1. Issue Overview and Scope
 
-Release 0.1.3 represents the core architectural maturation of the Kaiju platform. This milestone transitions data access, business orchestration, and concurrency management from rapid-prototype patterns into an enterprise-grade, high-throughput, clean architecture. It eliminates time-of-check to time-of-use (TOCTOU) concurrency vulnerabilities, establishes transactional boundaries across domain aggregates, migrates execution from legacy operating system thread pools to Java 25 Virtual Threads, hardens identity provisioning with precise PostgreSQL state inspection, secures audit trails as immutable append-only logs, migrates spatial managing region validations into transactional application services, and aligns Spock test execution with connection pool visibility and mandatory database cleanup.
+Release 0.0.5 represents the core architectural maturation of the Kaiju platform. This milestone transitions data access, business orchestration, and concurrency management from rapid-prototype patterns into an enterprise-grade, high-throughput, clean architecture. It eliminates time-of-check to time-of-use (TOCTOU) concurrency vulnerabilities, establishes transactional boundaries across domain aggregates, migrates execution from legacy operating system thread pools to Java 25 Virtual Threads, hardens identity provisioning with precise PostgreSQL state inspection, secures audit trails as immutable append-only logs, migrates spatial managing region validations into transactional application services, and aligns Spock test execution with connection pool visibility and mandatory database cleanup.
 
-### Audited Issues in Release 0.1.3
+### Audited Issues in Release 0.0.5
 
 * **Issue #40: Data Access: Eliminate TOCTOU 2-Query Anti-Pattern Across Controllers**: Eliminate redundant `existsById()` checks preceding `deleteById()` operations across all controllers. Replace two-round-trip queries with atomic single-query deletions returning the affected row count (`long deletedCount = repo.removeById(id); if (deletedCount == 0) throw new HttpStatusException(NOT_FOUND, ...);`). Delete `ControllerUtils.java` entirely from the codebase.
 * **Issue #54: Architecture: Introduce Declarative `@Transactional` Application Service Layer**: Introduce `lol.pbu.kaiju.service` containing application services (`ProjectService`, `ShiftService`, `OrganizationService`, `UserService`, `AuditService`) annotated with declarative `@Transactional` boundaries to encapsulate multi-entity business mutations, boundary validations, and audit record generation within atomic transactions.
@@ -1602,7 +1602,7 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
 
 ### 7.1 Quality Verification Gates
 
-All changes must pass five strict verification gates before Release 0.1.3 is considered complete:
+All changes must pass five strict verification gates before Release 0.0.5 is considered complete:
 
 ```
 +-------------------------------------------------------------------------+

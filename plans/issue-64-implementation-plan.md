@@ -1,4 +1,4 @@
-# Technical Implementation Plan: Release 0.1.2 (Issue #64)
+# Technical Implementation Plan: Release 0.0.4 (Issue #64)
 
 **API Boundaries, DTO Records, Compile-Time Serde & Pipeline Test Migration**
 
@@ -8,7 +8,7 @@
 
 ### 1.1 Scope & Mission
 
-Release 0.1.2 establishes strict architectural boundaries across the Kaiju platform by eliminating domain model leakage in the REST API, securing child entity mass-assignment vectors, enforcing bean validation constraints, enabling reflection-free Micronaut AOT/Serde introspection, and migrating all Spock controller specifications to full Netty HTTP pipeline integration tests.
+Release 0.0.4 establishes strict architectural boundaries across the Kaiju platform by eliminating domain model leakage in the REST API, securing child entity mass-assignment vectors, enforcing bean validation constraints, enabling reflection-free Micronaut AOT/Serde introspection, and migrating all Spock controller specifications to full Netty HTTP pipeline integration tests.
 
 This release incorporates core architectural principles with three specific design enhancements:
 - **Enhancement 1 (Coordinate Bounds Validation)**: Mandatory `@Min(-180) @Max(180)` on longitude and `@Min(-90) @Max(90)` on latitude across all spatial DTOs.
@@ -1577,7 +1577,7 @@ Phase 8: Verification Gates, JaCoCo, SonarQube & Lighthouse
 
 ### 10.1 Rollback Strategy
 
-1. **Branch Isolation**: All changes are developed on release branch `release/0.1.2`.
+1. **Branch Isolation**: All changes are developed on release branch `release/0.0.4`.
 2. **Atomic Commits**: Separate commits for:
    - Commit 1: Build script updates and SonarQube pinning (#51).
    - Commit 2: Spatial Serde serializers & Domain model `@Serdeable` (#51).
@@ -1588,7 +1588,7 @@ Phase 8: Verification Gates, JaCoCo, SonarQube & Lighthouse
 
 ### 10.2 Verification Gates
 
-Before merging Release 0.1.2 into `main`:
+Before merging Release 0.0.4 into `main`:
 1. **Compile Gate**: `./gradlew compileJava compileTestGroovy` succeeds with zero errors and zero deprecation warnings.
 2. **AOT Gate**: `./gradlew check` compiles and executes with `convertYamlToJava = true` and `optimizeServiceLoading = true`.
 3. **Test Suite Gate**: All controller tests execute over Netty HTTP pipeline with 100% pass rate.
