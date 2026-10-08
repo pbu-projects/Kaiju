@@ -19,6 +19,7 @@ import org.locationtech.jts.geom.Point;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.micronaut.data.annotation.Join.Type.LEFT_FETCH;
 import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
 
 @JdbcRepository(dialect = POSTGRES)
@@ -26,6 +27,7 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
 
     @Override
     @Join("organization")
+    @Join(value = "managingRegion", type = LEFT_FETCH)
     @NonNull
     Optional<Project> findById(@NonNull UUID id);
 

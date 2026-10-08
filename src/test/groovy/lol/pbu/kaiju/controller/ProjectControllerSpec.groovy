@@ -12,9 +12,12 @@ import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
+import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.ProjectSearchCard
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
+import lol.pbu.kaiju.model.UserRole
+import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.OrganizationRepository
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
@@ -30,6 +33,7 @@ import spock.lang.Shared
 import spock.lang.Unroll
 
 import java.security.Principal
+import java.time.OffsetDateTime
 
 import io.micronaut.http.HttpStatus
 import static io.micronaut.http.HttpStatus.BAD_REQUEST
@@ -1052,6 +1056,392 @@ class ProjectControllerSpec extends BaseControllerSpec {
         0.0    | 95.0  | 1000.0
         0.0    | 0.0   | -1.0
         0.0    | 0.0   | 600000.0
+    }
+
+    def "SUBMIT | should throw 400 when managingRegion payload has null ID"() {
+        given: "a project with managingRegion that has null ID"
+        def org = getRandomOrganization()
+        def regionWithNullId = new AdministrativeRegion(null, "Null Id Region", null, null)
+        def project = new Project(null, org, regionWithNullId, "Test Title", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+
+        when: "submitting the project"
+        projectController.submitProject(project, testPrincipal)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == BAD_REQUEST
+        e.message == "Managing region does not exist"
+    }
+
+    def "SUBMIT | should successfully save virtual project with valid managingRegion"() {
+        given: "a valid region and organization where user has authority"
+        UUID regId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Submit Virtual Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
+        """, regId)
+        def org = organizationRepository.save(new Organization(null, "Org For Virtual Region", null, null, true, UNVERIFIED, null, []))
+        def region = new AdministrativeRegion(regId, "Submit Virtual Region", null, null)
+        def project = new Project(null, org, region, "Virtual Region Proj", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+
+        when: "submitting virtual project with global admin"
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        then: "project is saved and managingRegion is set"
+        saved.id() != null
+        saved.managingRegion() != null
+        saved.managingRegion().id() == regId
+    }
+
+    def "UPDATE | should throw 404 when reassigned organization has null ID"() {
+        given: "an existing project"
+        def org = getRandomOrganization()
+        def project = TestFixtures.createBasicProject(org, "Org Reassign Null ID", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        when: "updating the project with an organization shell having a null ID"
+        def orgWithNullId = new Organization(null, "Shell Org", null, null, true, UNVERIFIED, null, [])
+        def updatedProject = new Project(saved.id(), orgWithNullId, null, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
+        projectController.updateProject(saved.id(), updatedProject, testPrincipal)
+
+        then: "a 404 Not Found is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == NOT_FOUND
+        e.message == "Target organization not found"
+    }
+
+    def "UPDATE | should throw 400 when updating managingRegion with null ID"() {
+        given: "an existing project with no managingRegion"
+        def org = getRandomOrganization()
+        def project = TestFixtures.createBasicProject(org, "Update Region Null ID", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        when: "updating with a managingRegion whose ID is null"
+        def regionWithNullId = new AdministrativeRegion(null, "Null ID Region", null, null)
+        def updatedProject = new Project(saved.id(), org, regionWithNullId, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
+        projectController.updateProject(saved.id(), updatedProject, testPrincipal)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == BAD_REQUEST
+        e.message == "Managing region does not exist"
+    }
+
+    def "UPDATE | should throw 403 when user lacks authority to assign new managingRegion on update"() {
+        given: "an organization with a manager and a separate foreign region"
+        def orgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Update Region Org', true, 'VERIFIED')", orgId)
+
+        def foreignRegionId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Foreign Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
+        """, foreignRegionId)
+
+        def managerId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unauth-reg-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+
+        def org = new Organization(orgId, "Update Region Org", null, null, true, UNVERIFIED, null, [])
+        def initialProject = TestFixtures.createBasicProject(org, "Unauth Region Proj", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(initialProject, testPrincipal)
+
+        when: "the Org Manager attempts to assign a foreign region not linked to their organization"
+        def foreignRegion = new AdministrativeRegion(foreignRegionId, "Foreign Region", null, null)
+        def updateRequest = new Project(saved.id(), org, foreignRegion, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
+        projectController.updateProject(saved.id(), updateRequest, createPrincipal(managerId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message == "You do not have authority to assign this managing region"
+    }
+
+    def "UPDATE | should throw 403 when unauthorized user attempts to unassign managingRegion"() {
+        given: "a project with a managingRegion in Region B under an organization not bound to Region B"
+        def regBId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Region B', ST_GeogFromText('POLYGON((-104.8 39.7, -104.6 39.7, -104.6 39.8, -104.8 39.8, -104.8 39.7))'))
+        """, regBId)
+
+        def orgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Unassign Region', true, 'VERIFIED')", orgId)
+
+        def managerId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unauth-unassign-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+
+        def org = new Organization(orgId, "Org Unassign Region", null, null, true, UNVERIFIED, null, [])
+        def regB = new AdministrativeRegion(regBId, "Region B", null, null)
+        def initialProject = new Project(null, org, regB, "Project with Region B", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        Project saved = projectController.submitProject(initialProject, testPrincipal)
+
+        when: "the Org Manager attempts to unassign the managingRegion"
+        def updateRequest = new Project(saved.id(), org, null, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
+        projectController.updateProject(saved.id(), updateRequest, createPrincipal(managerId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message == "You do not have authority to unassign this managing region"
+    }
+
+    def "UPDATE | should allow authorized Org Manager to unassign managingRegion"() {
+        given: "a region and an organization bounded to it with an Org Manager"
+        def regId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Region For Unassign', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
+        """, regId)
+
+        def orgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org For Unassign', true, 'VERIFIED')", orgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
+
+        def managerId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unassign-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+
+        def org = new Organization(orgId, "Org For Unassign", null, null, true, UNVERIFIED, null, [])
+        def region = new AdministrativeRegion(regId, "Region For Unassign", null, null)
+        def initialProject = new Project(null, org, region, "Project with Region", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        Project saved = projectController.submitProject(initialProject, testPrincipal)
+
+        when: "the Org Manager updates the project setting managingRegion to null"
+        def updateRequest = new Project(saved.id(), org, null, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
+        Project updated = projectController.updateProject(saved.id(), updateRequest, createPrincipal(managerId))
+
+        then: "managingRegion is successfully unassigned"
+        updated.managingRegion() == null
+        def dbRow = sql.firstRow("SELECT managing_region_id FROM projects WHERE id = ?", [saved.id()])
+        dbRow.managing_region_id == null
+    }
+
+    def "UPDATE | should demote ACTIVE project to PENDING when reassigned to organization outside geographic bounds"() {
+        given: "two regions: Denver and Boulder"
+        def denverRegId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Denver City Reassign', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
+        """, denverRegId)
+
+        def boulderRegId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Boulder City Reassign', ST_GeogFromText('POLYGON((-105.35 39.95, -105.15 39.95, -105.15 40.10, -105.35 40.10, -105.35 39.95))'))
+        """, boulderRegId)
+
+        def orgAId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Denver Reassign Org A', true, 'VERIFIED')", orgAId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgAId, denverRegId)
+
+        def orgBId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Boulder Reassign Org B', true, 'VERIFIED')", orgBId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgBId, boulderRegId)
+
+        and: "an ACTIVE project under Denver Org with a location in Denver"
+        def gf = new GeometryFactory(new PrecisionModel(), 4326)
+        def denverPoint = gf.createPoint(new Coordinate(-104.9, 39.7))
+        def denverLoc = new Location(UUID.randomUUID(), "Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", denverPoint)
+
+        def projId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Active Denver Reassign Project', 'Desc', 'STANDARD', 'ACTIVE', NOW())
+        """, projId, orgAId)
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Denver Reassign Loc', '16th St', 'Denver', 'US', ST_GeogFromText('POINT(-104.9 39.7)'))",
+                denverLoc.id())
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, denverLoc.id())
+
+        def orgB = new Organization(orgBId, "Boulder Reassign Org B", null, null, true, UNVERIFIED, null, [])
+        def updateRequest = new Project(projId, orgB, null, "Active Denver Reassign Project", "Desc", STANDARD, ACTIVE, OffsetDateTime.now(), null, null, [denverLoc], [])
+
+        when: "a Global Admin reassigns the active Denver project to Boulder Org"
+        Project updated = projectController.updateProject(projId, updateRequest, testPrincipal)
+
+        then: "the status is automatically demoted to PENDING for regional review"
+        updated.status() == PENDING
+        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [projId])
+        row.status == 'PENDING'
+        row.organization_id == orgBId
+    }
+
+    def "UPDATE | should preserve ACTIVE status when reassigned to organization containing geographic bounds"() {
+        given: "a shared regional boundary enclosing Denver"
+        def regionId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Shared Denver Region', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
+        """, regionId)
+
+        def org1Id = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Alpha Shared', true, 'VERIFIED')", org1Id)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org1Id, regionId)
+
+        def org2Id = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Beta Shared', true, 'VERIFIED')", org2Id)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org2Id, regionId)
+
+        and: "an ACTIVE project in Org Alpha"
+        def gf = new GeometryFactory(new PrecisionModel(), 4326)
+        def denverPoint = gf.createPoint(new Coordinate(-104.9, 39.7))
+        def denverLoc = new Location(UUID.randomUUID(), "Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", denverPoint)
+
+        def projId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'Active Alpha Shared Proj', 'Desc', 'STANDARD', 'ACTIVE', NOW())
+        """, projId, org1Id)
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Denver Shared Loc', '16th St', 'Denver', 'US', ST_GeogFromText('POINT(-104.9 39.7)'))",
+                denverLoc.id())
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, denverLoc.id())
+
+        def org2 = new Organization(org2Id, "Org Beta Shared", null, null, true, UNVERIFIED, null, [])
+        def updateRequest = new Project(projId, org2, null, "Active Alpha Shared Proj", "Desc", STANDARD, ACTIVE, OffsetDateTime.now(), null, null, [denverLoc], [])
+
+        when: "reassigning to Org Beta which also encloses the location"
+        Project updated = projectController.updateProject(projId, updateRequest, testPrincipal)
+
+        then: "status is preserved as ACTIVE"
+        updated.status() == ACTIVE
+        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [projId])
+        row.status == 'ACTIVE'
+        row.organization_id == org2Id
+    }
+
+    def "UPDATE | should reject project update by unaffiliated standard user with 403 Forbidden"() {
+        given: "an existing project and an unaffiliated standard user"
+        def org = getRandomOrganization()
+        def project = TestFixtures.createBasicProject(org, "Protected Project", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        def unauthUserId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unaffil-update-${UUID.randomUUID()}@example.com".toString())
+
+        when: "unaffiliated user attempts to update the project"
+        def updateRequest = new Project(saved.id(), org, null, "Tampered Title", "Desc", STANDARD, DRAFT, saved.createdAt(), null, null, [], [])
+        projectController.updateProject(saved.id(), updateRequest, createPrincipal(unauthUserId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message == "You do not have permission to modify this project"
+    }
+
+    def "DELETE | should reject project deletion by unaffiliated user with 403 Forbidden"() {
+        given: "an existing project and an unaffiliated standard user"
+        def org = getRandomOrganization()
+        def project = TestFixtures.createBasicProject(org, "Protected Delete Proj", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        def unauthUserId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unaffil-del-${UUID.randomUUID()}@example.com".toString())
+
+        when: "unaffiliated user attempts to delete the project"
+        projectController.deleteProject(saved.id(), createPrincipal(unauthUserId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message == "You do not have permission to delete this project"
+    }
+
+    def "DELETE | should allow Org Manager to delete project belonging to their organization"() {
+        given: "an organization with an Org Manager and a project"
+        def orgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Delete Test Org', true, 'VERIFIED')", orgId)
+
+        def managerId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-del-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+
+        def org = new Organization(orgId, "Delete Test Org", null, null, true, UNVERIFIED, null, [])
+        def project = TestFixtures.createBasicProject(org, "Project to Delete", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        when: "the Org Manager deletes the project"
+        projectController.deleteProject(saved.id(), createPrincipal(managerId))
+
+        then: "the project is deleted from the database"
+        sql.firstRow("SELECT id FROM projects WHERE id = ?", [saved.id()]) == null
+    }
+
+    def "APPROVE | should reject approval of DRAFT project with 400 Bad Request"() {
+        given: "a project in DRAFT status"
+        def org = getRandomOrganization()
+        def project = TestFixtures.createBasicProject(org, "Draft Approval Project", "Desc", STANDARD, DRAFT)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        when: "attempting to approve the draft project"
+        projectController.approveProject(saved.id(), testPrincipal)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == BAD_REQUEST
+        e.message == "Only PENDING or PENDING_UPDATE projects can be approved"
+    }
+
+    def "APPROVE | should reject approval when REGION_DIRECTOR lacks geographic jurisdiction over physical locations"() {
+        given: "a Denver region and a Region Director for Denver"
+        def denverRegId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Denver Approval Region', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
+        """, denverRegId)
+
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-denver-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, denverRegId)
+
+        and: "a PENDING project with physical locations in Colorado Springs (outside Denver)"
+        def org = getRandomOrganization()
+        def gf = new GeometryFactory(new PrecisionModel(), 4326)
+        def csPoint = gf.createPoint(new Coordinate(-104.82, 38.83))
+        def csLoc = new Location(UUID.randomUUID(), "Colorado Springs Loc", "123 Main", "Colo Springs", "CO", "80903", "US", csPoint)
+
+        def projId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'CS Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+        """, projId, org.id())
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'CS Loc', '123 Main', 'Colo Springs', 'US', ST_GeogFromText('POINT(-104.82 38.83)'))",
+                csLoc.id())
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, csLoc.id())
+
+        when: "the Denver Region Director attempts to approve the project"
+        projectController.approveProject(projId, createPrincipal(directorId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message == "You do not have geographic jurisdiction to approve this project."
+    }
+
+    def "APPROVE | should throw 404 Not Found when approving principal does not exist in users table"() {
+        given: "a PENDING project"
+        def org = getRandomOrganization()
+        def project = TestFixtures.createBasicProject(org, "Actor 404 Project", "Desc", STANDARD, PENDING)
+        Project saved = projectController.submitProject(project, testPrincipal)
+
+        when: "calling approveProject with a principal UUID that is not in the users table"
+        def nonExistentUserPrincipal = createPrincipal(UUID.randomUUID())
+        projectController.approveProject(saved.id(), nonExistentUserPrincipal)
+
+        then: "a 404 Not Found is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == NOT_FOUND
+        e.message == "User not found"
+    }
+
+    def "SEARCH BY LOCATION | should return empty page when no projects exist within search radius"() {
+        when: "searching in the middle of the Atlantic Ocean where zero projects exist"
+        def emptyPage = projectController.searchByLocation(0.0, 0.0, 1000.0, Pageable.unpaged())
+
+        then: "an empty Page is returned"
+        emptyPage != null
+        emptyPage.content.isEmpty()
+        emptyPage.totalSize == 0
     }
 }
 
