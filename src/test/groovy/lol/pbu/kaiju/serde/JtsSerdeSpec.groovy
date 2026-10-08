@@ -231,4 +231,182 @@ class JtsSerdeSpec extends Specification {
         then: "an exception is thrown"
         thrown(IOException)
     }
+
+    /********** 3D Coordinates & Holes Tests **********/
+
+    def "JtsGeometrySerde | should serialize and deserialize 3D Point with Z coordinate"() {
+        given: "a 3D Point with Z coordinate"
+        Point point3d = geometryFactory.createPoint(new Coordinate(-105.0, 39.0, 1600.0))
+
+        when: "serialized to JSON"
+        String json = jsonMapper.writeValueAsString(point3d)
+
+        then: "Z coordinate is preserved in JSON"
+        json.contains('"coordinates":[-105.0,39.0,1600.0]')
+
+        when: "deserialized back to Geometry"
+        Geometry deserialized = jsonMapper.readValue(json, Geometry)
+
+        then: "Z coordinate is preserved on deserialized Point"
+        deserialized instanceof Point
+        deserialized.coordinate.x == -105.0
+        deserialized.coordinate.y == 39.0
+        deserialized.coordinate.z == 1600.0
+    }
+
+    def "JtsGeometrySerde | should serialize and deserialize Polygon with interior ring (hole)"() {
+        given: "a Polygon with an exterior shell and an interior hole"
+        Coordinate[] shellCoords = [
+                new Coordinate(-105.0, 39.0),
+                new Coordinate(-103.0, 39.0),
+                new Coordinate(-103.0, 41.0),
+                new Coordinate(-105.0, 41.0),
+                new Coordinate(-105.0, 39.0)
+        ]
+        Coordinate[] holeCoords = [
+                new Coordinate(-104.5, 39.5),
+                new Coordinate(-103.5, 39.5),
+                new Coordinate(-103.5, 40.5),
+                new Coordinate(-104.5, 40.5),
+                new Coordinate(-104.5, 39.5)
+        ]
+        Polygon polygonWithHole = geometryFactory.createPolygon(
+                geometryFactory.createLinearRing(shellCoords),
+                [geometryFactory.createLinearRing(holeCoords)] as org.locationtech.jts.geom.LinearRing[]
+        )
+
+        when: "serialized to JSON"
+        String json = jsonMapper.writeValueAsString(polygonWithHole)
+
+        then: "both shell and hole rings are serialized"
+        json.contains('"type":"Polygon"')
+
+        when: "deserialized back to Geometry"
+        Geometry deserialized = jsonMapper.readValue(json, Geometry)
+
+        then: "polygon retains its interior ring"
+        deserialized instanceof Polygon
+        Polygon resultPoly = (Polygon) deserialized
+        resultPoly.numInteriorRing == 1
+    }
+
+    def "JtsGeometrySerde | should serialize and deserialize MultiPolygon with interior ring"() {
+        given: "a MultiPolygon containing a polygon with a hole"
+        Coordinate[] shellCoords = [
+                new Coordinate(-105.0, 39.0),
+                new Coordinate(-103.0, 39.0),
+                new Coordinate(-103.0, 41.0),
+                new Coordinate(-105.0, 41.0),
+                new Coordinate(-105.0, 39.0)
+        ]
+        Coordinate[] holeCoords = [
+                new Coordinate(-104.5, 39.5),
+                new Coordinate(-103.5, 39.5),
+                new Coordinate(-103.5, 40.5),
+                new Coordinate(-104.5, 40.5),
+                new Coordinate(-104.5, 39.5)
+        ]
+        Polygon polygonWithHole = geometryFactory.createPolygon(
+                geometryFactory.createLinearRing(shellCoords),
+                [geometryFactory.createLinearRing(holeCoords)] as org.locationtech.jts.geom.LinearRing[]
+        )
+        MultiPolygon multiPolygon = geometryFactory.createMultiPolygon([polygonWithHole] as Polygon[])
+
+        when: "serialized and deserialized"
+        String json = jsonMapper.writeValueAsString(multiPolygon)
+        Geometry deserialized = jsonMapper.readValue(json, Geometry)
+
+        then: "deserialized MultiPolygon has member polygon with 1 hole"
+        deserialized instanceof MultiPolygon
+        MultiPolygon resultMp = (MultiPolygon) deserialized
+        resultMp.numGeometries == 1
+        ((Polygon) resultMp.getGeometryN(0)).numInteriorRing == 1
+    }
+
+    /********** Null Handling & Direct Constructor Tests **********/
+
+    def "JtsGeometrySerde | should handle null values gracefully"() {
+        given: "mock encoder"
+        io.micronaut.serde.Encoder encoder = Mock(io.micronaut.serde.Encoder)
+        io.micronaut.serde.Serializer.EncoderContext context = Mock(io.micronaut.serde.Serializer.EncoderContext)
+
+        when: "serializing null Geometry via serde"
+        geometrySerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(Geometry), null)
+
+        then: "encodeNull is invoked"
+        1 * encoder.encodeNull()
+
+        when: "deserializing null JSON"
+        Geometry nullGeom = jsonMapper.readValue("null", Geometry)
+        Point nullPoint = jsonMapper.readValue("null", Point)
+        Polygon nullPoly = jsonMapper.readValue("null", Polygon)
+        MultiPolygon nullMultiPoly = jsonMapper.readValue("null", MultiPolygon)
+
+        then: "nulls are returned without exception"
+        nullGeom == null
+        nullPoint == null
+        nullPoly == null
+        nullMultiPoly == null
+    }
+
+    def "Specialized serdes | should serialize nulls without error"() {
+        given: "mock encoder"
+        io.micronaut.serde.Encoder encoder = Mock(io.micronaut.serde.Encoder)
+        io.micronaut.serde.Serializer.EncoderContext context = Mock(io.micronaut.serde.Serializer.EncoderContext)
+
+        when: "serializing nulls"
+        pointSerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(Point), null)
+        polygonSerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(Polygon), null)
+        multiPolygonSerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(MultiPolygon), null)
+
+        then: "encodeNull is called each time"
+        3 * encoder.encodeNull()
+    }
+
+    def "Specialized serdes | should handle null return from delegate when decoding null node"() {
+        given: "mock decoder returning null node"
+        io.micronaut.serde.Decoder decoder = Mock(io.micronaut.serde.Decoder)
+        io.micronaut.serde.Deserializer.DecoderContext context = Mock(io.micronaut.serde.Deserializer.DecoderContext)
+        decoder.decodeNode() >> null
+
+        expect:
+        pointSerde.deserialize(decoder, context, io.micronaut.core.type.Argument.of(Point)) == null
+        polygonSerde.deserialize(decoder, context, io.micronaut.core.type.Argument.of(Polygon)) == null
+        multiPolygonSerde.deserialize(decoder, context, io.micronaut.core.type.Argument.of(MultiPolygon)) == null
+    }
+
+    def "JtsGeometrySerde | direct constructor and getter instantiate default factory"() {
+        when: "using default constructor"
+        JtsGeometrySerde directSerde = new JtsGeometrySerde()
+
+        then: "geometryFactory is available"
+        directSerde.geometryFactory != null
+        directSerde.geometryFactory.SRID == 4326
+    }
+
+    /********** Error Validation Branches **********/
+
+    def "JtsGeometrySerde | should throw exception on invalid GeoJSON payloads"() {
+        when: "deserializing invalid JSON #desc"
+        jsonMapper.readValue(invalidJson, Geometry)
+
+        then: "an exception is thrown"
+        thrown(IOException)
+
+        where:
+        desc                          | invalidJson
+        "not a JSON object"           | "123"
+        "missing type"                | '{"coordinates":[1,2]}'
+        "non-string type"             | '{"type":123,"coordinates":[1,2]}'
+        "missing coordinates"         | '{"type":"Point"}'
+        "non-array coordinates"       | '{"type":"Point","coordinates":"invalid"}'
+        "empty polygon coordinates"   | '{"type":"Polygon","coordinates":[]}'
+        "non-array shell"             | '{"type":"Polygon","coordinates":["invalid"]}'
+        "non-array hole"              | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39],[-104,40],[-105,40],[-105,39]],"bad"]}'
+        "non-array multipolygon"      | '{"type":"MultiPolygon","coordinates":["bad"]}'
+        "linear ring null coordinate" | '{"type":"Polygon","coordinates":[[[-105,39],null,[-104,40],[-105,39]]]}'
+        "coordinate too small"        | '{"type":"Point","coordinates":[1]}'
+        "coordinate not numbers"      | '{"type":"Point","coordinates":["a","b"]}'
+        "linear ring too short"       | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39]]]}'
+    }
 }

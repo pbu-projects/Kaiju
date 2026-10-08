@@ -28,6 +28,14 @@ import java.util.List;
 
 import static io.micronaut.core.type.Argument.OBJECT_ARGUMENT;
 
+/**
+ * Micronaut Serde serializer and deserializer for JTS {@link Geometry} objects and RFC 7946 GeoJSON.
+ *
+ * <p>LocationTech JTS and GeoJSON represent spatial structures under the {@link Geometry} type hierarchy
+ * (e.g., Point, Polygon, MultiPolygon) in memory and over HTTP, even though the Kaiju persistence layer
+ * exclusively uses PostGIS {@code geography} (WGS 84 / EPSG:4326) for geodesic real-world accuracy.
+ * This class serves solely as the HTTP wire adapter; no separate Cartesian geometry classes are needed.</p>
+ */
 @Singleton
 public class JtsGeometrySerde implements Serde<Geometry> {
 
@@ -109,10 +117,7 @@ public class JtsGeometrySerde implements Serde<Geometry> {
     private void writeRing(Encoder ringsEncoder, LineString ring) throws IOException {
         Encoder ringEncoder = ringsEncoder.encodeArray(OBJECT_ARGUMENT);
         for (Coordinate coord : ring.getCoordinates()) {
-            Encoder coordEncoder = ringEncoder.encodeArray(OBJECT_ARGUMENT);
-            coordEncoder.encodeDouble(coord.getX());
-            coordEncoder.encodeDouble(coord.getY());
-            coordEncoder.finishStructure();
+            writeCoordinate(ringEncoder, coord);
         }
         ringEncoder.finishStructure();
     }
@@ -123,9 +128,22 @@ public class JtsGeometrySerde implements Serde<Geometry> {
 
         encoder.encodeKey("coordinates");
         Encoder coordEncoder = encoder.encodeArray(OBJECT_ARGUMENT);
-        coordEncoder.encodeDouble(point.getX());
-        coordEncoder.encodeDouble(point.getY());
+        writeCoordinateElements(coordEncoder, point.getCoordinate());
         coordEncoder.finishStructure();
+    }
+
+    private void writeCoordinate(Encoder parentArrayEncoder, Coordinate coord) throws IOException {
+        Encoder coordEncoder = parentArrayEncoder.encodeArray(OBJECT_ARGUMENT);
+        writeCoordinateElements(coordEncoder, coord);
+        coordEncoder.finishStructure();
+    }
+
+    private void writeCoordinateElements(Encoder coordEncoder, Coordinate coord) throws IOException {
+        coordEncoder.encodeDouble(coord.getX());
+        coordEncoder.encodeDouble(coord.getY());
+        if (!Double.isNaN(coord.getZ())) {
+            coordEncoder.encodeDouble(coord.getZ());
+        }
     }
 
     @Override

@@ -15,6 +15,12 @@ import org.locationtech.jts.geom.Polygon;
 
 import java.io.IOException;
 
+/**
+ * Typed Micronaut Serde for JTS {@link Polygon} objects.
+ *
+ * <p>Delegates to {@link JtsGeometrySerde} to serialize and deserialize GeoJSON Polygons over HTTP.
+ * Domain entities bound to Polygon persist to PostGIS {@code geography(Polygon, 4326)} for geodesic accuracy.</p>
+ */
 @Singleton
 public class JtsPolygonSerde implements Serde<Polygon> {
 

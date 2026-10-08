@@ -32,6 +32,7 @@ public record AdministrativeRegion(
         UUID parentRegionId,
 
         @NotNull(message = "Administrative region geometry is required.")
+        @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
         Geometry geom
 ) {
     @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)

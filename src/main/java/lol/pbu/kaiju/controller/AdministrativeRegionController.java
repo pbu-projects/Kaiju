@@ -48,6 +48,9 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 @Controller("/administrative-regions")
 public class AdministrativeRegionController implements ControllerUtils {
 
+    public static final int DEFAULT_PAGE_SIZE = 20;
+    public static final String DEFAULT_SORT_FIELD = "name";
+
     private final AdministrativeRegionRepository administrativeRegionRepository;
 
     public AdministrativeRegionController(AdministrativeRegionRepository administrativeRegionRepository) {
@@ -66,7 +69,7 @@ public class AdministrativeRegionController implements ControllerUtils {
     @Get
     public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable CursoredPageable pageable) {
         CursoredPageable effectivePageable = (pageable == null || pageable.isUnpaged())
-                ? CursoredPageable.from(20, Sort.of(Sort.Order.asc("name")))
+                ? CursoredPageable.from(DEFAULT_PAGE_SIZE, Sort.of(Sort.Order.asc(DEFAULT_SORT_FIELD)))
                 : pageable;
         return administrativeRegionRepository.findAll(effectivePageable);
     }

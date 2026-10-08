@@ -15,6 +15,12 @@ import org.locationtech.jts.geom.MultiPolygon;
 
 import java.io.IOException;
 
+/**
+ * Typed Micronaut Serde for JTS {@link MultiPolygon} objects.
+ *
+ * <p>Delegates to {@link JtsGeometrySerde} to serialize and deserialize GeoJSON MultiPolygons over HTTP.
+ * Domain entities bound to MultiPolygon persist to PostGIS {@code geography(MultiPolygon, 4326)} for geodesic accuracy.</p>
+ */
 @Singleton
 public class JtsMultiPolygonSerde implements Serde<MultiPolygon> {
 

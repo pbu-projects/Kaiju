@@ -373,4 +373,65 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
         and: "the region is removed from the database"
         !administrativeRegionRepository.findById(region.id()).isPresent()
     }
+
+    def "Pagination | should apply default pagination and sort when requesting unpaged GET /administrative-regions"() {
+        given: "persisted regions"
+        createPersistedRegion("Beta Region")
+        createPersistedRegion("Alpha Region")
+
+        when: "an authenticated user requests without page/size parameters"
+        def response = client.exchange(
+                HttpRequest.GET("/")
+                        .header("X-Test-User", "volunteer-user")
+                        .header("X-Test-Role", "STANDARD_USER")
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                Map
+        )
+
+        then: "response is 200 OK with default pagination content"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+    }
+
+    def "ControllerUtils | should return 404 NOT FOUND when updating non-existent administrative region"() {
+        given: "a non-existent ID and valid update payload"
+        UUID nonExistentId = UUID.randomUUID()
+        Map updatePayload = [
+                name: "Ghost Region",
+                geom: [
+                        type: "Point",
+                        coordinates: [-105.0, 39.0]
+                ]
+        ]
+
+        when: "an administrator attempts to update a non-existent region"
+        client.exchange(
+                HttpRequest.PUT("/${nonExistentId}", updatePayload)
+                        .header("X-Test-User", "global-admin")
+                        .header("X-Test-Role", "system:admin")
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+        )
+
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "ControllerUtils | should return 404 NOT FOUND when deleting non-existent administrative region"() {
+        given: "a non-existent ID"
+        UUID nonExistentId = UUID.randomUUID()
+
+        when: "an administrator attempts to delete a non-existent region"
+        client.exchange(
+                HttpRequest.DELETE("/${nonExistentId}")
+                        .header("X-Test-User", "global-admin")
+                        .header("X-Test-Role", "system:admin")
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+        )
+
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
 }

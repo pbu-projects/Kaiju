@@ -15,6 +15,12 @@ import org.locationtech.jts.geom.Point;
 
 import java.io.IOException;
 
+/**
+ * Typed Micronaut Serde for JTS {@link Point} objects.
+ *
+ * <p>Delegates to {@link JtsGeometrySerde} to serialize and deserialize GeoJSON Points over HTTP.
+ * Domain entities bound to Point persist to PostGIS {@code geography(Point, 4326)} for geodesic accuracy.</p>
+ */
 @Singleton
 public class JtsPointSerde implements Serde<Point> {
 
