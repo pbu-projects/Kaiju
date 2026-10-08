@@ -38,7 +38,9 @@ To maintain compatibility across both deployment targets: - Rely on
 compile-time dependency injection (`@Singleton`, `@Inject`,
 `@Controller`). - Avoid reflection and dynamic proxying at runtime. -
 Use immutable Java `record`s or immutable models for DTOs. - Keep
-dependencies reflection-free and lightweight.
+dependencies reflection-free and lightweight. - Strictly follow the Google
+Java Style Guide and Kaiju import standards: no wildcard imports and no
+inline fully qualified class names (FQCN/FQDN), using explicit top-level imports.
 
 ==== Deployment Targets
 

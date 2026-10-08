@@ -2,7 +2,9 @@ package lol.pbu.kaiju.model
 
 import io.micronaut.core.convert.ConversionContext
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.MultiPolygon
 import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.Polygon
 import org.postgresql.util.PGobject
@@ -48,20 +50,21 @@ class JtsConverterSpec extends Specification {
         pointConverter.convertToEntityValue(new PGobject(), ConversionContext.DEFAULT) == null
     }
 
-    def "JtsPointConverter | should return null on ParseException for invalid hex or WKB value"() {
+    def "JtsPointConverter | should throw IllegalArgumentException on ParseException for invalid hex or WKB value"() {
         given: "a PGobject with malformed geometry representation"
         PGobject pgObject = new PGobject()
         pgObject.type = "geography"
         pgObject.value = "414243" // ABC in hex - valid hex but not a valid point WKB
 
         when: "converting to entity value"
-        Point result = pointConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
+        pointConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
-        then: "it returns null rather than throwing ParseException"
-        result == null
+        then: "it fails fast with IllegalArgumentException"
+        def e = thrown(IllegalArgumentException)
+        e.message.contains("Failed to parse Point from WKB")
     }
 
-    def "JtsPointConverter | should return null on SQLException when PGobject throws"() {
+    def "JtsPointConverter | should throw IllegalArgumentException on SQLException when PGobject throws"() {
         given: "a valid point"
         Point point = geometryFactory.createPoint(new Coordinate(-105.0, 39.0))
 
@@ -79,10 +82,11 @@ class JtsConverterSpec extends Specification {
         }
 
         when: "converting to persisted value"
-        PGobject result = throwingConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
+        throwingConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
 
-        then: "the SQLException is caught and null is returned"
-        result == null
+        then: "the SQLException causes fail-fast with IllegalArgumentException"
+        def e = thrown(IllegalArgumentException)
+        e.message.contains("Failed to serialize Point to PGobject geography")
     }
 
     def "JtsPointConverter | should default SRID to 4326 if SRID is 0"() {
@@ -152,20 +156,21 @@ class JtsConverterSpec extends Specification {
         polygonConverter.convertToEntityValue(new PGobject(), ConversionContext.DEFAULT) == null
     }
 
-    def "JtsPolygonConverter | should return null on ParseException for invalid hex or WKB value"() {
+    def "JtsPolygonConverter | should throw IllegalArgumentException on ParseException for invalid hex or WKB value"() {
         given: "a PGobject with malformed geometry representation"
         PGobject pgObject = new PGobject()
         pgObject.type = "geography"
         pgObject.value = "414243" // ABC in hex - valid hex but not a valid polygon WKB
 
         when: "converting to entity value"
-        Object result = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
+        polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
-        then: "it returns null rather than throwing ParseException"
-        result == null
+        then: "it fails fast with IllegalArgumentException"
+        def e = thrown(IllegalArgumentException)
+        e.message.contains("Failed to parse Polygon from WKB")
     }
 
-    def "JtsPolygonConverter | should return null on SQLException when PGobject throws"() {
+    def "JtsPolygonConverter | should throw IllegalArgumentException on SQLException when PGobject throws"() {
         given: "a valid polygon"
         Polygon polygon = createTestPolygon()
 
@@ -183,10 +188,11 @@ class JtsConverterSpec extends Specification {
         }
 
         when: "converting to persisted value"
-        Object result = throwingConverter.convertToPersistedValue(polygon, ConversionContext.DEFAULT)
+        throwingConverter.convertToPersistedValue(polygon, ConversionContext.DEFAULT)
 
-        then: "the SQLException is caught and null is returned"
-        result == null
+        then: "the SQLException causes fail-fast with IllegalArgumentException"
+        def e = thrown(IllegalArgumentException)
+        e.message.contains("Failed to serialize Geometry to PGobject geography")
     }
 
     def "JtsPolygonConverter | should default SRID to 4326 if SRID is 0"() {
@@ -215,5 +221,20 @@ class JtsConverterSpec extends Specification {
         then: "the SRID remains 3857"
         result instanceof Polygon
         ((Polygon) result).SRID == 3857
+    }
+
+    def "JtsPolygonConverter | should successfully parse MultiPolygon without ClassCastException"() {
+        given: "a valid MultiPolygon"
+        Polygon p1 = createTestPolygon()
+        MultiPolygon multiPolygon = geometryFactory.createMultiPolygon([p1] as Polygon[])
+        multiPolygon.setSRID(4326)
+
+        when: "converting to persisted value and back"
+        PGobject pgObject = polygonConverter.convertToPersistedValue(multiPolygon, ConversionContext.DEFAULT)
+        def result = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
+
+        then: "it reconstructs a Geometry instance without ClassCastException"
+        result instanceof Geometry
+        result.SRID == 4326
     }
 }

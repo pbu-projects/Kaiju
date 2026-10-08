@@ -18,6 +18,10 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.transaction.annotation.Transactional;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.ProjectAuditLog;
@@ -25,6 +29,7 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.AuditAction;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
+import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
@@ -34,10 +39,10 @@ import org.jspecify.annotations.NonNull;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.PrecisionModel;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.Optional;
@@ -62,19 +67,25 @@ public class ProjectController {
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
     private final ProjectAuditLogRepository projectAuditLogRepository;
+    private final AdministrativeRegionRepository administrativeRegionRepository;
+    private final GeometryFactory geometryFactory;
 
     public ProjectController(
             ProjectRepository projectRepository,
             ProjectSecurityService securityService,
             OrganizationRepository organizationRepository,
             UserRepository userRepository,
-            ProjectAuditLogRepository projectAuditLogRepository
+            ProjectAuditLogRepository projectAuditLogRepository,
+            AdministrativeRegionRepository administrativeRegionRepository,
+            GeometryFactory geometryFactory
     ) {
         this.projectRepository = projectRepository;
         this.securityService = securityService;
         this.organizationRepository = organizationRepository;
         this.userRepository = userRepository;
         this.projectAuditLogRepository = projectAuditLogRepository;
+        this.administrativeRegionRepository = administrativeRegionRepository;
+        this.geometryFactory = geometryFactory;
     }
 
     @Get
@@ -95,6 +106,20 @@ public class ProjectController {
         }
         
         UUID submitterId = UUID.fromString(principal.getName());
+
+        if (project.managingRegion() != null) {
+            UUID regionId = project.managingRegion().id();
+            if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
+                throw new HttpStatusException(BAD_REQUEST, "Managing region does not exist");
+            }
+            if (project.locations() != null && !project.locations().isEmpty()
+                    && !securityService.areAllLocationsInRegion(project, regionId)) {
+                throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
+            }
+            if (!securityService.canAssignManagingRegion(submitterId, project.organization().id(), regionId)) {
+                throw new HttpStatusException(FORBIDDEN, "You do not have authority to assign this managing region");
+            }
+        }
         
         // Evaluate the entire project's locations securely
         ProjectStatus evaluatedStatus = securityService.evaluateProjectCreationByUser(submitterId, project);
@@ -107,7 +132,7 @@ public class ProjectController {
                 project.description(),
                 project.projectType(),
                 evaluatedStatus,
-                java.time.OffsetDateTime.now(java.time.ZoneId.systemDefault()),
+                OffsetDateTime.now(ZoneId.systemDefault()),
                 null,
                 null,
                 project.locations(),
@@ -145,6 +170,36 @@ public class ProjectController {
                 targetOrg = organizationRepository.findById(requestedOrgId)
                         .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Target organization not found"));
             }
+        }
+
+        AdministrativeRegion effectiveRegion = project.managingRegion() != null ? project.managingRegion() : existing.managingRegion();
+        UUID effectiveOrgId;
+        if (targetOrg != null) {
+            effectiveOrgId = targetOrg.id();
+        } else if (existing.organization() != null) {
+            effectiveOrgId = existing.organization().id();
+        } else {
+            effectiveOrgId = null;
+        }
+
+        if (!Objects.equals(project.managingRegion(), existing.managingRegion())) {
+            if (project.managingRegion() != null) {
+                UUID regionId = project.managingRegion().id();
+                if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
+                    throw new HttpStatusException(BAD_REQUEST, "Managing region does not exist");
+                }
+                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, regionId)) {
+                    throw new HttpStatusException(FORBIDDEN, "You do not have authority to assign this managing region");
+                }
+            } else if (existing.managingRegion() != null
+                    && (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existing.managingRegion().id()))) {
+                throw new HttpStatusException(FORBIDDEN, "You do not have authority to unassign this managing region");
+            }
+        }
+
+        if (effectiveRegion != null && effectiveRegion.id() != null && project.locations() != null && !project.locations().isEmpty()
+                && !securityService.areAllLocationsInRegion(project, effectiveRegion.id())) {
+            throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
         }
 
         ProjectStatus newStatus = existing.status();
@@ -205,12 +260,11 @@ public class ProjectController {
      */
     @Get("/search-by-location")
     public Page<ProjectSearchCard> searchByLocation(
-            @QueryValue double longitude,
-            @QueryValue double latitude,
-            @QueryValue double radiusMeters,
+            @QueryValue @Min(-180) @Max(180) double longitude,
+            @QueryValue @Min(-90) @Max(90) double latitude,
+            @QueryValue @Positive @Max(500000) double radiusMeters,
             @Valid Pageable pageable
     ) {
-        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
         return projectRepository.searchByLocation(point, radiusMeters, pageable);
     }

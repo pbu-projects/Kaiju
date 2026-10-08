@@ -56,6 +56,68 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
     boolean isPointInOrgRegion(UUID organizationId, double longitude, double latitude);
 
     @Query("""
+        SELECT NOT EXISTS (
+            SELECT 1 FROM ST_Dump(ST_GeomFromWKB(:wkb, 4326)) d
+            WHERE NOT EXISTS (
+                SELECT 1 FROM administrative_regions r
+                JOIN organization_regions or_reg ON or_reg.region_id = r.id
+                WHERE or_reg.organization_id = :organizationId
+                  AND ST_Intersects(r.geom, d.geom)
+            )
+        )
+    """)
+    boolean areAllPointsInOrgRegion(UUID organizationId, byte[] wkb);
+
+    @Query("""
+        SELECT NOT EXISTS (
+            SELECT 1 FROM ST_Dump(ST_GeomFromWKB(:wkb, 4326)) d
+            WHERE NOT EXISTS (
+                SELECT 1 FROM administrative_regions r
+                JOIN region_users ru ON ru.region_id = r.id
+                WHERE ru.user_id = :userId
+                  AND ST_Intersects(r.geom, d.geom)
+            )
+        )
+    """)
+    boolean areAllPointsInAgentAssignedRegion(UUID userId, byte[] wkb);
+
+    @Query("""
+        SELECT NOT EXISTS (
+            SELECT 1 FROM ST_Dump(ST_GeomFromWKB(:wkb, 4326)) d
+            WHERE NOT EXISTS (
+                SELECT 1 FROM administrative_regions r
+                WHERE r.id = :regionId
+                  AND ST_Intersects(r.geom, d.geom)
+            )
+        )
+    """)
+    boolean areAllPointsInRegion(UUID regionId, byte[] wkb);
+
+    @Query("""
+        SELECT EXISTS (
+            SELECT 1 FROM organization_users 
+            WHERE user_id = :userId AND organization_id = :organizationId AND role = 'ORG_ADMIN'
+        )
+    """)
+    boolean isOrgAdmin(UUID userId, UUID organizationId);
+
+    @Query("""
+        SELECT EXISTS (
+            SELECT 1 FROM organization_regions 
+            WHERE organization_id = :organizationId AND region_id = :regionId
+        )
+    """)
+    boolean isOrgInRegion(UUID organizationId, UUID regionId);
+
+    @Query("""
+        SELECT EXISTS (
+            SELECT 1 FROM region_users 
+            WHERE user_id = :userId AND region_id = :regionId
+        )
+    """)
+    boolean isUserInRegion(UUID userId, UUID regionId);
+
+    @Query("""
         SELECT EXISTS (
             SELECT 1 FROM projects p
             JOIN project_locations pl ON pl.project_id = p.id

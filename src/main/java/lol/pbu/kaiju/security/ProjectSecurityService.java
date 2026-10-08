@@ -10,7 +10,12 @@ import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.MultiPoint;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.io.WKBWriter;
 
+import java.util.List;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
@@ -23,10 +28,12 @@ public class ProjectSecurityService {
 
     private final SecurityQueryRepository queryRepository;
     private final UserRepository userRepository;
+    private final GeometryFactory geometryFactory;
 
-    public ProjectSecurityService(SecurityQueryRepository queryRepository, UserRepository userRepository) {
+    public ProjectSecurityService(SecurityQueryRepository queryRepository, UserRepository userRepository, GeometryFactory geometryFactory) {
         this.queryRepository = queryRepository;
         this.userRepository = userRepository;
+        this.geometryFactory = geometryFactory;
     }
 
     /**
@@ -74,12 +81,11 @@ public class ProjectSecurityService {
         if (project.locations() == null || project.locations().isEmpty()) {
             return false;
         }
-        for (Location loc : project.locations()) {
-            if (loc.geom() == null || !queryRepository.isPointInOrgRegion(organizationId, loc.geom().getX(), loc.geom().getY())) {
-                return false;
-            }
+        byte[] wkb = buildMultiPointWkb(project.locations());
+        if (wkb.length == 0) {
+            return false;
         }
-        return true;
+        return queryRepository.areAllPointsInOrgRegion(organizationId, wkb);
     }
 
     public boolean areAllLocationsInOrgRegion(@NonNull Project project, @NonNull Organization organization) {
@@ -90,12 +96,59 @@ public class ProjectSecurityService {
     }
 
     private boolean areAllLocationsInAssignedRegion(Project project, UUID userId) {
-        for (Location loc : project.locations()) {
-            if (loc.geom() == null || !queryRepository.isPointInAgentAssignedRegion(userId, loc.geom().getX(), loc.geom().getY())) {
-                return false;
-            }
+        if (project.locations() == null || project.locations().isEmpty()) {
+            return false;
         }
-        return true;
+        byte[] wkb = buildMultiPointWkb(project.locations());
+        if (wkb.length == 0) {
+            return false;
+        }
+        return queryRepository.areAllPointsInAgentAssignedRegion(userId, wkb);
+    }
+
+    public boolean areAllLocationsInRegion(@NonNull Project project, @NonNull UUID regionId) {
+        if (project.locations() == null || project.locations().isEmpty()) {
+            return true;
+        }
+        byte[] wkb = buildMultiPointWkb(project.locations());
+        if (wkb.length == 0) {
+            return false;
+        }
+        return queryRepository.areAllPointsInRegion(regionId, wkb);
+    }
+
+    @NonNull
+    private byte[] buildMultiPointWkb(@NonNull List<Location> locations) {
+        if (locations.isEmpty()) {
+            return new byte[0];
+        }
+        Point[] points = new Point[locations.size()];
+        for (int i = 0; i < locations.size(); i++) {
+            Location loc = locations.get(i);
+            if (loc.geom() == null) {
+                return new byte[0];
+            }
+            points[i] = loc.geom();
+        }
+        MultiPoint multiPoint = geometryFactory.createMultiPoint(points);
+        multiPoint.setSRID(4326);
+        WKBWriter writer = new WKBWriter(2, true);
+        return writer.write(multiPoint);
+    }
+
+    /**
+     * Validates whether a user has authority to assign or reassign the project to a specific managing region.
+     */
+    public boolean canAssignManagingRegion(@NonNull UUID userId, @NonNull UUID organizationId, @NonNull UUID regionId) {
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return true;
+        }
+        if (queryRepository.isUserInRegion(userId, regionId)) {
+            return true;
+        }
+        return queryRepository.isOrgManager(userId, organizationId) && queryRepository.isOrgInRegion(organizationId, regionId);
     }
 
     /**

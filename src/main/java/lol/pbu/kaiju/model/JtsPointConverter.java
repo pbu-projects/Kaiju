@@ -8,11 +8,15 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
 import org.locationtech.jts.io.WKBWriter;
 import org.postgresql.util.PGobject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 
 @Singleton
 public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JtsPointConverter.class);
 
     @Override
     public PGobject convertToPersistedValue(Point entityValue, ConversionContext context) {
@@ -30,7 +34,8 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
             pgObject.setValue(hexWkb);
             return pgObject;
         } catch (SQLException e) {
-            return null;
+            LOG.error("Failed to convert Point to PGobject geography: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to serialize Point to PGobject geography", e);
         }
     }
 
@@ -52,7 +57,8 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
             }
             return point;
         } catch (ParseException e) {
-            return null;
+            LOG.error("Failed to parse Point from WKB: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to parse Point from WKB", e);
         }
     }
 }

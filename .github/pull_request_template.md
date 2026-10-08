@@ -13,6 +13,11 @@ To ensure that all changes are deliberate and understood (especially when utiliz
   * *Why did this change?*
   * *What changed?*
 
+## Test Validation (Journeys & Personas)
+
+* **Personas & Journeys Tested:** (e.g., Volunteer registering on mobile, Org Admin managing shifts)
+* **Scenarios Covered:** (e.g., Happy path, negative authorization like 403 Forbidden, boundary/spatial conditions)
+
 ## Checklist
 
 - [ ] I have personally reviewed all changes in this PR.

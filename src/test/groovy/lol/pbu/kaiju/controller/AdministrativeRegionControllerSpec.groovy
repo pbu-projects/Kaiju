@@ -100,7 +100,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
                         null,
                         props.name as String,
                         null,
-                        props.geom as org.locationtech.jts.geom.Geometry
+                        props.geom as Geometry
                 )
                 [invalidCase.caseName, r]
             }

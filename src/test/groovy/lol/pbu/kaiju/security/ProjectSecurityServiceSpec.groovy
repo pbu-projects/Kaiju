@@ -6,6 +6,15 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.domain.Location
+import lol.pbu.kaiju.domain.Organization
+import lol.pbu.kaiju.domain.Project
+import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.model.ProjectType
+import lol.pbu.kaiju.model.VerificationStatus
+import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.PrecisionModel
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.SecurityQueryRepository
 import lol.pbu.kaiju.repository.UserRepository
@@ -50,9 +59,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
         expect:
         // A global admin on any project (even one with no org match) can modify it
-        service.canModifyProject(admin.id(), new lol.pbu.kaiju.domain.Project(
+        service.canModifyProject(admin.id(), new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )) == true
     }
@@ -71,10 +80,10 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         """, anotherProject, anotherOrg)
 
         and: "user has NO org_user entry for that org"
-        def org = new lol.pbu.kaiju.domain.Organization(anotherOrg, "Other Org", null, null, true,
-                lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED, null, [])
-        def project = new lol.pbu.kaiju.domain.Project(anotherProject, org, null, "Other Project", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+        def org = new Organization(anotherOrg, "Other Org", null, null, true,
+                VerificationStatus.UNVERIFIED, null, [])
+        def project = new Project(anotherProject, org, null, "Other Project", "Desc",
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], [])
 
         expect:
@@ -84,9 +93,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canModifyProject returns false when project has no organization"() {
         given:
         User user = saveUser(UserRole.STANDARD_USER)
-        def project = new lol.pbu.kaiju.domain.Project(
+        def project = new Project(
                 UUID.randomUUID(), null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
 
@@ -96,9 +105,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "canModifyProject throws NOT_FOUND when user does not exist"() {
         given:
-        def project = new lol.pbu.kaiju.domain.Project(
+        def project = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
 
@@ -145,9 +154,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canReassignProject returns true for GLOBAL_ADMIN without any jurisdiction check"() {
         given:
         User admin = saveUser(UserRole.GLOBAL_ADMIN)
-        def project = new lol.pbu.kaiju.domain.Project(
+        def project = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
 
@@ -159,9 +168,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         given: "a standard user who is an org manager"
         User user = saveUser(UserRole.STANDARD_USER)
         executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", user.id(), orgId)
-        def project = new lol.pbu.kaiju.domain.Project(
+        def project = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
 
@@ -172,9 +181,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canReassignProject returns false for REGION_AGENT without jurisdiction"() {
         given: "a regional agent with no jurisdiction over the project"
         User agent = saveUser(UserRole.REGION_AGENT)
-        def project = new lol.pbu.kaiju.domain.Project(
+        def project = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
 
@@ -184,9 +193,9 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "canReassignProject throws NOT_FOUND when user does not exist"() {
         given:
-        def project = new lol.pbu.kaiju.domain.Project(
+        def project = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
 
@@ -200,14 +209,14 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "areAllLocationsInOrgRegion returns false when locations is null or empty"() {
         given:
-        def projectNoLocs = new lol.pbu.kaiju.domain.Project(
+        def projectNoLocs = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, [], []
         )
-        def projectNullLocs = new lol.pbu.kaiju.domain.Project(
+        def projectNullLocs = new Project(
                 projectId, null, null, "Title", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING,
+                ProjectType.STANDARD, ProjectStatus.PENDING,
                 OffsetDateTime.now(), null, null, null, []
         )
 
@@ -228,20 +237,20 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, testRegionId)
 
         and: "locations inside and outside the region"
-        def geomFactory = new org.locationtech.jts.geom.GeometryFactory(new org.locationtech.jts.geom.PrecisionModel(), 4326)
-        def insidePoint = geomFactory.createPoint(new org.locationtech.jts.geom.Coordinate(-104.9903, 39.7392))
-        def outsidePoint = geomFactory.createPoint(new org.locationtech.jts.geom.Coordinate(-105.2705, 40.0150))
-        def insideLoc = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "Inside", "123 St", "Denver", "CO", "80202", "US", insidePoint)
-        def outsideLoc = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "Outside", "456 St", "Boulder", "CO", "80302", "US", outsidePoint)
+        def geomFactory = new GeometryFactory(new PrecisionModel(), 4326)
+        def insidePoint = geomFactory.createPoint(new Coordinate(-104.9903, 39.7392))
+        def outsidePoint = geomFactory.createPoint(new Coordinate(-105.2705, 40.0150))
+        def insideLoc = new Location(UUID.randomUUID(), "Inside", "123 St", "Denver", "CO", "80202", "US", insidePoint)
+        def outsideLoc = new Location(UUID.randomUUID(), "Outside", "456 St", "Boulder", "CO", "80302", "US", outsidePoint)
 
-        def projectInside = new lol.pbu.kaiju.domain.Project(
+        def projectInside = new Project(
                 UUID.randomUUID(), null, null, "Inside", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.ACTIVE,
+                ProjectType.STANDARD, ProjectStatus.ACTIVE,
                 OffsetDateTime.now(), null, null, [insideLoc], []
         )
-        def projectOutside = new lol.pbu.kaiju.domain.Project(
+        def projectOutside = new Project(
                 UUID.randomUUID(), null, null, "Outside", "Desc",
-                lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.ACTIVE,
+                ProjectType.STANDARD, ProjectStatus.ACTIVE,
                 OffsetDateTime.now(), null, null, [outsideLoc], []
         )
 
@@ -341,7 +350,7 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
         expect:
         queryRepository.hasJurisdictionOverAllProjectLocations(director.id(), pId) == true
-        service.canReassignProject(director.id(), new lol.pbu.kaiju.domain.Project(pId, null, null, "Loc Project", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])) == true
+        service.canReassignProject(director.id(), new Project(pId, null, null, "Loc Project", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])) == true
     }
 
     def "canModifyProject allows REGION_DIRECTOR to modify a virtual project in their region"() {
@@ -362,8 +371,8 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
 
         and: "domain entity representation"
-        def orgEntity = new lol.pbu.kaiju.domain.Organization(vOrgId, "Mod Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.VERIFIED, null, [])
-        def projEntity = new lol.pbu.kaiju.domain.Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        def orgEntity = new Organization(vOrgId, "Mod Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        def projEntity = new Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
 
         expect:
         service.canModifyProject(director.id(), projEntity) == true
@@ -388,8 +397,8 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         def director = saveUser(UserRole.REGION_DIRECTOR)
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), dirRegId)
 
-        def orgEntity = new lol.pbu.kaiju.domain.Organization(vOrgId, "Other Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.VERIFIED, null, [])
-        def projEntity = new lol.pbu.kaiju.domain.Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        def orgEntity = new Organization(vOrgId, "Other Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        def projEntity = new Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
 
         expect:
         service.canModifyProject(director.id(), projEntity) == false
@@ -469,8 +478,8 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
 
         and: "domain entity representation"
-        def orgEntity = new lol.pbu.kaiju.domain.Organization(orgId, "Phys Mod Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.VERIFIED, null, [])
-        def projEntity = new lol.pbu.kaiju.domain.Project(projId, orgEntity, null, "Phys Mod Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        def orgEntity = new Organization(orgId, "Phys Mod Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        def projEntity = new Project(projId, orgEntity, null, "Phys Mod Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
 
         expect:
         service.canModifyProject(director.id(), projEntity) == true
@@ -494,8 +503,8 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
 
         and: "a domain entity"
-        def orgEntity = new lol.pbu.kaiju.domain.Organization(orgId, "VReassign Org", null, null, true, lol.pbu.kaiju.model.VerificationStatus.VERIFIED, null, [])
-        def projEntity = new lol.pbu.kaiju.domain.Project(projId, orgEntity, null, "VReassign Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        def orgEntity = new Organization(orgId, "VReassign Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        def projEntity = new Project(projId, orgEntity, null, "VReassign Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
 
         expect:
         service.canReassignProject(director.id(), projEntity) == true
@@ -526,5 +535,55 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         then: "a 403 Forbidden is thrown"
         HttpStatusException e = thrown()
         e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "areAllLocationsInOrgRegion batches multiple locations in single query"() {
+        given: "an organization linked to a region"
+        def regId = UUID.randomUUID()
+        def testOrgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Batch Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Batch Org', true, 'VERIFIED')", testOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, regId)
+
+        and: "a GeometryFactory and multiple points within the region"
+        def gf = new GeometryFactory(new PrecisionModel(), 4326)
+        def loc1 = new Location(UUID.randomUUID(), "L1", "A1", "C1", null, null, "US", gf.createPoint(new Coordinate(-105.0, 39.7)))
+        def loc2 = new Location(UUID.randomUUID(), "L2", "A2", "C2", null, null, "US", gf.createPoint(new Coordinate(-104.9, 39.7)))
+        def loc3 = new Location(UUID.randomUUID(), "L3", "A3", "C3", null, null, "US", gf.createPoint(new Coordinate(-104.8, 39.7)))
+
+        def projectAllIn = new Project(UUID.randomUUID(), null, null, "P1", "D", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, loc2, loc3], [])
+
+        and: "one point outside the region"
+        def locOut = new Location(UUID.randomUUID(), "LOut", "A4", "C4", null, null, "US", gf.createPoint(new Coordinate(-106.0, 41.0)))
+        def projectWithOut = new Project(UUID.randomUUID(), null, null, "P2", "D", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, locOut], [])
+
+        expect:
+        service.areAllLocationsInOrgRegion(projectAllIn, testOrgId) == true
+        service.areAllLocationsInOrgRegion(projectWithOut, testOrgId) == false
+    }
+
+    def "canAssignManagingRegion evaluates roles and organization presence"() {
+        given: "a region and organization"
+        def regId = UUID.randomUUID()
+        def testOrgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Assign Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Assign Org', true, 'VERIFIED')", testOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, regId)
+
+        and: "users with various roles"
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def standardUser = saveUser(UserRole.STANDARD_USER)
+
+        def orgManager = saveUser(UserRole.STANDARD_USER)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", orgManager.id(), testOrgId)
+
+        def regionalAgent = saveUser(UserRole.REGION_AGENT)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", regionalAgent.id(), regId)
+
+        expect:
+        service.canAssignManagingRegion(admin.id(), testOrgId, regId) == true
+        service.canAssignManagingRegion(orgManager.id(), testOrgId, regId) == true
+        service.canAssignManagingRegion(regionalAgent.id(), testOrgId, regId) == true
+        service.canAssignManagingRegion(standardUser.id(), testOrgId, regId) == false
     }
 }

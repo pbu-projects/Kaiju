@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.TestFixtures
@@ -8,7 +9,9 @@ import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.security.ProjectSecurityService
+import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.Point
+import org.locationtech.jts.io.WKTReader
 import spock.lang.Unroll
 
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
@@ -68,7 +71,7 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
 
         and: "the target geographic point"
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
-        org.locationtech.jts.geom.Geometry geom = new org.locationtech.jts.io.WKTReader().read(targetPointWkt)
+        Geometry geom = new WKTReader().read(targetPointWkt)
         Location dummyLocation = TestFixtures.createDummyLocation((Point) geom)
         Organization dummyOrg = TestFixtures.createDummyOrganization(orgId, orgStatus)
         Project dummyProject = TestFixtures.createDummyProject(dummyOrg, dummyLocation)
@@ -77,7 +80,7 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         def actualResult
         try {
             actualResult = projectSecurityService.evaluateProjectCreationByUser(userId, dummyProject)
-        } catch (io.micronaut.http.exceptions.HttpStatusException e) {
+        } catch (HttpStatusException e) {
             actualResult = null
         }
 
