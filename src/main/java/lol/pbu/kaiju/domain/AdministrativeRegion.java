@@ -10,10 +10,13 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.model.JtsPolygonConverter;
 
+import io.micronaut.serde.annotation.Serdeable;
+
 import java.util.UUID;
 
 import static io.micronaut.data.model.DataType.OBJECT;
 
+@Serdeable
 @MappedEntity("administrative_regions")
 public record AdministrativeRegion(
         @Id
