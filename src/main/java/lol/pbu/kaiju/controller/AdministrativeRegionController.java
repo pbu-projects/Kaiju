@@ -27,6 +27,7 @@ import java.util.UUID;
 
 import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 /**
@@ -34,10 +35,11 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
  *
  * <p>Enforces a two-tier security model: read operations require general authentication
  * ({@link SecurityRule#IS_AUTHENTICATED}), while mutating operations are restricted to
- * platform administrators ({@link Permission#SYSTEM_ADMIN_CLAIM}).</p>
+ * platform administrators and regional managers ({@link Permission#SYSTEM_ADMIN_CLAIM}, {@link Permission#REGION_MANAGE_CLAIM}).</p>
  *
  * @see SecurityRoles
  * @see Permission#SYSTEM_ADMIN_CLAIM
+ * @see Permission#REGION_MANAGE_CLAIM
  * @see AuthentikAuthenticationMapper
  * @see AdministrativeRegionRepository
  */
@@ -85,14 +87,15 @@ public class AdministrativeRegionController implements ControllerUtils {
 
     /**
      * Creates and persists a new administrative region polygon.
-     * Restricted to platform administrators ({@code GLOBAL_ADMIN}).
+     * Restricted to platform administrators ({@code GLOBAL_ADMIN}) and regional managers ({@code REGIONAL_ADMIN}).
      *
      * @param region the administrative region to create, including its geographic boundary polygon
      * @return the persisted {@link AdministrativeRegion} with its assigned identifier
      * @see AdministrativeRegionController for controller-level security architecture
      * @see Permission#SYSTEM_ADMIN_CLAIM
+     * @see Permission#REGION_MANAGE_CLAIM
      */
-    @Secured(SYSTEM_ADMIN_CLAIM)
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
     public AdministrativeRegion addAdministrativeRegion(@Valid @Body AdministrativeRegion region) {
         return administrativeRegionRepository.save(region);
@@ -100,7 +103,7 @@ public class AdministrativeRegionController implements ControllerUtils {
 
     /**
      * Updates an existing administrative region by ID.
-     * Restricted to platform administrators ({@code GLOBAL_ADMIN}).
+     * Restricted to platform administrators ({@code GLOBAL_ADMIN}) and regional managers ({@code REGIONAL_ADMIN}).
      *
      * @param id     the unique {@link UUID} of the administrative region to update
      * @param region the updated region data
@@ -108,8 +111,9 @@ public class AdministrativeRegionController implements ControllerUtils {
      * @see AdministrativeRegionController for controller-level security architecture
      * @see ControllerUtils#checkExists for entity existence validation
      * @see Permission#SYSTEM_ADMIN_CLAIM
+     * @see Permission#REGION_MANAGE_CLAIM
      */
-    @Secured(SYSTEM_ADMIN_CLAIM)
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body AdministrativeRegion region) {
         checkExists(administrativeRegionRepository, id);
@@ -118,14 +122,15 @@ public class AdministrativeRegionController implements ControllerUtils {
 
     /**
      * Deletes an administrative region by its unique identifier.
-     * Restricted to platform administrators ({@code GLOBAL_ADMIN}).
+     * Restricted to platform administrators ({@code GLOBAL_ADMIN}) and regional managers ({@code REGIONAL_ADMIN}).
      *
      * @param id the unique {@link UUID} of the administrative region to delete
      * @see AdministrativeRegionController for controller-level security architecture
      * @see ControllerUtils#checkExists for entity existence validation
      * @see Permission#SYSTEM_ADMIN_CLAIM
+     * @see Permission#REGION_MANAGE_CLAIM
      */
-    @Secured(SYSTEM_ADMIN_CLAIM)
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Delete("/{id}")
     public void deleteAdministrativeRegion(@PathVariable UUID id) {
         checkExists(administrativeRegionRepository, id);

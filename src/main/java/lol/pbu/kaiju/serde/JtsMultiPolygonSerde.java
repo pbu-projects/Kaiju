@@ -11,16 +11,16 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.MultiPolygon;
 
 import java.io.IOException;
 
 @Singleton
-public class JtsPolygonSerde implements Serde<Polygon> {
+public class JtsMultiPolygonSerde implements Serde<MultiPolygon> {
 
     private final JtsGeometrySerde geometrySerde;
 
-    public JtsPolygonSerde(JtsGeometrySerde geometrySerde) {
+    public JtsMultiPolygonSerde(JtsGeometrySerde geometrySerde) {
         this.geometrySerde = geometrySerde;
     }
 
@@ -28,25 +28,25 @@ public class JtsPolygonSerde implements Serde<Polygon> {
     public void serialize(
             @NonNull Encoder encoder,
             @NonNull EncoderContext context,
-            @NonNull Argument<? extends Polygon> type,
-            @Nullable Polygon value
+            @NonNull Argument<? extends MultiPolygon> type,
+            @Nullable MultiPolygon value
     ) throws IOException {
         geometrySerde.serialize(encoder, context, type, value);
     }
 
     @Override
-    public Polygon deserialize(
+    public MultiPolygon deserialize(
             @NonNull Decoder decoder,
             @NonNull DecoderContext context,
-            @NonNull Argument<? super Polygon> type
+            @NonNull Argument<? super MultiPolygon> type
     ) throws IOException {
         Geometry geom = geometrySerde.deserialize(decoder, context, Argument.of(Geometry.class));
         if (geom == null) {
             return null;
         }
-        if (geom instanceof Polygon polygon) {
-            return polygon;
+        if (geom instanceof MultiPolygon multiPolygon) {
+            return multiPolygon;
         }
-        throw new SerdeException("Expected Polygon geometry, but found " + geom.getGeometryType());
+        throw new SerdeException("Expected MultiPolygon geometry, but found " + geom.getGeometryType());
     }
 }

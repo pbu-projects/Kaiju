@@ -134,20 +134,6 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "Security | should reject regional agent attempting POST /administrative-regions with 403 FORBIDDEN"() {
-        when: "a regional agent lacking system:admin attempts to create a region"
-        client.exchange(
-                HttpRequest.POST("/", [name: "Agent Region"])
-                        .header("X-Test-User", "region-agent")
-                        .header("X-Test-Role", "region:manage")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
-        )
-
-        then: "a 403 FORBIDDEN response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.FORBIDDEN
-    }
-
     def "Security | should reject standard volunteer attempting PUT /administrative-regions/{id} with 403 FORBIDDEN"() {
         given: "an existing region"
         def region = createPersistedRegion("Region To Mutate")
@@ -223,6 +209,150 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         then:
         noExceptionThrown()
+    }
+
+    def "Security | should allow regional manager with region:manage claim to execute POST /administrative-regions"() {
+        given: "a valid GeoJSON creation payload"
+        Map payload = [
+                name: "Regional Created Region",
+                geom: [
+                        type: "Polygon",
+                        coordinates: [
+                                [
+                                        [-105.0, 39.0],
+                                        [-104.0, 39.0],
+                                        [-104.0, 40.0],
+                                        [-105.0, 40.0],
+                                        [-105.0, 39.0]
+                                ]
+                        ]
+                ]
+        ]
+
+        when: "a user with region:manage creates a region"
+        def response = client.exchange(
+                HttpRequest.POST("/", payload)
+                        .header("X-Test-User", "regional-manager")
+                        .header("X-Test-Role", "region:manage")
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                Map
+        )
+
+        then: "the region is created with 200 OK"
+        response.status == HttpStatus.OK
+        response.body().id != null
+        response.body().name == "Regional Created Region"
+
+        and: "the region is persisted in the database"
+        UUID createdId = UUID.fromString(response.body().id.toString())
+        administrativeRegionRepository.findById(createdId).isPresent()
+    }
+
+    def "Round-trip | should allow authorized POST with full GeoJSON payload, persisting and serializing back"() {
+        given: "a full GeoJSON payload"
+        Map payload = [
+                name: "Front Range Metro",
+                geom: [
+                        type: "Polygon",
+                        coordinates: [
+                                [
+                                        [-105.5, 39.5],
+                                        [-104.5, 39.5],
+                                        [-104.5, 40.5],
+                                        [-105.5, 40.5],
+                                        [-105.5, 39.5]
+                                ]
+                        ]
+                ]
+        ]
+
+        when: "a platform admin posts the region"
+        def response = client.exchange(
+                HttpRequest.POST("/", payload)
+                        .header("X-Test-User", "global-admin")
+                        .header("X-Test-Role", "system:admin")
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                Map
+        )
+
+        then: "the response is 200 OK with fully serialized GeoJSON geometry"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.id != null
+        body.name == "Front Range Metro"
+        body.geom instanceof Map
+        body.geom.type == "Polygon"
+        body.geom.coordinates != null
+
+        and: "the database entity has proper persisted Geometry"
+        UUID createdId = UUID.fromString(body.id.toString())
+        def persistedOpt = administrativeRegionRepository.findById(createdId)
+        persistedOpt.isPresent()
+        persistedOpt.get().geom() != null
+        persistedOpt.get().geom().geometryType == "Polygon"
+    }
+
+    def "Round-trip | should allow authorized PUT with full GeoJSON payload to update existing region"() {
+        given: "an existing persisted region"
+        def region = createPersistedRegion("Original Region")
+
+        and: "an update payload with new name and updated coordinates"
+        Map updatePayload = [
+                name: "Updated Front Range",
+                geom: [
+                        type: "Polygon",
+                        coordinates: [
+                                [
+                                        [-106.0, 38.0],
+                                        [-103.0, 38.0],
+                                        [-103.0, 41.0],
+                                        [-106.0, 41.0],
+                                        [-106.0, 38.0]
+                                ]
+                        ]
+                ]
+        ]
+
+        when: "a user with region:manage updates the region"
+        def response = client.exchange(
+                HttpRequest.PUT("/${region.id()}", updatePayload)
+                        .header("X-Test-User", "regional-manager")
+                        .header("X-Test-Role", "region:manage")
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                Map
+        )
+
+        then: "the update succeeds with 200 OK and updated GeoJSON response"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.id.toString() == region.id().toString()
+        body.name == "Updated Front Range"
+        body.geom.type == "Polygon"
+
+        and: "the database contains the updated data"
+        def updatedOpt = administrativeRegionRepository.findById(region.id())
+        updatedOpt.isPresent()
+        updatedOpt.get().name() == "Updated Front Range"
+        updatedOpt.get().geom() != null
+    }
+
+    def "Security | should allow regional manager with region:manage claim to delete region"() {
+        given: "an existing region to delete"
+        def region = createPersistedRegion("Regional Delete Target")
+
+        when: "a regional manager deletes the region"
+        def response = client.exchange(
+                HttpRequest.DELETE("/${region.id()}")
+                        .header("X-Test-User", "regional-manager")
+                        .header("X-Test-Role", "region:manage")
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+        )
+
+        then: "the deletion succeeds with 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the region is removed from the database"
+        !administrativeRegionRepository.findById(region.id()).isPresent()
     }
 
     def "Security | should allow global admin with system:admin claim to delete region"() {
