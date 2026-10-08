@@ -1,7 +1,6 @@
 package lol.pbu.kaiju.serde
 
 import io.micronaut.json.JsonMapper
-import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.locationtech.jts.geom.Coordinate

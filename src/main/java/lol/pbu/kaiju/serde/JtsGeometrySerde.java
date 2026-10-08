@@ -3,10 +3,8 @@ package lol.pbu.kaiju.serde;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.Decoder;
-import io.micronaut.serde.Deserializer.DecoderContext;
 import io.micronaut.serde.Encoder;
 import io.micronaut.serde.Serde;
-import io.micronaut.serde.Serializer.EncoderContext;
 import io.micronaut.serde.exceptions.SerdeException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -39,6 +37,9 @@ import static io.micronaut.core.type.Argument.OBJECT_ARGUMENT;
 @Singleton
 public class JtsGeometrySerde implements Serde<Geometry> {
 
+    private static final String TYPE_KEY = "type";
+    private static final String COORDINATES_KEY = "coordinates";
+
     private final GeometryFactory geometryFactory;
 
     public JtsGeometrySerde() {
@@ -68,26 +69,21 @@ public class JtsGeometrySerde implements Serde<Geometry> {
             return;
         }
 
-        if (!(value instanceof Polygon || value instanceof MultiPolygon || value instanceof Point)) {
-            throw new SerdeException("Unsupported geometry type for serialization: " + value.getGeometryType());
-        }
-
         Encoder objEncoder = encoder.encodeObject(type);
-        if (value instanceof Polygon polygon) {
-            writePolygon(objEncoder, polygon);
-        } else if (value instanceof MultiPolygon multiPolygon) {
-            writeMultiPolygon(objEncoder, multiPolygon);
-        } else if (value instanceof Point point) {
-            writePoint(objEncoder, point);
+        switch (value) {
+            case Polygon polygon -> writePolygon(objEncoder, polygon);
+            case MultiPolygon multiPolygon -> writeMultiPolygon(objEncoder, multiPolygon);
+            case Point point -> writePoint(objEncoder, point);
+            default -> throw new SerdeException("Unsupported geometry type for serialization: " + value.getGeometryType());
         }
         objEncoder.finishStructure();
     }
 
     private void writePolygon(Encoder encoder, Polygon polygon) throws IOException {
-        encoder.encodeKey("type");
+        encoder.encodeKey(TYPE_KEY);
         encoder.encodeString("Polygon");
 
-        encoder.encodeKey("coordinates");
+        encoder.encodeKey(COORDINATES_KEY);
         Encoder ringsEncoder = encoder.encodeArray(OBJECT_ARGUMENT);
         writeRing(ringsEncoder, polygon.getExteriorRing());
         for (int i = 0; i < polygon.getNumInteriorRing(); i++) {
@@ -97,10 +93,10 @@ public class JtsGeometrySerde implements Serde<Geometry> {
     }
 
     private void writeMultiPolygon(Encoder encoder, MultiPolygon multiPolygon) throws IOException {
-        encoder.encodeKey("type");
+        encoder.encodeKey(TYPE_KEY);
         encoder.encodeString("MultiPolygon");
 
-        encoder.encodeKey("coordinates");
+        encoder.encodeKey(COORDINATES_KEY);
         Encoder polysEncoder = encoder.encodeArray(OBJECT_ARGUMENT);
         for (int i = 0; i < multiPolygon.getNumGeometries(); i++) {
             Polygon poly = (Polygon) multiPolygon.getGeometryN(i);
@@ -123,10 +119,10 @@ public class JtsGeometrySerde implements Serde<Geometry> {
     }
 
     private void writePoint(Encoder encoder, Point point) throws IOException {
-        encoder.encodeKey("type");
+        encoder.encodeKey(TYPE_KEY);
         encoder.encodeString("Point");
 
-        encoder.encodeKey("coordinates");
+        encoder.encodeKey(COORDINATES_KEY);
         Encoder coordEncoder = encoder.encodeArray(OBJECT_ARGUMENT);
         writeCoordinateElements(coordEncoder, point.getCoordinate());
         coordEncoder.finishStructure();
@@ -163,25 +159,22 @@ public class JtsGeometrySerde implements Serde<Geometry> {
         if (!node.isObject()) {
             throw new SerdeException("GeoJSON geometry must be a JSON object");
         }
-        JsonNode typeNode = node.get("type");
+        JsonNode typeNode = node.get(TYPE_KEY);
         if (typeNode == null || !typeNode.isString()) {
             throw new SerdeException("Missing or invalid 'type' field in GeoJSON geometry");
         }
         String geomType = typeNode.getStringValue();
-        JsonNode coordsNode = node.get("coordinates");
+        JsonNode coordsNode = node.get(COORDINATES_KEY);
         if (coordsNode == null || !coordsNode.isArray()) {
             throw new SerdeException("Missing or invalid 'coordinates' field in GeoJSON geometry");
         }
 
-        if ("Polygon".equalsIgnoreCase(geomType)) {
-            return parsePolygon(coordsNode);
-        } else if ("MultiPolygon".equalsIgnoreCase(geomType)) {
-            return parseMultiPolygon(coordsNode);
-        } else if ("Point".equalsIgnoreCase(geomType)) {
-            return parsePoint(coordsNode);
-        } else {
-            throw new SerdeException("Unsupported geometry type: " + geomType);
-        }
+        return switch (geomType.toLowerCase()) {
+            case "polygon" -> parsePolygon(coordsNode);
+            case "multipolygon" -> parseMultiPolygon(coordsNode);
+            case "point" -> parsePoint(coordsNode);
+            default -> throw new SerdeException("Unsupported geometry type: " + geomType);
+        };
     }
 
     private Point parsePoint(JsonNode coordsNode) throws IOException {
