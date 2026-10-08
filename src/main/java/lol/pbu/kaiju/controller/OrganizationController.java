@@ -15,17 +15,21 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.repository.OrganizationRepository;
+import lol.pbu.kaiju.repository.SecurityQueryRepository;
+import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.ControllerUtils;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.PrecisionModel;
 
+import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
@@ -37,9 +41,20 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 public class OrganizationController implements ControllerUtils {
 
     private final OrganizationRepository organizationRepository;
+    private final GeometryFactory geometryFactory;
+    private final UserRepository userRepository;
+    private final SecurityQueryRepository queryRepository;
 
-    public OrganizationController(OrganizationRepository organizationRepository) {
+    public OrganizationController(
+            OrganizationRepository organizationRepository,
+            GeometryFactory geometryFactory,
+            UserRepository userRepository,
+            SecurityQueryRepository queryRepository
+    ) {
         this.organizationRepository = organizationRepository;
+        this.geometryFactory = geometryFactory;
+        this.userRepository = userRepository;
+        this.queryRepository = queryRepository;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -132,7 +147,6 @@ public class OrganizationController implements ControllerUtils {
             @Valid Pageable pageable
     ) {
         Pageable effectivePageable = normalizePageable(pageable);
-        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326);
         Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
         return organizationRepository.searchByLocation(point, radiusMeters, effectivePageable);
     }
@@ -193,7 +207,10 @@ public class OrganizationController implements ControllerUtils {
      * @return the updated organization
      */
     @Put("/{id}")
-    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body Organization organization) {
+    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body Organization organization, @Nullable Principal principal) {
+        if (principal != null) {
+            verifyOrgAdminAuthority(principal, id);
+        }
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Organization not found"));
         
@@ -210,17 +227,41 @@ public class OrganizationController implements ControllerUtils {
         return organizationRepository.update(secureOrganization);
     }
 
+    public Organization updateOrganization(UUID id, Organization organization) {
+        return updateOrganization(id, organization, null);
+    }
 
     /**
      * Deletes an organization by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the organization does not exist.
      *
      * @param id the ID of the organization to delete
+     * @param principal the authenticated principal
      */
     @Delete("/{id}")
-    public void deleteOrganization(@PathVariable UUID id) {
+    public void deleteOrganization(@PathVariable UUID id, @Nullable Principal principal) {
+        if (principal != null) {
+            verifyOrgAdminAuthority(principal, id);
+        }
         checkExists(organizationRepository, id);
         organizationRepository.deleteById(id);
+    }
+
+    public void deleteOrganization(UUID id) {
+        deleteOrganization(id, null);
+    }
+
+    private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
+        UUID callerId = UUID.fromString(principal.getName());
+        boolean isSysAdmin = userRepository.findById(callerId)
+                .map(u -> u.role().hasPermission(Permission.SYSTEM_ADMIN))
+                .orElse(false);
+        if (isSysAdmin) {
+            return;
+        }
+        if (!queryRepository.isOrgAdmin(callerId, organizationId)) {
+            throw new HttpStatusException(FORBIDDEN, "Forbidden: Only organization admins or system administrators may modify this organization");
+        }
     }
 
 }

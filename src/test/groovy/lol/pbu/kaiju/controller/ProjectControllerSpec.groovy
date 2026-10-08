@@ -8,6 +8,7 @@ import io.micronaut.http.exceptions.HttpStatusException
 import jakarta.inject.Inject
 import jakarta.validation.ValidationException
 import lol.pbu.kaiju.TestFixtures
+import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
@@ -56,6 +57,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
     lol.pbu.kaiju.repository.ProjectAuditLogRepository projectAuditLogRepository
+
+    @Inject
+    lol.pbu.kaiju.repository.AdministrativeRegionRepository administrativeRegionRepository
+
+    @Inject
+    GeometryFactory geometryFactory
 
     def setupSpec() {
         executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'test-principal@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
@@ -117,7 +124,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "CREATE | should throw HttpStatusException if organization is null"() {
         given: "a manual controller instance to bypass validation interceptors"
         def project = TestFixtures.createBasicProject(null, "Test Title", "Test Desc", STANDARD, DRAFT)
-        def controller = new ProjectController(projectRepository, realProjectSecurityService, organizationRepository, userRepository, projectAuditLogRepository)
+        def controller = new ProjectController(projectRepository, realProjectSecurityService, organizationRepository, userRepository, projectAuditLogRepository, administrativeRegionRepository, geometryFactory)
 
         when:
         controller.submitProject(project, testPrincipal)
@@ -941,6 +948,107 @@ class ProjectControllerSpec extends BaseControllerSpec {
         then: "the project transitions to ACTIVE"
         approved.id() == projId
         approved.status() == ACTIVE
+    }
+
+    def "SUBMIT | should throw 400 when managingRegion does not exist"() {
+        given: "an organization and a project referencing a non-existent managing region"
+        def org = organizationRepository.save(new Organization(null, "Org For NonExistent Region", null, null, true, UNVERIFIED, null, []))
+        def nonExistentRegion = new AdministrativeRegion(UUID.randomUUID(), "Ghost Region", null, null)
+        def project = new Project(null, org, nonExistentRegion, "Ghost Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+
+        when: "submitting the project"
+        projectController.submitProject(project, testPrincipal)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == BAD_REQUEST
+        e.message == "Managing region does not exist"
+    }
+
+    def "SUBMIT | should throw 400 when project locations do not fall within managingRegion"() {
+        given: "a managing region with a defined boundary"
+        def regId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Strict Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        def region = new AdministrativeRegion(regId, "Strict Region", null, null)
+
+        and: "an organization with global admin submitting"
+        def org = organizationRepository.save(new Organization(null, "Org For Boundary Test", null, null, true, UNVERIFIED, null, []))
+
+        and: "a location outside the managing region"
+        def gf = new GeometryFactory(new PrecisionModel(), 4326)
+        def outLoc = new Location(null, "Out Loc", "123 St", "Boulder", null, null, "US", gf.createPoint(new Coordinate(-106.0, 41.0)))
+        def project = new Project(null, org, region, "Out Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [outLoc], [])
+
+        when: "submitting the project"
+        projectController.submitProject(project, testPrincipal)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == BAD_REQUEST
+        e.message == "Project locations do not fall within the specified managing region"
+    }
+
+    def "SUBMIT | should throw 403 when submitter lacks authority to assign managingRegion"() {
+        given: "a managing region"
+        def regId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Auth Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        def region = new AdministrativeRegion(regId, "Auth Region", null, null)
+
+        and: "an organization and an unauthorized standard user"
+        def org = organizationRepository.save(new Organization(null, "Org For Auth Test", null, null, true, UNVERIFIED, null, []))
+        def unauthUserId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-${UUID.randomUUID()}@example.com".toString())
+
+        def project = new Project(null, org, region, "Unauthorized Region Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+
+        when: "submitting the project"
+        projectController.submitProject(project, createPrincipal(unauthUserId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == FORBIDDEN
+        e.message == "You do not have authority to assign this managing region"
+    }
+
+    def "UPDATE | should throw 400 when updating project locations outside existing managingRegion"() {
+        given: "a managing region and an active project inside it"
+        def regId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Update Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        def region = new AdministrativeRegion(regId, "Update Region", null, null)
+        def org = organizationRepository.save(new Organization(null, "Org For Update Loc Region", null, null, true, UNVERIFIED, null, []))
+
+        def gf = new GeometryFactory(new PrecisionModel(), 4326)
+        def inLoc = new Location(null, "In Loc", "123 St", "Denver", null, null, "US", gf.createPoint(new Coordinate(-104.9, 39.7)))
+        def initialProject = new Project(null, org, region, "Initial Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [inLoc], [])
+        Project saved = projectController.submitProject(initialProject, testPrincipal)
+
+        when: "updating the project with locations outside the managing region without modifying managingRegion"
+        def outLoc = new Location(null, "Out Loc", "123 St", "Boulder", null, null, "US", gf.createPoint(new Coordinate(-106.0, 41.0)))
+        def updatedProject = new Project(saved.id(), org, region, "Initial Project", "Desc", STANDARD, saved.status(), saved.createdAt(), null, null, [outLoc], [])
+        projectController.updateProject(saved.id(), updatedProject, testPrincipal)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == BAD_REQUEST
+        e.message == "Project locations do not fall within the specified managing region"
+    }
+
+    @Unroll
+    def "SEARCH | should reject invalid coordinates: lon=#lon, lat=#lat, rad=#rad"(double lon, double lat, double rad) {
+        when: "searching projects by location with invalid coordinates or radius"
+        projectController.searchByLocation(lon, lat, rad, Pageable.unpaged())
+
+        then: "a validation exception is thrown"
+        thrown(ValidationException)
+
+        where:
+        lon    | lat   | rad
+        -190.0 | 0.0   | 1000.0
+        195.0  | 0.0   | 1000.0
+        0.0    | -95.0 | 1000.0
+        0.0    | 95.0  | 1000.0
+        0.0    | 0.0   | -1.0
+        0.0    | 0.0   | 600000.0
     }
 }
 

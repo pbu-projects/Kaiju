@@ -527,4 +527,54 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         HttpStatusException e = thrown()
         e.status == HttpStatus.FORBIDDEN
     }
+
+    def "areAllLocationsInOrgRegion batches multiple locations in single query"() {
+        given: "an organization linked to a region"
+        def regId = UUID.randomUUID()
+        def testOrgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Batch Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Batch Org', true, 'VERIFIED')", testOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, regId)
+
+        and: "a GeometryFactory and multiple points within the region"
+        def gf = new org.locationtech.jts.geom.GeometryFactory(new org.locationtech.jts.geom.PrecisionModel(), 4326)
+        def loc1 = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "L1", "A1", "C1", null, null, "US", gf.createPoint(new org.locationtech.jts.geom.Coordinate(-105.0, 39.7)))
+        def loc2 = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "L2", "A2", "C2", null, null, "US", gf.createPoint(new org.locationtech.jts.geom.Coordinate(-104.9, 39.7)))
+        def loc3 = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "L3", "A3", "C3", null, null, "US", gf.createPoint(new org.locationtech.jts.geom.Coordinate(-104.8, 39.7)))
+
+        def projectAllIn = new lol.pbu.kaiju.domain.Project(UUID.randomUUID(), null, null, "P1", "D", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, loc2, loc3], [])
+
+        and: "one point outside the region"
+        def locOut = new lol.pbu.kaiju.domain.Location(UUID.randomUUID(), "LOut", "A4", "C4", null, null, "US", gf.createPoint(new org.locationtech.jts.geom.Coordinate(-106.0, 41.0)))
+        def projectWithOut = new lol.pbu.kaiju.domain.Project(UUID.randomUUID(), null, null, "P2", "D", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, locOut], [])
+
+        expect:
+        service.areAllLocationsInOrgRegion(projectAllIn, testOrgId) == true
+        service.areAllLocationsInOrgRegion(projectWithOut, testOrgId) == false
+    }
+
+    def "canAssignManagingRegion evaluates roles and organization presence"() {
+        given: "a region and organization"
+        def regId = UUID.randomUUID()
+        def testOrgId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Assign Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Assign Org', true, 'VERIFIED')", testOrgId)
+        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, regId)
+
+        and: "users with various roles"
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def standardUser = saveUser(UserRole.STANDARD_USER)
+
+        def orgManager = saveUser(UserRole.STANDARD_USER)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", orgManager.id(), testOrgId)
+
+        def regionalAgent = saveUser(UserRole.REGION_AGENT)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", regionalAgent.id(), regId)
+
+        expect:
+        service.canAssignManagingRegion(admin.id(), testOrgId, regId) == true
+        service.canAssignManagingRegion(orgManager.id(), testOrgId, regId) == true
+        service.canAssignManagingRegion(regionalAgent.id(), testOrgId, regId) == true
+        service.canAssignManagingRegion(standardUser.id(), testOrgId, regId) == false
+    }
 }

@@ -32,6 +32,7 @@ Backend service for Volunteer Monster.
 - [Architecture & UI](./docs/03-architecture.adoc)
 - [Domain & Security](./docs/02-domain-model.adoc)
 - [Testing](./docs/04-testing-strategy.adoc)
+- [Contributing](./CONTRIBUTING.md)
 - [Database Schema](./database/DB.md)
 - [Project Types](./database/Project_Discriminator.md)
 

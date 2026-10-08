@@ -17,6 +17,8 @@ import spock.lang.Unroll
 
 import static lol.pbu.kaiju.model.VerificationStatus.*
 
+import java.security.Principal
+
 class OrganizationControllerSpec extends BaseControllerSpec {
 
     @Inject
@@ -817,6 +819,69 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         resRegionUnpaged.content[0].id() == org1Id
         !resRegionSorted.content.isEmpty()
         resRegionSorted.content[0].id() == org1Id
+    }
+
+    Principal createPrincipal(UUID userId) {
+        new Principal() {
+            @Override
+            String getName() {
+                return userId.toString()
+            }
+        }
+    }
+
+    /********** AUTHORIZATION Tests **********/
+
+    def "AUTHORIZATION | should throw 403 when non-admin attempts to update an organization"() {
+        given: "an organization and a standard unauthorized user"
+        def org = organizationRepository.save(new Organization(null, "Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
+        def unauthUserId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-${UUID.randomUUID()}@example.com".toString())
+
+        def updated = new Organization(org.id(), "Hacked Name", "https://hacked.com", null, true, UNVERIFIED, null, [])
+
+        when: "unauthorized user attempts to update the organization"
+        organizationController.updateOrganization(org.id(), updated, createPrincipal(unauthUserId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status.code == 403
+    }
+
+    def "AUTHORIZATION | should throw 403 when non-admin attempts to delete an organization"() {
+        given: "an organization and a standard unauthorized user"
+        def org = organizationRepository.save(new Organization(null, "Delete Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
+        def unauthUserId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-del-${UUID.randomUUID()}@example.com".toString())
+
+        when: "unauthorized user attempts to delete the organization"
+        organizationController.deleteOrganization(org.id(), createPrincipal(unauthUserId))
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpStatusException)
+        e.status.code == 403
+    }
+
+    def "AUTHORIZATION | should allow organization admin to update and delete organization"() {
+        given: "an organization and an ORG_ADMIN for that organization"
+        def org = organizationRepository.save(new Organization(null, "Allowed Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
+        def adminId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", adminId, "admin-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", adminId, org.id())
+
+        def updated = new Organization(org.id(), "Updated By Admin", "https://example.com", null, true, UNVERIFIED, null, [])
+
+        when: "org admin updates the organization"
+        def result = organizationController.updateOrganization(org.id(), updated, createPrincipal(adminId))
+
+        then: "it succeeds"
+        result.name() == "Updated By Admin"
+
+        when: "org admin deletes the organization"
+        organizationController.deleteOrganization(org.id(), createPrincipal(adminId))
+
+        then: "it is removed"
+        !organizationRepository.findById(org.id()).isPresent()
     }
 }
 

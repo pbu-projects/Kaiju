@@ -8,11 +8,17 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
 import org.locationtech.jts.io.WKBWriter;
 import org.postgresql.util.PGobject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 
 @Singleton
 public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JtsPointConverter.class);
+    private static final ThreadLocal<WKBWriter> WKB_WRITER = ThreadLocal.withInitial(() -> new WKBWriter(2, true));
+    private static final ThreadLocal<WKBReader> WKB_READER = ThreadLocal.withInitial(WKBReader::new);
 
     @Override
     public PGobject convertToPersistedValue(Point entityValue, ConversionContext context) {
@@ -21,7 +27,7 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
         }
         try {
             // Include SRID in WKB (3D=false, SRID=true)
-            WKBWriter writer = new WKBWriter(2, true);
+            WKBWriter writer = WKB_WRITER.get();
             byte[] wkb = writer.write(entityValue);
             String hexWkb = WKBWriter.toHex(wkb);
 
@@ -30,7 +36,8 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
             pgObject.setValue(hexWkb);
             return pgObject;
         } catch (SQLException e) {
-            return null;
+            LOG.error("Failed to convert Point to PGobject geography: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to serialize Point to PGobject geography", e);
         }
     }
 
@@ -44,7 +51,7 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
             return null;
         }
         try {
-            WKBReader reader = new WKBReader();
+            WKBReader reader = WKB_READER.get();
             byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
             Point point = (Point) reader.read(bytes);
             if (point.getSRID() == 0) {
@@ -52,7 +59,8 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
             }
             return point;
         } catch (ParseException e) {
-            return null;
+            LOG.error("Failed to parse Point from WKB: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to parse Point from WKB", e);
         }
     }
 }

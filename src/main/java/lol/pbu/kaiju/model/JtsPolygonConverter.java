@@ -9,20 +9,26 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
 import org.locationtech.jts.io.WKBWriter;
 import org.postgresql.util.PGobject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.SQLException;
 
 @Singleton
-public class JtsPolygonConverter implements AttributeConverter<Geometry, Object> {
+public class JtsPolygonConverter implements AttributeConverter<Geometry, PGobject> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JtsPolygonConverter.class);
+    private static final ThreadLocal<WKBWriter> WKB_WRITER = ThreadLocal.withInitial(() -> new WKBWriter(2, true));
+    private static final ThreadLocal<WKBReader> WKB_READER = ThreadLocal.withInitial(WKBReader::new);
 
     @Override
-    public Object convertToPersistedValue(Geometry entityValue, ConversionContext context) {
+    public PGobject convertToPersistedValue(Geometry entityValue, ConversionContext context) {
         if (entityValue == null) {
             return null;
         }
         try {
             // Include SRID in WKB
-            WKBWriter writer = new WKBWriter(2, true);
+            WKBWriter writer = WKB_WRITER.get();
             byte[] wkb = writer.write(entityValue);
             String hexWkb = WKBWriter.toHex(wkb);
 
@@ -31,7 +37,8 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, Object>
             pgObject.setValue(hexWkb);
             return pgObject;
         } catch (SQLException e) {
-            return null;
+            LOG.error("Failed to convert Geometry to PGobject geography: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to serialize Geometry to PGobject geography", e);
         }
     }
 
@@ -40,24 +47,21 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, Object>
     }
 
     @Override
-    public Geometry convertToEntityValue(Object persistedValue, ConversionContext context) {
-        if (persistedValue == null) {
-            return null;
-        }
-        PGobject pgObject = (PGobject) persistedValue;
-        if (pgObject.getValue() == null) {
+    public Geometry convertToEntityValue(PGobject persistedValue, ConversionContext context) {
+        if (persistedValue == null || persistedValue.getValue() == null) {
             return null;
         }
         try {
-            WKBReader reader = new WKBReader();
-            byte[] bytes = WKBReader.hexToBytes(pgObject.getValue());
-            Polygon polygon = (Polygon) reader.read(bytes);
-            if (polygon.getSRID() == 0) {
-                polygon.setSRID(4326);
+            WKBReader reader = WKB_READER.get();
+            byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
+            Geometry geom = reader.read(bytes);
+            if (geom.getSRID() == 0) {
+                geom.setSRID(4326);
             }
-            return polygon;
+            return geom;
         } catch (ParseException e) {
-            return null;
+            LOG.error("Failed to parse Polygon from WKB: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Failed to parse Polygon from WKB", e);
         }
     }
 }
