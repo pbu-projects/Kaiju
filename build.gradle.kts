@@ -91,6 +91,9 @@ micronaut {
         incremental(true)
         annotations("lol.pbu.*")
     }
+    testResources {
+        sharedServer.set(true)
+    }
     aot {
         // Please review carefully the optimizations enabled below
         // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
@@ -123,6 +126,16 @@ tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
 // https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
 tasks.withType<AbstractTestTask>().configureEach {
     failOnNoDiscoveredTests = false
+}
+
+tasks.named<Test>("test") {
+    testLogging {
+        events("failed", "standardError", "standardOut")
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
 }
 
 tasks.named<org.asciidoctor.gradle.jvm.pdf.AsciidoctorPdfTask>("asciidoctorPdf") {
