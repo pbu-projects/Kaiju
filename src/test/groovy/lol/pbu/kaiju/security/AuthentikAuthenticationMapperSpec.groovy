@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.security
 
+import io.micronaut.data.exceptions.DataAccessException
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
@@ -8,6 +9,7 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.time.OffsetDateTime
@@ -29,7 +31,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = reactor.core.publisher.Mono.from(publisher).block()
+        AuthenticationResponse response = Mono.from(publisher).block()
 
         then: "it refuses to authenticate without an email"
         !response.isAuthenticated()
@@ -47,7 +49,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = reactor.core.publisher.Mono.from(publisher).block()
+        AuthenticationResponse response = Mono.from(publisher).block()
 
         then: "it logs them in with their actual database role"
         response.isAuthenticated()
@@ -67,7 +69,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = reactor.core.publisher.Mono.from(publisher).block()
+        AuthenticationResponse response = Mono.from(publisher).block()
 
         then: "the authentication is successful and assigned the default role"
         response.isAuthenticated()
@@ -91,7 +93,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         and: "a mock UserRepository that simulates a constraint violation on save, then finds the user"
         UserRepository mockRepo = Mock()
         mockRepo.findByEmail(email) >>> [Optional.empty(), Optional.of(preExisting)]
-        mockRepo.save(_) >> { throw new io.micronaut.data.exceptions.DataAccessException("duplicate key") }
+        mockRepo.save(_) >> { throw new DataAccessException("duplicate key") }
 
         and: "a mapper using the mock repository"
         AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockRepo)
@@ -100,7 +102,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
         when: "the mapper processes the login during the race condition"
         def publisher = testMapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = reactor.core.publisher.Mono.from(publisher).block()
+        AuthenticationResponse response = Mono.from(publisher).block()
 
         then: "authentication succeeds by recovering the user from the second fetch"
         response.isAuthenticated()

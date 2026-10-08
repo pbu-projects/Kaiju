@@ -10,7 +10,6 @@ import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.MultiPoint;
 import org.locationtech.jts.geom.Point;
@@ -30,8 +29,6 @@ public class ProjectSecurityService {
     private final SecurityQueryRepository queryRepository;
     private final UserRepository userRepository;
     private final GeometryFactory geometryFactory;
-
-    private static final ThreadLocal<WKBWriter> WKB_WRITER = ThreadLocal.withInitial(() -> new WKBWriter(2, true));
 
     public ProjectSecurityService(SecurityQueryRepository queryRepository, UserRepository userRepository, GeometryFactory geometryFactory) {
         this.queryRepository = queryRepository;
@@ -85,7 +82,7 @@ public class ProjectSecurityService {
             return false;
         }
         byte[] wkb = buildMultiPointWkb(project.locations());
-        if (wkb == null) {
+        if (wkb.length == 0) {
             return false;
         }
         return queryRepository.areAllPointsInOrgRegion(organizationId, wkb);
@@ -103,7 +100,7 @@ public class ProjectSecurityService {
             return false;
         }
         byte[] wkb = buildMultiPointWkb(project.locations());
-        if (wkb == null) {
+        if (wkb.length == 0) {
             return false;
         }
         return queryRepository.areAllPointsInAgentAssignedRegion(userId, wkb);
@@ -114,25 +111,28 @@ public class ProjectSecurityService {
             return true;
         }
         byte[] wkb = buildMultiPointWkb(project.locations());
-        if (wkb == null) {
+        if (wkb.length == 0) {
             return false;
         }
         return queryRepository.areAllPointsInRegion(regionId, wkb);
     }
 
-    @Nullable
+    @NonNull
     private byte[] buildMultiPointWkb(@NonNull List<Location> locations) {
+        if (locations.isEmpty()) {
+            return new byte[0];
+        }
         Point[] points = new Point[locations.size()];
         for (int i = 0; i < locations.size(); i++) {
             Location loc = locations.get(i);
             if (loc.geom() == null) {
-                return null;
+                return new byte[0];
             }
             points[i] = loc.geom();
         }
         MultiPoint multiPoint = geometryFactory.createMultiPoint(points);
         multiPoint.setSRID(4326);
-        WKBWriter writer = WKB_WRITER.get();
+        WKBWriter writer = new WKBWriter(2, true);
         return writer.write(multiPoint);
     }
 

@@ -4,7 +4,6 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.data.model.runtime.convert.AttributeConverter;
 import jakarta.inject.Singleton;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
 import org.locationtech.jts.io.WKBWriter;
@@ -18,8 +17,6 @@ import java.sql.SQLException;
 public class JtsPolygonConverter implements AttributeConverter<Geometry, PGobject> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JtsPolygonConverter.class);
-    private static final ThreadLocal<WKBWriter> WKB_WRITER = ThreadLocal.withInitial(() -> new WKBWriter(2, true));
-    private static final ThreadLocal<WKBReader> WKB_READER = ThreadLocal.withInitial(WKBReader::new);
 
     @Override
     public PGobject convertToPersistedValue(Geometry entityValue, ConversionContext context) {
@@ -28,7 +25,7 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, PGobjec
         }
         try {
             // Include SRID in WKB
-            WKBWriter writer = WKB_WRITER.get();
+            WKBWriter writer = new WKBWriter(2, true);
             byte[] wkb = writer.write(entityValue);
             String hexWkb = WKBWriter.toHex(wkb);
 
@@ -52,7 +49,7 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, PGobjec
             return null;
         }
         try {
-            WKBReader reader = WKB_READER.get();
+            WKBReader reader = new WKBReader();
             byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
             Geometry geom = reader.read(bytes);
             if (geom.getSRID() == 0) {

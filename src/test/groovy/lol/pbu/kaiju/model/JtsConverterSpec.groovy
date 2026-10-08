@@ -2,7 +2,9 @@ package lol.pbu.kaiju.model
 
 import io.micronaut.core.convert.ConversionContext
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.MultiPolygon
 import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.Polygon
 import org.postgresql.util.PGobject
@@ -224,7 +226,7 @@ class JtsConverterSpec extends Specification {
     def "JtsPolygonConverter | should successfully parse MultiPolygon without ClassCastException"() {
         given: "a valid MultiPolygon"
         Polygon p1 = createTestPolygon()
-        org.locationtech.jts.geom.MultiPolygon multiPolygon = geometryFactory.createMultiPolygon([p1] as Polygon[])
+        MultiPolygon multiPolygon = geometryFactory.createMultiPolygon([p1] as Polygon[])
         multiPolygon.setSRID(4326)
 
         when: "converting to persisted value and back"
@@ -232,7 +234,7 @@ class JtsConverterSpec extends Specification {
         def result = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
         then: "it reconstructs a Geometry instance without ClassCastException"
-        result instanceof org.locationtech.jts.geom.Geometry
+        result instanceof Geometry
         result.SRID == 4326
     }
 }

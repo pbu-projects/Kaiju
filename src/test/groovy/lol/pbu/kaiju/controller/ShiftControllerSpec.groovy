@@ -10,8 +10,9 @@ import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
+import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.repository.ShiftRepository
-import lol.pbu.kaiju.model.UserRole
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -292,7 +293,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def differentProjectRow = sql.firstRow("SELECT id FROM projects WHERE id != ? LIMIT 1", [originalProjectId])
         assert differentProjectRow != null
         UUID differentProjectId = differentProjectRow.id as UUID
-        def differentProject = new Project(differentProjectId, null, null, "Other Proj", "Desc", lol.pbu.kaiju.model.ProjectType.STANDARD, lol.pbu.kaiju.model.ProjectStatus.ACTIVE, OffsetDateTime.now(), null, null, [], [])
+        def differentProject = new Project(differentProjectId, null, null, "Other Proj", "Desc", ProjectType.STANDARD, ProjectStatus.ACTIVE, OffsetDateTime.now(), null, null, [], [])
 
         def updateRequest = new Shift(null, differentProject, true, null, OffsetDateTime.now().plusDays(2), OffsetDateTime.now().plusDays(2).plusHours(3), [])
 

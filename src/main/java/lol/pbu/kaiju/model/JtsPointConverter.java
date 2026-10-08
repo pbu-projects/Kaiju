@@ -17,8 +17,6 @@ import java.sql.SQLException;
 public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JtsPointConverter.class);
-    private static final ThreadLocal<WKBWriter> WKB_WRITER = ThreadLocal.withInitial(() -> new WKBWriter(2, true));
-    private static final ThreadLocal<WKBReader> WKB_READER = ThreadLocal.withInitial(WKBReader::new);
 
     @Override
     public PGobject convertToPersistedValue(Point entityValue, ConversionContext context) {
@@ -27,7 +25,7 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
         }
         try {
             // Include SRID in WKB (3D=false, SRID=true)
-            WKBWriter writer = WKB_WRITER.get();
+            WKBWriter writer = new WKBWriter(2, true);
             byte[] wkb = writer.write(entityValue);
             String hexWkb = WKBWriter.toHex(wkb);
 
@@ -51,7 +49,7 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
             return null;
         }
         try {
-            WKBReader reader = WKB_READER.get();
+            WKBReader reader = new WKBReader();
             byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
             Point point = (Point) reader.read(bytes);
             if (point.getSRID() == 0) {

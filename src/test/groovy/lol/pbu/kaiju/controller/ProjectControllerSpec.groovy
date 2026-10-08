@@ -15,8 +15,11 @@ import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectSearchCard
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
+import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.OrganizationRepository
+import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import lol.pbu.kaiju.repository.ProjectRepository
+import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.security.ProjectSecurityService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
@@ -53,13 +56,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
     OrganizationRepository organizationRepository
 
     @Inject
-    lol.pbu.kaiju.repository.UserRepository userRepository
+    UserRepository userRepository
 
     @Inject
-    lol.pbu.kaiju.repository.ProjectAuditLogRepository projectAuditLogRepository
+    ProjectAuditLogRepository projectAuditLogRepository
 
     @Inject
-    lol.pbu.kaiju.repository.AdministrativeRegionRepository administrativeRegionRepository
+    AdministrativeRegionRepository administrativeRegionRepository
 
     @Inject
     GeometryFactory geometryFactory

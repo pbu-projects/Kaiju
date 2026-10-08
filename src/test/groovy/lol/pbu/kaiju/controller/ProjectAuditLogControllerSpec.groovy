@@ -11,6 +11,7 @@ import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.ProjectAuditLog
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.AuditAction
+import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import spock.lang.Unroll
 
@@ -58,7 +59,7 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         if (!userRow) {
             throw new IllegalStateException("No users found in database to link audit log to.")
         }
-        new User(userRow.id as UUID, userRow.email as String, lol.pbu.kaiju.model.UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
+        new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
     }
 
     /********** CREATE Tests **********/

@@ -4,7 +4,11 @@ import io.micronaut.data.annotation.Join;
 import io.micronaut.data.annotation.Query;
 import io.micronaut.data.annotation.TypeDef;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
+import io.micronaut.data.model.CursoredPage;
+import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.DataType;
+import io.micronaut.data.model.Page;
+import io.micronaut.data.model.Pageable;
 import io.micronaut.data.repository.PageableRepository;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.JtsPointConverter;
@@ -26,7 +30,7 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
     Optional<Project> findById(@NonNull UUID id);
 
     @Join("organization")
-    io.micronaut.data.model.CursoredPage<Project> findByTitle(String title, io.micronaut.data.model.CursoredPageable pageable);
+    CursoredPage<Project> findByTitle(String title, CursoredPageable pageable);
 
     @Query(value = """
                 SELECT project_.id AS project_id,
@@ -62,9 +66,9 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
                   AND s.start_time >= NOW()
                   AND ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
             """)
-    io.micronaut.data.model.Page<ProjectSearchCard> searchByLocation(
+    Page<ProjectSearchCard> searchByLocation(
             @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class) Point point,
             double radiusMeters,
-            io.micronaut.data.model.Pageable pageable
+            Pageable pageable
     );
 }

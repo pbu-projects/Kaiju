@@ -42,6 +42,7 @@ import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Objects;
 import java.util.Optional;
@@ -111,10 +112,9 @@ public class ProjectController {
             if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
                 throw new HttpStatusException(BAD_REQUEST, "Managing region does not exist");
             }
-            if (project.locations() != null && !project.locations().isEmpty()) {
-                if (!securityService.areAllLocationsInRegion(project, regionId)) {
-                    throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
-                }
+            if (project.locations() != null && !project.locations().isEmpty()
+                    && !securityService.areAllLocationsInRegion(project, regionId)) {
+                throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
             }
             if (!securityService.canAssignManagingRegion(submitterId, project.organization().id(), regionId)) {
                 throw new HttpStatusException(FORBIDDEN, "You do not have authority to assign this managing region");
@@ -132,7 +132,7 @@ public class ProjectController {
                 project.description(),
                 project.projectType(),
                 evaluatedStatus,
-                java.time.OffsetDateTime.now(java.time.ZoneId.systemDefault()),
+                OffsetDateTime.now(ZoneId.systemDefault()),
                 null,
                 null,
                 project.locations(),
@@ -173,7 +173,14 @@ public class ProjectController {
         }
 
         AdministrativeRegion effectiveRegion = project.managingRegion() != null ? project.managingRegion() : existing.managingRegion();
-        UUID effectiveOrgId = targetOrg != null ? targetOrg.id() : (existing.organization() != null ? existing.organization().id() : null);
+        UUID effectiveOrgId;
+        if (targetOrg != null) {
+            effectiveOrgId = targetOrg.id();
+        } else if (existing.organization() != null) {
+            effectiveOrgId = existing.organization().id();
+        } else {
+            effectiveOrgId = null;
+        }
 
         if (!Objects.equals(project.managingRegion(), existing.managingRegion())) {
             if (project.managingRegion() != null) {
@@ -184,17 +191,15 @@ public class ProjectController {
                 if (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, regionId)) {
                     throw new HttpStatusException(FORBIDDEN, "You do not have authority to assign this managing region");
                 }
-            } else if (existing.managingRegion() != null) {
-                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existing.managingRegion().id())) {
-                    throw new HttpStatusException(FORBIDDEN, "You do not have authority to unassign this managing region");
-                }
+            } else if (existing.managingRegion() != null
+                    && (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existing.managingRegion().id()))) {
+                throw new HttpStatusException(FORBIDDEN, "You do not have authority to unassign this managing region");
             }
         }
 
-        if (effectiveRegion != null && effectiveRegion.id() != null && project.locations() != null && !project.locations().isEmpty()) {
-            if (!securityService.areAllLocationsInRegion(project, effectiveRegion.id())) {
-                throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
-            }
+        if (effectiveRegion != null && effectiveRegion.id() != null && project.locations() != null && !project.locations().isEmpty()
+                && !securityService.areAllLocationsInRegion(project, effectiveRegion.id())) {
+            throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
         }
 
         ProjectStatus newStatus = existing.status();
