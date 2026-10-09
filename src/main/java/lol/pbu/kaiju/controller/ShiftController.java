@@ -22,12 +22,8 @@ import lol.pbu.kaiju.domain.Tag;
 import lol.pbu.kaiju.dto.CreateShiftCommand;
 import lol.pbu.kaiju.dto.UpdateShiftCommand;
 import lol.pbu.kaiju.repository.LocationRepository;
-import lol.pbu.kaiju.repository.ProjectRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
-import lol.pbu.kaiju.repository.ShiftRepository;
 import lol.pbu.kaiju.repository.TagRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.service.ShiftService;
 import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
@@ -36,7 +32,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.BAD_REQUEST;
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
@@ -47,37 +42,28 @@ public class ShiftController {
 
     public static final String DEFAULT_SORT_FIELD = "id";
 
-    private final ShiftRepository shiftRepository;
-    private final ProjectRepository projectRepository;
+    private final ShiftService shiftService;
     private final LocationRepository locationRepository;
     private final TagRepository tagRepository;
-    private final SecurityQueryRepository queryRepository;
-    private final UserRepository userRepository;
 
     public ShiftController(
-            ShiftRepository shiftRepository,
-            ProjectRepository projectRepository,
+            ShiftService shiftService,
             LocationRepository locationRepository,
-            TagRepository tagRepository,
-            SecurityQueryRepository queryRepository,
-            UserRepository userRepository
+            TagRepository tagRepository
     ) {
-        this.shiftRepository = shiftRepository;
-        this.projectRepository = projectRepository;
+        this.shiftService = shiftService;
         this.locationRepository = locationRepository;
         this.tagRepository = tagRepository;
-        this.queryRepository = queryRepository;
-        this.userRepository = userRepository;
     }
 
     @Get
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable) {
-        return shiftRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return shiftService.getShifts(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
     public Optional<Shift> getShift(@PathVariable UUID id) {
-        return shiftRepository.findById(id);
+        return shiftService.getShiftById(id);
     }
 
     @Post
@@ -85,21 +71,33 @@ public class ShiftController {
         if (!command.isValidLocationLogic()) {
             throw new HttpStatusException(BAD_REQUEST, "A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
         }
-        Project project = projectRepository.findById(command.projectId())
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Project not found"));
-        verifyShiftAuthority(principal, project);
         Location location = resolveLocation(command.locationId());
         List<Tag> tags = resolveTags(command.tagIds());
+        Project stubProject = new Project(
+                command.projectId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
         Shift shift = new Shift(
                 null,
-                project,
+                stubProject,
                 command.isVirtual(),
                 location,
                 command.startTime(),
                 command.endTime(),
                 tags
         );
-        return shiftRepository.save(shift);
+        UUID actorUserId = UUID.fromString(principal.getName());
+        return shiftService.createShift(shift, actorUserId);
     }
 
     /**
@@ -118,21 +116,19 @@ public class ShiftController {
         if (!command.isValidLocationLogic()) {
             throw new HttpStatusException(BAD_REQUEST, "A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
         }
-        Shift existing = shiftRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
-        verifyShiftAuthority(principal, existing.project());
         Location location = resolveLocation(command.locationId());
         List<Tag> tags = resolveTags(command.tagIds());
-        Shift safeUpdate = new Shift(
+        Shift candidate = new Shift(
                 id,
-                existing.project(),
+                null,
                 command.isVirtual(),
                 location,
                 command.startTime(),
                 command.endTime(),
                 tags
         );
-        return shiftRepository.update(safeUpdate);
+        UUID actorUserId = UUID.fromString(principal.getName());
+        return shiftService.updateShift(id, candidate, actorUserId);
     }
 
     /**
@@ -146,10 +142,8 @@ public class ShiftController {
      */
     @Delete("/{id}")
     public void deleteShift(@PathVariable UUID id, Principal principal) {
-        Shift existing = shiftRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
-        verifyShiftAuthority(principal, existing.project());
-        shiftRepository.removeById(id);
+        UUID actorUserId = UUID.fromString(principal.getName());
+        shiftService.deleteShift(id, actorUserId);
     }
 
     private Location resolveLocation(UUID locationId) {
@@ -168,18 +162,5 @@ public class ShiftController {
                 .map(tagRepository::findById)
                 .flatMap(Optional::stream)
                 .toList();
-    }
-
-    private void verifyShiftAuthority(Principal principal, Project project) {
-        UUID callerId = UUID.fromString(principal.getName());
-        boolean isSysAdmin = userRepository.findById(callerId)
-                .map(u -> u.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-        if (isSysAdmin) {
-            return;
-        }
-        if (project.organization() == null || !queryRepository.isOrgManager(callerId, project.organization().id())) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: Only organization managers or system administrators may manage shifts for this project");
-        }
     }
 }

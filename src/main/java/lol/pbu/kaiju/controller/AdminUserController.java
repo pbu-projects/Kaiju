@@ -11,7 +11,7 @@ import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.RoleUpdateRequest;
-import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.service.UserService;
 
 import java.util.UUID;
 
@@ -23,10 +23,10 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 @Secured(SYSTEM_ADMIN_CLAIM)
 public class AdminUserController {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
-    public AdminUserController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public AdminUserController(UserService userService) {
+        this.userService = userService;
     }
 
     /**
@@ -39,8 +39,8 @@ public class AdminUserController {
      */
     @Put("/{id}/role")
     public User updateUserRole(@PathVariable UUID id, @Valid @Body RoleUpdateRequest request) {
-        userRepository.findById(id).orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
-        userRepository.updateRole(id, request.role());
-        return userRepository.findById(id).orElseThrow();
+        userService.updateRole(id, request.role());
+        return userService.getUserById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 }
