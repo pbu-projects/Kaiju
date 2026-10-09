@@ -47,6 +47,34 @@ class ShiftControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'shift-admin@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
     }
 
+    def setup() {
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'shift-admin@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
+        ensureFixtures()
+    }
+
+    private void ensureFixtures() {
+        def locRow = sql.firstRow("SELECT id FROM locations LIMIT 1")
+        if (!locRow) {
+            executeUpdate("INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom) VALUES (?, 'Default Shift Loc', '123 Main', 'Denver', 'CO', '80202', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", UUID.randomUUID())
+        }
+        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
+        UUID projectId
+        if (!projRow) {
+            def orgId = UUID.randomUUID()
+            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Shift Test Org', true, 'VERIFIED')", orgId)
+            projectId = UUID.randomUUID()
+            executeUpdate("INSERT INTO projects (id, organization_id, title, description, project_type, status) VALUES (?, ?, 'Shift Test Proj', 'Test project description exceeding 20 chars', 'STANDARD', 'DRAFT')", projectId, orgId)
+        } else {
+            projectId = projRow.id as UUID
+        }
+        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
+        if (!shiftRow) {
+            def startTime = OffsetDateTime.now()
+            def endTime = startTime.plusHours(2)
+            executeUpdate("INSERT INTO shifts (id, project_id, is_virtual, start_time, end_time) VALUES (?, ?, true, ?, ?)", UUID.randomUUID(), projectId, Timestamp.from(startTime.toInstant()), Timestamp.from(endTime.toInstant()))
+        }
+    }
+
     def cleanupSpec() {
         executeUpdate("DELETE FROM users WHERE id = ?", adminId)
     }
@@ -439,6 +467,13 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "LIST | should fully drain all shifts sequentially using cursors"() {
         setup:
+        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
+        UUID projectId = projRow.id as UUID
+        while ((sql.firstRow("SELECT count(*) as count FROM shifts").count as int) < 2) {
+            def startTime = OffsetDateTime.now()
+            def endTime = startTime.plusHours(2)
+            executeUpdate("INSERT INTO shifts (id, project_id, is_virtual, start_time, end_time) VALUES (?, ?, true, ?, ?)", UUID.randomUUID(), projectId, Timestamp.from(startTime.toInstant()), Timestamp.from(endTime.toInstant()))
+        }
         Set<Shift> allShifts = new LinkedHashSet<>()
         int pageSize = 5
         def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("id")))
@@ -459,6 +494,15 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     def "LIST | should retrieve shifts with pagination via HTTP GET"() {
+        setup:
+        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
+        UUID projectId = projRow.id as UUID
+        while ((sql.firstRow("SELECT count(*) as count FROM shifts").count as int) < 2) {
+            def startTime = OffsetDateTime.now()
+            def endTime = startTime.plusHours(2)
+            executeUpdate("INSERT INTO shifts (id, project_id, is_virtual, start_time, end_time) VALUES (?, ?, true, ?, ?)", UUID.randomUUID(), projectId, Timestamp.from(startTime.toInstant()), Timestamp.from(endTime.toInstant()))
+        }
+
         when: "requesting shifts via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/shifts?size=5"), adminId.toString()), Map)
 

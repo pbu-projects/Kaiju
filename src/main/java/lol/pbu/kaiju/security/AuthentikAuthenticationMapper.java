@@ -1,6 +1,6 @@
 package lol.pbu.kaiju.security;
 
-import io.micronaut.data.exceptions.DataAccessException;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.authentication.AuthenticationResponse;
@@ -11,28 +11,22 @@ import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.service.UserService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
-import java.time.OffsetDateTime;
 import java.util.Map;
-import java.util.Optional;
-
-import static java.time.ZoneId.systemDefault;
-import static lol.pbu.kaiju.model.UserRole.STANDARD_USER;
 
 @Named("authentik")
 @Singleton
-@ExecuteOn(TaskExecutors.IO)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
-    public AuthentikAuthenticationMapper(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public AuthentikAuthenticationMapper(UserService userService) {
+        this.userService = userService;
     }
 
     @Override
@@ -42,34 +36,21 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             @NonNull OpenIdTokenResponse tokenResponse,
             @NonNull OpenIdClaims openIdClaims,
             @Nullable State state) {
-        return Mono.fromCallable(() -> {
-            String email = openIdClaims.getEmail();
-            if (email == null || email.isBlank()) {
-                return AuthenticationResponse.failure("No email present in OpenID claims");
-            }
+        String email = openIdClaims.getEmail();
+        if (email == null || email.isBlank()) {
+            return Publishers.just(AuthenticationResponse.failure("No email present in OpenID claims"));
+        }
 
-            Optional<User> optionalUser = userRepository.findByEmail(email);
-            User user;
-            if (optionalUser.isPresent()) {
-                user = optionalUser.get();
-            } else {
-                try {
-                    // Attempt to create the user as a STANDARD_USER
-                    User newUser = new User(null, email, STANDARD_USER, OffsetDateTime.now(systemDefault()));
-                    user = userRepository.save(newUser);
-                } catch (DataAccessException e) {
-                    // If another thread just created them, fetch again
-                    user = userRepository.findByEmail(email).orElseThrow(() -> new IllegalStateException("Failed to fetch user after constraint violation", e));
-                }
-            }
+        User user = userService.provisionOrGetUser(email);
 
-            // Map database role to Micronaut Security Context
-            // Using the user's UUID as the principal name is best practice since emails can change
-            return AuthenticationResponse.success(
-                    user.id().toString(),
-                    user.role().getPermissions().stream().map(Permission::getClaim).toList(),
-                    Map.of("email", user.email())
-            );
-        });
+        // Map database role to Micronaut Security Context
+        // Using the user's UUID as the principal name is best practice since emails can change
+        AuthenticationResponse response = AuthenticationResponse.success(
+                user.id().toString(),
+                user.role().getPermissions().stream().map(Permission::getClaim).toList(),
+                Map.of("email", user.email())
+        );
+
+        return Publishers.just(response);
     }
 }

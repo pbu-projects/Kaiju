@@ -22,7 +22,7 @@ import spock.lang.Shared
 
 import java.time.OffsetDateTime
 
-@MicronautTest(transactional = true)
+@MicronautTest(transactional = false)
 class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     @Inject
@@ -40,7 +40,7 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     @Shared
     UUID projectId = UUID.randomUUID()
 
-    def setupSpec() {
+    def setup() {
         // Seed a real organization and project using raw SQL to avoid validation constraint issues
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Test Org', true)", orgId)
         executeUpdate("""

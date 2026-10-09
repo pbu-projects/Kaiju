@@ -78,4 +78,6 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
             double radiusMeters,
             Pageable pageable
     );
+
+    long removeById(@NonNull UUID id);
 }

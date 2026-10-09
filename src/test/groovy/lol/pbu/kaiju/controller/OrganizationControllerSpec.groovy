@@ -100,6 +100,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def setup() {
         cleanup()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'org-admin-test@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
     }
 
     static class PageResponse<T> {
@@ -391,6 +392,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "LIST | should fully drain all organizations sequentially using cursors"() {
         setup:
+        (1..3).each { i ->
+            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Drain Test Org ${i}', true, 'VERIFIED')", UUID.randomUUID())
+        }
         Set<Organization> allOrgs = new LinkedHashSet<>()
         int pageSize = 5
         def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("name")))
@@ -411,6 +415,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "LIST | should retrieve organizations with pagination via HTTP GET"() {
+        setup:
+        (1..3).each { i ->
+            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Page Test Org ${i}', true, 'VERIFIED')", UUID.randomUUID())
+        }
+
         when: "requesting organizations via HTTP GET as global admin"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5"), adminId.toString()), Map)
 
@@ -422,6 +431,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "LIST | should retrieve organizations with pagination and sorting via HTTP GET"() {
+        setup:
+        (1..3).each { i ->
+            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Sort Test Org ${i}', true, 'VERIFIED')", UUID.randomUUID())
+        }
+
         when: "requesting organizations via HTTP GET as global admin with sort"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5&sort=name,asc"), adminId.toString()), Map)
 

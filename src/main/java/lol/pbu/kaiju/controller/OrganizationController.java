@@ -15,6 +15,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
@@ -29,7 +30,8 @@ import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.service.OrganizationService;
+import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -39,29 +41,30 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
-@ExecuteOn(BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organizations")
-public class OrganizationController implements ControllerUtils {
+public class OrganizationController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
 
+    private final OrganizationService organizationService;
     private final OrganizationRepository organizationRepository;
     private final SpatialMappingService spatialMappingService;
     private final UserRepository userRepository;
     private final SecurityQueryRepository queryRepository;
 
     public OrganizationController(
+            OrganizationService organizationService,
             OrganizationRepository organizationRepository,
             SpatialMappingService spatialMappingService,
             UserRepository userRepository,
             SecurityQueryRepository queryRepository
     ) {
+        this.organizationService = organizationService;
         this.organizationRepository = organizationRepository;
         this.spatialMappingService = spatialMappingService;
         this.userRepository = userRepository;
@@ -71,7 +74,7 @@ public class OrganizationController implements ControllerUtils {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<Organization> getOrganizations(@Nullable CursoredPageable pageable) {
-        return organizationRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationService.getOrganizations(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -177,7 +180,7 @@ public class OrganizationController implements ControllerUtils {
 
     private @NonNull Pageable normalizePageable(@Nullable Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
-            return Pageable.from(0, DEFAULT_PAGE_SIZE);
+            return Pageable.from(0, PageableUtils.DEFAULT_PAGE_SIZE);
         }
         if (!pageable.getSort().getOrderBy().isEmpty()) {
             return Pageable.from(pageable.getNumber(), pageable.getSize());
@@ -197,11 +200,12 @@ public class OrganizationController implements ControllerUtils {
 
     @Get("/{id}")
     public Optional<Organization> getOrganization(@PathVariable UUID id) {
-        return organizationRepository.findById(id);
+        return organizationService.getOrganizationById(id);
     }
 
     @Post
-    public Organization addOrganization(@Valid @Body CreateOrganizationCommand command) {
+    public Organization addOrganization(@Valid @Body CreateOrganizationCommand command, Principal principal) {
+        UUID creatorUserId = UUID.fromString(principal.getName());
         Organization organization = new Organization(
                 null,
                 command.name(),
@@ -212,7 +216,7 @@ public class OrganizationController implements ControllerUtils {
                 null,
                 List.of()
         );
-        return organizationRepository.save(organization);
+        return organizationService.createOrganization(organization, creatorUserId);
     }
 
     /**
@@ -227,20 +231,18 @@ public class OrganizationController implements ControllerUtils {
     @Put("/{id}")
     public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationCommand command, Principal principal) {
         verifyOrgAdminAuthority(principal, id);
-        Organization existing = organizationRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Organization not found"));
-
-        Organization updatedOrganization = new Organization(
+        Organization candidate = new Organization(
                 id,
                 command.name(),
                 command.websiteUrl(),
                 command.parentId(),
                 command.isPublic(),
-                existing.verificationStatus(),
-                existing.verificationExpiresAt(),
-                existing.locations()
+                null,
+                null,
+                null
         );
-        return organizationRepository.update(updatedOrganization);
+        UUID actorUserId = UUID.fromString(principal.getName());
+        return organizationService.updateOrganization(id, candidate, actorUserId);
     }
 
     /**
@@ -253,8 +255,7 @@ public class OrganizationController implements ControllerUtils {
     @Delete("/{id}")
     public void deleteOrganization(@PathVariable UUID id, Principal principal) {
         verifyOrgAdminAuthority(principal, id);
-        checkExists(organizationRepository, id);
-        organizationRepository.deleteById(id);
+        organizationService.deleteOrganization(id);
     }
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
@@ -269,5 +270,4 @@ public class OrganizationController implements ControllerUtils {
             throw new HttpStatusException(FORBIDDEN, "Forbidden: Only organization admins or system administrators may modify this organization");
         }
     }
-
 }

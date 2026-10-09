@@ -407,7 +407,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
         body.content instanceof List
     }
 
-    def "ControllerUtils | should return 404 NOT FOUND when updating non-existent administrative region"() {
+    def "Not Found | should return 404 NOT FOUND when updating non-existent administrative region"() {
         given: "a non-existent ID and valid update payload"
         UUID nonExistentId = UUID.randomUUID()
         Map updatePayload = [
@@ -434,7 +434,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "ControllerUtils | should return 404 NOT FOUND when deleting non-existent administrative region"() {
+    def "Not Found | should return 404 NOT FOUND when deleting non-existent administrative region"() {
         given: "a non-existent ID"
         UUID nonExistentId = UUID.randomUUID()
 

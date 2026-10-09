@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -10,6 +11,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -18,7 +20,7 @@ import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.dto.CreateBoundaryCommand;
 import lol.pbu.kaiju.dto.UpdateBoundaryCommand;
 import lol.pbu.kaiju.repository.BoundaryRepository;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 
 import java.util.Optional;
@@ -26,10 +28,10 @@ import java.util.UUID;
 
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/boundaries")
-public class BoundaryController implements ControllerUtils {
+public class BoundaryController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
 
@@ -43,7 +45,7 @@ public class BoundaryController implements ControllerUtils {
 
     @Get
     public CursoredPage<Boundary> getBoundaries(@Nullable @Valid CursoredPageable pageable) {
-        return boundaryRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return boundaryRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -71,7 +73,8 @@ public class BoundaryController implements ControllerUtils {
      */
     @Put("/{id}")
     public Boundary updateBoundary(@PathVariable UUID id, @Valid @Body UpdateBoundaryCommand command) {
-        checkExists(boundaryRepository, id);
+        boundaryRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Boundary not found"));
         Boundary boundary = new Boundary(
                 id,
                 command.name(),
@@ -88,7 +91,9 @@ public class BoundaryController implements ControllerUtils {
      */
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id) {
-        checkExists(boundaryRepository, id);
-        boundaryRepository.deleteById(id);
+        long deletedCount = boundaryRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Boundary not found");
+        }
     }
 }

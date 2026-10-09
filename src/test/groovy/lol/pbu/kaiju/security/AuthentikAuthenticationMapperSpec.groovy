@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.security
 
-import io.micronaut.data.exceptions.DataAccessException
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
@@ -9,31 +8,77 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
-import reactor.core.publisher.Mono
+import lol.pbu.kaiju.service.UserService
+import org.reactivestreams.Publisher
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import spock.lang.Specification
 
 import java.time.OffsetDateTime
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
 
 @MicronautTest(transactional = true)
 class AuthentikAuthenticationMapperSpec extends Specification {
 
     @Inject
     UserRepository userRepository
-    
+
+    @Inject
+    UserService userService
+
     @Inject
     AuthentikAuthenticationMapper mapper
 
+    private static <T> T await(Publisher<T> publisher) {
+        CompletableFuture<T> future = new CompletableFuture<>()
+        publisher.subscribe(new Subscriber<T>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(1)
+            }
+            @Override
+            void onNext(T t) {
+                future.complete(t)
+            }
+            @Override
+            void onError(Throwable t) {
+                future.completeExceptionally(t)
+            }
+            @Override
+            void onComplete() {
+                if (!future.isDone()) {
+                    future.complete(null)
+                }
+            }
+        })
+        return future.get(5, TimeUnit.SECONDS)
+    }
+
     def "should return failure if email is missing from claims"() {
         given: "a fake incoming token with no email"
-        // We use a Map proxy here to represent the external Authentik claims JSON
         OpenIdClaims claims = [getEmail: { -> null }] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
-        
+
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = Mono.from(publisher).block()
+        AuthenticationResponse response = await(publisher)
 
         then: "it refuses to authenticate without an email"
+        !response.isAuthenticated()
+        response.getMessage().get() == "No email present in OpenID claims"
+    }
+
+    def "should return failure if email is blank in claims"() {
+        given: "a fake incoming token with blank email"
+        OpenIdClaims claims = [getEmail: { -> "   " }] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login"
+        def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = await(publisher)
+
+        then: "it refuses to authenticate with a blank email"
         !response.isAuthenticated()
         response.getMessage().get() == "No email present in OpenID claims"
     }
@@ -42,14 +87,14 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         given: "a real user saved in the actual PostGIS database"
         String email = "existing-${UUID.randomUUID()}@example.com"
         User existingUser = userRepository.save(new User(null, email, UserRole.GLOBAL_ADMIN, OffsetDateTime.now()))
-        
+
         and: "an incoming token for that email"
         OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
-        
+
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = Mono.from(publisher).block()
+        AuthenticationResponse response = await(publisher)
 
         then: "it logs them in with their actual database role"
         response.isAuthenticated()
@@ -62,50 +107,48 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         given: "an email that does NOT exist in the database"
         String email = "new-${UUID.randomUUID()}@example.com"
         assert !userRepository.findByEmail(email).isPresent()
-        
+
         and: "an incoming token for that email"
         OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
-        
+
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = Mono.from(publisher).block()
+        AuthenticationResponse response = await(publisher)
 
         then: "the authentication is successful and assigned the default role"
         response.isAuthenticated()
         response.getAuthentication().get().getRoles().contains("project:create")
         response.getAuthentication().get().getAttributes().get("email") == email
-        
+
         and: "the user was actually physically persisted into the real PostGIS database"
         def dbUser = userRepository.findByEmail(email).get()
         dbUser.email() == email
         dbUser.role() == UserRole.STANDARD_USER
-        
+
         and: "their new database UUID was used as the session ID"
         response.getAuthentication().get().getName() == dbUser.id().toString()
     }
 
-    def "should recover gracefully when a concurrent insert causes a DataAccessException"() {
-        given: "a user who is pre-created in db to simulate a race condition"
-        String email = "race-${UUID.randomUUID()}@example.com"
-        User preExisting = userRepository.save(new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now()))
+    def "should delegate to UserService to provision or get user"() {
+        given: "a mock UserService"
+        UserService mockUserService = Mock()
+        String email = "delegated-${UUID.randomUUID()}@example.com"
+        User mockUser = new User(UUID.randomUUID(), email, UserRole.STANDARD_USER, OffsetDateTime.now())
 
-        and: "a mock UserRepository that simulates a constraint violation on save, then finds the user"
-        UserRepository mockRepo = Mock()
-        mockRepo.findByEmail(email) >>> [Optional.empty(), Optional.of(preExisting)]
-        mockRepo.save(_) >> { throw new DataAccessException("duplicate key") }
-
-        and: "a mapper using the mock repository"
-        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockRepo)
+        and: "a mapper using the mock UserService"
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService)
         OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
-        when: "the mapper processes the login during the race condition"
+        when: "the mapper processes the login"
         def publisher = testMapper.createAuthenticationResponse("authentik", token, claims, null)
-        AuthenticationResponse response = Mono.from(publisher).block()
+        AuthenticationResponse response = await(publisher)
 
-        then: "authentication succeeds by recovering the user from the second fetch"
+        then: "authentication succeeds with user from UserService"
+        1 * mockUserService.provisionOrGetUser(email) >> mockUser
         response.isAuthenticated()
-        response.getAuthentication().get().getName() == preExisting.id().toString()
+        response.getAuthentication().get().getName() == mockUser.id().toString()
+        response.getAuthentication().get().getAttributes().get("email") == email
     }
 }

@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
@@ -18,16 +19,15 @@ import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.security.SecurityRoles;
-import lol.pbu.kaiju.security.AuthentikAuthenticationMapper;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
@@ -45,10 +45,10 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
  * @see AuthentikAuthenticationMapper
  * @see AdministrativeRegionRepository
  */
-@ExecuteOn(BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/administrative-regions")
-public class AdministrativeRegionController implements ControllerUtils {
+public class AdministrativeRegionController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
 
@@ -72,7 +72,7 @@ public class AdministrativeRegionController implements ControllerUtils {
      */
     @Get
     public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable CursoredPageable pageable) {
-        return administrativeRegionRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return administrativeRegionRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -119,14 +119,14 @@ public class AdministrativeRegionController implements ControllerUtils {
      * @param command the updated region command data
      * @return the updated {@link AdministrativeRegion}
      * @see AdministrativeRegionController for controller-level security architecture
-     * @see ControllerUtils#checkExists for entity existence validation
      * @see Permission#SYSTEM_ADMIN_CLAIM
      * @see Permission#REGION_MANAGE_CLAIM
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body UpdateAdministrativeRegionCommand command) {
-        checkExists(administrativeRegionRepository, id);
+        administrativeRegionRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found"));
         AdministrativeRegion region = new AdministrativeRegion(
                 id,
                 command.name(),
@@ -142,14 +142,15 @@ public class AdministrativeRegionController implements ControllerUtils {
      *
      * @param id the unique {@link UUID} of the administrative region to delete
      * @see AdministrativeRegionController for controller-level security architecture
-     * @see ControllerUtils#checkExists for entity existence validation
      * @see Permission#SYSTEM_ADMIN_CLAIM
      * @see Permission#REGION_MANAGE_CLAIM
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Delete("/{id}")
     public void deleteAdministrativeRegion(@PathVariable UUID id) {
-        checkExists(administrativeRegionRepository, id);
-        administrativeRegionRepository.deleteById(id);
+        long deletedCount = administrativeRegionRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
+        }
     }
 }

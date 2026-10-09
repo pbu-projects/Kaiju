@@ -318,6 +318,9 @@ class UserControllerSpec extends BaseControllerSpec {
 
     def "LIST | should fully drain all users sequentially using cursors"() {
         setup:
+        (1..2).each {
+            createDbUser("drain-${it}-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        }
         Set<User> allUsers = new LinkedHashSet<>()
         int pageSize = 5
         def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("email")))

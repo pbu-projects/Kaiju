@@ -1,6 +1,15 @@
 micronaut:
   application:
     name: kaiju
+  server:
+    thread-selection: AUTO
+  executors:
+    io:
+      type: THREAD_PER_TASK
+      virtual: true
+    scheduled:
+      type: SCHEDULED
+      virtual: true
   metrics:
     enabled: true
   security:

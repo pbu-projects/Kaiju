@@ -21,7 +21,8 @@ import lol.pbu.kaiju.dto.UpdateUserCommand;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.service.UserService;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
@@ -30,33 +31,34 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_USER_MANAGE_CLAIM;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/users")
-public class UserController implements ControllerUtils {
+public class UserController {
 
     public static final String DEFAULT_SORT_FIELD = "email";
 
+    private final UserService userService;
     private final UserRepository userRepository;
 
-    public UserController(UserRepository userRepository) {
+    public UserController(UserService userService, UserRepository userRepository) {
+        this.userService = userService;
         this.userRepository = userRepository;
     }
 
     @Get
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     public CursoredPage<User> getUsers(@Nullable @Valid CursoredPageable pageable) {
-        return userRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return userService.getUsers(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
     public Optional<User> getUser(@PathVariable UUID id, Principal principal) {
         verifySelfOrAdmin(id, principal);
-        return userRepository.findById(id);
+        return userService.getUserById(id);
     }
 
     @Post
@@ -72,7 +74,7 @@ public class UserController implements ControllerUtils {
                 targetRole,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
-        return userRepository.save(safeUser);
+        return userService.createUser(safeUser);
     }
 
     /**
@@ -90,18 +92,13 @@ public class UserController implements ControllerUtils {
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserCommand command, Principal principal) {
         verifySelfOrAdmin(id, principal);
-
-        User existingUser = userRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
-
-        // Copy over allowed fields, but retain strictly controlled fields
-        User safeUpdate = new User(
+        User candidate = new User(
                 id,
                 command.email(),
-                existingUser.role(), // Retain existing role
-                existingUser.createdAt()
+                null,
+                null
         );
-        return userRepository.update(safeUpdate);
+        return userService.updateUser(id, candidate);
     }
 
     /**
@@ -116,8 +113,7 @@ public class UserController implements ControllerUtils {
     @Delete("/{id}")
     public void deleteUser(@PathVariable UUID id, Principal principal) {
         verifySelfOrAdmin(id, principal);
-        checkExists(userRepository, id);
-        userRepository.deleteById(id);
+        userService.deleteUser(id);
     }
 
     private void verifySelfOrAdmin(UUID targetUserId, Principal principal) {

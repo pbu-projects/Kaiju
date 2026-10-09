@@ -22,4 +22,6 @@ public interface UserRepository extends PageableRepository<User, UUID> {
     void updateRole(@Id UUID id, UserRole role);
 
     Optional<User> findByEmail(String email);
+
+    long removeById(@NonNull UUID id);
 }

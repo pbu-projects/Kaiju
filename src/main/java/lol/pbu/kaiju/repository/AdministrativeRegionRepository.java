@@ -15,4 +15,6 @@ import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
 public interface AdministrativeRegionRepository extends PageableRepository<AdministrativeRegion, UUID> {
     @NonNull
     CursoredPage<AdministrativeRegion> findAll(@NonNull CursoredPageable pageable);
+
+    long removeById(@NonNull UUID id);
 }
