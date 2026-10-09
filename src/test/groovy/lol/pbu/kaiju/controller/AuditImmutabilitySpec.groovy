@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -13,7 +14,7 @@ import java.util.UUID
 class AuditImmutabilitySpec extends BaseControllerSpec {
 
     @Unroll
-    def "AUDIT IMMUTABILITY | #method #endpoint should be rejected (404 or 405)"(String method, io.micronaut.http.HttpMethod httpMethod, String endpoint) {
+    def "AUDIT IMMUTABILITY | #method #endpoint should be rejected (404 or 405)"(String method, HttpMethod httpMethod, String endpoint) {
         when: "attempting a forbidden mutation on audit log endpoints"
         def request = asGlobalAdmin(
                 HttpRequest.create(httpMethod, endpoint)
@@ -28,12 +29,12 @@ class AuditImmutabilitySpec extends BaseControllerSpec {
         e.status in [HttpStatus.METHOD_NOT_ALLOWED, HttpStatus.NOT_FOUND]
 
         where:
-        method   | httpMethod                          | endpoint
-        "PUT"    | io.micronaut.http.HttpMethod.PUT    | "/project-audit-logs/${UUID.randomUUID()}"
-        "DELETE" | io.micronaut.http.HttpMethod.DELETE | "/project-audit-logs/${UUID.randomUUID()}"
-        "POST"   | io.micronaut.http.HttpMethod.POST   | "/project-audit-logs"
-        "PUT"    | io.micronaut.http.HttpMethod.PUT    | "/organization-audit-logs/${UUID.randomUUID()}"
-        "DELETE" | io.micronaut.http.HttpMethod.DELETE | "/organization-audit-logs/${UUID.randomUUID()}"
-        "POST"   | io.micronaut.http.HttpMethod.POST   | "/organization-audit-logs"
+        method   | httpMethod        | endpoint
+        "PUT"    | HttpMethod.PUT    | "/project-audit-logs/${UUID.randomUUID()}"
+        "DELETE" | HttpMethod.DELETE | "/project-audit-logs/${UUID.randomUUID()}"
+        "POST"   | HttpMethod.POST   | "/project-audit-logs"
+        "PUT"    | HttpMethod.PUT    | "/organization-audit-logs/${UUID.randomUUID()}"
+        "DELETE" | HttpMethod.DELETE | "/organization-audit-logs/${UUID.randomUUID()}"
+        "POST"   | HttpMethod.POST   | "/organization-audit-logs"
     }
 }

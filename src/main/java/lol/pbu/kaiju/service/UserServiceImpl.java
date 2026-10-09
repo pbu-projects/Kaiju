@@ -118,7 +118,7 @@ public class UserServiceImpl implements UserService {
                 if (ex instanceof RuntimeException runtimeException) {
                     throw runtimeException;
                 }
-                throw new RuntimeException(ex);
+                throw new IllegalStateException("Database error during user provisioning", ex);
             }
         });
     }

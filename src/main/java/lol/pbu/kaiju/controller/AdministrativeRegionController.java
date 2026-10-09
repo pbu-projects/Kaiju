@@ -22,8 +22,6 @@ import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.security.SecurityRoles;
-import lol.pbu.kaiju.security.AuthentikAuthenticationMapper;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 

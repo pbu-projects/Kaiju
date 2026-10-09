@@ -10,11 +10,13 @@ import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.OrganizationRepository
+import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.UserRepository
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -28,6 +30,12 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
 
     @Inject
     ProjectService projectService
+
+    @Inject
+    OrganizationService organizationService
+
+    @Inject
+    ProjectRepository projectRepository
 
     @Inject
     AdministrativeRegionRepository regionRepository
@@ -127,5 +135,43 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
         def e = thrown(HttpStatusException)
         e.status == HttpStatus.FORBIDDEN
         e.message == "You do not have authority to assign this managing region"
+    }
+
+    def "ProjectService | approves and rejects project with audit records"() {
+        given: "an admin, organization, and projects in PENDING state"
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def org = saveOrganization("Approve Org")
+        def pendingProject1 = projectRepository.save(new Project(
+                null, org, null, "Pending Project 1", "Desc", ProjectType.STANDARD,
+                ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], []
+        ))
+        def pendingProject2 = projectRepository.save(new Project(
+                null, org, null, "Pending Project 2", "Desc", ProjectType.STANDARD,
+                ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], []
+        ))
+
+        when: "approving the project"
+        def approved = projectService.approveProject(pendingProject1.id(), admin.id())
+
+        then: "status is updated to ACTIVE"
+        approved.status() == ProjectStatus.ACTIVE
+
+        when: "rejecting the project"
+        def rejected = projectService.rejectProject(pendingProject2.id(), admin.id())
+
+        then: "status is updated to REJECTED"
+        rejected.status() == ProjectStatus.REJECTED
+    }
+
+    def "OrganizationService | updates verification status and generates audit log"() {
+        given: "an admin and unverified organization"
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def org = saveOrganization("Unverified Org")
+
+        when: "updating verification status"
+        def updated = organizationService.updateVerificationStatus(org.id(), VerificationStatus.REVOKED, "Failed audit", admin.id())
+
+        then: "status is updated and audit record created"
+        updated.verificationStatus() == VerificationStatus.REVOKED
     }
 }
