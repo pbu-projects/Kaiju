@@ -15,7 +15,6 @@ import lol.pbu.kaiju.domain.ProjectAuditLog
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.dto.CreateProjectAuditLogCommand
 import lol.pbu.kaiju.dto.UpdateProjectAuditLogCommand
-import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import spock.lang.Unroll
