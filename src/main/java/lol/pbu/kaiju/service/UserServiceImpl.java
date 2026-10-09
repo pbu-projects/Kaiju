@@ -10,7 +10,6 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
-import org.postgresql.util.PSQLException;
 import org.postgresql.util.PSQLState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,14 +125,9 @@ public class UserServiceImpl implements UserService {
     private boolean isUniqueConstraintViolation(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
-            if (current instanceof PSQLException psqlException) {
-                if (SQL_STATE_UNIQUE_VIOLATION.equals(psqlException.getSQLState())) {
-                    return true;
-                }
-            } else if (current instanceof SQLException sqlException) {
-                if (SQL_STATE_UNIQUE_VIOLATION.equals(sqlException.getSQLState())) {
-                    return true;
-                }
+            if (current instanceof SQLException sqlException
+                    && SQL_STATE_UNIQUE_VIOLATION.equals(sqlException.getSQLState())) {
+                return true;
             }
             current = current.getCause();
         }

@@ -47,7 +47,9 @@ class AuthentikAuthenticationMapperSpec extends Specification {
             }
             @Override
             void onComplete() {
-                if (!future.isDone()) future.complete(null)
+                if (!future.isDone()) {
+                    future.complete(null)
+                }
             }
         })
         return future.get(5, TimeUnit.SECONDS)

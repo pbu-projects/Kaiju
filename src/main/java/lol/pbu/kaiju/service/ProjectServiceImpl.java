@@ -89,22 +89,7 @@ public class ProjectServiceImpl implements ProjectService {
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
 
-        AdministrativeRegion managingRegion = null;
-        if (project.managingRegion() != null) {
-            UUID regionId = project.managingRegion().id();
-            if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
-            }
-            if (project.locations() != null && !project.locations().isEmpty()) {
-                if (!securityService.areAllLocationsInRegion(project, regionId)) {
-                    throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
-                }
-            }
-            if (!securityService.canAssignManagingRegion(actorUserId, org.id(), regionId)) {
-                throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
-            }
-            managingRegion = administrativeRegionRepository.findById(regionId).orElse(project.managingRegion());
-        }
+        AdministrativeRegion managingRegion = validateAndResolveManagingRegion(project, org.id(), actorUserId);
 
         Project transientProject = new Project(
                 null,
@@ -143,6 +128,25 @@ public class ProjectServiceImpl implements ProjectService {
         return saved;
     }
 
+    private AdministrativeRegion validateAndResolveManagingRegion(
+            Project project, UUID orgId, UUID actorUserId) {
+        if (project.managingRegion() == null) {
+            return null;
+        }
+        UUID regionId = project.managingRegion().id();
+        if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
+        }
+        if (project.locations() != null && !project.locations().isEmpty()
+                && !securityService.areAllLocationsInRegion(project, regionId)) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
+        }
+        if (!securityService.canAssignManagingRegion(actorUserId, orgId, regionId)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
+        }
+        return administrativeRegionRepository.findById(regionId).orElse(project.managingRegion());
+    }
+
     @Override
     @Transactional
     @NonNull
@@ -157,44 +161,10 @@ public class ProjectServiceImpl implements ProjectService {
             throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to modify this project");
         }
 
-        Organization targetOrg = existing.organization();
+        Organization targetOrg = resolveTargetOrganization(actorUserId, existing, project);
         UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
-
-        if (project.organization() != null) {
-            UUID requestedOrgId = project.organization().id();
-            if (!Objects.equals(requestedOrgId, existingOrgId)) {
-                if (!securityService.canReassignProject(actorUserId, existing)) {
-                    throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to reassign this project to another organization");
-                }
-                if (requestedOrgId == null) {
-                    throw new HttpStatusException(HttpStatus.NOT_FOUND, "Target organization not found");
-                }
-                targetOrg = organizationRepository.findById(requestedOrgId)
-                        .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Target organization not found"));
-            }
-        }
-
-        AdministrativeRegion targetRegion = existing.managingRegion();
-        UUID existingRegionId = existing.managingRegion() != null ? existing.managingRegion().id() : null;
-        UUID requestedRegionId = project.managingRegion() != null ? project.managingRegion().id() : null;
         UUID effectiveOrgId = targetOrg != null ? targetOrg.id() : existingOrgId;
-
-        if (!Objects.equals(requestedRegionId, existingRegionId)) {
-            if (requestedRegionId != null) {
-                if (!administrativeRegionRepository.existsById(requestedRegionId)) {
-                    throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
-                }
-                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId)) {
-                    throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
-                }
-                targetRegion = administrativeRegionRepository.findById(requestedRegionId).orElse(project.managingRegion());
-            } else {
-                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId)) {
-                    throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
-                }
-                targetRegion = null;
-            }
-        }
+        AdministrativeRegion targetRegion = resolveTargetRegion(actorUserId, existing, effectiveOrgId, project);
 
         List<Location> domainLocations = project.locations() != null ? project.locations() : existing.locations();
         List<Boundary> domainBoundaries = project.boundaries() != null ? project.boundaries() : existing.boundaries();
@@ -219,14 +189,7 @@ public class ProjectServiceImpl implements ProjectService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
         }
 
-        boolean locationsModified = !Objects.equals(domainLocations, existing.locations());
-        boolean reassigned = !Objects.equals(targetOrg != null ? targetOrg.id() : null, existingOrgId);
-        ProjectStatus newStatus = existing.status();
-        if ((locationsModified || reassigned)
-                && existing.status() == ProjectStatus.ACTIVE
-                && (targetOrg == null || !securityService.areAllLocationsInOrgRegion(transientProject, targetOrg.id()))) {
-            newStatus = ProjectStatus.PENDING;
-        }
+        ProjectStatus newStatus = determineUpdatedStatus(existing, transientProject, targetOrg, existingOrgId, domainLocations);
 
         Project updated = projectRepository.update(new Project(
                 id,
@@ -245,6 +208,67 @@ public class ProjectServiceImpl implements ProjectService {
 
         auditService.recordProjectAudit(updated, actor, AuditAction.EDITED);
         return updated;
+    }
+
+    private Organization resolveTargetOrganization(UUID actorUserId, Project existing, Project project) {
+        Organization targetOrg = existing.organization();
+        UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
+
+        if (project.organization() != null) {
+            UUID requestedOrgId = project.organization().id();
+            if (!Objects.equals(requestedOrgId, existingOrgId)) {
+                if (!securityService.canReassignProject(actorUserId, existing)) {
+                    throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to reassign this project to another organization");
+                }
+                if (requestedOrgId == null) {
+                    throw new HttpStatusException(HttpStatus.NOT_FOUND, "Target organization not found");
+                }
+                targetOrg = organizationRepository.findById(requestedOrgId)
+                        .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Target organization not found"));
+            }
+        }
+        return targetOrg;
+    }
+
+    private AdministrativeRegion resolveTargetRegion(
+            UUID actorUserId, Project existing, UUID effectiveOrgId, Project project) {
+        AdministrativeRegion targetRegion = existing.managingRegion();
+        UUID existingRegionId = existing.managingRegion() != null ? existing.managingRegion().id() : null;
+        UUID requestedRegionId = project.managingRegion() != null ? project.managingRegion().id() : null;
+
+        if (!Objects.equals(requestedRegionId, existingRegionId)) {
+            if (requestedRegionId != null) {
+                if (!administrativeRegionRepository.existsById(requestedRegionId)) {
+                    throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
+                }
+                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId)) {
+                    throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
+                }
+                targetRegion = administrativeRegionRepository.findById(requestedRegionId).orElse(project.managingRegion());
+            } else {
+                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId)) {
+                    throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
+                }
+                targetRegion = null;
+            }
+        }
+        return targetRegion;
+    }
+
+    private ProjectStatus determineUpdatedStatus(
+            Project existing,
+            Project transientProject,
+            Organization targetOrg,
+            UUID existingOrgId,
+            List<Location> domainLocations) {
+        boolean locationsModified = !Objects.equals(domainLocations, existing.locations());
+        boolean reassigned = !Objects.equals(targetOrg != null ? targetOrg.id() : null, existingOrgId);
+        if ((locationsModified || reassigned)
+                && existing.status() == ProjectStatus.ACTIVE
+                && (targetOrg == null || !securityService.areAllLocationsInOrgRegion(transientProject, targetOrg.id()))) {
+            return ProjectStatus.PENDING;
+        }
+        return existing.status();
     }
 
     @Override
