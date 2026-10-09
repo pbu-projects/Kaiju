@@ -162,7 +162,7 @@ public class ShiftController implements ControllerUtils {
 
     private List<Tag> resolveTags(List<UUID> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
-            return null;
+            return List.of();
         }
         return tagIds.stream()
                 .map(tagRepository::findById)
