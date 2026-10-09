@@ -4,6 +4,7 @@ import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
 import io.micronaut.data.annotation.Relation;
+import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotNull;
 import lol.pbu.kaiju.model.AuditAction;
 
@@ -12,6 +13,7 @@ import java.util.UUID;
 
 import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_ONE;
 
+@Serdeable
 @MappedEntity("project_audit_logs")
 public record ProjectAuditLog(
         @Id
