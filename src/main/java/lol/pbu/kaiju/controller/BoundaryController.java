@@ -3,7 +3,6 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.data.model.Sort;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -32,7 +31,6 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @Controller("/boundaries")
 public class BoundaryController implements ControllerUtils {
 
-    public static final int DEFAULT_PAGE_SIZE = 20;
     public static final String DEFAULT_SORT_FIELD = "name";
 
     private final BoundaryRepository boundaryRepository;
@@ -45,10 +43,7 @@ public class BoundaryController implements ControllerUtils {
 
     @Get
     public CursoredPage<Boundary> getBoundaries(@Nullable @Valid CursoredPageable pageable) {
-        CursoredPageable effectivePageable = (pageable == null || pageable.isUnpaged())
-                ? CursoredPageable.from(DEFAULT_PAGE_SIZE, Sort.of(Sort.Order.asc(DEFAULT_SORT_FIELD)))
-                : pageable;
-        return boundaryRepository.findAll(effectivePageable);
+        return boundaryRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")

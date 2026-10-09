@@ -1,22 +1,30 @@
 package lol.pbu.kaiju.controller
 
-
+import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
-import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.validation.ValidationException
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.dto.CreateUserCommand
+import lol.pbu.kaiju.dto.UpdateUserCommand
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import java.security.Principal
 import java.time.OffsetDateTime
+import java.util.UUID
 
+@Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@MicronautTest(transactional = false)
 class UserControllerSpec extends BaseControllerSpec {
 
     @Inject
@@ -28,26 +36,43 @@ class UserControllerSpec extends BaseControllerSpec {
     @Shared
     Faker faker = new Faker()
 
+    List<UUID> createdUserIds = []
+
+    def cleanup() {
+        createdUserIds.each { id ->
+            try {
+                executeUpdate("DELETE FROM users WHERE id = ?", id)
+            } catch (Exception ignored) {
+            }
+        }
+        createdUserIds.clear()
+    }
+
+    private User createDbUser(String email, UserRole role) {
+        User user = userRepository.save(new User(null, email, role, OffsetDateTime.now()))
+        createdUserIds.add(user.id())
+        return user
+    }
+
     /********** CREATE Tests **********/
 
-    def "CREATE | should successfully save a valid user"() {
-        given: "a new valid user"
-        def newUser = new User(
-                null,
-                faker.internet().emailAddress(),
-                UserRole.STANDARD_USER,
-                OffsetDateTime.now()
-        )
+    def "CREATE | should successfully save a valid user with default role via HTTP POST"() {
+        given: "a create user command without role specified"
+        String email = "test-user-${faker.number().digits(6)}@example.com"
+        def command = new CreateUserCommand(email, null)
 
-        when: "the user is added"
-        User saved = userController.addUser(newUser)
-
-        then: "the user is persisted with a generated ID"
-        verifyAll {
-            saved.id() != null
-            saved.email() == newUser.email()
-            saved.role() == newUser.role()
+        when: "the user is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", command)), User)
+        User saved = response.body()
+        if (saved?.id() != null) {
+            createdUserIds.add(saved.id())
         }
+
+        then: "the user is persisted with 200 OK and default STANDARD_USER role"
+        response.status == HttpStatus.OK
+        saved.id() != null
+        saved.email() == email
+        saved.role() == UserRole.STANDARD_USER
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM users WHERE id = ?", [saved.id()])
@@ -59,188 +84,237 @@ class UserControllerSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "CREATE | should fail to save user with invalid data: #testCase"(String testCase, User user) {
-        when: "an attempt is made to add a user with invalid data"
-        userController.addUser(user)
+    def "CREATE | should fail to save user with invalid data: #testCase"(String testCase, Map payload) {
+        when: "an attempt is made to add a user with invalid data via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/users", payload)), User)
 
-        then: "an exception is thrown"
-        thrown(ValidationException)
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
         where:
-        [testCase, user] << {
-            def validData = [
-                    email: "test@example.com",
-                    role : UserRole.STANDARD_USER
-            ]
+        testCase                | payload
+        "Null Email"            | [email: null]
+        "Blank Email"           | [email: "   "]
+        "Invalid Email Format"  | [email: "invalid-email"]
+        "Email Too Long"        | [email: "A" * 256 + "@example.com"]
+    }
 
-            def invalidCases = [
-                    [field: 'email', value: null, caseName: "Null Email"],
-                    [field: 'email', value: ' ', caseName: "Blank Email"],
-                    [field: 'email', value: "invalid-email", caseName: "Invalid Email Format"],
-                    [field: 'email', value: 'A' * 256 + "@example.com", caseName: "Email Too Long"],
-                    [field: 'role', value: null, caseName: "Null Role"]
-            ]
+    def "CREATE | should reject unauthenticated POST /users with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to create a user"
+        client.exchange(HttpRequest.POST("/users", new CreateUserCommand("unauth@example.com", null)), User)
 
-            return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def u = new User(
-                        null,
-                        props.email as String,
-                        props.role as UserRole,
-                        OffsetDateTime.now()
-                )
-                [invalidCase.caseName, u]
-            }
-        }()
+        then: "a 401 UNAUTHORIZED status is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    /********** AUTHORIZATION / ROLE ESCALATION Tests **********/
+
+    def "AUTHORIZATION | should throw 403 when non-admin attempts to create a user with elevated role"() {
+        given: "a standard user caller"
+        def caller = createDbUser("std-caller-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        def command = new CreateUserCommand("rogue-admin-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+
+        when: "the standard user attempts to create a global admin"
+        client.exchange(authenticated(HttpRequest.POST("/users", command), caller.id().toString(), ["STANDARD_USER"]), User)
+
+        then: "a 403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "AUTHORIZATION | should allow admin to create a user with elevated role"() {
+        given: "an admin caller"
+        def adminCaller = createDbUser("admin-caller-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+        def command = new CreateUserCommand("elevated-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+
+        when: "the admin creates an elevated user"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", command), adminCaller.id().toString()), User)
+        User saved = response.body()
+        if (saved?.id() != null) {
+            createdUserIds.add(saved.id())
+        }
+
+        then: "the user is saved with the elevated role"
+        response.status == HttpStatus.OK
+        saved.role() == UserRole.GLOBAL_ADMIN
     }
 
     /********** READ Tests **********/
 
-    def "READ | should retrieve an existing user by ID"() {
+    def "READ | should retrieve an existing user by ID when requested by self"() {
         given: "an existing user"
-        def user = userRepository.save(new User(null, "test-user-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        UUID id = user.id()
+        def user = createDbUser("read-self-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
 
-        when: "the user is requested by its ID"
-        def result = userController.getUser(id)
+        when: "the user is requested by its ID via HTTP GET"
+        def response = client.exchange(authenticated(HttpRequest.GET("/users/${user.id()}"), user.id().toString(), ["STANDARD_USER"]), User)
 
-        then: "the correct user is returned"
-        verifyAll {
-            result.isPresent()
-            result.get().id() == id
-            result.get().email() == user.email()
-        }
+        then: "200 OK is returned with the correct user"
+        response.status == HttpStatus.OK
+        response.body().id() == user.id()
+        response.body().email() == user.email()
     }
 
-    def "READ | should return empty for a non-existent user ID"() {
-        when: "a non-existent user is requested"
-        def result = userController.getUser(UUID.randomUUID())
+    def "READ | should allow admin to view any user profile"() {
+        given: "a standard user and an admin"
+        def user = createDbUser("view-target-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        def admin = createDbUser("view-admin-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
 
-        then: "the result is empty"
-        !result.isPresent()
+        when: "the admin views the user profile via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/users/${user.id()}"), admin.id().toString()), User)
+
+        then: "200 OK is returned with the target user"
+        response.status == HttpStatus.OK
+        response.body().id() == user.id()
     }
 
-    Principal createPrincipal(UUID userId) {
-        new Principal() {
-            @Override
-            String getName() {
-                return userId.toString()
-            }
-        }
+    def "READ | IDOR | should throw 403 when user attempts to view another user's profile"() {
+        given: "two standard users"
+        def userA = createDbUser("user-a-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        def userB = createDbUser("user-b-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+
+        when: "user A attempts to view user B's profile via HTTP GET"
+        client.exchange(authenticated(HttpRequest.GET("/users/${userB.id()}"), userA.id().toString(), ["STANDARD_USER"]), User)
+
+        then: "a 403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "READ | should return 404 for a non-existent user ID"() {
+        given: "an admin caller and a non-existent UUID"
+        def admin = createDbUser("admin-404-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+        def nonExistentId = UUID.randomUUID()
+
+        when: "a non-existent user is requested via HTTP GET"
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/users/${nonExistentId}"), admin.id().toString()), User)
+
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     /********** UPDATE Tests **********/
 
-    // SECURITY REGRESSION TEST: Verifies that Mass Assignment vulnerabilities are blocked.
-    // Ensure that users can update their allowed profile fields (like email) but cannot
-    // elevate their own privileges by sneaking a 'role' field into the payload.
-    def "UPDATE | should successfully update an existing user while ignoring role changes"() {
+    def "UPDATE | should successfully update an existing user profile while retaining role"() {
         given: "an existing user updating their own profile"
-        def user = userRepository.save(new User(null, "orig-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        UUID id = user.id()
-        def newEmail = faker.internet().emailAddress()
-        def updateRequest = new User(null, newEmail, UserRole.REGION_DIRECTOR, OffsetDateTime.now())
+        def user = createDbUser("update-self-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        String newEmail = "updated-${faker.number().digits(5)}@example.com"
+        def command = new UpdateUserCommand(newEmail)
 
-        when: "the user updates themselves"
-        User updated = userController.updateUser(id, updateRequest, createPrincipal(id))
+        when: "the user updates themselves via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/users/${user.id()}", command), user.id().toString(), ["STANDARD_USER"]), User)
+        User updated = response.body()
 
-        then: "the returned user contains the updated email but retains the original role"
-        verifyAll {
-            updated.id() == id
-            updated.email() == newEmail
-            updated.role() == UserRole.STANDARD_USER
-        }
+        then: "the returned user contains updated email and retains original role"
+        response.status == HttpStatus.OK
+        updated.id() == user.id()
+        updated.email() == newEmail
+        updated.role() == UserRole.STANDARD_USER
 
-        and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT email, role FROM users WHERE id = ?", [id])
-        verifyAll(dbResult) {
+        and: "the database reflects the update"
+        def result = sql.firstRow("SELECT email, role FROM users WHERE id = ?", [user.id()])
+        verifyAll(result) {
             email == newEmail
             role == 'STANDARD_USER'
         }
     }
 
-    def "UPDATE | should throw 403 Forbidden when standard user attempts to update another user"() {
-        given: "two users"
-        def victim = userRepository.save(new User(null, "victim-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        def attacker = userRepository.save(new User(null, "attacker-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        def updateRequest = new User(null, "hacked@example.com", UserRole.STANDARD_USER, OffsetDateTime.now())
+    def "UPDATE | IDOR | should throw 403 Forbidden when standard user attempts to update another user"() {
+        given: "a victim and an attacker"
+        def victim = createDbUser("victim-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        def attacker = createDbUser("attacker-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        def command = new UpdateUserCommand("hacked-${faker.number().digits(5)}@example.com")
 
-        when: "attacker attempts to update victim"
-        userController.updateUser(victim.id(), updateRequest, createPrincipal(attacker.id()))
+        when: "attacker attempts to update victim via HTTP PUT"
+        client.exchange(authenticated(HttpRequest.PUT("/users/${victim.id()}", command), attacker.id().toString(), ["STANDARD_USER"]), User)
 
-        then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status.code == 403
+        then: "a 403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "UPDATE | should fail to update a non-existent user when called by admin"() {
-        given: "a global admin and a random non-existent ID"
-        def admin = userRepository.save(new User(null, "admin-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN, OffsetDateTime.now()))
+        given: "an admin and a random non-existent ID"
+        def admin = createDbUser("admin-upd-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new User(null, "test@example.com", UserRole.STANDARD_USER, OffsetDateTime.now())
+        def command = new UpdateUserCommand("notfound-${faker.number().digits(5)}@example.com")
 
-        when: "an update is attempted by admin"
-        userController.updateUser(nonExistentId, updateRequest, createPrincipal(admin.id()))
+        when: "an update is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/users/${nonExistentId}", command), admin.id().toString()), User)
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
-
 
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing user when requested by self"() {
-        given: "a new user to be deleted"
-        def tempUser = new User(
-                null,
-                "delete-me@example.org",
-                UserRole.STANDARD_USER,
-                OffsetDateTime.now()
-        )
-        def saved = userController.addUser(tempUser)
-        UUID id = saved.id()
-        assert userRepository.existsById(id)
+        given: "a user deleting their own account"
+        def user = createDbUser("del-self-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
 
-        when: "the user deletes themselves"
-        userController.deleteUser(id, createPrincipal(id))
+        when: "the user deletes themselves via HTTP DELETE"
+        def response = client.exchange(authenticated(HttpRequest.DELETE("/users/${user.id()}"), user.id().toString(), ["STANDARD_USER"]))
 
-        then: "the user no longer exists in the repository or database"
-        verifyAll {
-            !userRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM users WHERE id = ?", [id]).count == 0
-        }
+        then: "the response is 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the user is removed from the database"
+        sql.firstRow("SELECT count(*) as count FROM users WHERE id = ?", [user.id()]).count == 0
     }
 
-    def "DELETE | should throw 403 Forbidden when standard user attempts to delete another user"() {
-        given: "two users"
-        def victim = userRepository.save(new User(null, "victim-del-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        def attacker = userRepository.save(new User(null, "attacker-del-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
+    def "DELETE | IDOR | should throw 403 Forbidden when standard user attempts to delete another user"() {
+        given: "a victim and an attacker"
+        def victim = createDbUser("victim-del-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+        def attacker = createDbUser("attacker-del-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
 
-        when: "attacker attempts to delete victim"
-        userController.deleteUser(victim.id(), createPrincipal(attacker.id()))
+        when: "the attacker attempts to delete the victim via HTTP DELETE"
+        client.exchange(authenticated(HttpRequest.DELETE("/users/${victim.id()}"), attacker.id().toString(), ["STANDARD_USER"]))
 
-        then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status.code == 403
+        then: "a 403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "DELETE | should fail to delete a non-existent user when called by admin"() {
-        given: "a global admin and a random non-existent ID"
-        def admin = userRepository.save(new User(null, "admin-del-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN, OffsetDateTime.now()))
+        given: "an admin and a random non-existent ID"
+        def admin = createDbUser("admin-del-ne-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
         def nonExistentId = UUID.randomUUID()
 
-        when: "a delete is attempted by admin"
-        userController.deleteUser(nonExistentId, createPrincipal(admin.id()))
+        when: "a delete is attempted via HTTP DELETE"
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/users/${nonExistentId}"), admin.id().toString()))
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
-
     /********** LIST Tests **********/
+
+    def "LIST | should retrieve users with pagination when called by admin"() {
+        given: "an admin user in the system"
+        def admin = createDbUser("admin-list-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+
+        when: "requesting users via HTTP GET with admin credentials"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/users?size=5"), admin.id().toString()), Map)
+
+        then: "the response is 200 OK with paginated content"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+        body.content.size() >= 1
+    }
+
+    def "LIST | should reject unauthenticated GET /users with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to list users"
+        client.exchange(HttpRequest.GET("/users"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
     def "LIST | should fully drain all users sequentially using cursors"() {
         setup:
@@ -263,51 +337,15 @@ class UserControllerSpec extends BaseControllerSpec {
         }
     }
 
-    /********** AUTHORIZATION Tests **********/
+    def "LIST | should reject standard user GET /users with 403 FORBIDDEN"() {
+        given: "a standard authenticated user"
+        def user = createDbUser("std-list-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
 
-    def "AUTHORIZATION | should throw 403 when non-admin attempts to create a user with elevated role"() {
-        given: "a standard user and an attempt to create a GLOBAL_ADMIN user"
-        def standardUser = userRepository.save(new User(null, "std-create-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        def adminTarget = new User(null, "rogue-admin-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN, OffsetDateTime.now())
+        when: "attempting to list users with standard role"
+        client.exchange(authenticated(HttpRequest.GET("/users"), user.id().toString(), ["STANDARD_USER"]))
 
-        when: "the standard user attempts to create the global admin"
-        userController.addUser(adminTarget, createPrincipal(standardUser.id()))
-
-        then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status.code == 403
-    }
-
-    def "AUTHORIZATION | should throw 403 when user attempts to view another user's profile"() {
-        given: "two separate standard users"
-        def userA = userRepository.save(new User(null, "usera-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        def userB = userRepository.save(new User(null, "userb-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-
-        when: "user A attempts to view user B's profile"
-        userController.getUser(userB.id(), createPrincipal(userA.id()))
-
-        then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status.code == 403
-    }
-
-    def "AUTHORIZATION | should allow user to view their own profile and admin to view any profile"() {
-        given: "a standard user and an admin"
-        def userA = userRepository.save(new User(null, "user-self-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
-        def admin = userRepository.save(new User(null, "admin-view-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN, OffsetDateTime.now()))
-
-        when: "user views their own profile"
-        def selfView = userController.getUser(userA.id(), createPrincipal(userA.id()))
-
-        then: "it succeeds"
-        selfView.isPresent()
-        selfView.get().id() == userA.id()
-
-        when: "admin views user profile"
-        def adminView = userController.getUser(userA.id(), createPrincipal(admin.id()))
-
-        then: "it succeeds"
-        adminView.isPresent()
-        adminView.get().id() == userA.id()
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 }

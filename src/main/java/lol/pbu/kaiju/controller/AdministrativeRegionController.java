@@ -3,7 +3,6 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.data.model.Sort;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -51,7 +50,6 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 @Controller("/administrative-regions")
 public class AdministrativeRegionController implements ControllerUtils {
 
-    public static final int DEFAULT_PAGE_SIZE = 20;
     public static final String DEFAULT_SORT_FIELD = "name";
 
     private final AdministrativeRegionRepository administrativeRegionRepository;
@@ -74,10 +72,7 @@ public class AdministrativeRegionController implements ControllerUtils {
      */
     @Get
     public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable CursoredPageable pageable) {
-        CursoredPageable effectivePageable = (pageable == null || pageable.isUnpaged())
-                ? CursoredPageable.from(DEFAULT_PAGE_SIZE, Sort.of(Sort.Order.asc(DEFAULT_SORT_FIELD)))
-                : pageable;
-        return administrativeRegionRepository.findAll(effectivePageable);
+        return administrativeRegionRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**

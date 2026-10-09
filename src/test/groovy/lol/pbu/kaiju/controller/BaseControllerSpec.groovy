@@ -80,6 +80,6 @@ abstract class BaseControllerSpec extends Specification {
     }
 
     protected <T> MutableHttpRequest<T> asGlobalAdmin(MutableHttpRequest<T> request, String userId = "00000000-0000-0000-0000-000000000000") {
-        authenticated(request, userId, ["GLOBAL_ADMIN", "system:admin", "project:approve", "project:manage"])
+        authenticated(request, userId, ["GLOBAL_ADMIN", "system:admin", "system:user:manage", "project:approve", "project:manage", "region:manage", "org:manage_users", "org:edit"])
     }
 }

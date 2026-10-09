@@ -1,27 +1,38 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
-import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.validation.ValidationException
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.ProjectAuditLog
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.dto.CreateProjectAuditLogCommand
+import lol.pbu.kaiju.dto.UpdateProjectAuditLogCommand
 import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import spock.lang.Unroll
 
 import java.time.OffsetDateTime
+import java.util.UUID
 
 import static lol.pbu.kaiju.model.AuditAction.CREATED
+import static lol.pbu.kaiju.model.AuditAction.EDITED
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
+@Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@MicronautTest(transactional = false)
 class ProjectAuditLogControllerSpec extends BaseControllerSpec {
 
     @Inject
@@ -65,21 +76,21 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid project audit log"() {
-        given: "a new valid project audit log"
+        given: "a new valid project audit log command"
         def project = getRandomProject()
         def actor = getRandomUser()
-        def newLog = new ProjectAuditLog(null, project, actor, CREATED, OffsetDateTime.now())
+        def command = new CreateProjectAuditLogCommand(project.id(), actor.id(), CREATED)
 
-        when: "the project audit log is added"
-        ProjectAuditLog saved = projectAuditLogController.addProjectAuditLog(newLog)
+        when: "the project audit log is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/project-audit-logs", command)), ProjectAuditLog)
+        ProjectAuditLog saved = response.body()
 
-        then: "the project audit log is persisted with a generated ID"
-        verifyAll {
-            saved.id() != null
-            saved.project().id() == project.id()
-            saved.actor().id() == actor.id()
-            saved.action() == CREATED
-        }
+        then: "200 OK is returned and record is persisted"
+        response.status == HttpStatus.OK
+        saved.id() != null
+        saved.project().id() == project.id()
+        saved.actor().id() == actor.id()
+        saved.action() == CREATED
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM project_audit_logs WHERE id = ?", [saved.id()])
@@ -92,153 +103,140 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    @SuppressWarnings("GroovyAssignabilityCheck")
-    def "CREATE | should fail to save project audit log with invalid data: #testCase"(String testCase, Closure<ProjectAuditLog> logCreator) {
-        when: "an attempt is made to add a project audit log with invalid data"
-        projectAuditLogController.addProjectAuditLog(logCreator())
+    def "CREATE | should fail to save project audit log with invalid data: #testCase"(String testCase, Map payload) {
+        when: "an attempt is made to add a project audit log with invalid data via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/project-audit-logs", payload)), ProjectAuditLog)
 
-        then: "an exception is thrown"
-        thrown(ValidationException)
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
         where:
-        [testCase, logCreator] << {
-            def validProject = { -> getRandomProject() }
-            def validActor = { -> getRandomUser() }
+        testCase            | payload
+        "Null Project ID"   | [projectId: null, actorId: UUID.randomUUID(), action: "CREATED"]
+        "Null Actor ID"     | [projectId: UUID.randomUUID(), actorId: null, action: "CREATED"]
+        "Null Action"       | [projectId: UUID.randomUUID(), actorId: UUID.randomUUID(), action: null]
+    }
 
-            def invalidCases = [
-                    [field: 'project', value: { -> null }, caseName: "Null Project"],
-                    [field: 'actor', value: { -> null }, caseName: "Null Actor"],
-                    [field: 'action', value: { -> null }, caseName: "Null Action"]
-            ]
+    def "CREATE | should reject unauthenticated POST /project-audit-logs with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to add a project audit log"
+        client.exchange(HttpRequest.POST("/project-audit-logs", new CreateProjectAuditLogCommand(UUID.randomUUID(), UUID.randomUUID(), CREATED)))
 
-            return invalidCases.collect { invalidCase ->
-                [
-                        invalidCase.caseName,
-                        { ->
-                            new ProjectAuditLog(
-                                    null,
-                                    (invalidCase.field == 'project' ? invalidCase.value() : validProject()) as Project,
-                                    (invalidCase.field == 'actor' ? invalidCase.value() : validActor()) as User,
-                                    (invalidCase.field == 'action' ? invalidCase.value() : CREATED) as AuditAction,
-                                    OffsetDateTime.now()
-                            )
-                        }
-                ]
-            }
-        }()
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** READ Tests **********/
 
-    @Unroll
     def "READ | should retrieve an existing project audit log by ID"() {
-        given: "an existing project audit log ID from the database"
-        def firstRow = sql.firstRow("SELECT id FROM project_audit_logs LIMIT 1")
-        assert firstRow != null
-        UUID id = firstRow.id as UUID
+        given: "an existing project audit log"
+        def logRow = sql.firstRow("SELECT id FROM project_audit_logs LIMIT 1")
+        UUID id = logRow.id as UUID
 
-        when: "the project audit log is requested by its ID"
-        def result = projectAuditLogController.getProjectAuditLog(id)
+        when: "the project audit log is requested by its ID via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/project-audit-logs/${id}")), ProjectAuditLog)
+        ProjectAuditLog result = response.body()
 
-        then: "the correct project audit log is returned"
-        verifyAll {
-            result.isPresent()
-            result.get().id() == id
-        }
+        then: "200 OK is returned with the correct project audit log"
+        response.status == HttpStatus.OK
+        result.id() == id
     }
 
-    def "READ | should return empty for a non-existent project audit log ID"() {
-        when: "a non-existent project audit log is requested"
-        def result = projectAuditLogController.getProjectAuditLog(UUID.randomUUID())
+    def "READ | should return 404 for a non-existent project audit log ID"() {
+        when: "a non-existent project audit log is requested via HTTP GET"
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/project-audit-logs/${UUID.randomUUID()}")), ProjectAuditLog)
 
-        then: "the result is empty"
-        !result.isPresent()
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "READ | should reject unauthenticated GET /project-audit-logs/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to read an audit log"
+        client.exchange(HttpRequest.GET("/project-audit-logs/${UUID.randomUUID()}"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** UPDATE Tests **********/
 
     def "UPDATE | should successfully update an existing project audit log"() {
-        given: "an existing project audit log's details"
-        def logRow = sql.firstRow("SELECT id FROM project_audit_logs LIMIT 1")
-        assert logRow != null
+        given: "an existing project audit log"
+        def logRow = sql.firstRow("SELECT id FROM project_audit_logs WHERE action = 'CREATED' LIMIT 1")
         UUID id = logRow.id as UUID
-        def project = getRandomProject()
-        def actor = getRandomUser()
-        def updateRequest = new ProjectAuditLog(null, project, actor, AuditAction.EDITED, OffsetDateTime.now())
+        def command = new UpdateProjectAuditLogCommand(EDITED)
 
-        when: "the project audit log is updated"
-        ProjectAuditLog updated = projectAuditLogController.updateProjectAuditLog(id, updateRequest)
+        when: "the project audit log is updated via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/project-audit-logs/${id}", command)), ProjectAuditLog)
+        ProjectAuditLog updated = response.body()
 
-        then: "the returned project audit log contains the updated data"
-        verifyAll {
-            updated.id() == id
-            updated.action() == AuditAction.EDITED
-        }
+        then: "200 OK is returned and changes are reflected"
+        response.status == HttpStatus.OK
+        updated.id() == id
+        updated.action() == EDITED
 
-        and: "the changes are persisted in the database"
+        and: "persisted in the database"
         def dbResult = sql.firstRow("SELECT action FROM project_audit_logs WHERE id = ?", [id])
-        verifyAll(dbResult) {
-            action == 'EDITED'
-        }
+        dbResult.action == 'EDITED'
     }
 
     def "UPDATE | should fail to update a non-existent project audit log"() {
-        given: "a random non-existent ID and an update request"
+        given: "a random non-existent ID and command"
         def nonExistentId = UUID.randomUUID()
-        def project = getRandomProject()
-        def actor = getRandomUser()
-        def updateRequest = new ProjectAuditLog(null, project, actor, AuditAction.APPROVED, OffsetDateTime.now())
+        def command = new UpdateProjectAuditLogCommand(EDITED)
 
-        when: "an update is attempted"
-        projectAuditLogController.updateProjectAuditLog(nonExistentId, updateRequest)
+        when: "an update is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/project-audit-logs/${nonExistentId}", command)), ProjectAuditLog)
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
-
 
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing project audit log"() {
-        given: "a new project audit log to be deleted"
-        def project = getRandomProject()
-        def actor = getRandomUser()
-        def tempLog = new ProjectAuditLog(
-                null,
-                project,
-                actor,
-                CREATED,
-                OffsetDateTime.now()
-        )
-        def saved = projectAuditLogController.addProjectAuditLog(tempLog)
-        UUID id = saved.id()
-        assert projectAuditLogRepository.existsById(id)
+        given: "a project audit log to be deleted"
+        def logRow = sql.firstRow("SELECT id FROM project_audit_logs WHERE action = 'CREATED' LIMIT 1")
+        UUID id = logRow.id as UUID
 
-        when: "the project audit log is deleted"
-        projectAuditLogController.deleteProjectAuditLog(id)
+        when: "the project audit log is deleted via HTTP DELETE"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/project-audit-logs/${id}")))
 
-        then: "the project audit log no longer exists in the repository or database"
-        verifyAll {
-            !projectAuditLogRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM project_audit_logs WHERE id = ?", [id]).count == 0
-        }
+        then: "200 OK is returned"
+        response.status == HttpStatus.OK
+
+        and: "the project audit log no longer exists in repository or database"
+        !projectAuditLogRepository.findById(id).isPresent()
+        sql.firstRow("SELECT count(*) as count FROM project_audit_logs WHERE id = ?", [id]).count == 0
     }
 
     def "DELETE | should fail to delete a non-existent project audit log"() {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
-        when: "a delete is attempted"
-        projectAuditLogController.deleteProjectAuditLog(nonExistentId)
+        when: "a delete is attempted via HTTP DELETE"
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/project-audit-logs/${nonExistentId}")))
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
-
     /********** LIST Tests **********/
+
+    def "LIST | should retrieve project audit logs with pagination"() {
+        when: "requesting project audit logs via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/project-audit-logs?size=5")), Map)
+
+        then: "the response is 200 OK with content list"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+    }
 
     def "LIST | should fully drain all project audit logs sequentially using cursors"() {
         setup:

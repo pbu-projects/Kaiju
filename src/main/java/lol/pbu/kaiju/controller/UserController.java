@@ -3,13 +3,21 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Put;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.dto.CreateUserCommand;
+import lol.pbu.kaiju.dto.UpdateUserCommand;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
@@ -31,6 +39,8 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_USER_MANAGE_CLAIM;
 @Controller("/users")
 public class UserController implements ControllerUtils {
 
+    public static final String DEFAULT_SORT_FIELD = "email";
+
     private final UserRepository userRepository;
 
     public UserController(UserRepository userRepository) {
@@ -39,42 +49,30 @@ public class UserController implements ControllerUtils {
 
     @Get
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
-    public CursoredPage<User> getUsers(@Valid CursoredPageable pageable) {
-        return userRepository.findAll(pageable);
+    public CursoredPage<User> getUsers(@Nullable @Valid CursoredPageable pageable) {
+        return userRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
-    public Optional<User> getUser(@PathVariable UUID id, @Nullable Principal principal) {
-        if (principal != null) {
-            verifySelfOrAdmin(id, principal);
-        }
+    public Optional<User> getUser(@PathVariable UUID id, Principal principal) {
+        verifySelfOrAdmin(id, principal);
         return userRepository.findById(id);
     }
 
-    public Optional<User> getUser(UUID id) {
-        return getUser(id, null);
-    }
-
     @Post
-    public User addUser(@Valid @Body User user, @Nullable Principal principal) {
+    public User addUser(@Valid @Body CreateUserCommand command, Principal principal) {
         UserRole targetRole = UserRole.STANDARD_USER;
-        if (user.role() != null && user.role() != UserRole.STANDARD_USER) {
-            if (principal != null) {
-                verifyAdmin(principal);
-            }
-            targetRole = user.role();
+        if (command.role() != null && command.role() != UserRole.STANDARD_USER) {
+            verifyAdmin(principal);
+            targetRole = command.role();
         }
         User safeUser = new User(
                 null,
-                user.email(),
+                command.email(),
                 targetRole,
-                user.createdAt() != null ? user.createdAt() : OffsetDateTime.now(ZoneOffset.UTC)
+                OffsetDateTime.now(ZoneOffset.UTC)
         );
         return userRepository.save(safeUser);
-    }
-
-    public User addUser(User user) {
-        return addUser(user, null);
     }
 
     /**
@@ -85,12 +83,12 @@ public class UserController implements ControllerUtils {
      * Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id        the ID of the user to update
-     * @param user      the updated user details
+     * @param command   the updated user details
      * @param principal the authenticated principal
      * @return the updated user
      */
     @Put("/{id}")
-    public User updateUser(@PathVariable UUID id, @Valid @Body User user, Principal principal) {
+    public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserCommand command, Principal principal) {
         verifySelfOrAdmin(id, principal);
 
         User existingUser = userRepository.findById(id)
@@ -99,8 +97,8 @@ public class UserController implements ControllerUtils {
         // Copy over allowed fields, but retain strictly controlled fields
         User safeUpdate = new User(
                 id,
-                user.email(),
-                existingUser.role(), // Ignore the role from the request
+                command.email(),
+                existingUser.role(), // Retain existing role
                 existingUser.createdAt()
         );
         return userRepository.update(safeUpdate);
