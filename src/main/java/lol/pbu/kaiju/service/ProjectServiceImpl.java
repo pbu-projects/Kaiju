@@ -189,7 +189,7 @@ public class ProjectServiceImpl implements ProjectService {
                 }
                 targetRegion = administrativeRegionRepository.findById(requestedRegionId).orElse(project.managingRegion());
             } else {
-                if (existingRegionId != null && (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId))) {
+                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId)) {
                     throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
                 }
                 targetRegion = null;
