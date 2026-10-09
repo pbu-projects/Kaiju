@@ -22,9 +22,7 @@ import spock.lang.Unroll
 
 import java.util.UUID
 
-import static lol.pbu.kaiju.model.VerificationStatus.REVOKED
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
-import static lol.pbu.kaiju.model.VerificationStatus.VERIFIED
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.oauth2.enabled", value = "false")

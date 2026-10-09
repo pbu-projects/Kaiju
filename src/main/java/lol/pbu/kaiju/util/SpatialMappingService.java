@@ -30,10 +30,9 @@ public class SpatialMappingService {
         if (dtos == null || dtos.size() < 3) {
             throw new IllegalArgumentException("A polygon requires at least 3 coordinates.");
         }
-        List<Coordinate> coords = new ArrayList<>(dtos.size() + 1);
-        for (CoordinateDto dto : dtos) {
-            coords.add(new Coordinate(dto.longitude(), dto.latitude()));
-        }
+        List<Coordinate> coords = new ArrayList<>(dtos.stream()
+                .map(dto -> new Coordinate(dto.longitude(), dto.latitude()))
+                .toList());
         // Ensure polygon ring closure
         Coordinate first = coords.get(0);
         Coordinate last = coords.get(coords.size() - 1);
