@@ -39,7 +39,6 @@ dependencies {
     implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
     implementation("org.postgresql:postgresql")
     implementation("io.micronaut:micronaut-retry")
-    implementation("io.micronaut.reactor:micronaut-reactor-http-client")
     implementation("io.micronaut:micronaut-management")
     implementation("io.micronaut.micrometer:micronaut-micrometer-core")
     implementation("io.micronaut.micrometer:micronaut-micrometer-observation-http")
@@ -47,6 +46,7 @@ dependencies {
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
 
+    testImplementation("io.micronaut:micronaut-http-client")
     testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:testcontainers-postgresql")

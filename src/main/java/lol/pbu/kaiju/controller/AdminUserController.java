@@ -6,6 +6,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
@@ -15,10 +16,9 @@ import lol.pbu.kaiju.service.UserService;
 
 import java.util.UUID;
 
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
-@ExecuteOn(BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Controller("/admin/users")
 @Secured(SYSTEM_ADMIN_CLAIM)
 public class AdminUserController {

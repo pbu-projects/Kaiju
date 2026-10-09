@@ -15,6 +15,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
@@ -40,11 +41,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
-@ExecuteOn(BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organizations")
 public class OrganizationController {

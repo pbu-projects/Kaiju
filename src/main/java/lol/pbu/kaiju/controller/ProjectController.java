@@ -45,7 +45,7 @@ import java.util.UUID;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.PROJECT_APPROVE_CLAIM;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/projects")
 public class ProjectController {

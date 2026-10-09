@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
@@ -29,7 +30,6 @@ import lol.pbu.kaiju.util.SpatialMappingService;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
@@ -47,7 +47,7 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
  * @see AuthentikAuthenticationMapper
  * @see AdministrativeRegionRepository
  */
-@ExecuteOn(BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/administrative-regions")
 public class AdministrativeRegionController {

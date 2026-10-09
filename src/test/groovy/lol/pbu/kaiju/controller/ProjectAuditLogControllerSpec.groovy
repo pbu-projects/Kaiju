@@ -27,11 +27,19 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
     ProjectAuditLogController projectAuditLogController
 
     def setup() {
-        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
-        def projectId = projRow.id as UUID
-
         def userRow = sql.firstRow("SELECT id FROM users LIMIT 1")
-        def actorId = userRow.id as UUID
+        UUID actorId = userRow ? (userRow.id as UUID) : UUID.fromString("00000000-0000-0000-0000-000000000000")
+
+        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
+        UUID projectId
+        if (projRow) {
+            projectId = projRow.id as UUID
+        } else {
+            def orgId = UUID.randomUUID()
+            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Audit Test Org', true, 'VERIFIED')", orgId)
+            projectId = UUID.randomUUID()
+            executeUpdate("INSERT INTO projects (id, organization_id, title, description, project_type, status) VALUES (?, ?, 'Audit Test Proj', 'Test project description exceeding 20 chars', 'STANDARD', 'DRAFT')", projectId, orgId)
+        }
 
         sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", [projectId, actorId])
         sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')", [projectId, actorId])

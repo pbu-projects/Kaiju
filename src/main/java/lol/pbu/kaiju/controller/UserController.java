@@ -34,7 +34,7 @@ import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_USER_MANAGE_CLAIM;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/users")
 public class UserController {

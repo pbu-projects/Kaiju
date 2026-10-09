@@ -27,7 +27,7 @@ import java.util.UUID;
 
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
-@ExecuteOn(TaskExecutors.BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/tags")
 public class TagController {

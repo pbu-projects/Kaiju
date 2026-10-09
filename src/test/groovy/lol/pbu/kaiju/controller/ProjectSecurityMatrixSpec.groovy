@@ -17,7 +17,7 @@ import spock.lang.Unroll
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING
 
-@MicronautTest(transactional = true)
+@MicronautTest(transactional = false)
 class ProjectSecurityMatrixSpec extends BaseControllerSpec {
 
     @Inject

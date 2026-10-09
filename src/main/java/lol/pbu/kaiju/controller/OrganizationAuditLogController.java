@@ -6,6 +6,7 @@ import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
@@ -16,10 +17,9 @@ import lol.pbu.kaiju.util.PageableUtils;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.scheduling.TaskExecutors.BLOCKING;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
-@ExecuteOn(BLOCKING)
+@ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organization-audit-logs")
 public class OrganizationAuditLogController {
