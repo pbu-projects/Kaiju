@@ -1,23 +1,24 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.context.annotation.Property
+import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
-import io.micronaut.data.model.Page
-import io.micronaut.data.model.Pageable
 import io.micronaut.data.model.Sort
-import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.uri.UriBuilder
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.validation.ValidationException
-import lol.pbu.kaiju.TestFixtures
-import lol.pbu.kaiju.domain.AdministrativeRegion
-import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
-import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.model.ProjectSearchCard
+import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.CreateProjectCommand
+import lol.pbu.kaiju.dto.ProjectBoundaryCommand
+import lol.pbu.kaiju.dto.ProjectLocationCommand
+import lol.pbu.kaiju.dto.UpdateProjectCommand
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
-import lol.pbu.kaiju.model.UserRole
-import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.OrganizationRepository
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
@@ -25,26 +26,22 @@ import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.security.ProjectSecurityService
 import net.datafaker.Faker
-import org.locationtech.jts.geom.Coordinate
-import org.locationtech.jts.geom.GeometryFactory
-import org.locationtech.jts.geom.Point
-import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import java.security.Principal
-import java.time.OffsetDateTime
+import java.util.UUID
 
-import io.micronaut.http.HttpStatus
-import static io.micronaut.http.HttpStatus.BAD_REQUEST
-import static io.micronaut.http.HttpStatus.FORBIDDEN
-import static io.micronaut.http.HttpStatus.NOT_FOUND
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING_UPDATE
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
+@Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@MicronautTest(transactional = false)
 class ProjectControllerSpec extends BaseControllerSpec {
 
     @Inject
@@ -68,53 +65,122 @@ class ProjectControllerSpec extends BaseControllerSpec {
     @Inject
     AdministrativeRegionRepository administrativeRegionRepository
 
-    @Inject
-    GeometryFactory geometryFactory
+    @Shared
+    Faker faker = new Faker()
+
+    @Shared
+    String adminId = "00000000-0000-0000-0000-000000000000"
 
     def setupSpec() {
         executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'test-principal@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
     }
 
-    @Shared
-    Principal testPrincipal = new Principal() { @Override String getName() { return "00000000-0000-0000-0000-000000000000" } }
-
-    Principal createPrincipal(UUID userId) {
-        new Principal() {
-            @Override
-            String getName() {
-                return userId.toString()
-            }
-        }
+    def cleanup() {
+        executeUpdate("DELETE FROM shift_tags")
+        executeUpdate("DELETE FROM shifts")
+        executeUpdate("DELETE FROM project_audit_logs")
+        executeUpdate("DELETE FROM project_locations")
+        executeUpdate("DELETE FROM project_boundaries")
+        executeUpdate("DELETE FROM project_users")
+        executeUpdate("DELETE FROM projects")
+        executeUpdate("DELETE FROM organization_regions")
+        executeUpdate("DELETE FROM organization_users")
+        executeUpdate("DELETE FROM region_users")
+        executeUpdate("DELETE FROM locations WHERE name LIKE '%Loc%' OR name LIKE '%St%' OR address_line LIKE '%St%' OR city = 'Denver' OR city = 'Boulder' OR city = 'Toronto' OR city = 'Colo Springs'")
+        executeUpdate("DELETE FROM administrative_regions WHERE name LIKE '%Region%'")
+        executeUpdate("DELETE FROM organizations WHERE name LIKE '%Org%' OR name LIKE '%Denver%' OR name LIKE '%Boulder%' OR name LIKE '%Default%' OR name LIKE '%Test%'")
+        executeUpdate("DELETE FROM users WHERE email LIKE '%@example.com' AND id != '00000000-0000-0000-0000-000000000000'")
     }
 
-    @Shared
-    Faker faker = new Faker()
+    def setup() {
+        cleanup()
+    }
 
     private Organization getRandomOrganization() {
         def orgRow = sql.firstRow("SELECT id, name FROM organizations LIMIT 1")
-        if (!orgRow) {
-            throw new IllegalStateException("No organizations found in database to link project to.")
+        if (orgRow) {
+            return new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, UNVERIFIED, null, [])
         }
-        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, UNVERIFIED, null, [])
+        def newId = UUID.randomUUID()
+        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Default Test Org', true, 'VERIFIED')", newId)
+        return new Organization(newId, 'Default Test Org', null, null, true, UNVERIFIED, null, [])
+    }
+
+    private List<ProjectBoundaryCommand> defaultBoundaries(String name = "Default Boundary") {
+        [
+                new ProjectBoundaryCommand(
+                        name,
+                        [
+                                new CoordinateDto(-105.0, 39.0),
+                                new CoordinateDto(-104.0, 39.0),
+                                new CoordinateDto(-104.0, 40.0),
+                                new CoordinateDto(-105.0, 39.0)
+                        ]
+                )
+        ]
+    }
+
+    private CreateProjectCommand createProjectCommand(
+            UUID orgId,
+            String title = "Valid Project Title ${faker.number().digits(5)}",
+            String description = "Valid Description that has at least 20 chars long.",
+            ProjectType projectType = STANDARD,
+            ProjectStatus status = DRAFT,
+            UUID managingRegionId = null,
+            List<ProjectLocationCommand> locations = [],
+            List<ProjectBoundaryCommand> boundaries = defaultBoundaries()
+    ) {
+        new CreateProjectCommand(
+                orgId,
+                managingRegionId,
+                title,
+                description,
+                projectType,
+                status,
+                locations,
+                boundaries
+        )
+    }
+
+    private UpdateProjectCommand updateProjectCommand(
+            UUID orgId = null,
+            String title = "Updated Project Title ${faker.number().digits(5)}",
+            String description = "Updated Description that has at least 20 chars long.",
+            ProjectType projectType = STANDARD,
+            UUID managingRegionId = null,
+            List<ProjectLocationCommand> locations = [],
+            List<ProjectBoundaryCommand> boundaries = defaultBoundaries()
+    ) {
+        new UpdateProjectCommand(
+                orgId,
+                managingRegionId,
+                title,
+                description,
+                projectType,
+                locations,
+                boundaries
+        )
     }
 
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid project"() {
-        given: "a new valid project"
+        given: "a valid create project command"
         def org = getRandomOrganization()
-        def newProject = TestFixtures.createBasicProject(org as Organization, "Test Project ${faker.company().name()}" as String, "Test Description ${faker.lorem().paragraph()}" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
+        def command = createProjectCommand(org.id(), "Test Project ${faker.company().name()}", "Test Description with plenty of words to exceed twenty characters limit.", STANDARD, DRAFT)
 
-        when: "the project is added"
-        Project saved = projectController.submitProject(newProject, testPrincipal)
+        when: "the project is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        Project saved = response.body()
 
-        then: "the project is persisted with a generated ID"
+        then: "the project is persisted with 200 OK and a generated ID"
+        response.status == HttpStatus.OK
         verifyAll {
             saved.id() != null
-            saved.title() == newProject.title()
-            saved.description() == newProject.description()
-            saved.projectType() == newProject.projectType()
-            saved.status() == newProject.status()
+            saved.title() == command.title()
+            saved.description() == command.description()
+            saved.projectType() == command.projectType()
+            saved.status() == DRAFT
         }
 
         and: "it can be retrieved from the database"
@@ -126,98 +192,186 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
     }
 
-    @Unroll
+    def "CREATE | should ensure child locations and boundaries have server-generated IDs (Issue #26 mass-assignment immunity)"() {
+        given: "a project create command with child locations and boundaries"
+        def org = getRandomOrganization()
+        def locCmd = new ProjectLocationCommand(
+                "Mass Assign Loc",
+                "123 St",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9903,
+                39.7392
+        )
+        def bndCmd = new ProjectBoundaryCommand(
+                "Mass Assign Bnd",
+                [
+                        new CoordinateDto(-105.0, 39.0),
+                        new CoordinateDto(-104.0, 39.0),
+                        new CoordinateDto(-104.0, 40.0),
+                        new CoordinateDto(-105.0, 39.0)
+                ]
+        )
+        def command = new CreateProjectCommand(
+                org.id(),
+                null,
+                "Mass Assignment Project",
+                "Description for mass assignment immunity test exceeding 20 chars.",
+                STANDARD,
+                DRAFT,
+                [locCmd],
+                [bndCmd]
+        )
 
-    def "CREATE | should throw HttpStatusException if organization is null"() {
-        given: "a manual controller instance to bypass validation interceptors"
-        def project = TestFixtures.createBasicProject(null, "Test Title", "Test Desc", STANDARD, DRAFT)
-        def controller = new ProjectController(projectRepository, realProjectSecurityService, organizationRepository, userRepository, projectAuditLogRepository, administrativeRegionRepository, geometryFactory)
+        when: "submitting the project via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        Project saved = response.body()
 
-        when:
-        controller.submitProject(project, testPrincipal)
+        then: "the project is persisted with generated ID"
+        response.status == HttpStatus.OK
+        saved.id() != null
 
-        then:
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Organization is required"
+        and: "child locations and boundaries enforce mass-assignment immunity with server-managed null IDs"
+        verifyAll {
+            saved.locations() != null
+            saved.locations().size() == 1
+            saved.locations()[0].id() == null
+            saved.locations()[0].name() == "Mass Assign Loc"
+            saved.boundaries() != null
+            saved.boundaries().size() == 1
+            saved.boundaries()[0].id() == null
+            saved.boundaries()[0].name() == "Mass Assign Bnd"
+        }
     }
 
-    def "CREATE | should fail to save project with invalid data: #testCase"(String testCase, Project project) {
-        when: "an attempt is made to add a project with invalid data"
-        projectController.submitProject(project, testPrincipal)
+    def "CREATE | should fail when boundaries list is empty (Issue #41)"() {
+        given: "a command with empty boundaries"
+        def org = getRandomOrganization()
+        def command = new CreateProjectCommand(
+                org.id(),
+                null,
+                "Empty Boundaries Project",
+                "Description with at least twenty characters here.",
+                STANDARD,
+                DRAFT,
+                [],
+                []
+        )
 
-        then: "an exception is thrown"
-        thrown(ValidationException)
+        when: "submitting via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "CREATE | should fail when description is less than 20 characters (Issue #42)"() {
+        given: "a command with description under 20 characters"
+        def org = getRandomOrganization()
+        def command = new CreateProjectCommand(
+                org.id(),
+                null,
+                "Short Desc Proj",
+                "Too short!",
+                STANDARD,
+                DRAFT,
+                [],
+                defaultBoundaries()
+        )
+
+        when: "submitting via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    @Unroll
+    def "CREATE | should fail to save project with invalid payload: #testCase"(String testCase, Map payload) {
+        when: "submitting invalid project data via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", payload)), Project)
+
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
         where:
-        [testCase, project] << {
-            def dummyOrg = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, UNVERIFIED, null, [])
+        testCase                 | payload
+        "Null Organization ID"   | [organizationId: null, title: "Valid Title", description: "At least 20 chars in description", projectType: "STANDARD", boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Null Title"             | [organizationId: UUID.randomUUID(), title: null, description: "At least 20 chars in description", projectType: "STANDARD", boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Blank Title"            | [organizationId: UUID.randomUUID(), title: "   ", description: "At least 20 chars in description", projectType: "STANDARD", boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Title Too Long"         | [organizationId: UUID.randomUUID(), title: "A" * 256, description: "At least 20 chars in description", projectType: "STANDARD", boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Null Description"       | [organizationId: UUID.randomUUID(), title: "Valid Title", description: null, projectType: "STANDARD", boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Description Too Short"  | [organizationId: UUID.randomUUID(), title: "Valid Title", description: "Short", projectType: "STANDARD", boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Null Project Type"      | [organizationId: UUID.randomUUID(), title: "Valid Title", description: "At least 20 chars in description", projectType: null, boundaries: [[name: "B", coordinates: [[longitude: -105.0, latitude: 39.0], [longitude: -104.0, latitude: 39.0], [longitude: -104.0, latitude: 40.0], [longitude: -105.0, latitude: 39.0]]]]]
+        "Null Boundaries"        | [organizationId: UUID.randomUUID(), title: "Valid Title", description: "At least 20 chars in description", projectType: "STANDARD", boundaries: null]
+        "Empty Boundaries"       | [organizationId: UUID.randomUUID(), title: "Valid Title", description: "At least 20 chars in description", projectType: "STANDARD", boundaries: []]
+    }
 
-            def validData = [organization: dummyOrg,
-                             title       : "Valid Title",
-                             description : "Valid Description",
-                             projectType: STANDARD,
-                             status     : DRAFT]
+    def "CREATE | should throw 400 when organization does not exist"() {
+        given: "a create command with non-existent organization ID"
+        def nonExistentOrgId = UUID.randomUUID()
+        def command = createProjectCommand(nonExistentOrgId, "Orphan Project")
 
-            def invalidCases = [[field: 'organization', value: null, caseName: "Null Organization"],
-                                [field: 'title', value: null, caseName: "Null Title"],
-                                [field: 'title', value: ' ', caseName: "Blank Title"],
-                                [field: 'title', value: 'A' * 256, caseName: "Title Too Long"],
-                                [field: 'description', value: null, caseName: "Null Description"],
-                                [field: 'description', value: ' ', caseName: "Blank Description"],
-                                [field: 'projectType', value: null, caseName: "Null Project Type"],
-                                [field: 'status', value: null, caseName: "Null Status"]]
+        when: "submitting via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
 
-            return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def proj = TestFixtures.createBasicProject(props.organization as Organization as Organization, props.title as String as String, props.description as String as String, props.projectType as ProjectType as ProjectType, props.status as ProjectStatus as ProjectStatus)
-                [invalidCase.caseName, proj]
-            }
-        }()
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     /********** READ Tests **********/
 
     def "READ | should retrieve an existing project by ID"() {
-        given: "an existing project"
+        given: "an existing project created via HTTP"
         def org = getRandomOrganization()
-        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Test Project Read" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal)
-        UUID id = project.id()
+        def command = createProjectCommand(org.id(), "Test Project Read")
+        Project created = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
+        UUID id = created.id()
 
-        when: "the project is requested by its ID"
-        def result = projectController.getProject(id)
+        when: "the project is requested by its ID via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects/${id}")), Project)
+        Project result = response.body()
 
         then: "the correct project is returned"
+        response.status == HttpStatus.OK
         verifyAll {
-            result.isPresent()
-            result.get().id() == id
-            result.get().title() == "Test Project Read"
+            result != null
+            result.id() == id
+            result.title() == "Test Project Read"
         }
     }
 
-    def "READ | should return empty for a non-existent project ID"() {
-        when: "a non-existent project is requested"
-        def result = projectController.getProject(UUID.randomUUID())
+    def "READ | should return 404 for a non-existent project ID"() {
+        when: "a non-existent project is requested via HTTP GET"
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/projects/${UUID.randomUUID()}")), Project)
 
-        then: "the result is empty"
-        !result.isPresent()
+        then: "a 404 Not Found exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     def "READ | should retrieve projects by title"() {
-        given: "an existing project's title from the database"
+        given: "an existing project in the database"
         def org = getRandomOrganization()
-        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Searchable Title ${faker.number().digits(5)}" as String, "Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal)
-        def targetTitle = project.title()
+        def targetTitle = "Searchable Title ${faker.number().digits(5)}"
+        def command = createProjectCommand(org.id(), targetTitle)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
 
-        when: "projects are searched by this title"
-        def page = projectController.getProjects(targetTitle, CursoredPageable.from(10, Sort.of(Sort.Order.asc("title"))))
+        when: "projects are searched by this title via HTTP GET"
+        def uri = UriBuilder.of("/projects").queryParam("title", targetTitle).build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "the search returns a page containing the project"
-        verifyAll {
-            page != null
-            page.content.any { it.title() == targetTitle }
-        }
+        response.status == HttpStatus.OK
+        def content = response.body().content as List
+        content != null
+        content.any { it.title == targetTitle }
     }
 
     /********** UPDATE Tests **********/
@@ -225,16 +379,20 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing project"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def project = projectController.submitProject(TestFixtures.createBasicProject(org as Organization, "Original Project Title" as String, "Original Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus), testPrincipal)
-        UUID id = project.id()
+        def createCmd = createProjectCommand(org.id(), "Original Project Title", "Original Description with plenty of words to exceed 20 characters.", STANDARD, DRAFT)
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        UUID id = saved.id()
+
         def newTitle = "Updated ${faker.book().title()}"
-        def newDescription = "Updated Description ${faker.lorem().paragraph()}"
-        def updateRequest = TestFixtures.createBasicProject(org as Organization, newTitle as String, newDescription as String, STANDARD as ProjectType, ACTIVE as ProjectStatus)
+        def newDescription = "Updated Description with plenty of words to exceed twenty characters limit."
+        def updateCmd = updateProjectCommand(org.id(), newTitle, newDescription, STANDARD)
 
-        when: "the project is updated"
-        Project updated = projectController.updateProject(id, updateRequest, testPrincipal)
+        when: "the project is updated via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${id}", updateCmd)), Project)
+        Project updated = response.body()
 
-        then: "the returned project contains the updated data but status remains unchanged"
+        then: "the returned project contains updated data while status remains DRAFT"
+        response.status == HttpStatus.OK
         verifyAll {
             updated.id() == id
             updated.title() == newTitle
@@ -252,17 +410,67 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent project"() {
-        given: "a random non-existent ID and an update request"
+        given: "a random non-existent ID and an update command"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateRequest = TestFixtures.createBasicProject(org as Organization, "New Title" as String, "New Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
+        def updateCmd = updateProjectCommand(org.id(), "New Title", "New Description exceeding twenty chars length.")
 
-        when: "an update is attempted"
-        projectController.updateProject(nonExistentId, updateRequest, testPrincipal)
+        when: "an update is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${nonExistentId}", updateCmd)), Project)
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 Not Found exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "UPDATE | should fail when boundaries list is empty (Issue #41)"() {
+        given: "an existing project"
+        def org = getRandomOrganization()
+        def createCmd = createProjectCommand(org.id(), "Project Before Empty Boundary Update")
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+
+        and: "an update command with empty boundaries"
+        def updateCmd = new UpdateProjectCommand(
+                org.id(),
+                null,
+                "Updated Title With Empty Boundaries",
+                "Description with at least twenty characters here.",
+                STANDARD,
+                [],
+                []
+        )
+
+        when: "updating via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "UPDATE | should fail when description is less than 20 characters (Issue #42)"() {
+        given: "an existing project"
+        def org = getRandomOrganization()
+        def createCmd = createProjectCommand(org.id(), "Project Before Short Desc Update")
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+
+        and: "an update command with description under 20 characters"
+        def updateCmd = new UpdateProjectCommand(
+                org.id(),
+                null,
+                "Valid Updated Title",
+                "Too short!",
+                STANDARD,
+                [],
+                defaultBoundaries()
+        )
+
+        when: "updating via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     def "UPDATE | should reject reassignment to another organization when user is ORG_MANAGER"() {
@@ -281,20 +489,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def projectId = UUID.randomUUID()
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Project in Org A', 'Desc', 'STANDARD', 'DRAFT', NOW())
+            VALUES (?, ?, 'Project in Org A', 'Description of project in Org A that is long enough.', 'STANDARD', 'DRAFT', NOW())
         """, projectId, orgAId)
 
-        and: "an update payload attempting to reassign the project to Org B"
-        def orgB = new Organization(orgBId, "Org B", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = TestFixtures.createBasicProject(orgB, "Hijacked Title", "Hijacked Desc", STANDARD, DRAFT)
+        and: "an update command attempting to reassign the project to Org B"
+        def updateCmd = updateProjectCommand(orgBId, "Hijacked Title", "Hijacked Description that is at least twenty chars long.")
 
-        when: "the Org Manager attempts to reassign the project to Org B"
-        projectController.updateProject(projectId, updateRequest, createPrincipal(userId))
+        when: "the Org Manager attempts to reassign the project to Org B via HTTP PUT"
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), userId.toString(), ["STANDARD_USER"]), Project)
 
         then: "the request is rejected with 403 Forbidden"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have permission to reassign this project to another organization"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
 
         and: "the project in the database remains assigned to Org A"
         def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
@@ -316,53 +522,25 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def projectId = UUID.randomUUID()
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Initial Title', 'Initial Desc', 'STANDARD', 'DRAFT', NOW())
+            VALUES (?, ?, 'Initial Title', 'Initial Description that is at least twenty chars long.', 'STANDARD', 'DRAFT', NOW())
         """, projectId, orgAId)
 
         and: "an update payload preserving Org A with updated title and description"
-        def orgA = new Organization(orgAId, "Org A", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = TestFixtures.createBasicProject(orgA, "Legit Updated Title", "Legit Updated Desc", STANDARD, DRAFT)
+        def updateCmd = updateProjectCommand(orgAId, "Legit Updated Title", "Legit Updated Description that is at least twenty chars long.")
 
-        when: "the Org Manager updates the project"
-        Project updated = projectController.updateProject(projectId, updateRequest, createPrincipal(userId))
+        when: "the Org Manager updates the project via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), userId.toString(), ["STANDARD_USER"]), Project)
+        Project updated = response.body()
 
         then: "the update succeeds"
+        response.status == HttpStatus.OK
         updated.id() == projectId
         updated.title() == "Legit Updated Title"
-        updated.description() == "Legit Updated Desc"
 
         and: "the database reflects the updated fields while organization remains Org A"
         def projectInDb = sql.firstRow("SELECT organization_id, title, description FROM projects WHERE id = ?", [projectId])
         projectInDb.organization_id == orgAId
         projectInDb.title == "Legit Updated Title"
-        projectInDb.description == "Legit Updated Desc"
-    }
-
-    def "UPDATE | should fail validation when organization is null in payload"() {
-        given: "an organization Org A"
-        def orgAId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
-
-        and: "a user who is an ORG_MANAGER of Org A"
-        def userId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-null-org-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgAId)
-
-        and: "a project belonging to Org A"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Initial Title', 'Initial Desc', 'STANDARD', 'DRAFT', NOW())
-        """, projectId, orgAId)
-
-        and: "an update payload with null organization"
-        def updateRequest = TestFixtures.createBasicProject(null, "Updated Title With Null Org", "Desc", STANDARD, DRAFT)
-
-        when: "the Org Manager attempts to update the project with a null organization"
-        projectController.updateProject(projectId, updateRequest, createPrincipal(userId))
-
-        then: "validation fails because organization is required on Project"
-        thrown(ValidationException)
     }
 
     def "UPDATE | should allow project reassignment to another organization when user is GLOBAL_ADMIN"() {
@@ -372,25 +550,22 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
 
-        and: "a GLOBAL_ADMIN user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-${UUID.randomUUID()}@example.com".toString())
-
         and: "a project belonging to Org A"
         def projectId = UUID.randomUUID()
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Original Title', 'Original Desc', 'STANDARD', 'DRAFT', NOW())
+            VALUES (?, ?, 'Original Title', 'Original Description that is at least twenty chars long.', 'STANDARD', 'DRAFT', NOW())
         """, projectId, orgAId)
 
-        and: "an update payload reassigning the project to Org B"
-        def orgB = new Organization(orgBId, "Org B", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = TestFixtures.createBasicProject(orgB, "Admin Updated Title", "Admin Updated Desc", STANDARD, DRAFT)
+        and: "an update command reassigning the project to Org B"
+        def updateCmd = updateProjectCommand(orgBId, "Admin Updated Title", "Admin Updated Description that is at least twenty chars long.")
 
-        when: "the Global Admin reassigns the project to Org B"
-        Project updated = projectController.updateProject(projectId, updateRequest, createPrincipal(adminId))
+        when: "the Global Admin reassigns the project to Org B via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        Project updated = response.body()
 
         then: "the update succeeds"
+        response.status == HttpStatus.OK
         updated.id() == projectId
         updated.title() == "Admin Updated Title"
 
@@ -417,20 +592,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def projectId = UUID.randomUUID()
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Dual Mgr Project', 'Desc', 'STANDARD', 'DRAFT', NOW())
+            VALUES (?, ?, 'Dual Mgr Project', 'Dual Mgr Description that is at least twenty chars long.', 'STANDARD', 'DRAFT', NOW())
         """, projectId, orgAId)
 
-        and: "an update payload reassigning the project to Org B"
-        def orgB = new Organization(orgBId, "Org B", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = TestFixtures.createBasicProject(orgB, "Reassigned by Dual Manager", "Desc", STANDARD, DRAFT)
+        and: "an update command reassigning the project to Org B"
+        def updateCmd = updateProjectCommand(orgBId, "Reassigned by Dual Manager", "Desc with plenty of characters to pass validation.")
 
-        when: "the dual manager attempts to reassign the project to Org B"
-        projectController.updateProject(projectId, updateRequest, createPrincipal(dualManagerId))
+        when: "the dual manager attempts to reassign the project to Org B via HTTP PUT"
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), dualManagerId.toString(), ["STANDARD_USER"]), Project)
 
-        then: "the update is rejected with 403 Forbidden because org managers cannot reassign projects"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have permission to reassign this project to another organization"
+        then: "the update is rejected with 403 Forbidden"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
 
         and: "the project remains assigned to Org A in the database"
         def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
@@ -442,29 +615,23 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def orgAId = UUID.randomUUID()
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
 
-        and: "a GLOBAL_ADMIN user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-${UUID.randomUUID()}@example.com".toString())
-
         and: "a project belonging to Org A"
         def projectId = UUID.randomUUID()
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Project to Reassign', 'Desc', 'STANDARD', 'DRAFT', NOW())
+            VALUES (?, ?, 'Project to Reassign', 'Description of project to reassign at least 20 chars.', 'STANDARD', 'DRAFT', NOW())
         """, projectId, orgAId)
 
-        and: "an update payload with a non-existent destination organization"
+        and: "an update command with a non-existent destination organization"
         def nonExistentOrgId = UUID.randomUUID()
-        def nonExistentOrg = new Organization(nonExistentOrgId, "Ghost Org", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = TestFixtures.createBasicProject(nonExistentOrg, "Ghost Org Project", "Desc", STANDARD, DRAFT)
+        def updateCmd = updateProjectCommand(nonExistentOrgId, "Ghost Org Project", "Description with plenty of characters to pass validation.")
 
-        when: "the Global Admin reassigns the project to non-existent organization"
-        projectController.updateProject(projectId, updateRequest, createPrincipal(adminId))
+        when: "the Global Admin reassigns the project to non-existent organization via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
 
         then: "a 404 Not Found exception is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == NOT_FOUND
-        e.message == "Target organization not found"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
 
         and: "the project in DB remains assigned to Org A"
         def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
@@ -492,33 +659,28 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def projectId = UUID.randomUUID()
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Active Denver Project', 'Desc', 'STANDARD', 'ACTIVE', NOW())
+            VALUES (?, ?, 'Active Denver Project', 'Description of active Denver project at least 20 chars.', 'STANDARD', 'ACTIVE', NOW())
         """, projectId, orgId)
 
-        and: "an update payload with a location outside the region (Boulder)"
-        def geomFactory = new GeometryFactory(new PrecisionModel(), 4326)
-        def outsidePoint = geomFactory.createPoint(new Coordinate(-105.2705, 40.0150))
-        def outsideLoc = new Location(UUID.randomUUID(), "Boulder Loc", "123 Pearl St", "Boulder", "CO", "80302", "US", outsidePoint)
-        def org = new Organization(orgId, "Denver Org", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = new Project(
-                projectId,
-                org,
-                null,
-                "Updated Active Project",
-                "Updated Desc",
-                STANDARD,
-                ACTIVE,
-                null,
-                null,
-                null,
-                [outsideLoc],
-                []
+        and: "an update command with a location outside the region (Boulder)"
+        def outsideLoc = new ProjectLocationCommand(
+                "Boulder Loc",
+                "123 Pearl St",
+                "Boulder",
+                "CO",
+                "80302",
+                "US",
+                -105.2705,
+                40.0150
         )
+        def updateCmd = updateProjectCommand(orgId, "Updated Active Project", "Updated Description with plenty of words to exceed twenty chars.", STANDARD, null, [outsideLoc])
 
-        when: "the Org Manager updates the project with outside locations"
-        Project updated = projectController.updateProject(projectId, updateRequest, createPrincipal(userId))
+        when: "the Org Manager updates the project with outside locations via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), userId.toString(), ["STANDARD_USER"]), Project)
+        Project updated = response.body()
 
         then: "the project status is demoted to PENDING for regional review"
+        response.status == HttpStatus.OK
         updated.status() == PENDING
 
         and: "the status in database is PENDING"
@@ -530,83 +692,66 @@ class ProjectControllerSpec extends BaseControllerSpec {
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing project"() {
-        given: "a new project to be deleted"
+        given: "a new project created via HTTP"
         def org = getRandomOrganization()
-        def tempProject = TestFixtures.createBasicProject(org as Organization, "Temporary Project to Delete" as String, "Temporary Description" as String, STANDARD as ProjectType, DRAFT as ProjectStatus)
-        def saved = projectController.submitProject(tempProject, testPrincipal)
+        def command = createProjectCommand(org.id(), "Temporary Project to Delete")
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
         UUID id = saved.id()
-        assert projectRepository.existsById(id)
 
-        when: "the project is deleted"
-        projectController.deleteProject(id, testPrincipal)
+        when: "the project is deleted via HTTP DELETE"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/projects/${id}")))
 
         then: "the project no longer exists in the repository or database"
-        verifyAll {
-            !projectRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
-        }
+        response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
+        !projectRepository.findById(id).isPresent()
+        sql.firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
     }
 
     def "DELETE | should fail to delete a non-existent project"() {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
-        when: "a delete is attempted"
-        projectController.deleteProject(nonExistentId, testPrincipal)
+        when: "a delete is attempted via HTTP DELETE"
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/projects/${nonExistentId}")))
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 Not Found exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
+
+    /********** SEARCH BY LOCATION Tests **********/
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
         given: "seed the database with test organization, projects, locations (closest to furthest), and active shifts"
         def uuids = [:].withDefault { UUID.randomUUID() }
 
-        // SQL Templates Helper
         String idName = "id, name"
         def insertInto = { String table, String columns, String values ->
             "INSERT INTO ${table} (${columns}) VALUES (${values})"
         }
 
         String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Distance Test Org', true")
-        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description', 'STANDARD', 'ACTIVE', NOW()")
+        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description with at least twenty characters here.', 'STANDARD', 'ACTIVE', NOW()")
         String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
         String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
         String insertShiftSql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours'")
 
         [
                 [insertOrganizationSql, [uuids.organizationId]],
-
-                // Projects
                 [insertProjectSql, [uuids.projectIdA, uuids.organizationId, 'Project A']],
                 [insertProjectSql, [uuids.projectIdB, uuids.organizationId, 'Project B']],
                 [insertProjectSql, [uuids.projectIdC, uuids.organizationId, 'Project C']],
                 [insertProjectSql, [uuids.projectIdD, uuids.organizationId, 'Project D']],
                 [insertProjectSql, [uuids.projectIdE, uuids.organizationId, 'Project E']],
 
-                /*
-                validate point math with sql queries to database, ie
-                SELECT
-                    name,
-                    ST_Distance(
-                        geom,
-                        ST_GeographyFromText('POINT(-104.9903 39.7392)')
-                    ) / 1000.0 AS distance_km
-                FROM locations
-                ORDER BY distance_km ASC;
-                 */
+                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']],
+                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']],
+                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],
+                [insertLocationSql, [uuids.locE1, 'Location E1', '101 Fourth St', 'Denver', 'US', 'POINT(-104.9903 39.8472)']],
+                [insertLocationSql, [uuids.locC1, 'Location C1', '202 Fifth St', 'Denver', 'US', 'POINT(-104.9903 39.8742)']],
+                [insertLocationSql, [uuids.locA3, 'Location A3', '303 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],
+                [insertLocationSql, [uuids.locD1, 'Location D1', '404 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],
 
-                // Locations (Reference point: POINT(-104.9903 39.7392))
-                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']], // ~2 km (1st closest)
-                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']], // ~5 km (2nd closest)
-                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],  // ~10 km (3rd closest)
-                [insertLocationSql, [uuids.locE1, 'Location E1', '101 Fourth St', 'Denver', 'US', 'POINT(-104.9903 39.8472)']], // ~12 km (4th closest)
-                [insertLocationSql, [uuids.locC1, 'Location C1', '202 Fifth St', 'Denver', 'US', 'POINT(-104.9903 39.8742)']],  // ~15 km (5th closest)
-                [insertLocationSql, [uuids.locA3, 'Location A3', '303 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],    // ~50 km (outside)
-                [insertLocationSql, [uuids.locD1, 'Location D1', '404 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],    // ~50 km (outside)
-
-                // Project Locations mappings
                 [insertProjectLocationSql, [uuids.projectIdA, uuids.locA1]],
                 [insertProjectLocationSql, [uuids.projectIdA, uuids.locA2]],
                 [insertProjectLocationSql, [uuids.projectIdA, uuids.locA3]],
@@ -615,7 +760,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 [insertProjectLocationSql, [uuids.projectIdC, uuids.locC1]],
                 [insertProjectLocationSql, [uuids.projectIdD, uuids.locD1]],
 
-                // Active Shifts
                 [insertShiftSql, [uuids.shiftA1, uuids.projectIdA, uuids.locA1]],
                 [insertShiftSql, [uuids.shiftA2, uuids.projectIdA, uuids.locA2]],
                 [insertShiftSql, [uuids.shiftA3, uuids.projectIdA, uuids.locA3]],
@@ -625,34 +769,25 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 [insertShiftSql, [uuids.shiftD1, uuids.projectIdD, uuids.locD1]]
         ].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
 
-        and: "a reference point at Denver center"
-        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
-        Point point = geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
-
-        when: "searching projects by location with 20km radius and a large page size to handle existing database records"
-        Page<ProjectSearchCard> page = projectController.searchByLocation(point.getX(), point.getY(), 20000.0, Pageable.from(0, 100))
+        when: "searching projects by location via HTTP GET with 20km radius"
+        def uri = UriBuilder.of("/projects/search-by-location")
+                .queryParam("longitude", -104.9903)
+                .queryParam("latitude", 39.7392)
+                .queryParam("radiusMeters", 20000.0)
+                .queryParam("size", 100)
+                .build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "only active projects in range are returned sorted by closest location, with no duplicates per project"
-        page != null
-        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() in [uuids.projectIdA, uuids.projectIdB, uuids.projectIdC, uuids.projectIdD, uuids.projectIdE] }
+        response.status == HttpStatus.OK
+        List items = response.body().content as List
+        List testResults = items.findAll { (it.projectId as String) in [uuids.projectIdA, uuids.projectIdB, uuids.projectIdC, uuids.projectIdD, uuids.projectIdE].collect { it.toString() } }
         testResults.size() == 4
 
-        // 1st: Project A (via Location A1 @ ~2km)
-        testResults[0].projectId() == uuids.projectIdA
-        testResults[0].locationId() == uuids.locA1
-
-        // 2nd: Project B (via Location B1 @ ~5km)
-        testResults[1].projectId() == uuids.projectIdB
-        testResults[1].locationId() == uuids.locB1
-
-        // 3rd: Project E (via Location E1 @ ~12km)
-        testResults[2].projectId() == uuids.projectIdE
-        testResults[2].locationId() == uuids.locE1
-
-        // 4th: Project C (via Location C1 @ ~15km)
-        testResults[3].projectId() == uuids.projectIdC
-        testResults[3].locationId() == uuids.locC1
-
+        testResults[0].projectId == uuids.projectIdA.toString()
+        testResults[1].projectId == uuids.projectIdB.toString()
+        testResults[2].projectId == uuids.projectIdE.toString()
+        testResults[3].projectId == uuids.projectIdC.toString()
     }
 
     @Unroll
@@ -660,14 +795,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "seed the database with test organization, project statuses, and shift time configurations"
         def uuids = [:].withDefault { UUID.randomUUID() }
 
-        // SQL Templates Helper
         String idName = "id, name"
         def insertInto = { String table, String columns, String values ->
             "INSERT INTO ${table} (${columns}) VALUES (${values})"
         }
 
         String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Status Test Org', true")
-        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description', 'STANDARD', ?, NOW()")
+        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description with at least twenty characters here.', 'STANDARD', ?, NOW()")
         String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
         String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
 
@@ -678,43 +812,37 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         [
                 [insertOrganizationSql, [uuids.organizationId]],
-
-                // Project A (multi-location) with status from where block
                 [insertProjectSql, [uuids.projectIdA, uuids.organizationId, 'Project A', status]],
-                // Project B (single-location) is always ACTIVE
                 [insertProjectSql, [uuids.projectIdB, uuids.organizationId, 'Project B', 'ACTIVE']],
-
-                // Locations (Reference point: POINT(-104.9903 39.7392))
-                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']], // ~2 km (closest)
-                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']], // ~5 km (second closest)
-                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],  // ~10 km (third closest)
-
-                // Mappings
+                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']],
+                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']],
+                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],
                 [insertProjectLocationSql, [uuids.projectIdA, uuids.locA1]],
                 [insertProjectLocationSql, [uuids.projectIdA, uuids.locA2]],
                 [insertProjectLocationSql, [uuids.projectIdB, uuids.locB1]],
-
-                // Shifts
                 [insertShiftA1Sql, [uuids.shiftA1, uuids.projectIdA, uuids.locA1]],
                 [insertShiftSql, [uuids.shiftA2, uuids.projectIdA, uuids.locA2]],
                 [insertShiftSql, [uuids.shiftB1, uuids.projectIdB, uuids.locB1]]
         ].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
 
-        and: "a reference point at Denver center"
-        GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
-        Point point = geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
-
-        when: "searching projects by location"
-        Page<ProjectSearchCard> page = projectController.searchByLocation(point.getX(), point.getY(), 20000.0, Pageable.from(0, 100))
+        when: "searching projects by location via HTTP GET"
+        def uri = UriBuilder.of("/projects/search-by-location")
+                .queryParam("longitude", -104.9903)
+                .queryParam("latitude", 39.7392)
+                .queryParam("radiusMeters", 20000.0)
+                .queryParam("size", 100)
+                .build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "the result matches expected order and presence based on project status and shift validity"
-        page != null
-        List<ProjectSearchCard> testResults = page.content.findAll { it.projectId() in [uuids.projectIdA, uuids.projectIdB] }
+        response.status == HttpStatus.OK
+        List items = response.body().content as List
+        List testResults = items.findAll { (it.projectId as String) in [uuids.projectIdA, uuids.projectIdB].collect { it.toString() } }
 
-        List<UUID> expectedUUIDs = expectedOrderNames.collect { name ->
-            name == 'A' ? uuids.projectIdA : uuids.projectIdB
+        List<String> expectedUUIDs = expectedOrderNames.collect { name ->
+            (name == 'A' ? uuids.projectIdA : uuids.projectIdB).toString()
         }
-        testResults.collect { it.projectId() } == expectedUUIDs
+        testResults.collect { it.projectId as String } == expectedUUIDs
 
         where:
         status     | shiftActive | expectedOrderNames
@@ -726,26 +854,63 @@ class ProjectControllerSpec extends BaseControllerSpec {
         'REJECTED' | true        | ['B']
     }
 
+    @Unroll
+    def "SEARCH | should reject invalid coordinates: lon=#lon, lat=#lat, rad=#rad"(double lon, double lat, double rad) {
+        when: "searching projects by location with invalid coordinates or radius via HTTP GET"
+        def uri = UriBuilder.of("/projects/search-by-location")
+                .queryParam("longitude", lon)
+                .queryParam("latitude", lat)
+                .queryParam("radiusMeters", rad)
+                .build().toString()
+        client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
+
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+
+        where:
+        lon    | lat   | rad
+        -190.0 | 0.0   | 1000.0
+        195.0  | 0.0   | 1000.0
+        0.0    | -95.0 | 1000.0
+        0.0    | 95.0  | 1000.0
+        0.0    | 0.0   | -1.0
+        0.0    | 0.0   | 600000.0
+    }
+
+    def "SEARCH BY LOCATION | should return empty page when no projects exist within search radius"() {
+        when: "searching in the middle of the Atlantic Ocean where zero projects exist via HTTP GET"
+        def uri = UriBuilder.of("/projects/search-by-location")
+                .queryParam("longitude", 0.0)
+                .queryParam("latitude", 0.0)
+                .queryParam("radiusMeters", 1000.0)
+                .build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
+
+        then: "an empty Page is returned"
+        response.status == HttpStatus.OK
+        def content = response.body().content as List
+        content.isEmpty()
+    }
+
     /********** APPROVE Tests **********/
 
     def "APPROVE | should allow GLOBAL_ADMIN to approve a virtual project"() {
-        given: "an organization and a pending virtual project (no locations)"
+        given: "an organization and a pending virtual project"
         def orgId = UUID.randomUUID()
         def projId = UUID.randomUUID()
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Approve Org', true)", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Virtual Approve Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+            VALUES (?, ?, 'Virtual Approve Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId)
 
-        and: "a GLOBAL_ADMIN user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-appr-${UUID.randomUUID()}@example.com".toString())
-
-        when: "the GLOBAL_ADMIN approves the project"
-        Project approved = projectController.approveProject(projId, createPrincipal(adminId))
+        when: "the GLOBAL_ADMIN approves the project via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
+        Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
+        response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
 
@@ -764,7 +929,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Director Virtual Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+            VALUES (?, ?, 'Director Virtual Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId)
 
         and: "a REGION_DIRECTOR of that region"
@@ -772,10 +937,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-appr-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
 
-        when: "the REGION_DIRECTOR approves the virtual project"
-        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+        when: "the REGION_DIRECTOR approves the virtual project via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
+        response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
     }
@@ -787,31 +954,27 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Agent VOrg', true)", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Agent VProj', 'Desc', 'STANDARD', 'PENDING', NOW())
+            VALUES (?, ?, 'Agent VProj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId)
 
         and: "a REGION_AGENT user"
         def agentId = UUID.randomUUID()
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_AGENT')", agentId, "agent-appr-${UUID.randomUUID()}@example.com".toString())
 
-        when: "the REGION_AGENT attempts to approve the virtual project"
-        projectController.approveProject(projId, createPrincipal(agentId))
+        when: "the REGION_AGENT attempts to approve the virtual project via HTTP PUT"
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), agentId.toString(), ["REGION_AGENT"]), Project)
 
         then: "a 403 Forbidden is thrown"
-        HttpStatusException e = thrown()
+        def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
     }
 
     def "APPROVE | should reject approval of non-existent project with 404 Not Found"() {
-        given: "a random project ID and an admin user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-404-${UUID.randomUUID()}@example.com".toString())
-
-        when: "approving a non-existent project"
-        projectController.approveProject(UUID.randomUUID(), createPrincipal(adminId))
+        when: "approving a non-existent project via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${UUID.randomUUID()}/status", "")), Project)
 
         then: "a 404 Not Found is thrown"
-        HttpStatusException e = thrown()
+        def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -822,18 +985,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Active Org', true)", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Already Active', 'Desc', 'STANDARD', 'ACTIVE', NOW())
+            VALUES (?, ?, 'Already Active', 'Description with at least twenty characters here.', 'STANDARD', 'ACTIVE', NOW())
         """, projId, orgId)
 
-        and: "an admin user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-active-${UUID.randomUUID()}@example.com".toString())
-
-        when: "attempting to approve an ACTIVE project"
-        projectController.approveProject(projId, createPrincipal(adminId))
+        when: "attempting to approve an ACTIVE project via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
 
         then: "a 400 Bad Request is thrown"
-        HttpStatusException e = thrown()
+        def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.BAD_REQUEST
     }
 
@@ -844,17 +1003,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'PendingUpdate Org', true)", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Pending Update Proj', 'Desc', 'STANDARD', 'PENDING_UPDATE', NOW())
+            VALUES (?, ?, 'Pending Update Proj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING_UPDATE', NOW())
         """, projId, orgId)
 
-        and: "an admin user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-pu-${UUID.randomUUID()}@example.com".toString())
-
-        when: "approving the PENDING_UPDATE project"
-        Project approved = projectController.approveProject(projId, createPrincipal(adminId))
+        when: "approving the PENDING_UPDATE project via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
+        Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
+        response.status == HttpStatus.OK
         approved.status() == ACTIVE
     }
 
@@ -865,18 +1022,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Deleted Org', true)", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at, deleted_at)
-            VALUES (?, ?, 'Deleted Proj', 'Desc', 'STANDARD', 'PENDING', NOW(), NOW())
+            VALUES (?, ?, 'Deleted Proj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW(), NOW())
         """, projId, orgId)
 
-        and: "an admin user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-del-${UUID.randomUUID()}@example.com".toString())
-
-        when: "attempting to approve a deleted project"
-        projectController.approveProject(projId, createPrincipal(adminId))
+        when: "attempting to approve a deleted project via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
 
         then: "a 404 Not Found is thrown preventing resurrection"
-        HttpStatusException e = thrown()
+        def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -887,21 +1040,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Audit Org', true)", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Audit Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
+            VALUES (?, ?, 'Audit Proj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId)
 
-        and: "an admin user"
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", adminId, "admin-log-${UUID.randomUUID()}@example.com".toString())
-
-        when: "approving the project"
-        projectController.approveProject(projId, createPrincipal(adminId))
+        when: "approving the project via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
 
         then: "a project_audit_logs record is written"
+        response.status == HttpStatus.OK
         def auditRow = sql.firstRow("SELECT action, actor_id FROM project_audit_logs WHERE project_id = ?", [projId])
         auditRow != null
         auditRow.action == 'APPROVED'
-        auditRow.actor_id == adminId
+        auditRow.actor_id == UUID.fromString(adminId)
     }
 
     def "APPROVE | should allow REGION_DIRECTOR to approve physical project with locations inside their region"() {
@@ -915,7 +1065,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Phys Loc', 'St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", locId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Phys Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+            VALUES (?, ?, 'Phys Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId)
         executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, locId)
 
@@ -924,10 +1074,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-phys-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
 
-        when: "the REGION_DIRECTOR approves the physical project"
-        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+        when: "the REGION_DIRECTOR approves the physical project via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        Project approved = response.body()
 
         then: "the physical project transitions to ACTIVE"
+        response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
     }
@@ -941,7 +1093,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Managing Reg Org', true, 'VERIFIED')", orgId)
         executeUpdate("""
             INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, ?, 'Virtual Assigned Project', 'Desc', 'STANDARD', 'PENDING', NOW())
+            VALUES (?, ?, ?, 'Virtual Assigned Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId, regId)
 
         and: "a REGION_DIRECTOR assigned to that managing region"
@@ -949,128 +1101,138 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-mgr-appr-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
 
-        when: "the REGION_DIRECTOR approves the virtual project"
-        Project approved = projectController.approveProject(projId, createPrincipal(directorId))
+        when: "the REGION_DIRECTOR approves the virtual project via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
+        response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
     }
 
-    def "SUBMIT | should throw 400 when managingRegion does not exist"() {
-        given: "an organization and a project referencing a non-existent managing region"
-        def org = organizationRepository.save(new Organization(null, "Org For NonExistent Region", null, null, true, UNVERIFIED, null, []))
-        def nonExistentRegion = new AdministrativeRegion(UUID.randomUUID(), "Ghost Region", null, null)
-        def project = new Project(null, org, nonExistentRegion, "Ghost Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+    def "APPROVE | should reject approval of DRAFT project with 400 Bad Request"() {
+        given: "a project in DRAFT status"
+        def org = getRandomOrganization()
+        def command = createProjectCommand(org.id(), "Draft Approval Project", "Description with at least twenty characters here.", STANDARD, DRAFT)
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
 
-        when: "submitting the project"
-        projectController.submitProject(project, testPrincipal)
+        when: "attempting to approve the draft project via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}/status", "")), Project)
 
         then: "a 400 Bad Request is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Managing region does not exist"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "APPROVE | should reject approval when REGION_DIRECTOR lacks geographic jurisdiction over physical locations"() {
+        given: "a Denver region and a Region Director for Denver"
+        def denverRegId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO administrative_regions (id, name, geom)
+            VALUES (?, 'Denver Approval Region', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
+        """, denverRegId)
+
+        def directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-denver-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, denverRegId)
+
+        and: "a PENDING project with physical locations in Colorado Springs (outside Denver)"
+        def org = getRandomOrganization()
+        def csLocId = UUID.randomUUID()
+        def projId = UUID.randomUUID()
+        executeUpdate("""
+            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
+            VALUES (?, ?, 'CS Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
+        """, projId, org.id())
+        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'CS Loc', '123 Main', 'Colo Springs', 'US', ST_GeogFromText('POINT(-104.82 38.83)'))",
+                csLocId)
+        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, csLocId)
+
+        when: "the Denver Region Director attempts to approve the project via HTTP PUT"
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "APPROVE | should throw 404 Not Found when approving principal does not exist in users table"() {
+        given: "a PENDING project"
+        def org = getRandomOrganization()
+        def command = createProjectCommand(org.id(), "Actor 404 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
+
+        when: "calling approveProject with a principal UUID that is not in the users table via HTTP PUT"
+        def nonExistentUserId = UUID.randomUUID()
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}/status", ""), nonExistentUserId.toString(), ["GLOBAL_ADMIN", "project:approve"]), Project)
+
+        then: "a 404 Not Found is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    /********** MANAGING REGION Tests **********/
+
+    def "SUBMIT | should throw 400 when managingRegion does not exist"() {
+        given: "a create project command referencing a non-existent managing region"
+        def org = getRandomOrganization()
+        def nonExistentRegionId = UUID.randomUUID()
+        def command = createProjectCommand(org.id(), "Ghost Project", "Description with at least twenty characters here.", STANDARD, DRAFT, nonExistentRegionId)
+
+        when: "submitting the project via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+
+        then: "a 400 Bad Request is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     def "SUBMIT | should throw 400 when project locations do not fall within managingRegion"() {
         given: "a managing region with a defined boundary"
         def regId = UUID.randomUUID()
         executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Strict Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        def region = new AdministrativeRegion(regId, "Strict Region", null, null)
 
-        and: "an organization with global admin submitting"
-        def org = organizationRepository.save(new Organization(null, "Org For Boundary Test", null, null, true, UNVERIFIED, null, []))
+        and: "an organization and a location outside the managing region"
+        def org = getRandomOrganization()
+        def outLoc = new ProjectLocationCommand(
+                "Out Loc",
+                "123 St",
+                "Boulder",
+                null,
+                null,
+                "US",
+                -106.0,
+                41.0
+        )
+        def command = createProjectCommand(org.id(), "Out Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [outLoc])
 
-        and: "a location outside the managing region"
-        def gf = new GeometryFactory(new PrecisionModel(), 4326)
-        def outLoc = new Location(null, "Out Loc", "123 St", "Boulder", null, null, "US", gf.createPoint(new Coordinate(-106.0, 41.0)))
-        def project = new Project(null, org, region, "Out Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [outLoc], [])
-
-        when: "submitting the project"
-        projectController.submitProject(project, testPrincipal)
+        when: "submitting the project via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
 
         then: "a 400 Bad Request is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Project locations do not fall within the specified managing region"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     def "SUBMIT | should throw 403 when submitter lacks authority to assign managingRegion"() {
         given: "a managing region"
         def regId = UUID.randomUUID()
         executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Auth Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        def region = new AdministrativeRegion(regId, "Auth Region", null, null)
 
         and: "an organization and an unauthorized standard user"
-        def org = organizationRepository.save(new Organization(null, "Org For Auth Test", null, null, true, UNVERIFIED, null, []))
+        def org = getRandomOrganization()
         def unauthUserId = UUID.randomUUID()
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-${UUID.randomUUID()}@example.com".toString())
 
-        def project = new Project(null, org, region, "Unauthorized Region Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def command = createProjectCommand(org.id(), "Unauthorized Region Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
 
-        when: "submitting the project"
-        projectController.submitProject(project, createPrincipal(unauthUserId))
+        when: "submitting the project via HTTP POST by unauthorized user"
+        client.exchange(authenticated(HttpRequest.POST("/projects", command), unauthUserId.toString(), ["STANDARD_USER"]), Project)
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have authority to assign this managing region"
-    }
-
-    def "UPDATE | should throw 400 when updating project locations outside existing managingRegion"() {
-        given: "a managing region and an active project inside it"
-        def regId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Update Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        def region = new AdministrativeRegion(regId, "Update Region", null, null)
-        def org = organizationRepository.save(new Organization(null, "Org For Update Loc Region", null, null, true, UNVERIFIED, null, []))
-
-        def gf = new GeometryFactory(new PrecisionModel(), 4326)
-        def inLoc = new Location(null, "In Loc", "123 St", "Denver", null, null, "US", gf.createPoint(new Coordinate(-104.9, 39.7)))
-        def initialProject = new Project(null, org, region, "Initial Project", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [inLoc], [])
-        Project saved = projectController.submitProject(initialProject, testPrincipal)
-
-        when: "updating the project with locations outside the managing region without modifying managingRegion"
-        def outLoc = new Location(null, "Out Loc", "123 St", "Boulder", null, null, "US", gf.createPoint(new Coordinate(-106.0, 41.0)))
-        def updatedProject = new Project(saved.id(), org, region, "Initial Project", "Desc", STANDARD, saved.status(), saved.createdAt(), null, null, [outLoc], [])
-        projectController.updateProject(saved.id(), updatedProject, testPrincipal)
-
-        then: "a 400 Bad Request is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Project locations do not fall within the specified managing region"
-    }
-
-    @Unroll
-    def "SEARCH | should reject invalid coordinates: lon=#lon, lat=#lat, rad=#rad"(double lon, double lat, double rad) {
-        when: "searching projects by location with invalid coordinates or radius"
-        projectController.searchByLocation(lon, lat, rad, Pageable.unpaged())
-
-        then: "a validation exception is thrown"
-        thrown(ValidationException)
-
-        where:
-        lon    | lat   | rad
-        -190.0 | 0.0   | 1000.0
-        195.0  | 0.0   | 1000.0
-        0.0    | -95.0 | 1000.0
-        0.0    | 95.0  | 1000.0
-        0.0    | 0.0   | -1.0
-        0.0    | 0.0   | 600000.0
-    }
-
-    def "SUBMIT | should throw 400 when managingRegion payload has null ID"() {
-        given: "a project with managingRegion that has null ID"
-        def org = getRandomOrganization()
-        def regionWithNullId = new AdministrativeRegion(null, "Null Id Region", null, null)
-        def project = new Project(null, org, regionWithNullId, "Test Title", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
-
-        when: "submitting the project"
-        projectController.submitProject(project, testPrincipal)
-
-        then: "a 400 Bad Request is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Managing region does not exist"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "SUBMIT | should successfully save virtual project with valid managingRegion"() {
@@ -1080,51 +1242,38 @@ class ProjectControllerSpec extends BaseControllerSpec {
             INSERT INTO administrative_regions (id, name, geom)
             VALUES (?, 'Submit Virtual Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
         """, regId)
-        def org = organizationRepository.save(new Organization(null, "Org For Virtual Region", null, null, true, UNVERIFIED, null, []))
-        def region = new AdministrativeRegion(regId, "Submit Virtual Region", null, null)
-        def project = new Project(null, org, region, "Virtual Region Proj", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        def org = getRandomOrganization()
+        def command = createProjectCommand(org.id(), "Virtual Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
 
-        when: "submitting virtual project with global admin"
-        Project saved = projectController.submitProject(project, testPrincipal)
+        when: "submitting virtual project with global admin via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        Project saved = response.body()
 
         then: "project is saved and managingRegion is set"
+        response.status == HttpStatus.OK
         saved.id() != null
         saved.managingRegion() != null
         saved.managingRegion().id() == regId
     }
 
-    def "UPDATE | should throw 404 when reassigned organization has null ID"() {
-        given: "an existing project"
+    def "UPDATE | should throw 400 when updating project locations outside existing managingRegion"() {
+        given: "a managing region and an active project inside it"
+        def regId = UUID.randomUUID()
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Update Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
         def org = getRandomOrganization()
-        def project = TestFixtures.createBasicProject(org, "Org Reassign Null ID", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(project, testPrincipal)
 
-        when: "updating the project with an organization shell having a null ID"
-        def orgWithNullId = new Organization(null, "Shell Org", null, null, true, UNVERIFIED, null, [])
-        def updatedProject = new Project(saved.id(), orgWithNullId, null, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
-        projectController.updateProject(saved.id(), updatedProject, testPrincipal)
+        def inLoc = new ProjectLocationCommand("In Loc", "123 St", "Denver", null, null, "US", -104.9, 39.7)
+        def createCmd = createProjectCommand(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [inLoc])
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        then: "a 404 Not Found is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == NOT_FOUND
-        e.message == "Target organization not found"
-    }
-
-    def "UPDATE | should throw 400 when updating managingRegion with null ID"() {
-        given: "an existing project with no managingRegion"
-        def org = getRandomOrganization()
-        def project = TestFixtures.createBasicProject(org, "Update Region Null ID", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(project, testPrincipal)
-
-        when: "updating with a managingRegion whose ID is null"
-        def regionWithNullId = new AdministrativeRegion(null, "Null ID Region", null, null)
-        def updatedProject = new Project(saved.id(), org, regionWithNullId, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
-        projectController.updateProject(saved.id(), updatedProject, testPrincipal)
+        when: "updating the project with locations outside the managing region without modifying managingRegion"
+        def outLoc = new ProjectLocationCommand("Out Loc", "123 St", "Boulder", null, null, "US", -106.0, 41.0)
+        def updateCmd = updateProjectCommand(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, regId, [outLoc])
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
 
         then: "a 400 Bad Request is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Managing region does not exist"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     def "UPDATE | should throw 403 when user lacks authority to assign new managingRegion on update"() {
@@ -1142,19 +1291,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unauth-reg-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
 
-        def org = new Organization(orgId, "Update Region Org", null, null, true, UNVERIFIED, null, [])
-        def initialProject = TestFixtures.createBasicProject(org, "Unauth Region Proj", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(initialProject, testPrincipal)
+        def createCmd = createProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT)
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        when: "the Org Manager attempts to assign a foreign region not linked to their organization"
-        def foreignRegion = new AdministrativeRegion(foreignRegionId, "Foreign Region", null, null)
-        def updateRequest = new Project(saved.id(), org, foreignRegion, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
-        projectController.updateProject(saved.id(), updateRequest, createPrincipal(managerId))
+        when: "the Org Manager attempts to assign a foreign region not linked to their organization via HTTP PUT"
+        def updateCmd = updateProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, foreignRegionId)
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), managerId.toString(), ["STANDARD_USER"]), Project)
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have authority to assign this managing region"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "UPDATE | should throw 403 when unauthorized user attempts to unassign managingRegion"() {
@@ -1172,19 +1318,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unauth-unassign-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
 
-        def org = new Organization(orgId, "Org Unassign Region", null, null, true, UNVERIFIED, null, [])
-        def regB = new AdministrativeRegion(regBId, "Region B", null, null)
-        def initialProject = new Project(null, org, regB, "Project with Region B", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
-        Project saved = projectController.submitProject(initialProject, testPrincipal)
+        def createCmd = createProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, DRAFT, regBId)
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        when: "the Org Manager attempts to unassign the managingRegion"
-        def updateRequest = new Project(saved.id(), org, null, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
-        projectController.updateProject(saved.id(), updateRequest, createPrincipal(managerId))
+        when: "the Org Manager attempts to unassign the managingRegion via HTTP PUT"
+        def updateCmd = updateProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, null)
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), managerId.toString(), ["STANDARD_USER"]), Project)
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have authority to unassign this managing region"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "UPDATE | should allow authorized Org Manager to unassign managingRegion"() {
@@ -1203,16 +1346,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unassign-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
 
-        def org = new Organization(orgId, "Org For Unassign", null, null, true, UNVERIFIED, null, [])
-        def region = new AdministrativeRegion(regId, "Region For Unassign", null, null)
-        def initialProject = new Project(null, org, region, "Project with Region", "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
-        Project saved = projectController.submitProject(initialProject, testPrincipal)
+        def createCmd = createProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        when: "the Org Manager updates the project setting managingRegion to null"
-        def updateRequest = new Project(saved.id(), org, null, saved.title(), saved.description(), saved.projectType(), saved.status(), saved.createdAt(), null, null, [], [])
-        Project updated = projectController.updateProject(saved.id(), updateRequest, createPrincipal(managerId))
+        when: "the Org Manager updates the project setting managingRegion to null via HTTP PUT"
+        def updateCmd = updateProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, null)
+        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), managerId.toString(), ["STANDARD_USER"]), Project)
+        Project updated = response.body()
 
         then: "managingRegion is successfully unassigned"
+        response.status == HttpStatus.OK
         updated.managingRegion() == null
         def dbRow = sql.firstRow("SELECT managing_region_id FROM projects WHERE id = ?", [saved.id()])
         dbRow.managing_region_id == null
@@ -1241,28 +1384,20 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgBId, boulderRegId)
 
         and: "an ACTIVE project under Denver Org with a location in Denver"
-        def gf = new GeometryFactory(new PrecisionModel(), 4326)
-        def denverPoint = gf.createPoint(new Coordinate(-104.9, 39.7))
-        def denverLoc = new Location(UUID.randomUUID(), "Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", denverPoint)
+        def denverLoc = new ProjectLocationCommand("Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
+        def createCmd = createProjectCommand(orgAId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        executeUpdate("UPDATE projects SET status = 'ACTIVE' WHERE id = ?", saved.id())
 
-        def projId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Active Denver Reassign Project', 'Desc', 'STANDARD', 'ACTIVE', NOW())
-        """, projId, orgAId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Denver Reassign Loc', '16th St', 'Denver', 'US', ST_GeogFromText('POINT(-104.9 39.7)'))",
-                denverLoc.id())
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, denverLoc.id())
-
-        def orgB = new Organization(orgBId, "Boulder Reassign Org B", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = new Project(projId, orgB, null, "Active Denver Reassign Project", "Desc", STANDARD, ACTIVE, OffsetDateTime.now(), null, null, [denverLoc], [])
-
-        when: "a Global Admin reassigns the active Denver project to Boulder Org"
-        Project updated = projectController.updateProject(projId, updateRequest, testPrincipal)
+        when: "a Global Admin reassigns the active Denver project to Boulder Org via HTTP PUT"
+        def updateCmd = updateProjectCommand(orgBId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        Project updated = response.body()
 
         then: "the status is automatically demoted to PENDING for regional review"
+        response.status == HttpStatus.OK
         updated.status() == PENDING
-        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [projId])
+        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [saved.id()])
         row.status == 'PENDING'
         row.organization_id == orgBId
     }
@@ -1284,28 +1419,20 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org2Id, regionId)
 
         and: "an ACTIVE project in Org Alpha"
-        def gf = new GeometryFactory(new PrecisionModel(), 4326)
-        def denverPoint = gf.createPoint(new Coordinate(-104.9, 39.7))
-        def denverLoc = new Location(UUID.randomUUID(), "Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", denverPoint)
+        def denverLoc = new ProjectLocationCommand("Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
+        def createCmd = createProjectCommand(org1Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        executeUpdate("UPDATE projects SET status = 'ACTIVE' WHERE id = ?", saved.id())
 
-        def projId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Active Alpha Shared Proj', 'Desc', 'STANDARD', 'ACTIVE', NOW())
-        """, projId, org1Id)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Denver Shared Loc', '16th St', 'Denver', 'US', ST_GeogFromText('POINT(-104.9 39.7)'))",
-                denverLoc.id())
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, denverLoc.id())
-
-        def org2 = new Organization(org2Id, "Org Beta Shared", null, null, true, UNVERIFIED, null, [])
-        def updateRequest = new Project(projId, org2, null, "Active Alpha Shared Proj", "Desc", STANDARD, ACTIVE, OffsetDateTime.now(), null, null, [denverLoc], [])
-
-        when: "reassigning to Org Beta which also encloses the location"
-        Project updated = projectController.updateProject(projId, updateRequest, testPrincipal)
+        when: "reassigning to Org Beta which also encloses the location via HTTP PUT"
+        def updateCmd = updateProjectCommand(org2Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        Project updated = response.body()
 
         then: "status is preserved as ACTIVE"
+        response.status == HttpStatus.OK
         updated.status() == ACTIVE
-        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [projId])
+        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [saved.id()])
         row.status == 'ACTIVE'
         row.organization_id == org2Id
     }
@@ -1313,38 +1440,36 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should reject project update by unaffiliated standard user with 403 Forbidden"() {
         given: "an existing project and an unaffiliated standard user"
         def org = getRandomOrganization()
-        def project = TestFixtures.createBasicProject(org, "Protected Project", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(project, testPrincipal)
+        def createCmd = createProjectCommand(org.id(), "Protected Project", "Description with at least twenty characters here.")
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
         def unauthUserId = UUID.randomUUID()
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unaffil-update-${UUID.randomUUID()}@example.com".toString())
 
-        when: "unaffiliated user attempts to update the project"
-        def updateRequest = new Project(saved.id(), org, null, "Tampered Title", "Desc", STANDARD, DRAFT, saved.createdAt(), null, null, [], [])
-        projectController.updateProject(saved.id(), updateRequest, createPrincipal(unauthUserId))
+        when: "unaffiliated user attempts to update the project via HTTP PUT"
+        def updateCmd = updateProjectCommand(org.id(), "Tampered Title", "Description with at least twenty characters here.")
+        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), unauthUserId.toString(), ["STANDARD_USER"]), Project)
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have permission to modify this project"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "DELETE | should reject project deletion by unaffiliated user with 403 Forbidden"() {
         given: "an existing project and an unaffiliated standard user"
         def org = getRandomOrganization()
-        def project = TestFixtures.createBasicProject(org, "Protected Delete Proj", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(project, testPrincipal)
+        def createCmd = createProjectCommand(org.id(), "Protected Delete Proj", "Description with at least twenty characters here.")
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
         def unauthUserId = UUID.randomUUID()
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unaffil-del-${UUID.randomUUID()}@example.com".toString())
 
-        when: "unaffiliated user attempts to delete the project"
-        projectController.deleteProject(saved.id(), createPrincipal(unauthUserId))
+        when: "unaffiliated user attempts to delete the project via HTTP DELETE"
+        client.exchange(authenticated(HttpRequest.DELETE("/projects/${saved.id()}"), unauthUserId.toString(), ["STANDARD_USER"]))
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have permission to delete this project"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "DELETE | should allow Org Manager to delete project belonging to their organization"() {
@@ -1356,92 +1481,99 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-del-${UUID.randomUUID()}@example.com".toString())
         executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
 
-        def org = new Organization(orgId, "Delete Test Org", null, null, true, UNVERIFIED, null, [])
-        def project = TestFixtures.createBasicProject(org, "Project to Delete", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(project, testPrincipal)
+        def createCmd = createProjectCommand(orgId, "Project to Delete", "Description with at least twenty characters here.")
+        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        when: "the Org Manager deletes the project"
-        projectController.deleteProject(saved.id(), createPrincipal(managerId))
+        when: "the Org Manager deletes the project via HTTP DELETE"
+        def response = client.exchange(authenticated(HttpRequest.DELETE("/projects/${saved.id()}"), managerId.toString(), ["STANDARD_USER"]))
 
         then: "the project is deleted from the database"
+        response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
         sql.firstRow("SELECT id FROM projects WHERE id = ?", [saved.id()]) == null
     }
 
-    def "APPROVE | should reject approval of DRAFT project with 400 Bad Request"() {
-        given: "a project in DRAFT status"
+    /********** LIST / Draining Tests **********/
+
+    def "LIST | should fully drain all projects sequentially using cursors"() {
+        setup:
         def org = getRandomOrganization()
-        def project = TestFixtures.createBasicProject(org, "Draft Approval Project", "Desc", STANDARD, DRAFT)
-        Project saved = projectController.submitProject(project, testPrincipal)
+        (1..12).each { i ->
+            def cmd = createProjectCommand(org.id(), "Cursor Drain Project ${String.format('%02d', i)}")
+            client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project)
+        }
+        Set<Project> allProjects = new LinkedHashSet<>()
+        int pageSize = 5
+        def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("title")))
 
-        when: "attempting to approve the draft project"
-        projectController.approveProject(saved.id(), testPrincipal)
+        when: "iterating through pages until no more data remains using projectController.getProjects"
+        while (pageable != null) {
+            CursoredPage<Project> page = projectController.getProjects(null, pageable)
+            allProjects.addAll(page.content)
+            pageable = page.hasNext() ? page.nextPageable() : null
+        }
 
-        then: "a 400 Bad Request is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == BAD_REQUEST
-        e.message == "Only PENDING or PENDING_UPDATE projects can be approved"
+        then: "the collected set contains all projects from the database"
+        def totalCount = sql.firstRow("SELECT count(*) as count FROM projects").count
+        verifyAll {
+            allProjects.size() == totalCount
+            allProjects.size() >= 12
+        }
     }
 
-    def "APPROVE | should reject approval when REGION_DIRECTOR lacks geographic jurisdiction over physical locations"() {
-        given: "a Denver region and a Region Director for Denver"
-        def denverRegId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Denver Approval Region', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
-        """, denverRegId)
-
-        def directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-denver-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, denverRegId)
-
-        and: "a PENDING project with physical locations in Colorado Springs (outside Denver)"
+    def "LIST | should support HTTP pagination on GET /projects"() {
+        setup:
         def org = getRandomOrganization()
-        def gf = new GeometryFactory(new PrecisionModel(), 4326)
-        def csPoint = gf.createPoint(new Coordinate(-104.82, 38.83))
-        def csLoc = new Location(UUID.randomUUID(), "Colorado Springs Loc", "123 Main", "Colo Springs", "CO", "80903", "US", csPoint)
+        (1..5).each { i ->
+            def cmd = createProjectCommand(org.id(), "Http Paging Project ${i}")
+            client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project)
+        }
 
-        def projId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'CS Project', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projId, org.id())
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'CS Loc', '123 Main', 'Colo Springs', 'US', ST_GeogFromText('POINT(-104.82 38.83)'))",
-                csLoc.id())
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, csLoc.id())
+        when: "querying projects via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects?size=5")), Map)
 
-        when: "the Denver Region Director attempts to approve the project"
-        projectController.approveProject(projId, createPrincipal(directorId))
-
-        then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == FORBIDDEN
-        e.message == "You do not have geographic jurisdiction to approve this project."
+        then: "the response is 200 OK with content list"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+        body.content.size() >= 5
     }
 
-    def "APPROVE | should throw 404 Not Found when approving principal does not exist in users table"() {
-        given: "a PENDING project"
-        def org = getRandomOrganization()
-        def project = TestFixtures.createBasicProject(org, "Actor 404 Project", "Desc", STANDARD, PENDING)
-        Project saved = projectController.submitProject(project, testPrincipal)
+    /********** Security 401 Negative Tests **********/
 
-        when: "calling approveProject with a principal UUID that is not in the users table"
-        def nonExistentUserPrincipal = createPrincipal(UUID.randomUUID())
-        projectController.approveProject(saved.id(), nonExistentUserPrincipal)
+    @Unroll
+    def "Security | should reject unauthenticated request with 401 UNAUTHORIZED for #method #uri"(String method, String uri) {
+        when: "sending unauthenticated request"
+        HttpRequest<?> req
+        switch (method) {
+            case "GET":
+                req = HttpRequest.GET(uri)
+                break
+            case "POST":
+                req = HttpRequest.POST(uri, [title: "Test", description: "At least 20 chars in description"])
+                break
+            case "PUT":
+                req = HttpRequest.PUT(uri, [title: "Test", description: "At least 20 chars in description"])
+                break
+            case "DELETE":
+                req = HttpRequest.DELETE(uri)
+                break
+            default:
+                throw new IllegalArgumentException("Unsupported method ${method}")
+        }
+        client.exchange(req)
 
-        then: "a 404 Not Found is thrown"
-        def e = thrown(HttpStatusException)
-        e.status == NOT_FOUND
-        e.message == "User not found"
-    }
+        then: "a 401 UNAUTHORIZED exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
 
-    def "SEARCH BY LOCATION | should return empty page when no projects exist within search radius"() {
-        when: "searching in the middle of the Atlantic Ocean where zero projects exist"
-        def emptyPage = projectController.searchByLocation(0.0, 0.0, 1000.0, Pageable.unpaged())
-
-        then: "an empty Page is returned"
-        emptyPage != null
-        emptyPage.content.isEmpty()
-        emptyPage.totalSize == 0
+        where:
+        method   | uri
+        "GET"    | "/projects"
+        "GET"    | "/projects/${UUID.randomUUID()}"
+        "GET"    | "/projects/search-by-location?longitude=0&latitude=0&radiusMeters=1000"
+        "POST"   | "/projects"
+        "PUT"    | "/projects/${UUID.randomUUID()}"
+        "DELETE" | "/projects/${UUID.randomUUID()}"
+        "PUT"    | "/projects/${UUID.randomUUID()}/status"
     }
 }
-

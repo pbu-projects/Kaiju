@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.repository;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.Join;
 import io.micronaut.data.annotation.Query;
 import io.micronaut.data.annotation.TypeDef;
@@ -31,8 +32,12 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
     @NonNull
     Optional<Project> findById(@NonNull UUID id);
 
+    @NonNull
     @Join("organization")
-    CursoredPage<Project> findByTitle(String title, CursoredPageable pageable);
+    CursoredPage<Project> findAll(@NonNull CursoredPageable pageable);
+
+    @Join("organization")
+    CursoredPage<Project> findByTitle(@Nullable String title, CursoredPageable pageable);
 
     @Query(value = """
                 SELECT project_.id AS project_id,
