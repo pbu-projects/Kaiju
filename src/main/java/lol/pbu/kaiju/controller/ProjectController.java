@@ -267,7 +267,7 @@ public class ProjectController implements ControllerUtils {
             }
             return targetRegion;
         }
-        if (existingRegionId != null && (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existingRegionId))) {
+        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existingRegionId)) {
             throw new HttpStatusException(FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
         }
         return null;
