@@ -3,15 +3,17 @@ package lol.pbu.kaiju.domain;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
+import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lol.pbu.kaiju.model.UserRole;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import lol.pbu.kaiju.model.UserRole;
 
+@Serdeable
 @MappedEntity("users")
 public record User(
         @Id

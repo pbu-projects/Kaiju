@@ -93,7 +93,14 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated POST /administrative-regions with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to create a region"
-        client.exchange(HttpRequest.POST("/", [name: "Unauthenticated Region"]).accept(MediaType.APPLICATION_JSON_TYPE))
+        client.exchange(HttpRequest.POST("/", [
+                name       : "Unauthenticated Region",
+                coordinates: [
+                        [longitude: -105.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 40.0]
+                ]
+        ]).accept(MediaType.APPLICATION_JSON_TYPE))
 
         then: "an UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -102,7 +109,14 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated PUT /administrative-regions/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to update a region"
-        client.exchange(HttpRequest.PUT("/${UUID.randomUUID()}", [name: "Unauthenticated Update"]).accept(MediaType.APPLICATION_JSON_TYPE))
+        client.exchange(HttpRequest.PUT("/${UUID.randomUUID()}", [
+                name       : "Unauthenticated Update",
+                coordinates: [
+                        [longitude: -105.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 40.0]
+                ]
+        ]).accept(MediaType.APPLICATION_JSON_TYPE))
 
         then: "an UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -123,7 +137,14 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
     def "Security | should reject standard volunteer attempting POST /administrative-regions with 403 FORBIDDEN"() {
         when: "a standard authenticated volunteer attempts to create a region"
         client.exchange(
-                HttpRequest.POST("/", [name: "Volunteer Rogue Region"])
+                HttpRequest.POST("/", [
+                        name       : "Volunteer Rogue Region",
+                        coordinates: [
+                                [longitude: -105.0, latitude: 39.0],
+                                [longitude: -104.0, latitude: 39.0],
+                                [longitude: -104.0, latitude: 40.0]
+                        ]
+                ])
                         .header("X-Test-User", "volunteer-user")
                         .header("X-Test-Role", "STANDARD_USER")
                         .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -140,7 +161,14 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a standard volunteer attempts to update the region"
         client.exchange(
-                HttpRequest.PUT("/${region.id()}", [name: "Unauthorized Update"])
+                HttpRequest.PUT("/${region.id()}", [
+                        name       : "Unauthorized Update",
+                        coordinates: [
+                                [longitude: -105.0, latitude: 39.0],
+                                [longitude: -104.0, latitude: 39.0],
+                                [longitude: -104.0, latitude: 40.0]
+                        ]
+                ])
                         .header("X-Test-User", "volunteer-user")
                         .header("X-Test-Role", "STANDARD_USER")
                         .accept(MediaType.APPLICATION_JSON_TYPE)
@@ -212,20 +240,15 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
     }
 
     def "Security | should allow regional manager with region:manage claim to execute POST /administrative-regions"() {
-        given: "a valid GeoJSON creation payload"
+        given: "a valid creation payload"
         Map payload = [
-                name: "Regional Created Region",
-                geom: [
-                        type: "Polygon",
-                        coordinates: [
-                                [
-                                        [-105.0, 39.0],
-                                        [-104.0, 39.0],
-                                        [-104.0, 40.0],
-                                        [-105.0, 40.0],
-                                        [-105.0, 39.0]
-                                ]
-                        ]
+                name       : "Regional Created Region",
+                coordinates: [
+                        [longitude: -105.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 40.0],
+                        [longitude: -105.0, latitude: 40.0],
+                        [longitude: -105.0, latitude: 39.0]
                 ]
         ]
 
@@ -249,20 +272,15 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
     }
 
     def "Round-trip | should allow authorized POST with full GeoJSON payload, persisting and serializing back"() {
-        given: "a full GeoJSON payload"
+        given: "a creation payload with coordinates"
         Map payload = [
-                name: "Front Range Metro",
-                geom: [
-                        type: "Polygon",
-                        coordinates: [
-                                [
-                                        [-105.5, 39.5],
-                                        [-104.5, 39.5],
-                                        [-104.5, 40.5],
-                                        [-105.5, 40.5],
-                                        [-105.5, 39.5]
-                                ]
-                        ]
+                name       : "Front Range Metro",
+                coordinates: [
+                        [longitude: -105.5, latitude: 39.5],
+                        [longitude: -104.5, latitude: 39.5],
+                        [longitude: -104.5, latitude: 40.5],
+                        [longitude: -105.5, latitude: 40.5],
+                        [longitude: -105.5, latitude: 39.5]
                 ]
         ]
 
@@ -298,18 +316,13 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         and: "an update payload with new name and updated coordinates"
         Map updatePayload = [
-                name: "Updated Front Range",
-                geom: [
-                        type: "Polygon",
-                        coordinates: [
-                                [
-                                        [-106.0, 38.0],
-                                        [-103.0, 38.0],
-                                        [-103.0, 41.0],
-                                        [-106.0, 41.0],
-                                        [-106.0, 38.0]
-                                ]
-                        ]
+                name       : "Updated Front Range",
+                coordinates: [
+                        [longitude: -106.0, latitude: 38.0],
+                        [longitude: -103.0, latitude: 38.0],
+                        [longitude: -103.0, latitude: 41.0],
+                        [longitude: -106.0, latitude: 41.0],
+                        [longitude: -106.0, latitude: 38.0]
                 ]
         ]
 
@@ -398,10 +411,13 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
         given: "a non-existent ID and valid update payload"
         UUID nonExistentId = UUID.randomUUID()
         Map updatePayload = [
-                name: "Ghost Region",
-                geom: [
-                        type: "Point",
-                        coordinates: [-105.0, 39.0]
+                name       : "Ghost Region",
+                coordinates: [
+                        [longitude: -105.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 39.0],
+                        [longitude: -104.0, latitude: 40.0],
+                        [longitude: -105.0, latitude: 40.0],
+                        [longitude: -105.0, latitude: 39.0]
                 ]
         ]
 

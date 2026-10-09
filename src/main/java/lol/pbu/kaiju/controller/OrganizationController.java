@@ -1,11 +1,19 @@
 package lol.pbu.kaiju.controller;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
-import io.micronaut.data.model.Sort;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -14,18 +22,19 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.Organization;
+import lol.pbu.kaiju.dto.CreateOrganizationCommand;
+import lol.pbu.kaiju.dto.UpdateOrganizationCommand;
+import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.ControllerUtils;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
+import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,19 +49,21 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 @Controller("/organizations")
 public class OrganizationController implements ControllerUtils {
 
+    public static final String DEFAULT_SORT_FIELD = "name";
+
     private final OrganizationRepository organizationRepository;
-    private final GeometryFactory geometryFactory;
+    private final SpatialMappingService spatialMappingService;
     private final UserRepository userRepository;
     private final SecurityQueryRepository queryRepository;
 
     public OrganizationController(
             OrganizationRepository organizationRepository,
-            GeometryFactory geometryFactory,
+            SpatialMappingService spatialMappingService,
             UserRepository userRepository,
             SecurityQueryRepository queryRepository
     ) {
         this.organizationRepository = organizationRepository;
-        this.geometryFactory = geometryFactory;
+        this.spatialMappingService = spatialMappingService;
         this.userRepository = userRepository;
         this.queryRepository = queryRepository;
     }
@@ -60,10 +71,7 @@ public class OrganizationController implements ControllerUtils {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<Organization> getOrganizations(@Nullable CursoredPageable pageable) {
-        CursoredPageable effectivePageable = (pageable == null || pageable.isUnpaged())
-                ? CursoredPageable.from(20, Sort.of(Sort.Order.asc("name")))
-                : pageable;
-        return organizationRepository.findAll(effectivePageable);
+        return organizationRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -102,11 +110,10 @@ public class OrganizationController implements ControllerUtils {
             return Page.empty();
         }
 
+        Pageable effectivePageable = normalizePageable(pageable);
         if (exact || isQuoted) {
-            Pageable effectivePageable = normalizePageable(pageable);
             return organizationRepository.searchByNameExact(unquoted, effectivePageable);
         } else {
-            Pageable effectivePageable = normalizePageable(pageable);
             String escapedTerm = escapeSqlLike(unquoted);
             String canonicalTerm = extractCanonicalTerm(unquoted);
             String escapedCanonical = escapeSqlLike(canonicalTerm);
@@ -147,7 +154,7 @@ public class OrganizationController implements ControllerUtils {
             @Valid Pageable pageable
     ) {
         Pageable effectivePageable = normalizePageable(pageable);
-        Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
+        Point point = spatialMappingService.toPoint(longitude, latitude);
         return organizationRepository.searchByLocation(point, radiusMeters, effectivePageable);
     }
 
@@ -170,7 +177,7 @@ public class OrganizationController implements ControllerUtils {
 
     private @NonNull Pageable normalizePageable(@Nullable Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
-            return Pageable.from(0, 20);
+            return Pageable.from(0, DEFAULT_PAGE_SIZE);
         }
         if (!pageable.getSort().getOrderBy().isEmpty()) {
             return Pageable.from(pageable.getNumber(), pageable.getSize());
@@ -194,7 +201,17 @@ public class OrganizationController implements ControllerUtils {
     }
 
     @Post
-    public Organization addOrganization(@Valid @Body Organization organization) {
+    public Organization addOrganization(@Valid @Body CreateOrganizationCommand command) {
+        Organization organization = new Organization(
+                null,
+                command.name(),
+                command.websiteUrl(),
+                command.parentId(),
+                command.isPublic(),
+                VerificationStatus.UNVERIFIED,
+                null,
+                List.of()
+        );
         return organizationRepository.save(organization);
     }
 
@@ -202,53 +219,42 @@ public class OrganizationController implements ControllerUtils {
      * Updates an existing organization by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the organization does not exist.
      *
-     * @param id           the ID of the organization to update
-     * @param organization the updated organization details
+     * @param id        the ID of the organization to update
+     * @param command   the updated organization command
+     * @param principal the authenticated principal
      * @return the updated organization
      */
     @Put("/{id}")
-    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body Organization organization, @Nullable Principal principal) {
-        if (principal != null) {
-            verifyOrgAdminAuthority(principal, id);
-        }
+    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationCommand command, Principal principal) {
+        verifyOrgAdminAuthority(principal, id);
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Organization not found"));
-        
-        Organization secureOrganization = new Organization(
+
+        Organization updatedOrganization = new Organization(
                 id,
-                organization.name(),
-                organization.websiteUrl(),
-                organization.parentId(),
-                organization.isPublic(),
+                command.name(),
+                command.websiteUrl(),
+                command.parentId(),
+                command.isPublic(),
                 existing.verificationStatus(),
                 existing.verificationExpiresAt(),
                 existing.locations()
         );
-        return organizationRepository.update(secureOrganization);
-    }
-
-    public Organization updateOrganization(UUID id, Organization organization) {
-        return updateOrganization(id, organization, null);
+        return organizationRepository.update(updatedOrganization);
     }
 
     /**
      * Deletes an organization by its ID after validating that it exists.
      * Throws 404 NOT_FOUND if the organization does not exist.
      *
-     * @param id the ID of the organization to delete
+     * @param id        the ID of the organization to delete
      * @param principal the authenticated principal
      */
     @Delete("/{id}")
-    public void deleteOrganization(@PathVariable UUID id, @Nullable Principal principal) {
-        if (principal != null) {
-            verifyOrgAdminAuthority(principal, id);
-        }
+    public void deleteOrganization(@PathVariable UUID id, Principal principal) {
+        verifyOrgAdminAuthority(principal, id);
         checkExists(organizationRepository, id);
         organizationRepository.deleteById(id);
-    }
-
-    public void deleteOrganization(UUID id) {
-        deleteOrganization(id, null);
     }
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {

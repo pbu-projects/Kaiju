@@ -4,7 +4,7 @@ plugins {
     id("com.gradleup.shadow") version "9.4.1"
     id("io.micronaut.aot") version "5.0.2"
     id("io.micronaut.test-resources") version "5.0.2"
-    id("org.sonarqube") version "latest.release"
+    id("org.sonarqube") version "7.5.0.8588"
     id("org.asciidoctor.jvm.pdf") version "4.0.2"
     id("jacoco")
 }
@@ -24,7 +24,6 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
-    annotationProcessor("ch.qos.logback:logback-classic")
 
     compileOnly("io.micronaut:micronaut-http-client")
 
@@ -47,7 +46,6 @@ dependencies {
 
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
-    runtimeOnly("org.yaml:snakeyaml")
 
     testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
     testImplementation("org.testcontainers:testcontainers")
@@ -97,8 +95,8 @@ micronaut {
     aot {
         // Please review carefully the optimizations enabled below
         // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
-        optimizeServiceLoading = false
-        convertYamlToJava = false
+        optimizeServiceLoading = true
+        convertYamlToJava = true
         precomputeOperations = true
         cacheEnvironment = true
         optimizeClassLoading = true
@@ -126,6 +124,11 @@ tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
 // https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
 tasks.withType<AbstractTestTask>().configureEach {
     failOnNoDiscoveredTests = false
+}
+
+// Disabled because snakeyaml runtime dependency is removed for AOT convertYamlToJava optimization
+tasks.named("inspectRuntimeClasspath") {
+    enabled = false
 }
 
 tasks.named<Test>("test") {

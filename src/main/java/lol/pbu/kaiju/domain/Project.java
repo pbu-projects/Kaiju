@@ -1,8 +1,13 @@
 package lol.pbu.kaiju.domain;
 
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.data.annotation.*;
+import io.micronaut.data.annotation.GeneratedValue;
+import io.micronaut.data.annotation.Id;
+import io.micronaut.data.annotation.MappedEntity;
+import io.micronaut.data.annotation.MappedProperty;
+import io.micronaut.data.annotation.Relation;
 import io.micronaut.data.annotation.sql.JoinTable;
+import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -16,6 +21,7 @@ import java.util.UUID;
 import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_MANY;
 import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_ONE;
 
+@Serdeable
 @MappedEntity("projects")
 public record Project(
         @Id

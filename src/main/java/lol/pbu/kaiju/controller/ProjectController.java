@@ -1,5 +1,7 @@
 package lol.pbu.kaiju.controller;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
@@ -22,10 +24,16 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
+import lol.pbu.kaiju.domain.Boundary;
+import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.ProjectAuditLog;
 import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.dto.CreateProjectCommand;
+import lol.pbu.kaiju.dto.ProjectBoundaryCommand;
+import lol.pbu.kaiju.dto.ProjectLocationCommand;
+import lol.pbu.kaiju.dto.UpdateProjectCommand;
 import lol.pbu.kaiju.model.AuditAction;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
@@ -35,15 +43,14 @@ import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.ProjectSecurityService;
-import org.jspecify.annotations.NonNull;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
+import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,11 +63,18 @@ import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 import static lol.pbu.kaiju.security.Permission.PROJECT_APPROVE_CLAIM;
 
-
 @ExecuteOn(TaskExecutors.BLOCKING)
+@Secured(IS_AUTHENTICATED)
 @Controller("/projects")
-public class ProjectController {
+public class ProjectController implements ControllerUtils {
+
+    public static final String DEFAULT_SORT_FIELD = "title";
     private static final String PROJECT_NOT_FOUND = "Project not found";
+    private static final String MANAGING_REGION_NOT_EXIST = "Managing region does not exist";
+    private static final String LOCATIONS_NOT_IN_REGION = "Project locations do not fall within the specified managing region";
+    private static final String UNAUTHORIZED_ASSIGN_REGION = "You do not have authority to assign this managing region";
+    private static final String UNAUTHORIZED_UNASSIGN_REGION = "You do not have authority to unassign this managing region";
+    private static final String ORGANIZATION_REQUIRED = "Organization is required";
 
     private final ProjectRepository projectRepository;
     private final ProjectSecurityService securityService;
@@ -68,7 +82,7 @@ public class ProjectController {
     private final UserRepository userRepository;
     private final ProjectAuditLogRepository projectAuditLogRepository;
     private final AdministrativeRegionRepository administrativeRegionRepository;
-    private final GeometryFactory geometryFactory;
+    private final SpatialMappingService spatialMappingService;
 
     public ProjectController(
             ProjectRepository projectRepository,
@@ -77,7 +91,7 @@ public class ProjectController {
             UserRepository userRepository,
             ProjectAuditLogRepository projectAuditLogRepository,
             AdministrativeRegionRepository administrativeRegionRepository,
-            GeometryFactory geometryFactory
+            SpatialMappingService spatialMappingService
     ) {
         this.projectRepository = projectRepository;
         this.securityService = securityService;
@@ -85,12 +99,16 @@ public class ProjectController {
         this.userRepository = userRepository;
         this.projectAuditLogRepository = projectAuditLogRepository;
         this.administrativeRegionRepository = administrativeRegionRepository;
-        this.geometryFactory = geometryFactory;
+        this.spatialMappingService = spatialMappingService;
     }
 
     @Get
-    public CursoredPage<Project> getProjects(String title, @Valid CursoredPageable pageable) {
-        return projectRepository.findByTitle(title, pageable);
+    public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
+        CursoredPageable resolved = resolvePageable(pageable, DEFAULT_SORT_FIELD);
+        if (title == null || title.isBlank()) {
+            return projectRepository.findAll(resolved);
+        }
+        return projectRepository.findByTitle(title, resolved);
     }
 
     @Get("/{id}")
@@ -99,46 +117,66 @@ public class ProjectController {
     }
 
     @Post
-    @Secured(IS_AUTHENTICATED)
-    public Project submitProject(@Valid @Body Project project, Principal principal) {
-        if (project.organization() == null) {
-            throw new HttpStatusException(BAD_REQUEST, "Organization is required");
+    public Project submitProject(@Valid @Body CreateProjectCommand command, Principal principal) {
+        if (command.organizationId() == null) {
+            throw new HttpStatusException(BAD_REQUEST, ORGANIZATION_REQUIRED);
         }
-        
-        UUID submitterId = UUID.fromString(principal.getName());
+        Organization org = organizationRepository.findById(command.organizationId())
+                .orElseThrow(() -> new HttpStatusException(BAD_REQUEST, ORGANIZATION_REQUIRED));
 
-        if (project.managingRegion() != null) {
-            UUID regionId = project.managingRegion().id();
-            if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
-                throw new HttpStatusException(BAD_REQUEST, "Managing region does not exist");
+        UUID submitterId = UUID.fromString(principal.getName());
+        AdministrativeRegion managingRegion = null;
+
+        if (command.managingRegionId() != null) {
+            managingRegion = administrativeRegionRepository.findById(command.managingRegionId())
+                    .orElseThrow(() -> new HttpStatusException(BAD_REQUEST, MANAGING_REGION_NOT_EXIST));
+        }
+
+        List<Location> domainLocations = mapLocations(command.locations());
+        List<Boundary> domainBoundaries = mapBoundaries(command.boundaries());
+
+        Project transientProject = new Project(
+                null,
+                org,
+                managingRegion,
+                command.title(),
+                command.description(),
+                command.projectType(),
+                command.status() != null ? command.status() : ProjectStatus.DRAFT,
+                OffsetDateTime.now(ZoneOffset.UTC),
+                null,
+                null,
+                domainLocations,
+                domainBoundaries
+        );
+
+        if (managingRegion != null) {
+            if (!domainLocations.isEmpty()
+                    && !securityService.areAllLocationsInRegion(transientProject, managingRegion.id())) {
+                throw new HttpStatusException(BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
             }
-            if (project.locations() != null && !project.locations().isEmpty()
-                    && !securityService.areAllLocationsInRegion(project, regionId)) {
-                throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
-            }
-            if (!securityService.canAssignManagingRegion(submitterId, project.organization().id(), regionId)) {
-                throw new HttpStatusException(FORBIDDEN, "You do not have authority to assign this managing region");
+            if (!securityService.canAssignManagingRegion(submitterId, org.id(), managingRegion.id())) {
+                throw new HttpStatusException(FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
             }
         }
-        
-        // Evaluate the entire project's locations securely
-        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreationByUser(submitterId, project);
+
+        ProjectStatus evaluatedStatus = securityService.evaluateProjectCreationByUser(submitterId, transientProject);
 
         Project secureProject = new Project(
-                null, // Force auto-generation
-                project.organization(),
-                project.managingRegion(),
-                project.title(),
-                project.description(),
-                project.projectType(),
+                null,
+                org,
+                managingRegion,
+                command.title(),
+                command.description(),
+                command.projectType(),
                 evaluatedStatus,
-                OffsetDateTime.now(ZoneId.systemDefault()),
+                OffsetDateTime.now(ZoneOffset.UTC),
                 null,
                 null,
-                project.locations(),
-                project.boundaries()
+                domainLocations,
+                domainBoundaries
         );
-        
+
         return projectRepository.save(secureProject);
     }
 
@@ -146,10 +184,10 @@ public class ProjectController {
      * Updates an existing project by its ID after validating that it exists.
      */
     @Put("/{id}")
-    @Secured(IS_AUTHENTICATED)
-    public Project updateProject(@PathVariable UUID id, @Valid @Body Project project, Principal principal) {
-        Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
-        
+    public Project updateProject(@PathVariable UUID id, @Valid @Body UpdateProjectCommand command, Principal principal) {
+        Project existing = projectRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
+
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to modify this project");
@@ -158,95 +196,101 @@ public class ProjectController {
         Organization targetOrg = existing.organization();
         UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
 
-        if (project.organization() != null) {
-            UUID requestedOrgId = project.organization().id();
+        if (command.organizationId() != null) {
+            UUID requestedOrgId = command.organizationId();
             if (!Objects.equals(requestedOrgId, existingOrgId)) {
                 if (!securityService.canReassignProject(userId, existing)) {
                     throw new HttpStatusException(FORBIDDEN, "You do not have permission to reassign this project to another organization");
-                }
-                if (requestedOrgId == null) {
-                    throw new HttpStatusException(NOT_FOUND, "Target organization not found");
                 }
                 targetOrg = organizationRepository.findById(requestedOrgId)
                         .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Target organization not found"));
             }
         }
 
-        AdministrativeRegion effectiveRegion = project.managingRegion() != null ? project.managingRegion() : existing.managingRegion();
-        UUID effectiveOrgId;
-        if (targetOrg != null) {
-            effectiveOrgId = targetOrg.id();
-        } else if (existing.organization() != null) {
-            effectiveOrgId = existing.organization().id();
-        } else {
-            effectiveOrgId = null;
-        }
+        UUID existingRegionId = existing.managingRegion() != null ? existing.managingRegion().id() : null;
+        UUID effectiveOrgId = targetOrg != null ? targetOrg.id() : existingOrgId;
+        AdministrativeRegion targetRegion = existing.managingRegion();
 
-        if (!Objects.equals(project.managingRegion(), existing.managingRegion())) {
-            if (project.managingRegion() != null) {
-                UUID regionId = project.managingRegion().id();
-                if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
-                    throw new HttpStatusException(BAD_REQUEST, "Managing region does not exist");
+        if (!Objects.equals(command.managingRegionId(), existingRegionId)) {
+            if (command.managingRegionId() != null) {
+                targetRegion = administrativeRegionRepository.findById(command.managingRegionId())
+                        .orElseThrow(() -> new HttpStatusException(BAD_REQUEST, MANAGING_REGION_NOT_EXIST));
+                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, command.managingRegionId())) {
+                    throw new HttpStatusException(FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
                 }
-                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, regionId)) {
-                    throw new HttpStatusException(FORBIDDEN, "You do not have authority to assign this managing region");
+            } else {
+                targetRegion = null;
+                if (existingRegionId != null && (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existingRegionId))) {
+                    throw new HttpStatusException(FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
                 }
-            } else if (existing.managingRegion() != null
-                    && (effectiveOrgId == null || !securityService.canAssignManagingRegion(userId, effectiveOrgId, existing.managingRegion().id()))) {
-                throw new HttpStatusException(FORBIDDEN, "You do not have authority to unassign this managing region");
             }
         }
 
-        if (effectiveRegion != null && effectiveRegion.id() != null && project.locations() != null && !project.locations().isEmpty()
-                && !securityService.areAllLocationsInRegion(project, effectiveRegion.id())) {
-            throw new HttpStatusException(BAD_REQUEST, "Project locations do not fall within the specified managing region");
-        }
+        List<Location> domainLocations = mapLocations(command.locations());
+        List<Boundary> domainBoundaries = mapBoundaries(command.boundaries());
 
-        ProjectStatus newStatus = existing.status();
-        boolean locationsModified = !Objects.equals(project.locations(), existing.locations());
-        boolean reassigned = !Objects.equals(targetOrg != null ? targetOrg.id() : null, existingOrgId);
-
-        if (locationsModified || reassigned) {
-            if (existing.status() == ACTIVE && (targetOrg == null || !securityService.areAllLocationsInOrgRegion(project, targetOrg.id()))) {
-                newStatus = PENDING;
-            }
-        }
-        
-        // Prevent users from unilaterally modifying the status during an update and fix mass assignment
-        Project secureProject = new Project(
+        Project transientProject = new Project(
                 id,
                 targetOrg,
-                project.managingRegion(),
-                project.title(),
-                project.description(),
-                project.projectType(),
-                newStatus, 
+                targetRegion,
+                command.title(),
+                command.description(),
+                command.projectType(),
+                existing.status(),
                 existing.createdAt(),
                 existing.deletedAt(),
                 existing.deletedBy(),
-                project.locations(),
-                project.boundaries()
+                domainLocations,
+                domainBoundaries
         );
+
+        if (targetRegion != null && !domainLocations.isEmpty()
+                && !securityService.areAllLocationsInRegion(transientProject, targetRegion.id())) {
+            throw new HttpStatusException(BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
+        }
+
+        ProjectStatus newStatus = existing.status();
+        boolean locationsModified = !Objects.equals(domainLocations, existing.locations());
+        boolean reassigned = !Objects.equals(targetOrg != null ? targetOrg.id() : null, existingOrgId);
+
+        if (locationsModified || reassigned) {
+            if (existing.status() == ACTIVE && (targetOrg == null || !securityService.areAllLocationsInOrgRegion(transientProject, targetOrg.id()))) {
+                newStatus = PENDING;
+            }
+        }
+
+        Project secureProject = new Project(
+                id,
+                targetOrg,
+                targetRegion,
+                command.title(),
+                command.description(),
+                command.projectType(),
+                newStatus,
+                existing.createdAt(),
+                existing.deletedAt(),
+                existing.deletedBy(),
+                domainLocations,
+                domainBoundaries
+        );
+
         return projectRepository.update(secureProject);
     }
-
 
     /**
      * Deletes a project by its ID after validating that it exists.
      */
     @Delete("/{id}")
-    @Secured(IS_AUTHENTICATED)
     public void deleteProject(@PathVariable UUID id, Principal principal) {
         Project existing = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
-        
+
         UUID userId = UUID.fromString(principal.getName());
         if (!securityService.canModifyProject(userId, existing)) {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to delete this project");
         }
-        
+
         projectRepository.deleteById(id);
     }
-
 
     /**
      * Searches active projects by their closest location coordinates within a given radius.
@@ -265,7 +309,7 @@ public class ProjectController {
             @QueryValue @Positive @Max(500000) double radiusMeters,
             @Valid Pageable pageable
     ) {
-        Point point = geometryFactory.createPoint(new Coordinate(longitude, latitude));
+        Point point = spatialMappingService.toPoint(longitude, latitude);
         return projectRepository.searchByLocation(point, radiusMeters, pageable);
     }
 
@@ -280,7 +324,6 @@ public class ProjectController {
     public Project approveProject(@PathVariable @NonNull UUID id, @NonNull Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
 
-        // Fetch the project and validate its current state first
         Project project = projectRepository.findById(id).orElseThrow(() -> new HttpStatusException(NOT_FOUND, PROJECT_NOT_FOUND));
 
         if (project.deletedAt() != null) {
@@ -291,7 +334,6 @@ public class ProjectController {
             throw new HttpStatusException(BAD_REQUEST, "Only PENDING or PENDING_UPDATE projects can be approved");
         }
 
-        // Ensure they have geographic jurisdiction to approve it
         securityService.authorizeRegionalAdminApproval(regionalAdminId, id);
 
         Project approvedProject = projectRepository.update(new Project(
@@ -320,5 +362,36 @@ public class ProjectController {
         ));
 
         return approvedProject;
+    }
+
+    private List<Location> mapLocations(List<ProjectLocationCommand> locations) {
+        if (locations == null) {
+            return List.of();
+        }
+        return locations.stream()
+                .map(loc -> new Location(
+                        null,
+                        loc.name(),
+                        loc.addressLine(),
+                        loc.city(),
+                        loc.stateProvince(),
+                        loc.postalCode(),
+                        loc.countryCode(),
+                        spatialMappingService.toPoint(loc.longitude(), loc.latitude())
+                ))
+                .toList();
+    }
+
+    private List<Boundary> mapBoundaries(List<ProjectBoundaryCommand> boundaries) {
+        if (boundaries == null) {
+            return List.of();
+        }
+        return boundaries.stream()
+                .map(bnd -> new Boundary(
+                        null,
+                        bnd.name(),
+                        spatialMappingService.toPolygon(bnd.coordinates())
+                ))
+                .toList();
     }
 }

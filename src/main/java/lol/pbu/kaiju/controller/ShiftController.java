@@ -1,23 +1,37 @@
 package lol.pbu.kaiju.controller;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.Post;
+import io.micronaut.http.annotation.Put;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
+import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
+import lol.pbu.kaiju.domain.Tag;
+import lol.pbu.kaiju.dto.CreateShiftCommand;
+import lol.pbu.kaiju.dto.UpdateShiftCommand;
+import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.ShiftRepository;
+import lol.pbu.kaiju.repository.TagRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.ControllerUtils;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -31,26 +45,34 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @Controller("/shifts")
 public class ShiftController implements ControllerUtils {
 
+    public static final String DEFAULT_SORT_FIELD = "id";
+
     private final ShiftRepository shiftRepository;
     private final ProjectRepository projectRepository;
+    private final LocationRepository locationRepository;
+    private final TagRepository tagRepository;
     private final SecurityQueryRepository queryRepository;
     private final UserRepository userRepository;
 
     public ShiftController(
             ShiftRepository shiftRepository,
             ProjectRepository projectRepository,
+            LocationRepository locationRepository,
+            TagRepository tagRepository,
             SecurityQueryRepository queryRepository,
             UserRepository userRepository
     ) {
         this.shiftRepository = shiftRepository;
         this.projectRepository = projectRepository;
+        this.locationRepository = locationRepository;
+        this.tagRepository = tagRepository;
         this.queryRepository = queryRepository;
         this.userRepository = userRepository;
     }
 
     @Get
-    public CursoredPage<Shift> getShifts(@Valid CursoredPageable pageable) {
-        return shiftRepository.findAll(pageable);
+    public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable) {
+        return shiftRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -59,13 +81,24 @@ public class ShiftController implements ControllerUtils {
     }
 
     @Post
-    public Shift addShift(@Valid @Body Shift shift, Principal principal) {
-        if (shift.project() == null || shift.project().id() == null) {
-            throw new HttpStatusException(BAD_REQUEST, "Shift project is required");
+    public Shift addShift(@Valid @Body CreateShiftCommand command, Principal principal) {
+        if (!command.isValidLocationLogic()) {
+            throw new HttpStatusException(BAD_REQUEST, "A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
         }
-        Project project = projectRepository.findById(shift.project().id())
+        Project project = projectRepository.findById(command.projectId())
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Project not found"));
         verifyShiftAuthority(principal, project);
+        Location location = resolveLocation(command.locationId());
+        List<Tag> tags = resolveTags(command.tagIds());
+        Shift shift = new Shift(
+                null,
+                project,
+                command.isVirtual(),
+                location,
+                command.startTime(),
+                command.endTime(),
+                tags
+        );
         return shiftRepository.save(shift);
     }
 
@@ -76,23 +109,28 @@ public class ShiftController implements ControllerUtils {
      * Throws 404 NOT_FOUND if the shift does not exist.
      *
      * @param id        the ID of the shift to update
-     * @param shift     the updated shift details
+     * @param command   the updated shift details
      * @param principal the authenticated principal
      * @return the updated shift
      */
     @Put("/{id}")
-    public Shift updateShift(@PathVariable UUID id, @Valid @Body Shift shift, Principal principal) {
+    public Shift updateShift(@PathVariable UUID id, @Valid @Body UpdateShiftCommand command, Principal principal) {
+        if (!command.isValidLocationLogic()) {
+            throw new HttpStatusException(BAD_REQUEST, "A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
+        }
         Shift existing = shiftRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
         verifyShiftAuthority(principal, existing.project());
+        Location location = resolveLocation(command.locationId());
+        List<Tag> tags = resolveTags(command.tagIds());
         Shift safeUpdate = new Shift(
                 id,
                 existing.project(),
-                shift.isVirtual(),
-                shift.location(),
-                shift.startTime(),
-                shift.endTime(),
-                shift.tags()
+                command.isVirtual(),
+                location,
+                command.startTime(),
+                command.endTime(),
+                tags
         );
         return shiftRepository.update(safeUpdate);
     }
@@ -112,6 +150,24 @@ public class ShiftController implements ControllerUtils {
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
         verifyShiftAuthority(principal, existing.project());
         shiftRepository.deleteById(id);
+    }
+
+    private Location resolveLocation(UUID locationId) {
+        if (locationId == null) {
+            return null;
+        }
+        return locationRepository.findById(locationId)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Location not found"));
+    }
+
+    private List<Tag> resolveTags(List<UUID> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return null;
+        }
+        return tagIds.stream()
+                .map(tagRepository::findById)
+                .flatMap(Optional::stream)
+                .toList();
     }
 
     private void verifyShiftAuthority(Principal principal, Project project) {

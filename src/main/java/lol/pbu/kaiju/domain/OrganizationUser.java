@@ -1,10 +1,12 @@
 package lol.pbu.kaiju.domain;
 
 import io.micronaut.data.annotation.EmbeddedId;
-import lol.pbu.kaiju.model.OrganizationUserRole;
 import io.micronaut.data.annotation.MappedEntity;
+import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotNull;
+import lol.pbu.kaiju.model.OrganizationUserRole;
 
+@Serdeable
 @MappedEntity("organization_users")
 public record OrganizationUser(
         @EmbeddedId
