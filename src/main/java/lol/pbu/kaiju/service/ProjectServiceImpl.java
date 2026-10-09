@@ -232,27 +232,34 @@ public class ProjectServiceImpl implements ProjectService {
 
     private AdministrativeRegion resolveTargetRegion(
             UUID actorUserId, Project existing, UUID effectiveOrgId, Project project) {
-        AdministrativeRegion targetRegion = existing.managingRegion();
         UUID existingRegionId = existing.managingRegion() != null ? existing.managingRegion().id() : null;
         UUID requestedRegionId = project.managingRegion() != null ? project.managingRegion().id() : null;
 
-        if (!Objects.equals(requestedRegionId, existingRegionId)) {
-            if (requestedRegionId != null) {
-                if (!administrativeRegionRepository.existsById(requestedRegionId)) {
-                    throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
-                }
-                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId)) {
-                    throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
-                }
-                targetRegion = administrativeRegionRepository.findById(requestedRegionId).orElse(project.managingRegion());
-            } else {
-                if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId)) {
-                    throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
-                }
-                targetRegion = null;
-            }
+        if (Objects.equals(requestedRegionId, existingRegionId)) {
+            return existing.managingRegion();
         }
-        return targetRegion;
+        if (requestedRegionId != null) {
+            return assignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId, project.managingRegion());
+        }
+        unassignManagingRegion(actorUserId, effectiveOrgId, existingRegionId);
+        return null;
+    }
+
+    private AdministrativeRegion assignManagingRegion(
+            UUID actorUserId, UUID effectiveOrgId, UUID requestedRegionId, AdministrativeRegion fallbackRegion) {
+        if (!administrativeRegionRepository.existsById(requestedRegionId)) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
+        }
+        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
+        }
+        return administrativeRegionRepository.findById(requestedRegionId).orElse(fallbackRegion);
+    }
+
+    private void unassignManagingRegion(UUID actorUserId, UUID effectiveOrgId, UUID existingRegionId) {
+        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
+        }
     }
 
     private ProjectStatus determineUpdatedStatus(
