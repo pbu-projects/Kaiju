@@ -1,24 +1,35 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
-import io.micronaut.data.model.Page
 import io.micronaut.data.model.Pageable
 import io.micronaut.data.model.Sort
-import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.uri.UriBuilder
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.validation.ValidationException
 import lol.pbu.kaiju.domain.Organization
+import lol.pbu.kaiju.dto.CreateOrganizationCommand
+import lol.pbu.kaiju.dto.UpdateOrganizationCommand
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
 
-import static lol.pbu.kaiju.model.VerificationStatus.*
+import java.util.UUID
 
-import java.security.Principal
+import static lol.pbu.kaiju.model.VerificationStatus.REVOKED
+import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
+import static lol.pbu.kaiju.model.VerificationStatus.VERIFIED
 
+@Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@MicronautTest(transactional = false)
 class OrganizationControllerSpec extends BaseControllerSpec {
 
     @Inject
@@ -30,29 +41,174 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     @Shared
     Faker faker = new Faker()
 
+    @Shared
+    UUID adminId = UUID.randomUUID()
+
+    @Shared
+    List<UUID> createdUserIds = []
+
+    def setupSpec() {
+        executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'global-admin@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'org-admin-test@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
+    }
+
+    def cleanupSpec() {
+        executeUpdate("DELETE FROM users WHERE id = ?", adminId)
+    }
+
+    def cleanup() {
+        executeUpdate("DELETE FROM organization_locations")
+        executeUpdate("DELETE FROM organization_regions")
+        createdUserIds.each { id ->
+            try {
+                executeUpdate("DELETE FROM organization_users WHERE user_id = ?", id)
+                executeUpdate("DELETE FROM users WHERE id = ?", id)
+            } catch (Exception ignored) {
+            }
+        }
+        createdUserIds.clear()
+        sql.execute("""
+            DELETE FROM organizations 
+            WHERE name LIKE '%Salvation Army%' 
+               OR name LIKE '%Shelter%' 
+               OR name LIKE '%Charity Org%' 
+               OR name LIKE '%Wildcard%' 
+               OR name LIKE '%Volunteer Initiative%' 
+               OR name LIKE 'Special%' 
+               OR name LIKE 'Org Near%' 
+               OR name LIKE 'Org Mid%' 
+               OR name LIKE 'Org Far%' 
+               OR name LIKE '%Food Bank%' 
+               OR name LIKE 'Paging Test Org%' 
+               OR name LIKE '%Organization Example%' 
+               OR name LIKE '%Better Tomorrow%' 
+               OR name LIKE 'Test Org%' 
+               OR name LIKE 'Original%' 
+               OR name LIKE 'Updated%' 
+               OR name LIKE 'Temporary%' 
+               OR name LIKE 'Auth Org%' 
+               OR name LIKE 'Delete Auth Org%' 
+               OR name LIKE 'Allowed Org%' 
+               OR name LIKE 'Std Org%' 
+               OR name LIKE 'Std Del Org%' 
+               OR name LIKE 'Hacked%' 
+               OR name LIKE 'Valid Org%' 
+               OR name LIKE 'Valid Name%' 
+               OR name LIKE 'Red Cross%'
+        """ as String)
+        sql.execute("DELETE FROM locations WHERE name IN ('Loc Near', 'Loc Mid', 'Loc Far', 'Loc Pub', 'Loc Priv', 'Paging Test Loc')" as String)
+        sql.execute("DELETE FROM administrative_regions WHERE name IN ('Colorado Region', 'Utah Region', 'Test Region Private', 'Paging Region')" as String)
+    }
+
+    def setup() {
+        cleanup()
+    }
+
+    static class PageResponse<T> {
+        List<T> content = []
+        int totalSize
+
+        boolean isEmpty() {
+            content == null || content.isEmpty()
+        }
+    }
+
+    private PageResponse<Organization> toPage(Map body) {
+        if (!body) {
+            return new PageResponse<Organization>(content: [], totalSize: 0)
+        }
+        List items = (body.content as List) ?: []
+        List<Organization> orgs = items.collect { Map item ->
+            new Organization(
+                    item.id ? UUID.fromString(item.id as String) : null,
+                    item.name as String,
+                    item.websiteUrl as String,
+                    item.parentId ? UUID.fromString(item.parentId as String) : null,
+                    item.isPublic != null ? (item.isPublic as Boolean) : true,
+                    item.verificationStatus ? VerificationStatus.valueOf(item.verificationStatus as String) : null,
+                    null,
+                    []
+            )
+        }
+        int total = body.totalSize != null ? (body.totalSize as int) : orgs.size()
+        new PageResponse<Organization>(content: orgs, totalSize: total)
+    }
+
+    private PageResponse<Organization> searchByName(String name, boolean exact = false, Pageable pageable = null) {
+        def builder = UriBuilder.of("/organizations/search-by-name")
+                .queryParam("name", name)
+                .queryParam("exact", exact)
+        if (pageable != null && !pageable.isUnpaged()) {
+            builder.queryParam("page", pageable.number)
+            builder.queryParam("size", pageable.size)
+            if (pageable.sort != null && !pageable.sort.orderBy.isEmpty()) {
+                pageable.sort.orderBy.each { order ->
+                    builder.queryParam("sort", "${order.property},${order.direction.name().toLowerCase()}")
+                }
+            }
+        }
+        def uri = builder.build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri), adminId.toString()), Map)
+        toPage(response.body())
+    }
+
+    private PageResponse<Organization> searchByLocation(double longitude, double latitude, double radiusMeters, Pageable pageable = null) {
+        def builder = UriBuilder.of("/organizations/search-by-location")
+                .queryParam("longitude", longitude)
+                .queryParam("latitude", latitude)
+                .queryParam("radiusMeters", radiusMeters)
+        if (pageable != null && !pageable.isUnpaged()) {
+            builder.queryParam("page", pageable.number)
+            builder.queryParam("size", pageable.size)
+            if (pageable.sort != null && !pageable.sort.orderBy.isEmpty()) {
+                pageable.sort.orderBy.each { order ->
+                    builder.queryParam("sort", "${order.property},${order.direction.name().toLowerCase()}")
+                }
+            }
+        }
+        def uri = builder.build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri), adminId.toString()), Map)
+        toPage(response.body())
+    }
+
+    private PageResponse<Organization> searchByRegion(UUID regionId, Pageable pageable = null) {
+        def builder = UriBuilder.of("/organizations/search-by-region")
+                .queryParam("regionId", regionId)
+        if (pageable != null && !pageable.isUnpaged()) {
+            builder.queryParam("page", pageable.number)
+            builder.queryParam("size", pageable.size)
+            if (pageable.sort != null && !pageable.sort.orderBy.isEmpty()) {
+                pageable.sort.orderBy.each { order ->
+                    builder.queryParam("sort", "${order.property},${order.direction.name().toLowerCase()}")
+                }
+            }
+        }
+        def uri = builder.build().toString()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri), adminId.toString()), Map)
+        toPage(response.body())
+    }
+
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid organization"() {
-        given: "a new valid organization"
-        def newOrg = new Organization(
-                null,
+        given: "a new valid organization command"
+        def command = new CreateOrganizationCommand(
                 "Test Org ${faker.company().name()}",
                 "https://${faker.internet().domainName()}",
                 null,
-                true,
-                UNVERIFIED,
-                null,
-                []
+                true
         )
 
-        when: "the organization is added"
-        Organization saved = organizationController.addOrganization(newOrg)
+        when: "the organization is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command), adminId.toString()), Organization)
+        Organization saved = response.body()
 
         then: "the organization is persisted with a generated ID"
+        response.status == HttpStatus.OK
         verifyAll {
             saved.id() != null
-            saved.name() == newOrg.name()
-            saved.websiteUrl() == newOrg.websiteUrl()
+            saved.name() == command.name()
+            saved.websiteUrl() == command.websiteUrl()
         }
 
         and: "it can be retrieved from the database"
@@ -65,44 +221,21 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "CREATE | should fail to save organization with invalid data: #testCase"(String testCase, Organization organization) {
-        when: "an attempt is made to add an organization with invalid data"
-        organizationController.addOrganization(organization)
+    def "CREATE | should fail to save organization with invalid data: #testCase"(String testCase, Map payload) {
+        when: "an attempt is made to add an organization with invalid data via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", payload), adminId.toString()), Organization)
 
-        then: "an exception is thrown"
-        thrown(ValidationException)
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
         where:
-        [testCase, organization] << {
-            def validData = [
-                    name      : "Valid Name",
-                    websiteUrl: "https://example.com"
-            ]
-
-            def invalidCases = [
-                    [field: 'name', value: null, caseName: "Null Name"],
-                    [field: 'name', value: ' ', caseName: "Blank Name"],
-                    [field: 'name', value: 'A' * 256, caseName: "Name Too Long"],
-                    [field: 'websiteUrl', value: '', caseName: "Blank Website URL"],
-                    [field: 'websiteUrl', value: 'A' * 256, caseName: "Website URL Too Long"]
-            ]
-
-            return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def org = new Organization(
-                        null,
-                        props.name as String,
-                        props.websiteUrl as String,
-                        null,
-                        true,
-                        UNVERIFIED,
-                        null,
-                        []
-                )
-                [invalidCase.caseName, org]
-            }
-        }()
+        testCase               | payload
+        "Null Name"            | [name: null, websiteUrl: "https://example.com", isPublic: true]
+        "Blank Name"           | [name: "   ", websiteUrl: "https://example.com", isPublic: true]
+        "Name Too Long"        | [name: "A" * 256, websiteUrl: "https://example.com", isPublic: true]
+        "Website URL Too Long" | [name: "Valid Name", websiteUrl: "A" * 256, isPublic: true]
+        "Null isPublic"        | [name: "Valid Name", websiteUrl: "https://example.com", isPublic: null]
     }
 
     /********** READ Tests **********/
@@ -112,23 +245,24 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def org = organizationRepository.save(new Organization(null, "Test Organization Read", "https://example.com", null, true, UNVERIFIED, null, []))
         UUID id = org.id()
 
-        when: "the organization is requested by its ID"
-        def result = organizationController.getOrganization(id)
+        when: "the organization is requested by its ID via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${id}"), adminId.toString()), Organization)
 
         then: "the correct organization is returned"
+        response.status == HttpStatus.OK
         verifyAll {
-            result.isPresent()
-            result.get().id() == id
-            result.get().name() == "Test Organization Read"
+            response.body().id() == id
+            response.body().name() == "Test Organization Read"
         }
     }
 
-    def "READ | should return empty for a non-existent organization ID"() {
-        when: "a non-existent organization is requested"
-        def result = organizationController.getOrganization(UUID.randomUUID())
+    def "READ | should return 404 for a non-existent organization ID"() {
+        when: "a non-existent organization is requested via HTTP GET"
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${UUID.randomUUID()}"), adminId.toString()), Organization)
 
-        then: "the result is empty"
-        !result.isPresent()
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     /********** UPDATE Tests **********/
@@ -139,12 +273,14 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         UUID id = org.id()
         def newName = "Updated ${faker.company().name()}"
         def newUrl = "https://${faker.internet().domainName()}"
-        def updateRequest = new Organization(null, newName, newUrl, null, true, UNVERIFIED, null, [])
+        def updateCommand = new UpdateOrganizationCommand(newName, newUrl, null, true)
 
-        when: "the organization is updated"
-        Organization updated = organizationController.updateOrganization(id, updateRequest)
+        when: "the organization is updated via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateCommand), adminId.toString()), Organization)
+        Organization updated = response.body()
 
         then: "the returned organization contains the updated data"
+        response.status == HttpStatus.OK
         verifyAll {
             updated.id() == id
             updated.name() == newName
@@ -160,65 +296,81 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent organization"() {
-        given: "a random non-existent ID and an update request"
+        given: "a random non-existent ID and an update command"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Organization(null, "Test Org", "https://example.com", null, true, UNVERIFIED, null, [])
+        def updateCommand = new UpdateOrganizationCommand("Test Org", "https://example.com", null, true)
 
-        when: "an update is attempted"
-        organizationController.updateOrganization(nonExistentId, updateRequest)
+        when: "an update is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateCommand), adminId.toString()), Organization)
 
         then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
+    @Unroll
+    def "UPDATE | should fail to update organization with invalid data: #testCase"(String testCase, Map payload) {
+        given: "an existing organization"
+        def org = organizationRepository.save(new Organization(null, "Valid Org For Update", "https://example.com", null, true, UNVERIFIED, null, []))
 
+        when: "an update with invalid data is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${org.id()}", payload), adminId.toString()), Organization)
+
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+
+        where:
+        testCase               | payload
+        "Blank Name"           | [name: "   ", websiteUrl: "https://example.com", isPublic: true]
+        "Name Too Long"        | [name: "A" * 256, websiteUrl: "https://example.com", isPublic: true]
+        "Website URL Too Long" | [name: "Valid Name", websiteUrl: "A" * 256, isPublic: true]
+        "Null isPublic"        | [name: "Valid Name", websiteUrl: "https://example.com", isPublic: null]
+    }
 
     @Unroll
-    def "UPDATE | should prevent mass assignment vulnerabilities: #testCase"(String testCase, Organization updatePayload, boolean shouldNameChange, VerificationStatus expectedStatus) {
+    def "UPDATE | should prevent mass assignment vulnerabilities: #testCase"(String testCase, Map payload, boolean shouldNameChange, VerificationStatus expectedStatus) {
         given: "an existing organization"
         def org = organizationRepository.save(new Organization(null, "Original Name", "https://example.com", null, true, UNVERIFIED, null, []))
         UUID id = org.id()
 
-        when: "an update is submitted"
-        Organization updated = organizationController.updateOrganization(id, updatePayload)
+        when: "an update is submitted via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", payload), adminId.toString()), Organization)
+        Organization updated = response.body()
 
         then: "the safe fields are updated correctly"
-        updated.name() == (shouldNameChange ? updatePayload.name() : "Original Name")
+        updated.name() == (shouldNameChange ? payload.name : "Original Name")
 
         and: "the sensitive fields are NOT updated"
         updated.verificationStatus() == expectedStatus
 
         where:
-        testCase                           | updatePayload                                                                                                           || shouldNameChange | expectedStatus
-        "Change safe field only"           | new Organization(null, "New Name", "https://example.com", null, true, UNVERIFIED, null, [])                             || true             | UNVERIFIED
-        "Attempt to escalate verification" | new Organization(null, "Original Name", "https://example.com", null, true, VERIFIED, null, [])                          || false            | UNVERIFIED
-        "Change safe and attempt escalate" | new Organization(null, "Hacked Name", "https://example.com", null, true, VERIFIED, null, [])                            || true             | UNVERIFIED
-        "Attempt to set REVOKED"          | new Organization(null, "Original Name", "https://example.com", null, true, REVOKED, null, [])                          || false            | UNVERIFIED
+        testCase                           | payload                                                                                                   || shouldNameChange | expectedStatus
+        "Change safe field only"           | [name: "New Name", websiteUrl: "https://example.com", isPublic: true]                                     || true             | UNVERIFIED
+        "Attempt to escalate verification" | [name: "Original Name", websiteUrl: "https://example.com", isPublic: true, verificationStatus: "VERIFIED"] || false            | UNVERIFIED
+        "Change safe and attempt escalate" | [name: "Hacked Name", websiteUrl: "https://example.com", isPublic: true, verificationStatus: "VERIFIED"]   || true             | UNVERIFIED
+        "Attempt to set REVOKED"           | [name: "Original Name", websiteUrl: "https://example.com", isPublic: true, verificationStatus: "REVOKED"]  || false            | UNVERIFIED
     }
 
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing organization"() {
         given: "a new organization to be deleted"
-        def tempOrg = new Organization(
-                null,
+        def command = new CreateOrganizationCommand(
                 "Temporary Org to Delete",
                 "https://example.org",
                 null,
-                true,
-                UNVERIFIED,
-                null,
-                []
+                true
         )
-        def saved = organizationController.addOrganization(tempOrg)
-        UUID id = saved.id()
+        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command), adminId.toString()), Organization)
+        UUID id = createResponse.body().id()
         assert organizationRepository.existsById(id)
 
-        when: "the organization is deleted"
-        organizationController.deleteOrganization(id)
+        when: "the organization is deleted via HTTP DELETE"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${id}"), adminId.toString()))
 
         then: "the organization no longer exists in the repository or database"
+        response.status == HttpStatus.OK
         verifyAll {
             !organizationRepository.findById(id).isPresent()
             sql.firstRow("SELECT count(*) as count FROM organizations WHERE id = ?", [id]).count == 0
@@ -229,12 +381,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
-        when: "a delete is attempted"
-        organizationController.deleteOrganization(nonExistentId)
+        when: "a delete is attempted via HTTP DELETE"
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${nonExistentId}"), adminId.toString()))
 
         then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     /********** LIST Tests **********/
@@ -260,6 +412,28 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
     }
 
+    def "LIST | should retrieve organizations with pagination via HTTP GET"() {
+        when: "requesting organizations via HTTP GET as global admin"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5"), adminId.toString()), Map)
+
+        then: "the response is 200 OK with content list"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+        body.content.size() >= 2
+    }
+
+    def "LIST | should retrieve organizations with pagination and sorting via HTTP GET"() {
+        when: "requesting organizations via HTTP GET as global admin with sort"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5&sort=name,asc"), adminId.toString()), Map)
+
+        then: "the response is 200 OK with content list"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+        body.content.size() >= 2
+    }
+
     /********** SEARCH Tests **********/
 
     def "SEARCH BY NAME | exact search with double quotes should return strictly the exact organization"() {
@@ -279,7 +453,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "searching with double quotes for exact parent name"
-        Page<Organization> results = organizationController.searchByName('"The Salvation Army"', false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName('"The Salvation Army"', false, Pageable.from(0, 10))
 
         then: "only the exact match is returned"
         results.content.size() == 1
@@ -298,7 +472,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "searching with single quotes for exact name"
-        Page<Organization> results = organizationController.searchByName("'The Salvation Army'", false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName("'The Salvation Army'", false, Pageable.from(0, 10))
 
         then: "only the exact match is returned"
         results.content.size() == 1
@@ -317,7 +491,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "searching with exact=true flag"
-        Page<Organization> results = organizationController.searchByName("The Salvation Army", true, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName("The Salvation Army", true, Pageable.from(0, 10))
 
         then: "only the exact match is returned"
         results.content.size() == 1
@@ -330,7 +504,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
 
         when: "searching with lowercase quoted string"
-        Page<Organization> results = organizationController.searchByName('"the salvation army"', false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName('"the salvation army"', false, Pageable.from(0, 10))
 
         then: "it matches the organization case-insensitively"
         results.content.size() == 1
@@ -354,7 +528,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "performing a non-exact ranked search"
-        Page<Organization> results = organizationController.searchByName("Salvation Army", false, Pageable.from(0, 20))
+        PageResponse<Organization> results = searchByName("Salvation Army", false, Pageable.from(0, 20))
 
         then: "all 7 Salvation Army organizations are returned, excluding the unrelated one"
         results.content.size() == 7
@@ -378,7 +552,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "searching for branch prefix"
-        Page<Organization> results = organizationController.searchByName("The Salvation Army -", false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName("The Salvation Army -", false, Pageable.from(0, 10))
 
         then: "only the two Corps branches are returned"
         results.content.size() == 2
@@ -390,7 +564,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | blank or empty search query should return empty page"() {
         when: "searching with blank string"
-        Page<Organization> results = organizationController.searchByName("   ", false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName("   ", false, Pageable.from(0, 10))
 
         then: "an empty page is returned"
         results.content.isEmpty()
@@ -398,7 +572,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | non-matching query should return empty page"() {
         when: "searching for non-existent name"
-        Page<Organization> results = organizationController.searchByName("NonExistentOrgXYZ999", false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName("NonExistentOrgXYZ999", false, Pageable.from(0, 10))
 
         then: "an empty page is returned"
         results.content.isEmpty()
@@ -425,7 +599,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", orgFarId, locFarId)
 
         when: "searching within 15 km of Denver center"
-        Page<Organization> results = organizationController.searchByLocation(-104.9903, 39.7392, 15000, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByLocation(-104.9903, 39.7392, 15000, Pageable.from(0, 10))
 
         then: "Near and Mid orgs are returned, Far is excluded, ordered by distance"
         results.content.size() == 2
@@ -442,7 +616,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Red Cross Society', true, 'VERIFIED')", UUID.randomUUID())
 
         when: "searching with a typo: 'Slavation Army'"
-        Page<Organization> results = organizationController.searchByName("Slavation Army", false, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByName("Slavation Army", false, Pageable.from(0, 10))
 
         then: "The Salvation Army is matched via trigram similarity and ranked first"
         !results.content.isEmpty()
@@ -468,7 +642,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org2Id, region2Id)
 
         when: "searching for organizations in Region 1"
-        Page<Organization> results = organizationController.searchByRegion(region1Id, Pageable.from(0, 10))
+        PageResponse<Organization> results = searchByRegion(region1Id, Pageable.from(0, 10))
 
         then: "only the organization operating in Region 1 is returned"
         results.content.size() == 1
@@ -497,13 +671,13 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", privateOrgId, regionId)
 
         when: "searching by name"
-        def nameResults = organizationController.searchByName("Confidential Shelter", false, Pageable.from(0, 10))
+        def nameResults = searchByName("Confidential Shelter", false, Pageable.from(0, 10))
 
         and: "searching by location"
-        def locResults = organizationController.searchByLocation(-104.99, 39.74, 5000, Pageable.from(0, 10))
+        def locResults = searchByLocation(-104.99, 39.74, 5000, Pageable.from(0, 10))
 
         and: "searching by region"
-        def regionResults = organizationController.searchByRegion(regionId, Pageable.from(0, 10))
+        def regionResults = searchByRegion(regionId, Pageable.from(0, 10))
 
         then: "private organization is never returned in any search endpoint"
         nameResults.content.collect { it.id() } == [publicOrgId]
@@ -524,7 +698,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Revoked', true, 'REVOKED')", revokedId)
 
         when: "searching by name"
-        def results = organizationController.searchByName("Charity Org", false, Pageable.from(0, 10))
+        def results = searchByName("Charity Org", false, Pageable.from(0, 10))
 
         then: "only the verified organization is returned"
         results.content.collect { it.id() } == [verifiedId]
@@ -536,10 +710,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Wildcard Test Org B', true, 'VERIFIED')", UUID.randomUUID())
 
         when: "searching with wildcard characters"
-        def percentResults = organizationController.searchByName("%", false, Pageable.from(0, 10))
-        def underscoreResults = organizationController.searchByName("_", false, Pageable.from(0, 10))
-        def multiWildcardResults = organizationController.searchByName(" %_% ", false, Pageable.from(0, 10))
-        def emptyQuotesResults = organizationController.searchByName('""', false, Pageable.from(0, 10))
+        def percentResults = searchByName("%", false, Pageable.from(0, 10))
+        def underscoreResults = searchByName("_", false, Pageable.from(0, 10))
+        def multiWildcardResults = searchByName(" %_% ", false, Pageable.from(0, 10))
+        def emptyQuotesResults = searchByName('""', false, Pageable.from(0, 10))
 
         then: "all wildcard-only and empty quote queries return empty results"
         percentResults.content.isEmpty()
@@ -557,33 +731,33 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
 
         when: "searching with leading/trailing spaces outside quotes: '  \"The Salvation Army\"  '"
-        def resPaddedQuotes = organizationController.searchByName('  "The Salvation Army"  ', false, Pageable.from(0, 10))
+        def resPaddedQuotes = searchByName('  "The Salvation Army"  ', false, Pageable.from(0, 10))
 
         and: "searching with spaces inside quotes: '\"  The Salvation Army  \"'"
-        def resSpacesInside = organizationController.searchByName('"  The Salvation Army  "', false, Pageable.from(0, 10))
+        def resSpacesInside = searchByName('"  The Salvation Army  "', false, Pageable.from(0, 10))
 
         and: "searching with single-quote character only: '\'' and '\"'"
-        def resSingleQuoteOnly = organizationController.searchByName("'", false, Pageable.from(0, 10))
-        def resDoubleQuoteOnly = organizationController.searchByName('"', false, Pageable.from(0, 10))
+        def resSingleQuoteOnly = searchByName("'", false, Pageable.from(0, 10))
+        def resDoubleQuoteOnly = searchByName('"', false, Pageable.from(0, 10))
 
         and: "searching with empty quotes containing whitespace: '\"   \"' and '\'   \''"
-        def resEmptyDoubleWithSpaces = organizationController.searchByName('"   "', false, Pageable.from(0, 10))
-        def resEmptySingleWithSpaces = organizationController.searchByName("'   '", false, Pageable.from(0, 10))
+        def resEmptyDoubleWithSpaces = searchByName('"   "', false, Pageable.from(0, 10))
+        def resEmptySingleWithSpaces = searchByName("'   '", false, Pageable.from(0, 10))
 
         and: "searching with mismatched opening quote: '\"The Salvation Army'"
-        def resMismatchedDoubleStart = organizationController.searchByName('"The Salvation Army', false, Pageable.from(0, 10))
+        def resMismatchedDoubleStart = searchByName('"The Salvation Army', false, Pageable.from(0, 10))
 
         and: "searching with mismatched closing quote: 'The Salvation Army\"'"
-        def resMismatchedDoubleEnd = organizationController.searchByName('The Salvation Army"', false, Pageable.from(0, 10))
+        def resMismatchedDoubleEnd = searchByName('The Salvation Army"', false, Pageable.from(0, 10))
 
         and: "searching with mismatched opening single quote: '\'The Salvation Army'"
-        def resMismatchedSingleStart = organizationController.searchByName("'The Salvation Army", false, Pageable.from(0, 10))
+        def resMismatchedSingleStart = searchByName("'The Salvation Army", false, Pageable.from(0, 10))
 
         and: "searching with mismatched closing single quote: 'The Salvation Army\''"
-        def resMismatchedSingleEnd = organizationController.searchByName("The Salvation Army'", false, Pageable.from(0, 10))
+        def resMismatchedSingleEnd = searchByName("The Salvation Army'", false, Pageable.from(0, 10))
 
         and: "searching with exact=true AND quoted together"
-        def resExactAndQuoted = organizationController.searchByName('"The Salvation Army"', true, Pageable.from(0, 10))
+        def resExactAndQuoted = searchByName('"The Salvation Army"', true, Pageable.from(0, 10))
 
         then: "exact quote variations return strictly the single exact parent org"
         resPaddedQuotes.content.size() == 1
@@ -622,13 +796,13 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
 
         when: "searching with transposed 'v' and 't': 'Salavtion Army'"
-        def resTransposedVt = organizationController.searchByName("Salavtion Army", false, Pageable.from(0, 10))
+        def resTransposedVt = searchByName("Salavtion Army", false, Pageable.from(0, 10))
 
         and: "searching with transposed 'm' and 'r': 'Salvation Amry'"
-        def resTransposedMr = organizationController.searchByName("Salvation Amry", false, Pageable.from(0, 10))
+        def resTransposedMr = searchByName("Salvation Amry", false, Pageable.from(0, 10))
 
         and: "searching with typo and article: 'The Slavation Army'"
-        def resTypoWithArticle = organizationController.searchByName("The Slavation Army", false, Pageable.from(0, 10))
+        def resTypoWithArticle = searchByName("The Slavation Army", false, Pageable.from(0, 10))
 
         then: "all typo variations successfully find The Salvation Army via trigram similarity"
         !resTransposedVt.content.isEmpty()
@@ -654,8 +828,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Better Tomorrow Foundation Network', true, 'VERIFIED')", compAId)
 
         when: "searching without the leading article"
-        def resAn = organizationController.searchByName("Organization Example", false, Pageable.from(0, 10))
-        def resA = organizationController.searchByName("Better Tomorrow Foundation", false, Pageable.from(0, 10))
+        def resAn = searchByName("Organization Example", false, Pageable.from(0, 10))
+        def resA = searchByName("Better Tomorrow Foundation", false, Pageable.from(0, 10))
 
         then: "article normalization correctly ranks the parent entity with stripped article above the competitor"
         resAn.content.size() == 2
@@ -677,10 +851,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'SpecialXOps Outreach', true, 'VERIFIED')", UUID.randomUUID())
 
         when: "searching for literal '100%'"
-        def resPercent = organizationController.searchByName("100%", false, Pageable.from(0, 10))
+        def resPercent = searchByName("100%", false, Pageable.from(0, 10))
 
         and: "searching for literal 'Special_Ops'"
-        def resUnderscore = organizationController.searchByName("Special_Ops", false, Pageable.from(0, 10))
+        def resUnderscore = searchByName("Special_Ops", false, Pageable.from(0, 10))
 
         then: "literal percent matches only the organization containing '100%'"
         resPercent.content.size() == 1
@@ -712,28 +886,28 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Friends of The Salvation Army', true, 'VERIFIED')", friendsId)
 
         when: "searching for 'Denver'"
-        def resDenver = organizationController.searchByName("Denver", false, Pageable.from(0, 10))
+        def resDenver = searchByName("Denver", false, Pageable.from(0, 10))
 
         and: "searching for 'Aurora'"
-        def resAurora = organizationController.searchByName("Aurora", false, Pageable.from(0, 10))
+        def resAurora = searchByName("Aurora", false, Pageable.from(0, 10))
 
         and: "searching for 'Colorado Springs'"
-        def resSprings = organizationController.searchByName("Colorado Springs", false, Pageable.from(0, 10))
+        def resSprings = searchByName("Colorado Springs", false, Pageable.from(0, 10))
 
         and: "searching for 'Intermountain'"
-        def resIntermountain = organizationController.searchByName("Intermountain", false, Pageable.from(0, 10))
+        def resIntermountain = searchByName("Intermountain", false, Pageable.from(0, 10))
 
         and: "searching for 'Family Store'"
-        def resStore = organizationController.searchByName("Family Store", false, Pageable.from(0, 10))
+        def resStore = searchByName("Family Store", false, Pageable.from(0, 10))
 
         and: "searching for 'Emergency Disaster'"
-        def resDisaster = organizationController.searchByName("Emergency Disaster", false, Pageable.from(0, 10))
+        def resDisaster = searchByName("Emergency Disaster", false, Pageable.from(0, 10))
 
         and: "searching for 'Friends of'"
-        def resFriends = organizationController.searchByName("Friends of", false, Pageable.from(0, 10))
+        def resFriends = searchByName("Friends of", false, Pageable.from(0, 10))
 
         and: "searching for 'Salvation Army' ranks parent organization at top"
-        def resParent = organizationController.searchByName("Salvation Army", false, Pageable.from(0, 10))
+        def resParent = searchByName("Salvation Army", false, Pageable.from(0, 10))
 
         then: "each specific query accurately isolates its target entity at the top of results"
         resParent.content[0].id() == parentId
@@ -750,7 +924,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         given: "organizations, locations, and regions exist"
         def org1Id = UUID.randomUUID()
         def org2Id = UUID.randomUUID()
-        // Equal-length names (17 chars) ensure that native tie-breaker (o.name ASC) directly contradicts client DESC sort
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org 1', true, 'VERIFIED')", org1Id)
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org 2', true, 'VERIFIED')", org2Id)
 
@@ -821,67 +994,114 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         resRegionSorted.content[0].id() == org1Id
     }
 
-    Principal createPrincipal(UUID userId) {
-        new Principal() {
-            @Override
-            String getName() {
-                return userId.toString()
-            }
-        }
+    /********** AUTHORIZATION & SECURITY Tests **********/
+
+    def "SECURITY | should reject unauthenticated GET /organizations with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to list organizations"
+        client.exchange(HttpRequest.GET("/organizations"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
-    /********** AUTHORIZATION Tests **********/
+    def "SECURITY | should reject unauthenticated POST /organizations with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to create an organization"
+        def command = new CreateOrganizationCommand("Unauth Org", "https://example.com", null, true)
+        client.exchange(HttpRequest.POST("/organizations", command), Organization)
 
-    def "AUTHORIZATION | should throw 403 when non-admin attempts to update an organization"() {
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "SECURITY | should reject unauthenticated PUT /organizations/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to update an organization"
+        def command = new UpdateOrganizationCommand("Unauth Org", "https://example.com", null, true)
+        client.exchange(HttpRequest.PUT("/organizations/${UUID.randomUUID()}", command), Organization)
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "SECURITY | should reject unauthenticated DELETE /organizations/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to delete an organization"
+        client.exchange(HttpRequest.DELETE("/organizations/${UUID.randomUUID()}"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "SECURITY | should return 403 FORBIDDEN when standard user without system admin claim accesses GET /organizations"() {
+        given: "a standard user"
+        def standardUserId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", standardUserId, "std-${UUID.randomUUID()}@example.com".toString())
+        createdUserIds.add(standardUserId)
+
+        when: "standard user attempts GET /organizations"
+        client.exchange(authenticated(HttpRequest.GET("/organizations"), standardUserId.toString(), ["STANDARD_USER"]))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority updates organization"() {
         given: "an organization and a standard unauthorized user"
         def org = organizationRepository.save(new Organization(null, "Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
         def unauthUserId = UUID.randomUUID()
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-${UUID.randomUUID()}@example.com".toString())
+        createdUserIds.add(unauthUserId)
 
-        def updated = new Organization(org.id(), "Hacked Name", "https://hacked.com", null, true, UNVERIFIED, null, [])
+        def updated = new UpdateOrganizationCommand("Hacked Name", "https://hacked.com", null, true)
 
         when: "unauthorized user attempts to update the organization"
-        organizationController.updateOrganization(org.id(), updated, createPrincipal(unauthUserId))
+        client.exchange(authenticated(HttpRequest.PUT("/organizations/${org.id()}", updated), unauthUserId.toString(), ["STANDARD_USER"]), Organization)
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status.code == 403
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
-    def "AUTHORIZATION | should throw 403 when non-admin attempts to delete an organization"() {
+    def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority deletes organization"() {
         given: "an organization and a standard unauthorized user"
         def org = organizationRepository.save(new Organization(null, "Delete Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
         def unauthUserId = UUID.randomUUID()
         executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-del-${UUID.randomUUID()}@example.com".toString())
+        createdUserIds.add(unauthUserId)
 
         when: "unauthorized user attempts to delete the organization"
-        organizationController.deleteOrganization(org.id(), createPrincipal(unauthUserId))
+        client.exchange(authenticated(HttpRequest.DELETE("/organizations/${org.id()}"), unauthUserId.toString(), ["STANDARD_USER"]))
 
         then: "a 403 Forbidden is thrown"
-        def e = thrown(HttpStatusException)
-        e.status.code == 403
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "AUTHORIZATION | should allow organization admin to update and delete organization"() {
         given: "an organization and an ORG_ADMIN for that organization"
         def org = organizationRepository.save(new Organization(null, "Allowed Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
-        def adminId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", adminId, "admin-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", adminId, org.id())
+        def adminUser = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", adminUser, "admin-${UUID.randomUUID()}@example.com".toString())
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", adminUser, org.id())
+        createdUserIds.add(adminUser)
 
-        def updated = new Organization(org.id(), "Updated By Admin", "https://example.com", null, true, UNVERIFIED, null, [])
+        def updated = new UpdateOrganizationCommand("Updated By Admin", "https://example.com", null, true)
 
-        when: "org admin updates the organization"
-        def result = organizationController.updateOrganization(org.id(), updated, createPrincipal(adminId))
+        when: "org admin updates the organization via HTTP PUT"
+        def response = client.exchange(authenticated(HttpRequest.PUT("/organizations/${org.id()}", updated), adminUser.toString(), ["STANDARD_USER"]), Organization)
 
         then: "it succeeds"
-        result.name() == "Updated By Admin"
+        response.status == HttpStatus.OK
+        response.body().name() == "Updated By Admin"
 
-        when: "org admin deletes the organization"
-        organizationController.deleteOrganization(org.id(), createPrincipal(adminId))
+        when: "org admin deletes the organization via HTTP DELETE"
+        def delResponse = client.exchange(authenticated(HttpRequest.DELETE("/organizations/${org.id()}"), adminUser.toString(), ["STANDARD_USER"]))
 
         then: "it is removed"
+        delResponse.status == HttpStatus.OK
         !organizationRepository.findById(org.id()).isPresent()
     }
 }
-
