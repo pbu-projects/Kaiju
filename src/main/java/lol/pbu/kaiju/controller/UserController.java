@@ -21,7 +21,7 @@ import lol.pbu.kaiju.dto.UpdateUserCommand;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
@@ -37,7 +37,7 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_USER_MANAGE_CLAIM;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/users")
-public class UserController implements ControllerUtils {
+public class UserController {
 
     public static final String DEFAULT_SORT_FIELD = "email";
 
@@ -50,7 +50,7 @@ public class UserController implements ControllerUtils {
     @Get
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     public CursoredPage<User> getUsers(@Nullable @Valid CursoredPageable pageable) {
-        return userRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return userRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -116,8 +116,10 @@ public class UserController implements ControllerUtils {
     @Delete("/{id}")
     public void deleteUser(@PathVariable UUID id, Principal principal) {
         verifySelfOrAdmin(id, principal);
-        checkExists(userRepository, id);
-        userRepository.deleteById(id);
+        long deletedCount = userRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(NOT_FOUND, "User not found");
+        }
     }
 
     private void verifySelfOrAdmin(UUID targetUserId, Principal principal) {

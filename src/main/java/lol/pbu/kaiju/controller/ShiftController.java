@@ -28,7 +28,7 @@ import lol.pbu.kaiju.repository.ShiftRepository;
 import lol.pbu.kaiju.repository.TagRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
 import java.util.List;
@@ -43,7 +43,7 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/shifts")
-public class ShiftController implements ControllerUtils {
+public class ShiftController {
 
     public static final String DEFAULT_SORT_FIELD = "id";
 
@@ -72,7 +72,7 @@ public class ShiftController implements ControllerUtils {
 
     @Get
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable) {
-        return shiftRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return shiftRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -149,7 +149,7 @@ public class ShiftController implements ControllerUtils {
         Shift existing = shiftRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Shift not found"));
         verifyShiftAuthority(principal, existing.project());
-        shiftRepository.deleteById(id);
+        shiftRepository.removeById(id);
     }
 
     private Location resolveLocation(UUID locationId) {

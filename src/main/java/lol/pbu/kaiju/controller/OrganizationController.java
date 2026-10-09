@@ -29,7 +29,7 @@ import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -47,7 +47,7 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 @ExecuteOn(BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organizations")
-public class OrganizationController implements ControllerUtils {
+public class OrganizationController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
 
@@ -71,7 +71,7 @@ public class OrganizationController implements ControllerUtils {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<Organization> getOrganizations(@Nullable CursoredPageable pageable) {
-        return organizationRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -177,7 +177,7 @@ public class OrganizationController implements ControllerUtils {
 
     private @NonNull Pageable normalizePageable(@Nullable Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
-            return Pageable.from(0, DEFAULT_PAGE_SIZE);
+            return Pageable.from(0, PageableUtils.DEFAULT_PAGE_SIZE);
         }
         if (!pageable.getSort().getOrderBy().isEmpty()) {
             return Pageable.from(pageable.getNumber(), pageable.getSize());
@@ -253,8 +253,10 @@ public class OrganizationController implements ControllerUtils {
     @Delete("/{id}")
     public void deleteOrganization(@PathVariable UUID id, Principal principal) {
         verifyOrgAdminAuthority(principal, id);
-        checkExists(organizationRepository, id);
-        organizationRepository.deleteById(id);
+        long deletedCount = organizationRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(NOT_FOUND, "Organization not found");
+        }
     }
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {

@@ -22,4 +22,6 @@ public interface OrganizationAuditLogRepository extends PageableRepository<Organ
     @Join("organization")
     @Join("actor")
     Optional<OrganizationAuditLog> findById(@NonNull UUID id);
+
+    long removeById(@NonNull UUID id);
 }

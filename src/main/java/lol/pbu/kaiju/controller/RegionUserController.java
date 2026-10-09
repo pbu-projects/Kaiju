@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -10,6 +11,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -19,7 +21,7 @@ import lol.pbu.kaiju.domain.RegionUserId;
 import lol.pbu.kaiju.dto.CreateRegionUserCommand;
 import lol.pbu.kaiju.dto.UpdateRegionUserCommand;
 import lol.pbu.kaiju.repository.RegionUserRepository;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -29,7 +31,7 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/region-users")
-public class RegionUserController implements ControllerUtils {
+public class RegionUserController {
 
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
@@ -41,7 +43,7 @@ public class RegionUserController implements ControllerUtils {
 
     @Get
     public CursoredPage<RegionUser> getRegionUsers(@Nullable @Valid CursoredPageable pageable) {
-        return regionUserRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return regionUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{userId}/{regionId}")
@@ -62,14 +64,17 @@ public class RegionUserController implements ControllerUtils {
             @Valid @Body UpdateRegionUserCommand command
     ) {
         RegionUserId id = new RegionUserId(userId, regionId);
-        checkExists(regionUserRepository, id);
+        regionUserRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Region user not found"));
         return regionUserRepository.update(new RegionUser(id, command.role()));
     }
 
     @Delete("/{userId}/{regionId}")
     public void deleteRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId) {
         RegionUserId id = new RegionUserId(userId, regionId);
-        checkExists(regionUserRepository, id);
-        regionUserRepository.deleteById(id);
+        long deletedCount = regionUserRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Region user not found");
+        }
     }
 }

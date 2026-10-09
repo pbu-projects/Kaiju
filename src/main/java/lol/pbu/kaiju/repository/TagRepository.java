@@ -15,4 +15,6 @@ import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
 public interface TagRepository extends PageableRepository<Tag, UUID> {
     @NonNull
     CursoredPage<Tag> findAll(@NonNull CursoredPageable pageable);
+
+    long removeById(@NonNull UUID id);
 }

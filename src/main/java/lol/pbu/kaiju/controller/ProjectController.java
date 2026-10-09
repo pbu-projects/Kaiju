@@ -43,7 +43,7 @@ import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -66,7 +66,7 @@ import static lol.pbu.kaiju.security.Permission.PROJECT_APPROVE_CLAIM;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/projects")
-public class ProjectController implements ControllerUtils {
+public class ProjectController {
 
     public static final String DEFAULT_SORT_FIELD = "title";
     private static final String PROJECT_NOT_FOUND = "Project not found";
@@ -104,7 +104,7 @@ public class ProjectController implements ControllerUtils {
 
     @Get
     public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
-        CursoredPageable resolved = resolvePageable(pageable, DEFAULT_SORT_FIELD);
+        CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         if (title == null || title.isBlank()) {
             return projectRepository.findAll(resolved);
         }
@@ -302,7 +302,7 @@ public class ProjectController implements ControllerUtils {
             throw new HttpStatusException(FORBIDDEN, "You do not have permission to delete this project");
         }
 
-        projectRepository.deleteById(id);
+        projectRepository.removeById(id);
     }
 
     /**

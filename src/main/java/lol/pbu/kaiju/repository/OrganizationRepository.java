@@ -157,5 +157,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
           AND o.verification_status = 'VERIFIED'
     """)
     Page<Organization> searchByRegion(@NonNull UUID regionId, @NonNull Pageable pageable);
+
+    long removeById(@NonNull UUID id);
 }
 

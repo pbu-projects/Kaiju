@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -23,7 +24,7 @@ import lol.pbu.kaiju.repository.OrganizationUserRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
 import java.util.Optional;
@@ -35,7 +36,7 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organization-users")
-public class OrganizationUserController implements ControllerUtils {
+public class OrganizationUserController {
 
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
@@ -55,7 +56,7 @@ public class OrganizationUserController implements ControllerUtils {
 
     @Get
     public CursoredPage<OrganizationUser> getOrganizationUsers(@Nullable @Valid CursoredPageable pageable) {
-        return organizationUserRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{userId}/{organizationId}")
@@ -79,7 +80,8 @@ public class OrganizationUserController implements ControllerUtils {
     ) {
         verifyOrgAdminAuthority(principal, organizationId);
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        checkExists(organizationUserRepository, id);
+        organizationUserRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found"));
         return organizationUserRepository.update(new OrganizationUser(id, command.role()));
     }
 
@@ -91,8 +93,10 @@ public class OrganizationUserController implements ControllerUtils {
     ) {
         verifyOrgAdminAuthority(principal, organizationId);
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        checkExists(organizationUserRepository, id);
-        organizationUserRepository.deleteById(id);
+        long deletedCount = organizationUserRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found");
+        }
     }
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {

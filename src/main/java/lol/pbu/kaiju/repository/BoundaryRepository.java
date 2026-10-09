@@ -15,4 +15,6 @@ import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
 public interface BoundaryRepository extends PageableRepository<Boundary, UUID> {
     @NonNull
     CursoredPage<Boundary> findAll(@NonNull CursoredPageable pageable);
+
+    long removeById(@NonNull UUID id);
 }

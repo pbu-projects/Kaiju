@@ -22,7 +22,7 @@ import lol.pbu.kaiju.dto.UpdateOrganizationAuditLogCommand;
 import lol.pbu.kaiju.repository.OrganizationAuditLogRepository;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -36,7 +36,7 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @ExecuteOn(BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/organization-audit-logs")
-public class OrganizationAuditLogController implements ControllerUtils {
+public class OrganizationAuditLogController {
 
     public static final String DEFAULT_SORT_FIELD = "id";
 
@@ -56,7 +56,7 @@ public class OrganizationAuditLogController implements ControllerUtils {
 
     @Get
     public CursoredPage<OrganizationAuditLog> getOrganizationAuditLogs(@Nullable @Valid CursoredPageable pageable) {
-        return organizationAuditLogRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationAuditLogRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -84,7 +84,6 @@ public class OrganizationAuditLogController implements ControllerUtils {
 
     @Put("/{id}")
     public OrganizationAuditLog updateOrganizationAuditLog(@PathVariable UUID id, @Valid @Body UpdateOrganizationAuditLogCommand command) {
-        checkExists(organizationAuditLogRepository, id);
         OrganizationAuditLog existing = organizationAuditLogRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Organization audit log not found"));
         OrganizationAuditLog updated = new OrganizationAuditLog(
@@ -101,7 +100,9 @@ public class OrganizationAuditLogController implements ControllerUtils {
 
     @Delete("/{id}")
     public void deleteOrganizationAuditLog(@PathVariable UUID id) {
-        checkExists(organizationAuditLogRepository, id);
-        organizationAuditLogRepository.deleteById(id);
+        long deletedCount = organizationAuditLogRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(NOT_FOUND, "Organization audit log not found");
+        }
     }
 }

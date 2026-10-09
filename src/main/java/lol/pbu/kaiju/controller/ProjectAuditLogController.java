@@ -23,7 +23,7 @@ import lol.pbu.kaiju.dto.UpdateProjectAuditLogCommand;
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.PageableUtils;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -36,7 +36,7 @@ import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 @ExecuteOn(TaskExecutors.BLOCKING)
 @Secured(IS_AUTHENTICATED)
 @Controller("/project-audit-logs")
-public class ProjectAuditLogController implements ControllerUtils {
+public class ProjectAuditLogController {
 
     public static final String DEFAULT_SORT_FIELD = "id";
 
@@ -56,7 +56,7 @@ public class ProjectAuditLogController implements ControllerUtils {
 
     @Get
     public CursoredPage<ProjectAuditLog> getProjectAuditLogs(@Nullable @Valid CursoredPageable pageable) {
-        return projectAuditLogRepository.findAll(resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return projectAuditLogRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -90,7 +90,6 @@ public class ProjectAuditLogController implements ControllerUtils {
      */
     @Put("/{id}")
     public ProjectAuditLog updateProjectAuditLog(@PathVariable UUID id, @Valid @Body UpdateProjectAuditLogCommand command) {
-        checkExists(projectAuditLogRepository, id);
         ProjectAuditLog existing = projectAuditLogRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Project audit log not found"));
         ProjectAuditLog updated = new ProjectAuditLog(
@@ -112,8 +111,9 @@ public class ProjectAuditLogController implements ControllerUtils {
      */
     @Delete("/{id}")
     public void deleteProjectAuditLog(@PathVariable UUID id) {
-        checkExists(projectAuditLogRepository, id);
-        projectAuditLogRepository.deleteById(id);
+        long deletedCount = projectAuditLogRepository.removeById(id);
+        if (deletedCount == 0) {
+            throw new HttpStatusException(NOT_FOUND, "Project audit log not found");
+        }
     }
-
 }
