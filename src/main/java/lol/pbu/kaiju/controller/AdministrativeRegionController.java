@@ -16,11 +16,14 @@ import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.security.SecurityRoles;
 import lol.pbu.kaiju.security.AuthentikAuthenticationMapper;
 import lol.pbu.kaiju.util.ControllerUtils;
+import lol.pbu.kaiju.util.SpatialMappingService;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -52,9 +55,12 @@ public class AdministrativeRegionController implements ControllerUtils {
     public static final String DEFAULT_SORT_FIELD = "name";
 
     private final AdministrativeRegionRepository administrativeRegionRepository;
+    private final SpatialMappingService spatialMappingService;
 
-    public AdministrativeRegionController(AdministrativeRegionRepository administrativeRegionRepository) {
+    public AdministrativeRegionController(AdministrativeRegionRepository administrativeRegionRepository,
+                                          SpatialMappingService spatialMappingService) {
         this.administrativeRegionRepository = administrativeRegionRepository;
+        this.spatialMappingService = spatialMappingService;
     }
 
     /**
@@ -92,7 +98,7 @@ public class AdministrativeRegionController implements ControllerUtils {
      * Creates and persists a new administrative region polygon.
      * Restricted to platform administrators ({@code GLOBAL_ADMIN}) and regional managers ({@code REGIONAL_ADMIN}).
      *
-     * @param region the administrative region to create, including its geographic boundary polygon
+     * @param command the administrative region creation command, including its geographic boundary coordinates
      * @return the persisted {@link AdministrativeRegion} with its assigned identifier
      * @see AdministrativeRegionController for controller-level security architecture
      * @see Permission#SYSTEM_ADMIN_CLAIM
@@ -100,7 +106,13 @@ public class AdministrativeRegionController implements ControllerUtils {
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
-    public AdministrativeRegion addAdministrativeRegion(@Valid @Body AdministrativeRegion region) {
+    public AdministrativeRegion addAdministrativeRegion(@Valid @Body CreateAdministrativeRegionCommand command) {
+        AdministrativeRegion region = new AdministrativeRegion(
+                null,
+                command.name(),
+                command.parentRegionId(),
+                spatialMappingService.toPolygon(command.coordinates())
+        );
         return administrativeRegionRepository.save(region);
     }
 
@@ -108,8 +120,8 @@ public class AdministrativeRegionController implements ControllerUtils {
      * Updates an existing administrative region by ID.
      * Restricted to platform administrators ({@code GLOBAL_ADMIN}) and regional managers ({@code REGIONAL_ADMIN}).
      *
-     * @param id     the unique {@link UUID} of the administrative region to update
-     * @param region the updated region data
+     * @param id      the unique {@link UUID} of the administrative region to update
+     * @param command the updated region command data
      * @return the updated {@link AdministrativeRegion}
      * @see AdministrativeRegionController for controller-level security architecture
      * @see ControllerUtils#checkExists for entity existence validation
@@ -118,9 +130,15 @@ public class AdministrativeRegionController implements ControllerUtils {
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
-    public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body AdministrativeRegion region) {
+    public AdministrativeRegion updateAdministrativeRegion(@PathVariable UUID id, @Valid @Body UpdateAdministrativeRegionCommand command) {
         checkExists(administrativeRegionRepository, id);
-        return administrativeRegionRepository.update(region.withId(id));
+        AdministrativeRegion region = new AdministrativeRegion(
+                id,
+                command.name(),
+                command.parentRegionId(),
+                spatialMappingService.toPolygon(command.coordinates())
+        );
+        return administrativeRegionRepository.update(region);
     }
 
     /**

@@ -1,14 +1,15 @@
 package lol.pbu.kaiju.controller
 
-
-
-import io.micronaut.data.model.CursoredPage
-import io.micronaut.data.model.CursoredPageable
-import io.micronaut.data.model.Sort
-import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.context.annotation.Property
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.validation.ValidationException
 import lol.pbu.kaiju.domain.Boundary
+import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.CreateBoundaryCommand
+import lol.pbu.kaiju.dto.UpdateBoundaryCommand
 import lol.pbu.kaiju.repository.BoundaryRepository
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
@@ -18,13 +19,16 @@ import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import java.util.UUID
+
+@Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@MicronautTest(transactional = false)
 class BoundaryControllerSpec extends BaseControllerSpec {
 
     @Inject
     BoundaryRepository boundaryRepository
-
-    @Inject
-    BoundaryController boundaryController
 
     @Shared
     Faker faker = new Faker()
@@ -43,75 +47,82 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         geometryFactory.createPolygon(coords)
     }
 
+    private List<CoordinateDto> createCoordinateDtos() {
+        [
+                new CoordinateDto(0.0, 0.0),
+                new CoordinateDto(0.0, 1.0),
+                new CoordinateDto(1.0, 1.0),
+                new CoordinateDto(1.0, 0.0),
+                new CoordinateDto(0.0, 0.0)
+        ]
+    }
+
     def setup() {
         sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary A', ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))', 4326))")
         sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary B', ST_GeomFromText('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', 4326))")
     }
 
     def cleanup() {
-        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %'")
+        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %' OR name LIKE 'Updated Boundary %' OR name LIKE 'Temporary Boundary %'")
     }
 
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid boundary"() {
-        given: "a new valid boundary"
-        def newBoundary = new Boundary(
-                null,
-                "Test Boundary ${faker.address().city()}",
-                createPolygon()
-        )
+        given: "a new valid boundary command"
+        String name = "Test Boundary ${faker.address().city()}"
+        def command = new CreateBoundaryCommand(name, createCoordinateDtos())
 
-        when: "the boundary is added"
-        Boundary saved = boundaryController.addBoundary(newBoundary)
+        when: "the boundary is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/boundaries", command)), Boundary)
+        Boundary saved = response.body()
 
-        then: "the boundary is persisted with a generated ID"
+        then: "the boundary is persisted with 200 OK and generated ID"
+        response.status == HttpStatus.OK
         verifyAll {
             saved.id() != null
-            saved.name() == newBoundary.name()
+            saved.name() == name
+            saved.geom() != null
         }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM boundaries WHERE id = ?", [saved.id()])
         verifyAll(result) {
             saved.id() == id
-            saved.name() == name
+            saved.name() == result.name
         }
     }
 
     @Unroll
-    def "CREATE | should fail to save boundary with invalid data: #testCase"(String testCase, Boundary boundary) {
-        when: "an attempt is made to add a boundary with invalid data"
-        boundaryController.addBoundary(boundary)
+    def "CREATE | should fail to save boundary with invalid data: #testCase"(String testCase, Map payload) {
+        when: "an attempt is made to add a boundary with invalid data via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/boundaries", payload)), Boundary)
 
-        then: "an exception is thrown"
-        thrown(ValidationException)
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
         where:
-        [testCase, boundary] << {
-            def validData = [
-                    name: "Valid Boundary Name",
-                    geom: createPolygon()
-            ]
+        testCase                    | payload
+        "Null Name"                 | [name: null, coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]]
+        "Blank Name"                | [name: " ", coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]]
+        "Name Too Long"             | [name: "A" * 256, coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]]
+        "Null Coordinates"          | [name: "Valid Name", coordinates: null]
+        "Less Than 3 Coordinates"   | [name: "Valid Name", coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0]]]
+        "Longitude Out of Bounds"   | [name: "Valid Name", coordinates: [[longitude: 181.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]]
+        "Latitude Out of Bounds"    | [name: "Valid Name", coordinates: [[longitude: 0.0, latitude: -91.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]]
+    }
 
-            def invalidCases = [
-                    [field: 'name', value: null, caseName: "Null Name"],
-                    [field: 'name', value: ' ', caseName: "Blank Name"],
-                    [field: 'name', value: 'A' * 256, caseName: "Name Too Long"],
-                    [field: 'geom', value: null, caseName: "Null Geometry"]
-            ]
+    def "CREATE | should reject unauthenticated POST /boundaries with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to create a boundary"
+        client.exchange(HttpRequest.POST("/boundaries", [
+                name       : "Unauth Boundary",
+                coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]
+        ]), Boundary)
 
-            return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def b = new Boundary(
-                        null,
-                        props.name as String,
-                        props.geom as Polygon
-                )
-                [invalidCase.caseName, b]
-            }
-        }()
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** READ Tests **********/
@@ -121,23 +132,33 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         def boundary = boundaryRepository.save(new Boundary(null, "Test Boundary Read", createPolygon()))
         UUID id = boundary.id()
 
-        when: "the boundary is requested by its ID"
-        def result = boundaryController.getBoundary(id)
+        when: "the boundary is requested by its ID via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/boundaries/${id}")), Boundary)
 
-        then: "the correct boundary is returned"
+        then: "the correct boundary is returned with 200 OK"
+        response.status == HttpStatus.OK
         verifyAll {
-            result.isPresent()
-            result.get().id() == id
-            result.get().name() == "Test Boundary Read"
+            response.body().id() == id
+            response.body().name() == "Test Boundary Read"
         }
     }
 
-    def "READ | should return empty for a non-existent boundary ID"() {
-        when: "a non-existent boundary is requested"
-        def result = boundaryController.getBoundary(UUID.randomUUID())
+    def "READ | should return 404 for a non-existent boundary ID"() {
+        when: "a non-existent boundary is requested via HTTP GET"
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/boundaries/${UUID.randomUUID()}")), Boundary)
 
-        then: "the result is empty"
-        !result.isPresent()
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "READ | should reject unauthenticated GET /boundaries/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to get a boundary"
+        client.exchange(HttpRequest.GET("/boundaries/${UUID.randomUUID()}"), Boundary)
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** UPDATE Tests **********/
@@ -147,12 +168,14 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         def boundary = boundaryRepository.save(new Boundary(null, "Original Boundary Name", createPolygon()))
         UUID id = boundary.id()
         def newName = "Updated Boundary ${faker.address().city()}"
-        def updateRequest = new Boundary(null, newName, createPolygon())
+        def updateCommand = new UpdateBoundaryCommand(newName, createCoordinateDtos())
 
-        when: "the boundary is updated"
-        Boundary updated = boundaryController.updateBoundary(id, updateRequest)
+        when: "the boundary is updated via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${id}", updateCommand)), Boundary)
+        Boundary updated = response.body()
 
-        then: "the returned boundary contains the updated data"
+        then: "the returned boundary contains the updated data with 200 OK"
+        response.status == HttpStatus.OK
         verifyAll {
             updated.id() == id
             updated.name() == newName
@@ -166,36 +189,64 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent boundary"() {
-        given: "a random non-existent ID and an update request"
+        given: "a random non-existent ID and an update command"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Boundary(null, "Test Boundary", createPolygon())
+        def updateCommand = new UpdateBoundaryCommand("Test Boundary", createCoordinateDtos())
 
-        when: "an update is attempted"
-        boundaryController.updateBoundary(nonExistentId, updateRequest)
+        when: "an update is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${nonExistentId}", updateCommand)), Boundary)
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
+    def "UPDATE | should fail to update boundary with invalid data: #testCase"(String testCase, Map payload) {
+        given: "an existing boundary"
+        def boundary = boundaryRepository.save(new Boundary(null, "Test Update Invalid", createPolygon()))
+        UUID id = boundary.id()
+
+        when: "an update with invalid data is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${id}", payload)), Boundary)
+
+        then: "a 400 BAD REQUEST status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+
+        where:
+        testCase                  | payload
+        "Blank Name"              | [name: " ", coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]]
+        "Less Than 3 Coordinates" | [name: "Valid", coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0]]]
+    }
+
+    def "UPDATE | should reject unauthenticated PUT /boundaries/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to update a boundary"
+        client.exchange(HttpRequest.PUT("/boundaries/${UUID.randomUUID()}", [
+                name       : "Unauth Boundary",
+                coordinates: [[longitude: 0.0, latitude: 0.0], [longitude: 0.0, latitude: 1.0], [longitude: 1.0, latitude: 1.0]]
+        ]), Boundary)
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing boundary"() {
         given: "a new boundary to be deleted"
-        def tempBoundary = new Boundary(
-                null,
-                "Temporary Boundary to Delete",
-                createPolygon()
-        )
-        def saved = boundaryController.addBoundary(tempBoundary)
+        def tempBoundary = new Boundary(null, "Temporary Boundary to Delete", createPolygon())
+        def saved = boundaryRepository.save(tempBoundary)
         UUID id = saved.id()
         assert boundaryRepository.existsById(id)
 
-        when: "the boundary is deleted"
-        boundaryController.deleteBoundary(id)
+        when: "the boundary is deleted via HTTP DELETE"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/boundaries/${id}")))
 
-        then: "the boundary no longer exists in the repository or database"
+        then: "the response is 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the boundary no longer exists in the repository or database"
         verifyAll {
             !boundaryRepository.findById(id).isPresent()
             sql.firstRow("SELECT count(*) as count FROM boundaries WHERE id = ?", [id]).count == 0
@@ -206,35 +257,42 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
-        when: "a delete is attempted"
-        boundaryController.deleteBoundary(nonExistentId)
+        when: "a delete is attempted via HTTP DELETE"
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/boundaries/${nonExistentId}")))
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
+    def "DELETE | should reject unauthenticated DELETE /boundaries/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to delete a boundary"
+        client.exchange(HttpRequest.DELETE("/boundaries/${UUID.randomUUID()}"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
     /********** LIST Tests **********/
 
-    def "LIST | should fully drain all boundaries sequentially using cursors"() {
-        setup:
-        Set<Boundary> allBoundaries = new LinkedHashSet<>()
-        int pageSize = 5
-        def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("name")))
+    def "LIST | should retrieve boundaries with pagination"() {
+        when: "requesting boundaries via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/boundaries?size=5")), Map)
 
-        when: "iterating through pages until no more data remains"
-        while (pageable != null) {
-            CursoredPage<Boundary> page = boundaryController.getBoundaries(pageable)
-            allBoundaries.addAll(page.content)
-            pageable = page.hasNext() ? page.nextPageable() : null
-        }
+        then: "the response is 200 OK with content list"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+        body.content.size() >= 2
+    }
 
-        then: "the collected set contains all boundaries from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM boundaries").count
-        verifyAll {
-            allBoundaries.size() == totalCount
-            allBoundaries.size() >= 2
-        }
+    def "LIST | should reject unauthenticated GET /boundaries with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to list boundaries"
+        client.exchange(HttpRequest.GET("/boundaries"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 }

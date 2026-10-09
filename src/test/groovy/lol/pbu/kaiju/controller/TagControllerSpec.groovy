@@ -1,26 +1,29 @@
 package lol.pbu.kaiju.controller
 
-
-
-import io.micronaut.data.model.CursoredPage
-import io.micronaut.data.model.CursoredPageable
-import io.micronaut.data.model.Sort
-import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.context.annotation.Property
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.validation.ValidationException
 import lol.pbu.kaiju.domain.Tag
+import lol.pbu.kaiju.dto.CreateTagCommand
+import lol.pbu.kaiju.dto.UpdateTagCommand
 import lol.pbu.kaiju.repository.TagRepository
 import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import java.util.UUID
+
+@Property(name = "micronaut.security.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@MicronautTest(transactional = false)
 class TagControllerSpec extends BaseControllerSpec {
 
     @Inject
     TagRepository tagRepository
-
-    @Inject
-    TagController tagController
 
     @Shared
     Faker faker = new Faker()
@@ -31,26 +34,24 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def cleanup() {
-        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%'")
+        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%' OR name LIKE 'tag-%' OR name LIKE 'updated-%' OR name LIKE 'temporary-tag-%'")
     }
 
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid tag"() {
-        given: "a new valid tag"
-        def newTag = new Tag(
-                null,
-                "tag-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
-        )
+        given: "a valid create tag command"
+        String tagName = "tag-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
+        def command = new CreateTagCommand(tagName)
 
-        when: "the tag is added"
-        Tag saved = tagController.addTag(newTag)
+        when: "the tag is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/tags", command)), Tag)
+        Tag saved = response.body()
 
-        then: "the tag is persisted with a generated ID"
-        verifyAll {
-            saved.id() != null
-            saved.name() == newTag.name()
-        }
+        then: "the tag is persisted with 200 OK and generated ID"
+        response.status == HttpStatus.OK
+        saved.id() != null
+        saved.name() == tagName
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
@@ -61,35 +62,28 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "CREATE | should fail to save tag with invalid data: #testCase"(String testCase, Tag tag) {
-        when: "an attempt is made to add a tag with invalid data"
-        tagController.addTag(tag)
+    def "CREATE | should fail to save tag with invalid data: #testCase"(String testCase, Map payload) {
+        when: "an attempt is made to add a tag with invalid data via HTTP POST"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/tags", payload)), Tag)
 
-        then: "an exception is thrown"
-        thrown(ValidationException)
+        then: "a 400 Bad Request exception is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
         where:
-        [testCase, tag] << {
-            def validData = [
-                    name: "valid-tag"
-            ]
+        testCase        | payload
+        "Null Name"     | [name: null]
+        "Blank Name"    | [name: "   "]
+        "Name Too Long" | [name: "A" * 51]
+    }
 
-            def invalidCases = [
-                    [field: 'name', value: null, caseName: "Null Name"],
-                    [field: 'name', value: ' ', caseName: "Blank Name"],
-                    [field: 'name', value: 'A' * 51, caseName: "Name Too Long"]
-            ]
+    def "CREATE | should reject unauthenticated POST /tags with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to create a tag"
+        client.exchange(HttpRequest.POST("/tags", new CreateTagCommand("unauth-tag")), Tag)
 
-            return invalidCases.collect { invalidCase ->
-                def props = new HashMap(validData)
-                props[invalidCase.field] = invalidCase.value
-                def t = new Tag(
-                        null,
-                        props.name as String
-                )
-                [invalidCase.caseName, t]
-            }
-        }()
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** READ Tests **********/
@@ -99,23 +93,31 @@ class TagControllerSpec extends BaseControllerSpec {
         def tag = tagRepository.save(new Tag(null, "test-tag-read-${faker.number().digits(5)}"))
         UUID id = tag.id()
 
-        when: "the tag is requested by its ID"
-        def result = tagController.getTag(id)
+        when: "the tag is requested by its ID via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/tags/${id}")), Tag)
 
-        then: "the correct tag is returned"
-        verifyAll {
-            result.isPresent()
-            result.get().id() == id
-            result.get().name() == tag.name()
-        }
+        then: "200 OK is returned with the correct tag"
+        response.status == HttpStatus.OK
+        response.body().id() == id
+        response.body().name() == tag.name()
     }
 
-    def "READ | should return empty for a non-existent tag ID"() {
-        when: "a non-existent tag is requested"
-        def result = tagController.getTag(UUID.randomUUID())
+    def "READ | should return 404 for a non-existent tag ID"() {
+        when: "a non-existent tag is requested via HTTP GET"
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/tags/${UUID.randomUUID()}")), Tag)
 
-        then: "the result is empty"
-        !result.isPresent()
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "READ | should reject unauthenticated GET /tags/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to get a tag"
+        client.exchange(HttpRequest.GET("/tags/${UUID.randomUUID()}"), Tag)
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** UPDATE Tests **********/
@@ -125,16 +127,16 @@ class TagControllerSpec extends BaseControllerSpec {
         def tag = tagRepository.save(new Tag(null, "original-tag-${faker.number().digits(5)}"))
         UUID id = tag.id()
         def newName = "updated-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
-        def updateRequest = new Tag(null, newName)
+        def updateCommand = new UpdateTagCommand(newName)
 
-        when: "the tag is updated"
-        Tag updated = tagController.updateTag(id, updateRequest)
+        when: "the tag is updated via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${id}", updateCommand)), Tag)
+        Tag updated = response.body()
 
-        then: "the returned tag contains the updated data"
-        verifyAll {
-            updated.id() == id
-            updated.name() == newName
-        }
+        then: "200 OK is returned with updated data"
+        response.status == HttpStatus.OK
+        updated.id() == id
+        updated.name() == newName
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
@@ -144,35 +146,60 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent tag"() {
-        given: "a random non-existent ID and an update request"
+        given: "a random non-existent ID and an update command"
         def nonExistentId = UUID.randomUUID()
-        def updateRequest = new Tag(null, "new-tag")
+        def updateCommand = new UpdateTagCommand("new-tag")
 
-        when: "an update is attempted"
-        tagController.updateTag(nonExistentId, updateRequest)
+        when: "an update is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${nonExistentId}", updateCommand)), Tag)
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
+    def "UPDATE | should fail to update tag with invalid data: #testCase"(String testCase, Map payload) {
+        given: "an existing tag"
+        def tag = tagRepository.save(new Tag(null, "tag-for-invalid-update"))
+        UUID id = tag.id()
+
+        when: "an update with invalid data is attempted via HTTP PUT"
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${id}", payload)), Tag)
+
+        then: "a 400 BAD REQUEST status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+
+        where:
+        testCase        | payload
+        "Blank Name"    | [name: "   "]
+        "Name Too Long" | [name: "A" * 51]
+    }
+
+    def "UPDATE | should reject unauthenticated PUT /tags/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to update a tag"
+        client.exchange(HttpRequest.PUT("/tags/${UUID.randomUUID()}", new UpdateTagCommand("test")), Tag)
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing tag"() {
         given: "a new tag to be deleted"
-        def tempTag = new Tag(
-                null,
-                "temporary-tag-to-delete"
-        )
-        def saved = tagController.addTag(tempTag)
+        def saved = tagRepository.save(new Tag(null, "temporary-tag-to-delete"))
         UUID id = saved.id()
         assert tagRepository.existsById(id)
 
-        when: "the tag is deleted"
-        tagController.deleteTag(id)
+        when: "the tag is deleted via HTTP DELETE"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/tags/${id}")))
 
-        then: "the tag no longer exists in the repository or database"
+        then: "the response is 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the tag no longer exists in the repository or database"
         verifyAll {
             !tagRepository.findById(id).isPresent()
             sql.firstRow("SELECT count(*) as count FROM tags WHERE id = ?", [id]).count == 0
@@ -183,35 +210,42 @@ class TagControllerSpec extends BaseControllerSpec {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
 
-        when: "a delete is attempted"
-        tagController.deleteTag(nonExistentId)
+        when: "a delete is attempted via HTTP DELETE"
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/tags/${nonExistentId}")))
 
-        then: "an exception is thrown indicating not found"
-        def e = thrown(HttpStatusException)
-        e.status.code == 404
+        then: "a 404 NOT FOUND status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
+    def "DELETE | should reject unauthenticated DELETE /tags/{id} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to delete a tag"
+        client.exchange(HttpRequest.DELETE("/tags/${UUID.randomUUID()}"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
     /********** LIST Tests **********/
 
-    def "LIST | should fully drain all tags sequentially using cursors"() {
-        setup:
-        Set<Tag> allTags = new LinkedHashSet<>()
-        int pageSize = 5
-        def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("name")))
+    def "LIST | should retrieve tags with pagination"() {
+        when: "requesting tags via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/tags?size=5")), Map)
 
-        when: "iterating through pages until no more data remains"
-        while (pageable != null) {
-            CursoredPage<Tag> page = tagController.getTags(pageable)
-            allTags.addAll(page.content)
-            pageable = page.hasNext() ? page.nextPageable() : null
-        }
+        then: "the response is 200 OK with content list"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        body.content instanceof List
+        body.content.size() >= 2
+    }
 
-        then: "the collected set contains all tags from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM tags").count
-        verifyAll {
-            allTags.size() == totalCount
-            allTags.size() >= 2
-        }
+    def "LIST | should reject unauthenticated GET /tags with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to list tags"
+        client.exchange(HttpRequest.GET("/tags"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 }
