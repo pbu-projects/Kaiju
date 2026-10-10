@@ -5,7 +5,6 @@ plugins {
     id("io.micronaut.aot") version "5.0.2"
     id("io.micronaut.test-resources") version "5.0.2"
     id("org.sonarqube") version "7.5.0.8588"
-    id("org.asciidoctor.jvm.pdf") version "4.0.2"
     id("jacoco")
 }
 
@@ -107,9 +106,10 @@ micronaut {
 }
 sonar {
     properties {
-        property("sonar.projectKey", "pbu-projects_Kaiju")
+        property("sonar.projectKey", "PeanutButter-Unicorn_kaiju")
         property("sonar.organization", "peanutbutter-unicorn")
         property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.jacoco.xmlReportPath", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.absolutePath)
         (System.getenv("SONAR_TOKEN") ?: System.getenv("sonar_token"))?.let { token ->
             if (token.isNotBlank()) {
                 property("sonar.token", token)
@@ -139,19 +139,6 @@ tasks.named<Test>("test") {
         showCauses = true
         showStackTraces = true
     }
-}
-
-tasks.named<org.asciidoctor.gradle.jvm.pdf.AsciidoctorPdfTask>("asciidoctorPdf") {
-    baseDirFollowsSourceDir()
-    setSourceDir(file("docs"))
-    setOutputDir(layout.buildDirectory.dir("docs/asciidoctor-pdf").get().asFile)
-    sources {
-        include("index.adoc")
-    }
-}
-
-asciidoctorj {
-    requires(file("docs/pdf-column-converter.rb"))
 }
 
 tasks.register("lighthouse") {
