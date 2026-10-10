@@ -8,9 +8,9 @@ Guidelines for contributing to the Kaiju backend service.
 
 Do not rewrite or reinvent established patterns. Follow the canonical documentation:
 
-* **Architecture & DTO Standards:** Refer to [Architecture & UI](docs/03-architecture.adoc) for guidelines on Java 25 records, reflection-free AOT compilation, and DTO boundaries.
-* **Testing Guidelines:** Refer to [Testing Strategy](docs/04-testing-strategy.adoc) for Spock, Testcontainers, and PostGIS boundary test rules.
-* **Security & Access Controls:** Refer to the [Security Test Plan](test-plan.md) and [Security Matrix](docs/06-security-matrix.adoc).
+* **Architecture & DTO Standards:** Refer to the internal Field Guide specification for guidelines on Java 25 records, reflection-free AOT compilation, and DTO boundaries.
+* **Testing Guidelines:** Refer to the internal Field Guide specification for Spock, Testcontainers, and PostGIS boundary test rules.
+* **Security & Access Controls:** Refer to the [Security Test Plan](test-plan.md) and the internal Field Guide security matrix.
 * **Personas & User Journeys:** Refer to the internal Field Guide specification for canonical Personas and Key User Journeys.
 
 ---

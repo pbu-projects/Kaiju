@@ -5,7 +5,7 @@ import io.micronaut.security.rules.SecurityRule;
 
 /**
  * Security role constants used for @Secured annotations.
- * See {@code docs/06-security-matrix.adoc} for the full permissions matrix.
+ * See the Field Guide security matrix for the full permissions matrix.
  */
 public final class SecurityRoles {
     private SecurityRoles() {}
