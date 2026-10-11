@@ -1,0 +1,368 @@
+version: 1
+metadata:
+  name: kaiju-test-personas
+  labels:
+    blueprints.goauthentik.io/description: Kaiju deterministic test personas blueprint
+entries:
+  # Groups
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Global Admins
+    attrs:
+      is_superuser: true
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Region Directors
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Region Agents
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Org Admins
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Org Managers
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Org Members
+  - model: authentik_core.group
+    state: present
+    identifiers:
+      name: Kaiju Standard Users
+
+  # Global System Admins
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: sarah.admin1@kaiju.local
+    attrs:
+      email: sarah.admin1@kaiju.local
+      name: Sarah Admin 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Global Admins
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: gary.admin2@kaiju.local
+    attrs:
+      email: gary.admin2@kaiju.local
+      name: Gary Admin 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Global Admins
+
+  # State Region (Level 1)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: rachel.state.director1@kaiju.local
+    attrs:
+      email: rachel.state.director1@kaiju.local
+      name: Rachel State Director 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Directors
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: robert.state.director2@kaiju.local
+    attrs:
+      email: robert.state.director2@kaiju.local
+      name: Robert State Director 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Directors
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: samuel.state.agent@kaiju.local
+    attrs:
+      email: samuel.state.agent@kaiju.local
+      name: Samuel State Agent
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Agents
+
+  # County Region (Level 2)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: daniel.county.director1@kaiju.local
+    attrs:
+      email: daniel.county.director1@kaiju.local
+      name: Daniel County Director 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Directors
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: diana.county.director2@kaiju.local
+    attrs:
+      email: diana.county.director2@kaiju.local
+      name: Diana County Director 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Directors
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: connie.county.agent@kaiju.local
+    attrs:
+      email: connie.county.agent@kaiju.local
+      name: Connie County Agent
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Agents
+
+  # Sibling County (Level 2)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: ethan.sibling.director1@kaiju.local
+    attrs:
+      email: ethan.sibling.director1@kaiju.local
+      name: Ethan Sibling Director 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Directors
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: emma.sibling.director2@kaiju.local
+    attrs:
+      email: emma.sibling.director2@kaiju.local
+      name: Emma Sibling Director 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Directors
+
+  # City Region (Level 3)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: clara.city.lead1@kaiju.local
+    attrs:
+      email: clara.city.lead1@kaiju.local
+      name: Clara City Lead 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Agents
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: cameron.city.lead2@kaiju.local
+    attrs:
+      email: cameron.city.lead2@kaiju.local
+      name: Cameron City Lead 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Region Agents
+
+  # National Org (Level 1)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: nathan.national.admin1@kaiju.local
+    attrs:
+      email: nathan.national.admin1@kaiju.local
+      name: Nathan National Admin 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: nicole.national.admin2@kaiju.local
+    attrs:
+      email: nicole.national.admin2@kaiju.local
+      name: Nicole National Admin 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: noah.national.manager@kaiju.local
+    attrs:
+      email: noah.national.manager@kaiju.local
+      name: Noah National Manager
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Managers
+        - !KeyOf Kaiju Standard Users
+
+  # State Chapter Org (Level 2)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: steven.state.admin1@kaiju.local
+    attrs:
+      email: steven.state.admin1@kaiju.local
+      name: Steven State Admin 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: sophia.state.admin2@kaiju.local
+    attrs:
+      email: sophia.state.admin2@kaiju.local
+      name: Sophia State Admin 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: susan.state.manager@kaiju.local
+    attrs:
+      email: susan.state.manager@kaiju.local
+      name: Susan State Manager
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Managers
+        - !KeyOf Kaiju Standard Users
+
+  # Sibling State Chapter Org (Level 2)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: ursula.utah.admin1@kaiju.local
+    attrs:
+      email: ursula.utah.admin1@kaiju.local
+      name: Ursula Utah Admin 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: ulysses.utah.admin2@kaiju.local
+    attrs:
+      email: ulysses.utah.admin2@kaiju.local
+      name: Ulysses Utah Admin 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+
+  # Local Branch Org (Level 3)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: leo.local.admin1@kaiju.local
+    attrs:
+      email: leo.local.admin1@kaiju.local
+      name: Leo Local Admin 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: lisa.local.admin2@kaiju.local
+    attrs:
+      email: lisa.local.admin2@kaiju.local
+      name: Lisa Local Admin 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Admins
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: laura.local.manager@kaiju.local
+    attrs:
+      email: laura.local.manager@kaiju.local
+      name: Laura Local Manager
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Managers
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: luke.local.member@kaiju.local
+    attrs:
+      email: luke.local.member@kaiju.local
+      name: Luke Local Member
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Org Members
+        - !KeyOf Kaiju Standard Users
+
+  # Independent Volunteers
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: victor.volunteer1@kaiju.local
+    attrs:
+      email: victor.volunteer1@kaiju.local
+      name: Victor Volunteer 1
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Standard Users
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: valerie.volunteer2@kaiju.local
+    attrs:
+      email: valerie.volunteer2@kaiju.local
+      name: Valerie Volunteer 2
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Standard Users
+
+  # JIT Provisioning Test Candidate (Present in Authentik, omitted from DB)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: jenny.new@kaiju.local
+    attrs:
+      email: jenny.new@kaiju.local
+      name: Jenny New
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf Kaiju Standard Users
