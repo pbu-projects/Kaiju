@@ -16,6 +16,8 @@ To ensure that all changes are deliberate and understood (especially when utiliz
 ## Test Validation (Journeys & Personas)
 
 * **Personas & Journeys Tested:** (e.g., Volunteer registering on mobile, Org Admin managing shifts)
+* **Portions of User Journeys Tested:** (e.g., Initial form submission, boundary spatial intersection checks, role update flow)
+* **Portions of User Journeys Left Untested:** (e.g., Email delivery notification deferred to future milestone, offline sync)
 * **Scenarios Covered:** (e.g., Happy path, negative authorization like 403 Forbidden, boundary/spatial conditions)
 
 ## Checklist
