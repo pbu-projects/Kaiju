@@ -20,19 +20,33 @@ import lol.pbu.kaiju.domain.Tag;
 import lol.pbu.kaiju.dto.CreateTagCommand;
 import lol.pbu.kaiju.dto.UpdateTagCommand;
 import lol.pbu.kaiju.repository.TagRepository;
+import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.PageableUtils;
 
 import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
+import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
+/**
+ * REST controller for managing tags.
+ *
+ * <p>Enforces a two-tier security model: read operations require general authentication,
+ * while mutating operations are restricted to platform administrators and regional managers.</p>
+ *
+ * @see Permission#SYSTEM_ADMIN_CLAIM
+ * @see Permission#REGION_MANAGE_CLAIM
+ * @see TagRepository
+ */
 @ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/tags")
 public class TagController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
+    private static final String TAG_NOT_FOUND = "Tag not found";
 
     private final TagRepository tagRepository;
 
@@ -40,16 +54,36 @@ public class TagController {
         this.tagRepository = tagRepository;
     }
 
+    /**
+     * Retrieves a paginated list of tags.
+     *
+     * @param pageable pagination and sorting parameters
+     * @return a cursored page of tags
+     */
     @Get
     public CursoredPage<Tag> getTags(@Nullable @Valid CursoredPageable pageable) {
         return tagRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
+    /**
+     * Retrieves a specific tag by its identifier.
+     *
+     * @param id the unique identifier of the tag
+     * @return an optional containing the tag if found
+     */
     @Get("/{id}")
     public Optional<Tag> getTag(@PathVariable UUID id) {
         return tagRepository.findById(id);
     }
 
+    /**
+     * Creates a new tag.
+     * Restricted to platform administrators and regional managers.
+     *
+     * @param command the payload containing tag details
+     * @return the persisted tag
+     */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
     public Tag addTag(@Valid @Body CreateTagCommand command) {
         return tagRepository.save(new Tag(null, command.name()));
@@ -57,30 +91,34 @@ public class TagController {
 
     /**
      * Updates an existing tag by its ID after validating that it exists.
+     * Restricted to platform administrators and regional managers.
      * Throws 404 NOT_FOUND if the tag does not exist.
      *
      * @param id      the ID of the tag to update
      * @param command the updated tag details
      * @return the updated tag
      */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
     public Tag updateTag(@PathVariable UUID id, @Valid @Body UpdateTagCommand command) {
         tagRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Tag not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, TAG_NOT_FOUND));
         return tagRepository.update(new Tag(id, command.name()));
     }
 
     /**
      * Deletes a tag by its ID after validating that it exists.
+     * Restricted to platform administrators and regional managers.
      * Throws 404 NOT_FOUND if the tag does not exist.
      *
      * @param id the ID of the tag to delete
      */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Delete("/{id}")
     public void deleteTag(@PathVariable UUID id) {
         long deletedCount = tagRepository.removeById(id);
         if (deletedCount == 0) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Tag not found");
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, TAG_NOT_FOUND);
         }
     }
 }

@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller
 import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -27,6 +28,12 @@ import java.util.UUID
 @MicronautTest(transactional = false)
 class BoundaryControllerSpec extends BaseControllerSpec {
 
+    private static final String ROLE_STANDARD_USER = "STANDARD_USER"
+    private static final String ROLE_REGION_AGENT = "REGION_AGENT"
+    private static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
+    private static final String CLAIM_REGION_MANAGE = "region:manage"
+    private static final String BASE_PATH = "/boundaries"
+
     @Inject
     BoundaryRepository boundaryRepository
 
@@ -35,6 +42,18 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
+
+    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_STANDARD_USER])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionAgent(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_AGENT])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionDirector(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_DIRECTOR, CLAIM_REGION_MANAGE])
+    }
 
     private Polygon createPolygon() {
         Coordinate[] coords = [
@@ -63,7 +82,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def cleanup() {
-        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %' OR name LIKE 'Updated Boundary %' OR name LIKE 'Temporary Boundary %'")
+        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %' OR name LIKE 'Updated Boundary %' OR name LIKE 'Temporary Boundary %' OR name LIKE 'Director Boundary %'")
     }
 
     /********** CREATE Tests **********/
@@ -91,6 +110,60 @@ class BoundaryControllerSpec extends BaseControllerSpec {
             saved.id() == id
             saved.name() == result.name
         }
+    }
+
+    def "CREATE | should allow regional director with region:manage claim to create a boundary"() {
+        given: "a new valid boundary command"
+        String name = "Director Boundary ${faker.address().city()}"
+        def command = new CreateBoundaryCommand(name, createCoordinateDtos())
+
+        when: "the boundary is added by a regional director via HTTP POST"
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Boundary)
+        Boundary saved = response.body()
+
+        then: "the boundary is persisted with 200 OK and generated ID"
+        response.status == HttpStatus.OK
+        verifyAll {
+            saved.id() != null
+            saved.name() == name
+            saved.geom() != null
+        }
+
+        and: "it can be retrieved from the database"
+        def result = sql.firstRow("SELECT * FROM boundaries WHERE id = ?", [saved.id()])
+        verifyAll(result) {
+            saved.id() == id
+            saved.name() == result.name
+        }
+
+        cleanup:
+        if (saved?.id()) {
+            sql.execute("DELETE FROM boundaries WHERE id = ?", [saved.id()])
+        }
+    }
+
+    def "CREATE | should reject standard user attempting POST /boundaries with 403 FORBIDDEN"() {
+        given: "a valid boundary command"
+        def command = new CreateBoundaryCommand("Standard User Boundary", createCoordinateDtos())
+
+        when: "a standard user attempts to create a boundary via HTTP POST"
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), Boundary)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "CREATE | should reject regional agent without region:manage claim attempting POST /boundaries with 403 FORBIDDEN"() {
+        given: "a valid boundary command"
+        def command = new CreateBoundaryCommand("Agent Boundary", createCoordinateDtos())
+
+        when: "a regional agent attempts to create a boundary via HTTP POST"
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), Boundary)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     @Unroll
@@ -231,6 +304,58 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.UNAUTHORIZED
     }
 
+    def "UPDATE | should allow regional director with region:manage claim to update an existing boundary"() {
+        given: "an existing boundary"
+        def boundary = boundaryRepository.save(new Boundary(null, "Test Boundary Director Update", createPolygon()))
+        UUID id = boundary.id()
+        def newName = "Director Boundary Update ${faker.address().city()}"
+        def updateCommand = new UpdateBoundaryCommand(newName, createCoordinateDtos())
+
+        when: "the boundary is updated by a regional director via HTTP PUT"
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
+        Boundary updated = response.body()
+
+        then: "the returned boundary contains the updated data with 200 OK"
+        response.status == HttpStatus.OK
+        verifyAll {
+            updated.id() == id
+            updated.name() == newName
+        }
+
+        and: "the changes are persisted in the database"
+        def dbResult = sql.firstRow("SELECT name FROM boundaries WHERE id = ?", [id])
+        dbResult.name == newName
+
+        cleanup:
+        sql.execute("DELETE FROM boundaries WHERE id = ?", [id])
+    }
+
+    def "UPDATE | should reject standard user attempting PUT /boundaries/{id} with 403 FORBIDDEN"() {
+        given: "an update command and target boundary ID"
+        def updateCommand = new UpdateBoundaryCommand("Unauthorized Update", createCoordinateDtos())
+        UUID id = UUID.randomUUID()
+
+        when: "a standard user attempts to update a boundary via HTTP PUT"
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should reject regional agent without region:manage claim attempting PUT /boundaries/{id} with 403 FORBIDDEN"() {
+        given: "an update command and target boundary ID"
+        def updateCommand = new UpdateBoundaryCommand("Unauthorized Update", createCoordinateDtos())
+        UUID id = UUID.randomUUID()
+
+        when: "a regional agent attempts to update a boundary via HTTP PUT"
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing boundary"() {
@@ -272,6 +397,44 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "DELETE | should allow regional director with region:manage claim to remove an existing boundary"() {
+        given: "a new boundary to be deleted"
+        def tempBoundary = new Boundary(null, "Temporary Boundary Director Delete", createPolygon())
+        def saved = boundaryRepository.save(tempBoundary)
+        UUID id = saved.id()
+        assert boundaryRepository.existsById(id)
+
+        when: "the boundary is deleted by a regional director via HTTP DELETE"
+        def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${id}")))
+
+        then: "the response is 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the boundary no longer exists in the repository or database"
+        verifyAll {
+            !boundaryRepository.findById(id).isPresent()
+            sql.firstRow("SELECT count(*) as count FROM boundaries WHERE id = ?", [id]).count == 0
+        }
+    }
+
+    def "DELETE | should reject standard user attempting DELETE /boundaries/{id} with 403 FORBIDDEN"() {
+        when: "a standard user attempts to delete a boundary via HTTP DELETE"
+        client.exchange(asStandardUser(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should reject regional agent without region:manage claim attempting DELETE /boundaries/{id} with 403 FORBIDDEN"() {
+        when: "a regional agent attempts to delete a boundary via HTTP DELETE"
+        client.exchange(asRegionAgent(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** LIST Tests **********/

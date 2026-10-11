@@ -250,6 +250,15 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    def "UPDATE | should reject unauthenticated PUT /organization-users/{userId}/{orgId} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to update an organization user"
+        client.exchange(HttpRequest.PUT("/organization-users/${UUID.randomUUID()}/${UUID.randomUUID()}", new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing organization user when called by org admin"() {
@@ -314,6 +323,15 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "DELETE | should reject unauthenticated DELETE /organization-users/{userId}/{orgId} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to delete an organization user"
+        client.exchange(HttpRequest.DELETE("/organization-users/${UUID.randomUUID()}/${UUID.randomUUID()}"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** LIST Tests **********/
