@@ -279,11 +279,32 @@ public class BoundaryIngestionService {
         if (firstChild != null && firstChild.isNumber()) {
             validatePointCoordinates(node);
         } else if (firstChild != null && firstChild.isArray()) {
+            JsonNode grandChild = firstChild.get(0);
+            if (grandChild != null && grandChild.isNumber()) {
+                validateLinearRing(node);
+            }
             for (JsonNode child : node.values()) {
                 validateCoordinatesTree(child);
             }
         } else {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Unexpected coordinate structure in GeoJSON geometry.");
+        }
+    }
+
+    private void validateLinearRing(JsonNode ring) {
+        if (ring.size() < 4) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must contain at least 4 coordinate positions.");
+        }
+        JsonNode first = ring.get(0);
+        JsonNode last = ring.get(ring.size() - 1);
+        if (first != null && last != null && first.size() >= 2 && last.size() >= 2) {
+            double lonFirst = first.get(0).getNumberValue().doubleValue();
+            double latFirst = first.get(1).getNumberValue().doubleValue();
+            double lonLast = last.get(0).getNumberValue().doubleValue();
+            double latLast = last.get(1).getNumberValue().doubleValue();
+            if (Double.compare(lonFirst, lonLast) != 0 || Double.compare(latFirst, latLast) != 0) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
+            }
         }
     }
 
