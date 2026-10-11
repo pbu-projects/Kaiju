@@ -14,7 +14,7 @@ Nonprofits shouldn't have to choose between clunky legacy software and costly en
 <details>
 <summary><b>Hyper-Local Discovery</b>: Volunteers find initiatives right in their neighborhood without zip code guesswork.</summary>
 
-> All the math leans into two strengths: [PostGIS](https://postgis.net/)'s phenomenal spatial performance, and [Micronaut](https://micronaut.io/framework/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/)'s crazy speed. No reinventing the wheel, just pairing two technologies that work together beautifully.
+> All the math leans into two strengths: [PostGIS](https://postgis.net/)'s phenomenal spatial performance, and [Micronaut](https://micronaut.io/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/)'s crazy speed. No reinventing the wheel, just pairing two technologies that work together beautifully.
 
 </details>
 
