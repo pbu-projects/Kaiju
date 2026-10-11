@@ -4,14 +4,13 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.data.jdbc.runtime.JdbcOperations;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.json.tree.JsonNode;
+import io.micronaut.serde.ObjectMapper;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.dto.IngestBoundaryCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -50,11 +49,12 @@ public class BoundaryIngestionService {
 
     public BoundaryIngestionService(
             JdbcOperations jdbcOperations,
+            ObjectMapper objectMapper,
             @Value("${kaiju.tigerweb.allowed-host:tigerweb.geo.census.gov}") String allowedHost,
             @Value("${kaiju.tigerweb.allowed-path-prefix:/arcgis/rest/services/TIGERweb/}") String allowedPathPrefix
     ) {
         this.jdbcOperations = jdbcOperations;
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = objectMapper;
         this.allowedHost = allowedHost;
         this.allowedPathPrefix = allowedPathPrefix;
         this.httpClient = HttpClient.newBuilder()
@@ -65,12 +65,13 @@ public class BoundaryIngestionService {
 
     public BoundaryIngestionService(
             JdbcOperations jdbcOperations,
+            ObjectMapper objectMapper,
             HttpClient httpClient,
             String allowedHost,
             String allowedPathPrefix
     ) {
         this.jdbcOperations = jdbcOperations;
-        this.objectMapper = new ObjectMapper();
+        this.objectMapper = objectMapper;
         this.httpClient = httpClient;
         this.allowedHost = allowedHost;
         this.allowedPathPrefix = allowedPathPrefix;
@@ -98,7 +99,7 @@ public class BoundaryIngestionService {
         String geomJson;
         try {
             geomJson = objectMapper.writeValueAsString(geomNode);
-        } catch (JacksonException e) {
+        } catch (IOException e) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Failed to serialize geometry: " + e.getMessage());
         }
 
@@ -171,11 +172,11 @@ public class BoundaryIngestionService {
             throw new HttpStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Boundary download request was interrupted.");
         }
 
-        if (response.statusCode() != 200) {
-            throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "Authoritative boundary service returned HTTP status " + response.statusCode());
-        }
-
         try (InputStream in = response.body()) {
+            if (response.statusCode() != 200) {
+                throw new HttpStatusException(HttpStatus.BAD_GATEWAY, "Authoritative boundary service returned HTTP status " + response.statusCode());
+            }
+
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             byte[] buffer = new byte[8192];
             int totalBytes = 0;
@@ -196,20 +197,20 @@ public class BoundaryIngestionService {
     private JsonNode parseAndValidateGeoJson(byte[] payload) {
         JsonNode root;
         try {
-            root = objectMapper.readTree(payload);
-        } catch (JacksonException e) {
+            root = objectMapper.readValue(payload, JsonNode.class);
+        } catch (IOException e) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Response payload is not valid JSON: " + e.getMessage());
         }
 
         JsonNode geomNode;
-        if (root.has("features")) {
-            JsonNode features = root.get("features");
-            if (!features.isArray() || features.isEmpty()) {
+        JsonNode featuresNode = root.get("features");
+        if (featuresNode != null) {
+            if (!featuresNode.isArray() || featuresNode.size() == 0) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains no features.");
             }
-            JsonNode firstFeature = features.get(0);
-            geomNode = firstFeature.get("geometry");
-        } else if (root.has("geometry")) {
+            JsonNode firstFeature = featuresNode.get(0);
+            geomNode = firstFeature != null ? firstFeature.get("geometry") : null;
+        } else if (root.get("geometry") != null) {
             geomNode = root.get("geometry");
         } else {
             geomNode = root;
@@ -220,17 +221,17 @@ public class BoundaryIngestionService {
         }
 
         JsonNode typeNode = geomNode.get("type");
-        if (typeNode == null || !typeNode.isTextual()) {
+        if (typeNode == null || !typeNode.isString()) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON geometry is missing a valid type field.");
         }
 
-        String geomType = typeNode.asText();
+        String geomType = typeNode.getStringValue();
         if (!"Polygon".equalsIgnoreCase(geomType) && !"MultiPolygon".equalsIgnoreCase(geomType)) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Geometry type must be Polygon or MultiPolygon, found: " + geomType);
         }
 
         JsonNode coordsNode = geomNode.get("coordinates");
-        if (coordsNode == null || !coordsNode.isArray() || coordsNode.isEmpty()) {
+        if (coordsNode == null || !coordsNode.isArray() || coordsNode.size() == 0) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON geometry coordinates are missing or empty.");
         }
 
@@ -240,17 +241,17 @@ public class BoundaryIngestionService {
     }
 
     private void validateCoordinatesTree(JsonNode node) {
-        if (!node.isArray() || node.isEmpty()) {
+        if (!node.isArray() || node.size() == 0) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinate ring structure is empty or invalid.");
         }
 
         JsonNode firstChild = node.get(0);
-        if (firstChild.isNumber()) {
-            if (node.size() < 2 || !node.get(1).isNumber()) {
+        if (firstChild != null && firstChild.isNumber()) {
+            if (node.size() < 2 || node.get(1) == null || !node.get(1).isNumber()) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinate point must contain at least two numeric values.");
             }
-            double lon = node.get(0).asDouble();
-            double lat = node.get(1).asDouble();
+            double lon = node.get(0).getNumberValue().doubleValue();
+            double lat = node.get(1).getNumberValue().doubleValue();
 
             if (Double.isNaN(lon) || Double.isNaN(lat) || Double.isInfinite(lon) || Double.isInfinite(lat)) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinates must contain valid finite numbers.");
@@ -260,8 +261,8 @@ public class BoundaryIngestionService {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST,
                         String.format(Locale.ROOT, "Coordinates out of valid WGS84 bounds (-180..180 lon, -90..90 lat): lon=%.6f, lat=%.6f", lon, lat));
             }
-        } else if (firstChild.isArray()) {
-            for (JsonNode child : node) {
+        } else if (firstChild != null && firstChild.isArray()) {
+            for (JsonNode child : node.values()) {
                 validateCoordinatesTree(child);
             }
         } else {
@@ -276,49 +277,31 @@ public class BoundaryIngestionService {
 
     private IngestBoundaryResponse updateRegionBoundary(UUID regionId, String geomJson, double tolerance) {
         return jdbcOperations.execute(connection -> {
-            String regionName;
-            try (PreparedStatement checkStmt = connection.prepareStatement("SELECT name FROM administrative_regions WHERE id = ?")) {
-                checkStmt.setObject(1, regionId);
-                try (ResultSet rs = checkStmt.executeQuery()) {
-                    if (!rs.next()) {
-                        throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
-                    }
-                    regionName = rs.getString("name");
-                }
-            }
-
             String updateSql = """
-                UPDATE administrative_regions
-                SET geom = ST_Multi(ST_SimplifyPreserveTopology(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), ?))
-                WHERE id = ?
+                WITH simplified AS (
+                    SELECT
+                        ST_Multi(ST_SimplifyPreserveTopology(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), ?)) AS geom,
+                        ST_NPoints(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)) AS orig_pts
+                )
+                UPDATE administrative_regions r
+                SET geom = s.geom
+                FROM simplified s
+                WHERE r.id = ?
+                  AND ST_IsValid(s.geom::geometry)
+                RETURNING r.name, s.orig_pts, ST_NPoints(r.geom::geometry) AS simp_pts, ST_IsValid(r.geom::geometry) AS is_valid
             """;
 
             try (PreparedStatement updateStmt = connection.prepareStatement(updateSql)) {
                 updateStmt.setString(1, geomJson);
                 updateStmt.setDouble(2, tolerance);
-                updateStmt.setObject(3, regionId);
-                int updatedRows = updateStmt.executeUpdate();
-                if (updatedRows == 0) {
-                    throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
-                }
-            }
+                updateStmt.setString(3, geomJson);
+                updateStmt.setObject(4, regionId);
 
-            String statsSql = """
-                SELECT
-                    ST_NPoints(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)) AS original_points,
-                    ST_NPoints(geom::geometry) AS simplified_points,
-                    ST_IsValid(geom::geometry) AS is_valid
-                FROM administrative_regions
-                WHERE id = ?
-            """;
-
-            try (PreparedStatement statsStmt = connection.prepareStatement(statsSql)) {
-                statsStmt.setString(1, geomJson);
-                statsStmt.setObject(2, regionId);
-                try (ResultSet rs = statsStmt.executeQuery()) {
+                try (ResultSet rs = updateStmt.executeQuery()) {
                     if (rs.next()) {
-                        int origPoints = rs.getInt("original_points");
-                        int simpPoints = rs.getInt("simplified_points");
+                        String regionName = rs.getString("name");
+                        int origPoints = rs.getInt("orig_pts");
+                        int simpPoints = rs.getInt("simp_pts");
                         boolean isValid = rs.getBoolean("is_valid");
 
                         double reduction = origPoints > 0 ? (1.0 - (double) simpPoints / origPoints) * 100.0 : 0.0;
@@ -332,14 +315,29 @@ public class BoundaryIngestionService {
                                 reductionRatio,
                                 isValid
                         );
-                    } else {
-                        throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to compute boundary statistics.");
                     }
                 }
             } catch (SQLException e) {
-                LOG.error("Failed calculating boundary statistics for region {}: {}", regionId, e.getMessage(), e);
-                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error computing boundary simplification statistics: " + e.getMessage());
+                LOG.error("Failed executing atomic boundary update for region {}: {}", regionId, e.getMessage(), e);
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error updating administrative region boundary: " + e.getMessage());
             }
+
+            // Zero rows returned: determine if region is missing or geometry is invalid
+            boolean regionExists;
+            try (PreparedStatement checkStmt = connection.prepareStatement("SELECT 1 FROM administrative_regions WHERE id = ?")) {
+                checkStmt.setObject(1, regionId);
+                try (ResultSet rs = checkStmt.executeQuery()) {
+                    regionExists = rs.next();
+                }
+            } catch (SQLException e) {
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error verifying administrative region existence: " + e.getMessage());
+            }
+
+            if (!regionExists) {
+                throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
+            }
+
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
         });
     }
 }
