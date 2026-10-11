@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller
 import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -26,6 +27,12 @@ import java.util.UUID
 @MicronautTest(transactional = false)
 class LocationControllerSpec extends BaseControllerSpec {
 
+    private static final String ROLE_STANDARD_USER = "STANDARD_USER"
+    private static final String ROLE_REGION_AGENT = "REGION_AGENT"
+    private static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
+    private static final String CLAIM_REGION_MANAGE = "region:manage"
+    private static final String BASE_PATH = "/locations"
+
     @Inject
     LocationRepository locationRepository
 
@@ -35,12 +42,24 @@ class LocationControllerSpec extends BaseControllerSpec {
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
 
+    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_STANDARD_USER])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionAgent(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_AGENT])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionDirector(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_DIRECTOR, CLAIM_REGION_MANAGE])
+    }
+
     private Point createPoint(double lon = 0, double lat = 0) {
         geometryFactory.createPoint(new Coordinate(lon, lat))
     }
 
     def cleanup() {
-        sql.execute("DELETE FROM locations WHERE name LIKE 'Test%' OR name LIKE 'Updated%' OR name LIKE 'Original%'")
+        sql.execute("DELETE FROM locations WHERE name LIKE 'Test%' OR name LIKE 'Updated%' OR name LIKE 'Original%' OR name LIKE 'Director%'")
     }
 
     /********** CREATE Tests **********/
@@ -139,6 +158,61 @@ class LocationControllerSpec extends BaseControllerSpec {
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "CREATE | should allow regional director with region:manage claim to create a location"() {
+        given: "a new valid location command"
+        String name = "Director Location ${faker.company().name()}"
+        def command = new CreateLocationCommand(name, "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+
+        when: "the location is added by a regional director via HTTP POST"
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Location)
+        Location saved = response.body()
+
+        then: "the location is persisted with 200 OK and generated ID"
+        response.status == HttpStatus.OK
+        verifyAll {
+            saved.id() != null
+            saved.name() == name
+            saved.countryCode() == "US"
+            saved.geom() != null
+        }
+
+        and: "it can be retrieved from the database"
+        def result = sql.firstRow("SELECT * FROM locations WHERE id = ?", [saved.id()])
+        verifyAll(result) {
+            saved.id() == id
+            saved.name() == result.name
+        }
+
+        cleanup:
+        if (saved?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [saved.id()])
+        }
+    }
+
+    def "CREATE | should reject standard user attempting POST /locations with 403 FORBIDDEN"() {
+        given: "a valid location command"
+        def command = new CreateLocationCommand("Standard User Location", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+
+        when: "a standard user attempts to create a location via HTTP POST"
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), Location)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "CREATE | should reject regional agent without region:manage claim attempting POST /locations with 403 FORBIDDEN"() {
+        given: "a valid location command"
+        def command = new CreateLocationCommand("Agent Location", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+
+        when: "a regional agent attempts to create a location via HTTP POST"
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), Location)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** READ Tests **********/
@@ -254,6 +328,62 @@ class LocationControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.UNAUTHORIZED
     }
 
+    def "UPDATE | should allow regional director with region:manage claim to update an existing location"() {
+        given: "an existing location"
+        def location = locationRepository.save(new Location(null, "Original Location Director", "123 Main St", "Original City", "CO", "80202", "US", createPoint()))
+        UUID id = location.id()
+        def newName = "Director Location Update ${faker.company().name()}"
+        def updateCommand = new UpdateLocationCommand(newName, "456 Update Ave", "Denver", "CO", "80202", "US", -104.99, 39.74)
+
+        when: "the location is updated by a regional director via HTTP PUT"
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the returned location contains the updated data with 200 OK"
+        response.status == HttpStatus.OK
+        verifyAll {
+            updated.id() == id
+            updated.name() == newName
+            updated.city() == "Denver"
+        }
+
+        and: "the changes are persisted in the database"
+        def dbResult = sql.firstRow("SELECT name, city FROM locations WHERE id = ?", [id])
+        verifyAll(dbResult) {
+            name == newName
+            city == "Denver"
+        }
+
+        cleanup:
+        sql.execute("DELETE FROM locations WHERE id = ?", [id])
+    }
+
+    def "UPDATE | should reject standard user attempting PUT /locations/{id} with 403 FORBIDDEN"() {
+        given: "an update command and target location ID"
+        def updateCommand = new UpdateLocationCommand("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        UUID id = UUID.randomUUID()
+
+        when: "a standard user attempts to update a location via HTTP PUT"
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Location)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should reject regional agent without region:manage claim attempting PUT /locations/{id} with 403 FORBIDDEN"() {
+        given: "an update command and target location ID"
+        def updateCommand = new UpdateLocationCommand("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        UUID id = UUID.randomUUID()
+
+        when: "a regional agent attempts to update a location via HTTP PUT"
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Location)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing location"() {
@@ -295,6 +425,44 @@ class LocationControllerSpec extends BaseControllerSpec {
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "DELETE | should allow regional director with region:manage claim to remove an existing location"() {
+        given: "a new location to be deleted"
+        def tempLoc = new Location(null, "Director Delete Location", "123 Delete St", "Denver", "CO", "80202", "US", createPoint())
+        def saved = locationRepository.save(tempLoc)
+        UUID id = saved.id()
+        assert locationRepository.existsById(id)
+
+        when: "the location is deleted by a regional director via HTTP DELETE"
+        def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${id}")))
+
+        then: "the response is 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the location no longer exists in the repository or database"
+        verifyAll {
+            !locationRepository.findById(id).isPresent()
+            sql.firstRow("SELECT count(*) as count FROM locations WHERE id = ?", [id]).count == 0
+        }
+    }
+
+    def "DELETE | should reject standard user attempting DELETE /locations/{id} with 403 FORBIDDEN"() {
+        when: "a standard user attempts to delete a location via HTTP DELETE"
+        client.exchange(asStandardUser(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should reject regional agent without region:manage claim attempting DELETE /locations/{id} with 403 FORBIDDEN"() {
+        when: "a regional agent attempts to delete a location via HTTP DELETE"
+        client.exchange(asRegionAgent(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** LIST Tests **********/

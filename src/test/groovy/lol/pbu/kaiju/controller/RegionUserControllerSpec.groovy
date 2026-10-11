@@ -6,6 +6,7 @@ import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -25,11 +26,29 @@ import java.util.UUID
 @MicronautTest(transactional = false)
 class RegionUserControllerSpec extends BaseControllerSpec {
 
+    private static final String ROLE_STANDARD_USER = "STANDARD_USER"
+    private static final String ROLE_REGION_AGENT = "REGION_AGENT"
+    private static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
+    private static final String CLAIM_REGION_MANAGE = "region:manage"
+    private static final String BASE_PATH = "/region-users"
+
     @Inject
     RegionUserRepository regionUserRepository
 
     @Inject
     RegionUserController regionUserController
+
+    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_STANDARD_USER])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionAgent(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_AGENT])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionDirector(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_DIRECTOR, CLAIM_REGION_MANAGE])
+    }
 
     /********** CREATE Tests **********/
 
@@ -80,11 +99,65 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should reject unauthenticated POST /region-users with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to add a region user"
-        client.exchange(HttpRequest.POST("/region-users", new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_DIRECTOR)))
+        client.exchange(HttpRequest.POST(BASE_PATH, new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_DIRECTOR)))
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "CREATE | should reject standard user attempting POST /region-users with 403 FORBIDDEN"() {
+        given: "a region user creation command"
+        def command = new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_AGENT)
+
+        when: "a standard user attempts to create a region user"
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), RegionUser)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "CREATE | should reject regional agent without region:manage claim attempting POST /region-users with 403 FORBIDDEN"() {
+        given: "a region user creation command"
+        def command = new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_AGENT)
+
+        when: "a regional agent without region:manage attempts to create a region user"
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), RegionUser)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "CREATE | should allow regional director with region:manage claim to save a region user"() {
+        given: "a target user, administrative region, and regional director"
+        UUID targetUserId = UUID.randomUUID()
+        UUID targetRegionId = UUID.randomUUID()
+        UUID directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "director-create-user@example.com")
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", targetRegionId, "Director Test Region Create")
+
+        def command = new CreateRegionUserCommand(targetUserId, targetRegionId, RegionUserRole.REGION_AGENT)
+
+        when: "the regional director creates the region user via HTTP POST"
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command), directorId.toString()), RegionUser)
+        RegionUser saved = response.body()
+
+        then: "200 OK is returned and record is persisted"
+        response.status == HttpStatus.OK
+        saved.id().userId() == targetUserId
+        saved.id().regionId() == targetRegionId
+        saved.role() == RegionUserRole.REGION_AGENT
+
+        and: "it can be retrieved from the database"
+        def result = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [targetUserId, targetRegionId])
+        result.role == 'REGION_AGENT'
+
+        cleanup:
+        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
+        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", targetRegionId)
+        executeUpdate("DELETE FROM users WHERE id = ?", targetUserId)
     }
 
     /********** READ Tests **********/
@@ -173,6 +246,71 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    def "UPDATE | should reject unauthenticated PUT /region-users/{userId}/{regionId} with 401 UNAUTHORIZED"() {
+        given: "an update command"
+        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+
+        when: "an unauthenticated caller attempts to update a region user"
+        client.exchange(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", command))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "UPDATE | should reject standard user attempting PUT /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
+        given: "an update command"
+        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+
+        when: "a standard user attempts to update a region user"
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", command)), RegionUser)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should reject regional agent without region:manage claim attempting PUT /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
+        given: "an update command"
+        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+
+        when: "a regional agent without region:manage attempts to update a region user"
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", command)), RegionUser)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should allow regional director with region:manage claim to update an existing region user role"() {
+        given: "an existing region user association and regional director"
+        UUID targetUserId = UUID.randomUUID()
+        UUID targetRegionId = UUID.randomUUID()
+        UUID directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "director-update-user@example.com")
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", targetRegionId, "Director Test Region Update")
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", targetUserId, targetRegionId)
+
+        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+
+        when: "the regional director updates the role via HTTP PUT"
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${targetUserId}/${targetRegionId}", command), directorId.toString()), RegionUser)
+        RegionUser updated = response.body()
+
+        then: "200 OK is returned and update is reflected in response"
+        response.status == HttpStatus.OK
+        updated.role() == RegionUserRole.REGION_DIRECTOR
+
+        and: "persisted in the database"
+        def role = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [targetUserId, targetRegionId]).role
+        role == 'REGION_DIRECTOR'
+
+        cleanup:
+        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
+        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", targetRegionId)
+        executeUpdate("DELETE FROM users WHERE id = ?", targetUserId)
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing region user"() {
@@ -209,6 +347,57 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "DELETE | should reject unauthenticated DELETE /region-users/{userId}/{regionId} with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller attempts to delete a region user"
+        client.exchange(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "DELETE | should reject standard user attempting DELETE /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
+        when: "a standard user attempts to delete a region user"
+        client.exchange(asStandardUser(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should reject regional agent without region:manage claim attempting DELETE /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
+        when: "a regional agent without region:manage attempts to delete a region user"
+        client.exchange(asRegionAgent(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should allow regional director with region:manage claim to remove an existing region user"() {
+        given: "an existing region user association and regional director"
+        UUID targetUserId = UUID.randomUUID()
+        UUID targetRegionId = UUID.randomUUID()
+        UUID directorId = UUID.randomUUID()
+        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "director-del-user@example.com")
+        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", targetRegionId, "Director Test Region Delete")
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", targetUserId, targetRegionId)
+
+        when: "the regional director deletes the region user via HTTP DELETE"
+        def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${targetUserId}/${targetRegionId}"), directorId.toString()))
+
+        then: "200 OK is returned"
+        response.status == HttpStatus.OK
+
+        and: "the record is removed from the repository"
+        !regionUserRepository.existsById(new RegionUserId(targetUserId, targetRegionId))
+
+        cleanup:
+        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
+        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", targetRegionId)
+        executeUpdate("DELETE FROM users WHERE id = ?", targetUserId)
     }
 
     /********** LIST Tests **********/

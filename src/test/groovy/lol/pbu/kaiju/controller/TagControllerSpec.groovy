@@ -3,6 +3,7 @@ package lol.pbu.kaiju.controller
 import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -22,11 +23,29 @@ import java.util.UUID
 @MicronautTest(transactional = false)
 class TagControllerSpec extends BaseControllerSpec {
 
+    private static final String ROLE_STANDARD_USER = "STANDARD_USER"
+    private static final String ROLE_REGION_AGENT = "REGION_AGENT"
+    private static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
+    private static final String CLAIM_REGION_MANAGE = "region:manage"
+    private static final String BASE_PATH = "/tags"
+
     @Inject
     TagRepository tagRepository
 
     @Shared
     Faker faker = new Faker()
+
+    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_STANDARD_USER])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionAgent(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_AGENT])
+    }
+
+    protected <T> MutableHttpRequest<T> asRegionDirector(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, [ROLE_REGION_DIRECTOR, CLAIM_REGION_MANAGE])
+    }
 
     def setup() {
         sql.execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
@@ -34,7 +53,7 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def cleanup() {
-        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%' OR name LIKE 'tag-%' OR name LIKE 'updated-%' OR name LIKE 'temporary-tag-%'")
+        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%' OR name LIKE 'tag-%' OR name LIKE 'updated-%' OR name LIKE 'temporary-tag-%' OR name LIKE 'director-%'")
     }
 
     /********** CREATE Tests **********/
@@ -84,6 +103,57 @@ class TagControllerSpec extends BaseControllerSpec {
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "CREATE | should allow regional director with region:manage claim to create a tag"() {
+        given: "a valid create tag command"
+        String tagName = "director-tag-${UUID.randomUUID().toString().substring(0, 8)}"
+        def command = new CreateTagCommand(tagName)
+
+        when: "the tag is added by a regional director via HTTP POST"
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Tag)
+        Tag saved = response.body()
+
+        then: "the tag is persisted with 200 OK and generated ID"
+        response.status == HttpStatus.OK
+        saved.id() != null
+        saved.name() == tagName
+
+        and: "it can be retrieved from the database"
+        def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
+        verifyAll(result) {
+            saved.id() == id
+            saved.name() == name
+        }
+
+        cleanup:
+        if (saved?.id()) {
+            sql.execute("DELETE FROM tags WHERE id = ?", [saved.id()])
+        }
+    }
+
+    def "CREATE | should reject standard user attempting POST /tags with 403 FORBIDDEN"() {
+        given: "a valid tag command"
+        def command = new CreateTagCommand("standard-user-tag")
+
+        when: "a standard user attempts to create a tag via HTTP POST"
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), Tag)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "CREATE | should reject regional agent without region:manage claim attempting POST /tags with 403 FORBIDDEN"() {
+        given: "a valid tag command"
+        def command = new CreateTagCommand("agent-tag")
+
+        when: "a regional agent attempts to create a tag via HTTP POST"
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), Tag)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** READ Tests **********/
@@ -185,6 +255,58 @@ class TagControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.UNAUTHORIZED
     }
 
+    def "UPDATE | should allow regional director with region:manage claim to update an existing tag"() {
+        given: "an existing tag"
+        def tag = tagRepository.save(new Tag(null, "original-tag-${faker.number().digits(5)}"))
+        UUID id = tag.id()
+        def newName = "director-updated-${UUID.randomUUID().toString().substring(0, 8)}"
+        def updateCommand = new UpdateTagCommand(newName)
+
+        when: "the tag is updated by a regional director via HTTP PUT"
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Tag)
+        Tag updated = response.body()
+
+        then: "200 OK is returned with updated data"
+        response.status == HttpStatus.OK
+        updated.id() == id
+        updated.name() == newName
+
+        and: "the changes are persisted in the database"
+        def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
+        verifyAll(dbResult) {
+            name == newName
+        }
+
+        cleanup:
+        sql.execute("DELETE FROM tags WHERE id = ?", [id])
+    }
+
+    def "UPDATE | should reject standard user attempting PUT /tags/{id} with 403 FORBIDDEN"() {
+        given: "an update command and target tag ID"
+        def updateCommand = new UpdateTagCommand("unauthorized-update")
+        UUID id = UUID.randomUUID()
+
+        when: "a standard user attempts to update a tag via HTTP PUT"
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Tag)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should reject regional agent without region:manage claim attempting PUT /tags/{id} with 403 FORBIDDEN"() {
+        given: "an update command and target tag ID"
+        def updateCommand = new UpdateTagCommand("unauthorized-update")
+        UUID id = UUID.randomUUID()
+
+        when: "a regional agent attempts to update a tag via HTTP PUT"
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Tag)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     /********** DELETE Tests **********/
 
     def "DELETE | should remove an existing tag"() {
@@ -225,6 +347,43 @@ class TagControllerSpec extends BaseControllerSpec {
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "DELETE | should allow regional director with region:manage claim to remove an existing tag"() {
+        given: "a new tag to be deleted"
+        def saved = tagRepository.save(new Tag(null, "director-delete-tag"))
+        UUID id = saved.id()
+        assert tagRepository.existsById(id)
+
+        when: "the tag is deleted by a regional director via HTTP DELETE"
+        def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${id}")))
+
+        then: "the response is 200 OK"
+        response.status == HttpStatus.OK
+
+        and: "the tag no longer exists in the repository or database"
+        verifyAll {
+            !tagRepository.findById(id).isPresent()
+            sql.firstRow("SELECT count(*) as count FROM tags WHERE id = ?", [id]).count == 0
+        }
+    }
+
+    def "DELETE | should reject standard user attempting DELETE /tags/{id} with 403 FORBIDDEN"() {
+        when: "a standard user attempts to delete a tag via HTTP DELETE"
+        client.exchange(asStandardUser(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should reject regional agent without region:manage claim attempting DELETE /tags/{id} with 403 FORBIDDEN"() {
+        when: "a regional agent attempts to delete a tag via HTTP DELETE"
+        client.exchange(asRegionAgent(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** LIST Tests **********/

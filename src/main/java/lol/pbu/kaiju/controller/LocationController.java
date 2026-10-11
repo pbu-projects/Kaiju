@@ -20,6 +20,7 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.dto.CreateLocationCommand;
 import lol.pbu.kaiju.dto.UpdateLocationCommand;
 import lol.pbu.kaiju.repository.LocationRepository;
+import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 
@@ -27,13 +28,26 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
+import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
+/**
+ * REST controller for managing locations.
+ *
+ * <p>Enforces a two-tier security model: read operations require general authentication,
+ * while mutating operations are restricted to platform administrators and regional managers.</p>
+ *
+ * @see Permission#SYSTEM_ADMIN_CLAIM
+ * @see Permission#REGION_MANAGE_CLAIM
+ * @see LocationRepository
+ */
 @ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
 @Controller("/locations")
 public class LocationController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
+    private static final String LOCATION_NOT_FOUND = "Location not found";
 
     private final LocationRepository locationRepository;
     private final SpatialMappingService spatialMappingService;
@@ -53,6 +67,14 @@ public class LocationController {
         return locationRepository.findById(id);
     }
 
+    /**
+     * Creates a new location.
+     * Restricted to platform administrators and regional managers.
+     *
+     * @param command the payload containing location details
+     * @return the persisted location
+     */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
     public Location addLocation(@Valid @Body CreateLocationCommand command) {
         Location location = new Location(
@@ -70,16 +92,18 @@ public class LocationController {
 
     /**
      * Updates an existing location by its ID after validating that it exists.
+     * Restricted to platform administrators and regional managers.
      * Throws 404 NOT_FOUND if the location does not exist.
      *
      * @param id      the ID of the location to update
      * @param command the updated location details
      * @return the updated location
      */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body UpdateLocationCommand command) {
         locationRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Location not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, LOCATION_NOT_FOUND));
         Location location = new Location(
                 id,
                 command.name(),
@@ -95,15 +119,17 @@ public class LocationController {
 
     /**
      * Deletes a location by its ID after validating that it exists.
+     * Restricted to platform administrators and regional managers.
      * Throws 404 NOT_FOUND if the location does not exist.
      *
      * @param id the ID of the location to delete
      */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id) {
         long deletedCount = locationRepository.removeById(id);
         if (deletedCount == 0) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Location not found");
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, LOCATION_NOT_FOUND);
         }
     }
 }
