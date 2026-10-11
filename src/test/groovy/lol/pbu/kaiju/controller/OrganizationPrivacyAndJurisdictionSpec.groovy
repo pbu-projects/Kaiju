@@ -24,7 +24,7 @@ import java.util.UUID
 @Property(name = "micronaut.security.oauth2.enabled", value = "false")
 @Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
-class CrossTenantIsolationSecurityIntegrationSpec extends BaseControllerSpec {
+class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     static final String ROLE_STANDARD_USER = "STANDARD_USER"
     static final String ROLE_ORG_MANAGER = "ORG_MANAGER"
