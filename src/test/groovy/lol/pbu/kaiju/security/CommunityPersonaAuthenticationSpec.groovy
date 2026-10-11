@@ -8,8 +8,6 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.TestPersonas
-import lol.pbu.kaiju.model.OrganizationUserRole
-import lol.pbu.kaiju.model.RegionUserRole
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.UserService
