@@ -270,7 +270,7 @@ public class BoundaryIngestionService {
         }
     }
 
-    private double resolveTolerance(Double requestedTolerance) {
+    double resolveTolerance(Double requestedTolerance) {
         double tolerance = requestedTolerance != null ? requestedTolerance : DEFAULT_TOLERANCE;
         return Math.max(MIN_TOLERANCE, Math.min(MAX_TOLERANCE, tolerance));
     }
