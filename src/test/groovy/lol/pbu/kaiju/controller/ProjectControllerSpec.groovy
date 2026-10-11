@@ -75,6 +75,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'test-principal@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
     }
 
+    private static final String SEEDED_REGION_IDS = "'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000005'"
+    private static final String SEEDED_ORG_IDS = "'b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000006'"
+    private static final String SEEDED_USER_IDS = "'c0000000-0000-0000-0000-000000000001', 'c0000000-0000-0000-0000-000000000002', 'c0000000-0000-0000-0000-000000000003', 'c0000000-0000-0000-0000-000000000004', 'c0000000-0000-0000-0000-000000000005', 'c0000000-0000-0000-0000-000000000006', 'c0000000-0000-0000-0000-000000000007', 'c0000000-0000-0000-0000-000000000008', 'c0000000-0000-0000-0000-000000000009', 'c0000000-0000-0000-0000-000000000010', 'c0000000-0000-0000-0000-000000000011', 'c0000000-0000-0000-0000-000000000012', 'c0000000-0000-0000-0000-000000000013', 'c0000000-0000-0000-0000-000000000014', 'c0000000-0000-0000-0000-000000000015', 'c0000000-0000-0000-0000-000000000016', 'c0000000-0000-0000-0000-000000000017', 'c0000000-0000-0000-0000-000000000018', 'c0000000-0000-0000-0000-000000000019', 'c0000000-0000-0000-0000-000000000020', 'c0000000-0000-0000-0000-000000000021', 'c0000000-0000-0000-0000-000000000022', 'c0000000-0000-0000-0000-000000000023', 'c0000000-0000-0000-0000-000000000024', 'c0000000-0000-0000-0000-000000000025', 'c0000000-0000-0000-0000-000000000026'"
+
     def cleanup() {
         executeUpdate("DELETE FROM shift_tags")
         executeUpdate("DELETE FROM shifts")
@@ -83,13 +87,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("DELETE FROM project_boundaries")
         executeUpdate("DELETE FROM project_users")
         executeUpdate("DELETE FROM projects")
-        executeUpdate("DELETE FROM organization_regions")
-        executeUpdate("DELETE FROM organization_users")
-        executeUpdate("DELETE FROM region_users")
+        executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORG_IDS})")
+        executeUpdate("DELETE FROM organization_users WHERE user_id NOT IN (${SEEDED_USER_IDS})")
+        executeUpdate("DELETE FROM region_users WHERE user_id NOT IN (${SEEDED_USER_IDS})")
         executeUpdate("DELETE FROM locations WHERE name LIKE '%Loc%' OR name LIKE '%St%' OR address_line LIKE '%St%' OR city = 'Denver' OR city = 'Boulder' OR city = 'Toronto' OR city = 'Colo Springs'")
-        executeUpdate("DELETE FROM administrative_regions WHERE name LIKE '%Region%'")
-        executeUpdate("DELETE FROM organizations WHERE name LIKE '%Org%' OR name LIKE '%Denver%' OR name LIKE '%Boulder%' OR name LIKE '%Default%' OR name LIKE '%Test%'")
-        executeUpdate("DELETE FROM users WHERE email LIKE '%@example.com' AND id != '00000000-0000-0000-0000-000000000000'")
+        executeUpdate("DELETE FROM administrative_regions WHERE name LIKE '%Region%' AND id NOT IN (${SEEDED_REGION_IDS})")
+        executeUpdate("DELETE FROM organizations WHERE (name LIKE '%Org%' OR name LIKE '%Denver%' OR name LIKE '%Boulder%' OR name LIKE '%Default%' OR name LIKE '%Test%') AND id NOT IN (${SEEDED_ORG_IDS})")
+        executeUpdate("DELETE FROM users WHERE email LIKE '%@example.com' AND id != '00000000-0000-0000-0000-000000000000' AND id NOT IN (${SEEDED_USER_IDS})")
     }
 
     def setup() {

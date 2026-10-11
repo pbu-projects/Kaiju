@@ -47,16 +47,19 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
     UserRepository userRepository
 
     def cleanup() {
+        String SEEDED_ORGS = "'b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000006'"
+        String SEEDED_REGIONS = "'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000005'"
+
         executeUpdate("DELETE FROM shifts")
         executeUpdate("DELETE FROM project_audit_logs")
         executeUpdate("DELETE FROM project_locations")
         executeUpdate("DELETE FROM projects")
-        executeUpdate("DELETE FROM organization_regions")
-        executeUpdate("DELETE FROM region_users")
-        executeUpdate("DELETE FROM organization_users")
-        executeUpdate("DELETE FROM organizations")
+        executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORGS}) OR region_id NOT IN (${SEEDED_REGIONS})")
+        executeUpdate("DELETE FROM region_users WHERE region_id NOT IN (${SEEDED_REGIONS})")
+        executeUpdate("DELETE FROM organization_users WHERE organization_id NOT IN (${SEEDED_ORGS})")
+        executeUpdate("DELETE FROM organizations WHERE id NOT IN (${SEEDED_ORGS})")
         executeUpdate("DELETE FROM locations")
-        executeUpdate("DELETE FROM administrative_regions")
+        executeUpdate("DELETE FROM administrative_regions WHERE id NOT IN (${SEEDED_REGIONS})")
         executeUpdate("DELETE FROM users WHERE email LIKE '%@example.com'")
     }
 

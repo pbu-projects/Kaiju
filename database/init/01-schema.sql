@@ -62,7 +62,9 @@ CREATE TABLE administrative_regions
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name             VARCHAR(255)             NOT NULL,
     parent_region_id UUID REFERENCES administrative_regions (id),
-    geom             GEOGRAPHY(Polygon, 4326) NOT NULL
+    geom             GEOGRAPHY(Geometry, 4326) NOT NULL CHECK (
+        ST_GeometryType(geom::geometry) IN ('ST_Polygon', 'ST_MultiPolygon')
+    )
 );
 
 -- admin boundaries

@@ -2,7 +2,8 @@
 
 Please provide a brief description of the overarching goal of this Pull Request.
 
-## File-by-File Breakdown
+<details>
+<summary><h2>File-by-File Breakdown</h2></summary>
 
 To ensure that all changes are deliberate and understood (especially when utilizing AI-assistants), please explain the changes made in each file or logical group of files. 
 
@@ -13,12 +14,17 @@ To ensure that all changes are deliberate and understood (especially when utiliz
   * *Why did this change?*
   * *What changed?*
 
-## Test Validation (Journeys & Personas)
+</details>
+
+<details>
+<summary><h2>Test Validation (Journeys & Personas)</h2></summary>
 
 * **Personas & Journeys Tested:** (e.g., Volunteer registering on mobile, Org Admin managing shifts)
 * **Portions of User Journeys Tested:** (e.g., Initial form submission, boundary spatial intersection checks, role update flow)
 * **Portions of User Journeys Left Untested:** (e.g., Email delivery notification deferred to future milestone, offline sync)
 * **Scenarios Covered:** (e.g., Happy path, negative authorization like 403 Forbidden, boundary/spatial conditions)
+
+</details>
 
 ## Checklist
 
