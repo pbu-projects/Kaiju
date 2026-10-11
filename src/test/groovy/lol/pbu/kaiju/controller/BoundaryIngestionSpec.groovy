@@ -2,6 +2,7 @@ package lol.pbu.kaiju.controller
 
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import lol.pbu.kaiju.dto.IngestBoundaryCommand
@@ -19,6 +20,14 @@ import java.util.UUID
 class BoundaryIngestionSpec extends BaseControllerSpec {
 
     private UUID testRegionId
+
+    protected <T> MutableHttpRequest<T> asRegionalAdmin(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, ["REGION_DIRECTOR", "region:manage"])
+    }
+
+    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
+        authenticated(request, userId, ["STANDARD_USER"])
+    }
 
     def setup() {
         testRegionId = UUID.randomUUID()
@@ -39,7 +48,7 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
         def command = new IngestBoundaryCommand(denverUrl, 0.001)
 
-        when: "a regional manager or global admin requests boundary ingestion via HTTP POST"
+        when: "a global admin requests boundary ingestion via HTTP POST"
         def request = asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command))
         def response = client.exchange(request, IngestBoundaryResponse)
         IngestBoundaryResponse body = response.body()
@@ -178,18 +187,26 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         e.status == HttpStatus.BAD_REQUEST
     }
 
-    def "SECURITY | should return 403 Forbidden when unauthorized user attempts boundary ingestion"() {
+    def "SECURITY | should return 403 Forbidden when regional director attempts boundary ingestion"() {
+        given: "a regional director with region:manage claim"
+        String validUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
+        def command = new IngestBoundaryCommand(validUrl, null)
+
+        when: "a regional director attempts boundary ingestion"
+        client.exchange(asRegionalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+
+        then: "a 403 Forbidden exception is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "SECURITY | should return 403 Forbidden when standard user attempts boundary ingestion"() {
         given: "a standard user without administrative claims"
         String validUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
         def command = new IngestBoundaryCommand(validUrl, null)
 
-        when: "a standard user attempts ingestion"
-        def standardUserRequest = authenticated(
-                HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command),
-                UUID.randomUUID().toString(),
-                ["STANDARD_USER"]
-        )
-        client.exchange(standardUserRequest, IngestBoundaryResponse)
+        when: "a standard user attempts boundary ingestion"
+        client.exchange(asStandardUser(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
 
         then: "a 403 Forbidden exception is returned"
         def e = thrown(HttpClientResponseException)

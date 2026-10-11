@@ -82,6 +82,7 @@ services:
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
+      - ./authentik-blueprints.yaml:/blueprints/kaiju-test-personas.yaml:ro
     depends_on:
       authentik-db:
         condition: service_healthy
@@ -106,6 +107,7 @@ services:
     volumes:
       - authentik_media:/media
       - authentik_templates:/templates
+      - ./authentik-blueprints.yaml:/blueprints/kaiju-test-personas.yaml:ro
     depends_on:
       authentik-db:
         condition: service_healthy

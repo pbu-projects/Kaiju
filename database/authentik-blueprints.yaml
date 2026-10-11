@@ -5,33 +5,40 @@ metadata:
     blueprints.goauthentik.io/description: Kaiju deterministic test personas blueprint
 entries:
   # Groups
-  - model: authentik_core.group
+  - id: group-global-admins
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Global Admins
     attrs:
       is_superuser: true
-  - model: authentik_core.group
+  - id: group-region-directors
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Region Directors
-  - model: authentik_core.group
+  - id: group-region-agents
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Region Agents
-  - model: authentik_core.group
+  - id: group-org-admins
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Org Admins
-  - model: authentik_core.group
+  - id: group-org-managers
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Org Managers
-  - model: authentik_core.group
+  - id: group-org-members
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Org Members
-  - model: authentik_core.group
+  - id: group-standard-users
+    model: authentik_core.group
     state: present
     identifiers:
       name: Kaiju Standard Users
@@ -47,7 +54,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Global Admins
+        - !KeyOf group-global-admins
   - model: authentik_core.user
     state: present
     identifiers:
@@ -58,7 +65,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Global Admins
+        - !KeyOf group-global-admins
 
   # State Region (Level 1)
   - model: authentik_core.user
@@ -71,7 +78,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Directors
+        - !KeyOf group-region-directors
   - model: authentik_core.user
     state: present
     identifiers:
@@ -82,7 +89,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Directors
+        - !KeyOf group-region-directors
   - model: authentik_core.user
     state: present
     identifiers:
@@ -93,7 +100,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Agents
+        - !KeyOf group-region-agents
 
   # County Region (Level 2)
   - model: authentik_core.user
@@ -106,7 +113,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Directors
+        - !KeyOf group-region-directors
   - model: authentik_core.user
     state: present
     identifiers:
@@ -117,7 +124,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Directors
+        - !KeyOf group-region-directors
   - model: authentik_core.user
     state: present
     identifiers:
@@ -128,7 +135,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Agents
+        - !KeyOf group-region-agents
 
   # Sibling County (Level 2)
   - model: authentik_core.user
@@ -141,7 +148,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Directors
+        - !KeyOf group-region-directors
   - model: authentik_core.user
     state: present
     identifiers:
@@ -152,7 +159,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Directors
+        - !KeyOf group-region-directors
 
   # City Region (Level 3)
   - model: authentik_core.user
@@ -165,7 +172,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Agents
+        - !KeyOf group-region-agents
   - model: authentik_core.user
     state: present
     identifiers:
@@ -176,7 +183,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Region Agents
+        - !KeyOf group-region-agents
 
   # National Org (Level 1)
   - model: authentik_core.user
@@ -189,8 +196,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -201,8 +208,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -213,8 +220,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Managers
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-managers
+        - !KeyOf group-standard-users
 
   # State Chapter Org (Level 2)
   - model: authentik_core.user
@@ -227,8 +234,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -239,8 +246,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -251,8 +258,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Managers
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-managers
+        - !KeyOf group-standard-users
 
   # Sibling State Chapter Org (Level 2)
   - model: authentik_core.user
@@ -265,8 +272,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -277,8 +284,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
 
   # Local Branch Org (Level 3)
   - model: authentik_core.user
@@ -291,8 +298,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -303,8 +310,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Admins
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-admins
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -315,8 +322,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Managers
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-managers
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -327,8 +334,8 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Org Members
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-org-members
+        - !KeyOf group-standard-users
 
   # Independent Volunteers
   - model: authentik_core.user
@@ -341,7 +348,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-standard-users
   - model: authentik_core.user
     state: present
     identifiers:
@@ -352,7 +359,7 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-standard-users
 
   # JIT Provisioning Test Candidate (Present in Authentik, omitted from DB)
   - model: authentik_core.user
@@ -365,4 +372,4 @@ entries:
       is_active: true
       password: "KaijuCommunity2026!"
       groups:
-        - !KeyOf Kaiju Standard Users
+        - !KeyOf group-standard-users

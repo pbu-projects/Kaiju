@@ -43,10 +43,14 @@ public class BoundaryIngestionService {
 
     private static final String GEOMETRY_FIELD = "geometry";
     private static final String UPDATE_SQL = """
-        WITH simplified AS (
+        WITH raw_geom AS (
+            SELECT ST_SetSRID(ST_GeomFromGeoJSON(?), 4326) AS g
+        ),
+        simplified AS (
             SELECT
-                ST_Multi(ST_SimplifyPreserveTopology(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326), ?)) AS geom,
-                ST_NPoints(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)) AS orig_pts
+                ST_Multi(ST_SimplifyPreserveTopology(g, ?)) AS geom,
+                ST_NPoints(g) AS orig_pts
+            FROM raw_geom
         )
         UPDATE administrative_regions r
         SET geom = s.geom
@@ -231,6 +235,9 @@ public class BoundaryIngestionService {
             if (!featuresNode.isArray() || featuresNode.size() == 0) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains no features.");
             }
+            if (featuresNode.size() > 1) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains multiple features. A single region feature was expected.");
+            }
             JsonNode firstFeature = featuresNode.get(0);
             return firstFeature != null ? firstFeature.get(GEOMETRY_FIELD) : null;
         }
@@ -307,8 +314,7 @@ public class BoundaryIngestionService {
             try (PreparedStatement updateStmt = connection.prepareStatement(UPDATE_SQL)) {
                 updateStmt.setString(1, geomJson);
                 updateStmt.setDouble(2, tolerance);
-                updateStmt.setString(3, geomJson);
-                updateStmt.setObject(4, regionId);
+                updateStmt.setObject(3, regionId);
 
                 try (ResultSet rs = updateStmt.executeQuery()) {
                     if (rs.next()) {

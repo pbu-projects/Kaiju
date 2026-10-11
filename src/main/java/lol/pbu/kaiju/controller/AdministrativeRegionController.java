@@ -163,13 +163,13 @@ public class AdministrativeRegionController {
     /**
      * Ingests, simplifies, and validates a geographic boundary for an administrative region
      * from an authoritative external source such as US Census Bureau TIGERweb.
-     * Restricted to platform administrators (GLOBAL_ADMIN) and regional managers (REGIONAL_ADMIN).
+     * Restricted strictly to platform administrators ({@code GLOBAL_ADMIN}).
      *
      * @param id      the unique UUID of the administrative region to update
      * @param command the boundary ingestion command containing source URL and optional tolerance
      * @return the ingestion summary response
      */
-    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+    @Secured(SYSTEM_ADMIN_CLAIM)
     @Post("/{id}/boundary/ingest")
     public IngestBoundaryResponse ingestBoundary(@PathVariable UUID id, @Valid @Body IngestBoundaryCommand command) {
         return boundaryIngestionService.ingestBoundary(id, command);

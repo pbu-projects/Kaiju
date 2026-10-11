@@ -215,6 +215,49 @@ class BoundaryIngestionServiceSpec extends Specification {
         '{"type": "Polygon", "coordinates": [[[Double.NaN, 39.0]]]}'                                              | HttpStatus.BAD_REQUEST
         '{"type": "Polygon", "coordinates": [[[200.0, 39.0]]]}'                                                    | HttpStatus.BAD_REQUEST
         '{"type": "Polygon", "coordinates": [[["invalid", 39.0]]]}'                                                | HttpStatus.BAD_REQUEST
+        '{"type": "FeatureCollection", "features": [{"geometry": {"type": "Polygon", "coordinates": [[[-105.0, 39.0], [-104.0, 39.0], [-104.0, 40.0], [-105.0, 40.0], [-105.0, 39.0]]]}}, {"geometry": {"type": "Polygon", "coordinates": [[[-105.0, 39.0], [-104.0, 39.0], [-104.0, 40.0], [-105.0, 40.0], [-105.0, 39.0]]]}}]}' | HttpStatus.BAD_REQUEST
+    }
+
+    def "should reject multi-feature FeatureCollection with 400 Bad Request"() {
+        given: "a stub HTTP client returning a FeatureCollection with multiple features"
+        String multiFeaturePayload = """{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[-105.0, 39.0], [-104.0, 39.0], [-104.0, 40.0], [-105.0, 40.0], [-105.0, 39.0]]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[-105.1, 39.1], [-104.1, 39.1], [-104.1, 40.1], [-105.1, 40.1], [-105.1, 39.1]]]
+                    }
+                }
+            ]
+        }"""
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(multiFeaturePayload.getBytes("UTF-8")))
+        })
+
+        BoundaryIngestionService customService = new BoundaryIngestionService(
+                service.jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when: "attempting to ingest a multi-feature FeatureCollection"
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+
+        then: "a 400 Bad Request exception is thrown with appropriate explanation"
+        def ex = thrown(HttpStatusException)
+        ex.status == HttpStatus.BAD_REQUEST
+        ex.message.contains("GeoJSON FeatureCollection contains multiple features")
     }
 
     def "should enforce payload size limits"() {
