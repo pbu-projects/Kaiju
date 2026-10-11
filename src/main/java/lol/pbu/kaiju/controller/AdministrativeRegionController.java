@@ -17,11 +17,14 @@ import io.micronaut.security.rules.SecurityRule;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.IngestBoundaryCommand;
+import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.service.BoundaryIngestionService;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 
@@ -54,11 +57,14 @@ public class AdministrativeRegionController {
 
     private final AdministrativeRegionRepository administrativeRegionRepository;
     private final SpatialMappingService spatialMappingService;
+    private final BoundaryIngestionService boundaryIngestionService;
 
     public AdministrativeRegionController(AdministrativeRegionRepository administrativeRegionRepository,
-                                          SpatialMappingService spatialMappingService) {
+                                          SpatialMappingService spatialMappingService,
+                                          BoundaryIngestionService boundaryIngestionService) {
         this.administrativeRegionRepository = administrativeRegionRepository;
         this.spatialMappingService = spatialMappingService;
+        this.boundaryIngestionService = boundaryIngestionService;
     }
 
     /**
@@ -152,5 +158,20 @@ public class AdministrativeRegionController {
         if (deletedCount == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
         }
+    }
+
+    /**
+     * Ingests, simplifies, and validates a geographic boundary for an administrative region
+     * from an authoritative external source such as US Census Bureau TIGERweb.
+     * Restricted to platform administrators (GLOBAL_ADMIN) and regional managers (REGIONAL_ADMIN).
+     *
+     * @param id      the unique UUID of the administrative region to update
+     * @param command the boundary ingestion command containing source URL and optional tolerance
+     * @return the ingestion summary response
+     */
+    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+    @Post("/{id}/boundary/ingest")
+    public IngestBoundaryResponse ingestBoundary(@PathVariable UUID id, @Valid @Body IngestBoundaryCommand command) {
+        return boundaryIngestionService.ingestBoundary(id, command);
     }
 }

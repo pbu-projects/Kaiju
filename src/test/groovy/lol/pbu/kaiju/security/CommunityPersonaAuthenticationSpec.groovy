@@ -106,6 +106,59 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
     }
 
+    def "seeded county boundaries accurately contain internal landmarks and exclude adjacent municipalities"() {
+        given: "a connection to the test database"
+        Sql sql = new Sql(dataSource)
+
+        when: "evaluating spatial containment for real-world locations against Denver County and El Paso County"
+        def spatialResults = sql.firstRow("""
+            SELECT
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.9928 39.7392)')
+                ) AS denver_city_hall_inside,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.6737 39.8561)')
+                ) AS dia_inside,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-105.0814 39.7047)')
+                ) AS lakewood_inside,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8118 39.7083)')
+                ) AS aurora_inside,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8214 38.8339)')
+                ) AS cos_city_hall_inside,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.6091 38.2544)')
+                ) AS pueblo_inside
+        """, [
+                TestPersonas.DENVER_COUNTY_REGION_ID,
+                TestPersonas.DENVER_COUNTY_REGION_ID,
+                TestPersonas.DENVER_COUNTY_REGION_ID,
+                TestPersonas.DENVER_COUNTY_REGION_ID,
+                TestPersonas.EL_PASO_COUNTY_REGION_ID,
+                TestPersonas.EL_PASO_COUNTY_REGION_ID
+        ])
+
+        then: "Denver landmarks (City Hall and Denver International Airport) are strictly inside Denver County"
+        spatialResults.denver_city_hall_inside == true
+        spatialResults.dia_inside == true
+
+        and: "neighboring municipalities (Lakewood and Aurora) are strictly excluded from Denver County"
+        spatialResults.lakewood_inside == false
+        spatialResults.aurora_inside == false
+
+        and: "Colorado Springs City Hall is inside El Paso County and Pueblo is strictly excluded"
+        spatialResults.cos_city_hall_inside == true
+        spatialResults.pueblo_inside == false
+    }
+
     def "all seeded organizations in 3-tier organizational hierarchy exist with correct attributes"() {
         when: "querying organizations from the database"
         Map<UUID, Map<String, Object>> orgs = [:]
