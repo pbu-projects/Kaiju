@@ -1,6 +1,6 @@
 # Kaiju
 
-Backend service for Volunteer Monster—a modern platform connecting volunteers with community initiatives.
+Backend service for Volunteer Monster, a modern platform connecting volunteers with community initiatives.
 
 ## Project Status
 
@@ -14,28 +14,28 @@ Nonprofits shouldn't have to choose between clunky legacy software and costly en
 <details>
 <summary><b>Hyper-Local Discovery</b>: Volunteers find initiatives right in their neighborhood without zip code guesswork.</summary>
 
-- **How it works**: Uses PostgreSQL + PostGIS with native spatial geography indexing (`GEOGRAPHY(Point, 4326)`). Proximity searches and regional boundary intersections (`ST_DWithin`, `ST_Intersects`) are processed directly within the database engine, avoiding slow, imprecise centroid approximations.
+> All the math leans into two strengths: [PostGIS](https://postgis.net/)'s phenomenal spatial performance, and [Micronaut](https://micronaut.io/framework/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/)'s crazy speed. No reinventing the wheel, just pairing two technologies that work together beautifully.
 
 </details>
 
 <details>
 <summary><b>Budget-Friendly Frugality</b>: Minimal server and memory overhead keeps hosting costs near zero.</summary>
 
-- **How it works**: Built with Micronaut 5 compile-time dependency injection and Micronaut AOT, eliminating heavy runtime reflection and dynamic proxying. It runs with an ultra-lean memory footprint (or as a native GraalVM binary), allowing nonprofits to host on low-cost compute tiers.
+> Traditional servers eat up expensive memory just idling. By compiling ahead-of-time with [Micronaut AOT](https://micronaut-projects.github.io/micronaut-aot/latest/guide/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/), Kaiju starts instantly and runs with a tiny memory footprint. Nonprofits can host it on low-cost cloud tiers without blowing donor funds on giant hosting bills.
 
 </details>
 
 <details>
 <summary><b>Trusted & Safe</b>: Multi-layer verification, moderation queues, and immutable audit logs keep communities safe.</summary>
 
-- **How it works**: Enforces multi-tier Role-Based Access Control (RBAC) across platform, regional, and organizational scopes. New projects enter PostGIS-routed regional moderation queues with escalation timers, while sensitive state changes record tamper-evident audit logs within the same database transaction.
+> Safety shouldn't require bureaucracy. Verified partner organizations get fast-tracked, while new community initiatives are routed to local coordinators who know the area before listings go live. Everything from volunteer approvals to role updates is safely logged, and separate volunteer records ensure attendee histories stay private and protected.
 
 </details>
 
 <details>
 <summary><b>Fast & Resilient</b>: Sub-millisecond response times sustain major community drives and disaster mobilizations.</summary>
 
-- **How it works**: Runs on Java 25 with Generational ZGC for consistent sub-millisecond garbage collection pauses under heavy request loads. A unified relational model enables instant cross-domain joins across projects, shifts, and signups in single queries without distributed transaction overhead.
+> When an emergency response or major holiday drive brings thousands of volunteers to the platform at once, the system won't choke. Powered by [Java 25](https://openjdk.org/projects/jdk/25/)'s ultra-low-latency [Generational ZGC](https://openjdk.org/jeps/439) and a unified [PostgreSQL](https://www.postgresql.org/) database, searches and signups stay snappy under heavy traffic without spinning wheels or crashes.
 
 </details>
 
