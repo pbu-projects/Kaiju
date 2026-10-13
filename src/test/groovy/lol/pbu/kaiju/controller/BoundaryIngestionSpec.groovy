@@ -1,16 +1,21 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import lol.pbu.kaiju.dto.IngestBoundaryCommand
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
+import lol.pbu.kaiju.service.StubHttpClient
+import lol.pbu.kaiju.service.StubHttpResponse
 import spock.lang.Unroll
 
-import io.micronaut.context.annotation.Property
-
+import java.net.http.HttpClient as JavaHttpClient
+import java.net.http.HttpRequest as JavaHttpRequest
+import java.net.http.HttpResponse as JavaHttpResponse
 import java.util.UUID
 
 @Property(name = "micronaut.security.enabled", value = "true")
@@ -20,6 +25,20 @@ import java.util.UUID
 class BoundaryIngestionSpec extends BaseControllerSpec {
 
     private UUID testRegionId
+
+    @MockBean(JavaHttpClient)
+    JavaHttpClient javaHttpClient() {
+        new StubHttpClient(sendHandler: { JavaHttpRequest req, JavaHttpResponse.BodyHandler handler ->
+            if (req.uri().toString().contains("Denver") || req.uri().toString().contains("tigerweb")) {
+                InputStream fixtureStream = getClass().getResourceAsStream("/fixtures/denver-county-tigerweb.json")
+                if (fixtureStream == null) {
+                    throw new IllegalStateException("Fixture /fixtures/denver-county-tigerweb.json not found")
+                }
+                return new StubHttpResponse<InputStream>(200, fixtureStream)
+            }
+            return new StubHttpResponse<InputStream>(404, new ByteArrayInputStream(new byte[0]))
+        })
+    }
 
     protected <T> MutableHttpRequest<T> asRegionalAdmin(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
         authenticated(request, userId, ["REGION_DIRECTOR", "region:manage"])
@@ -69,6 +88,22 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         def dbRow = sql.firstRow("SELECT ST_IsValid(geom::geometry) AS is_valid, ST_NPoints(geom::geometry) AS pts FROM administrative_regions WHERE id = ?", [testRegionId])
         dbRow.is_valid == true
         dbRow.pts == body.simplifiedPoints()
+    }
+
+    def "SUCCESS | should permit valid query parameters containing words like description"() {
+        given: "a query URL with outFields containing DESCRIPTION"
+        String denverUrlWithDescription = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=NAME,DESCRIPTION&f=geojson"
+        def command = new IngestBoundaryCommand(denverUrlWithDescription, 0.001)
+
+        when: "a global admin requests boundary ingestion"
+        def request = asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command))
+        def response = client.exchange(request, IngestBoundaryResponse)
+
+        then: "the request succeeds with 200 OK"
+        response.status == HttpStatus.OK
+        response.body() != null
+        response.body().regionId() == testRegionId
+        response.body().valid() == true
     }
 
     def "REJECT | should reject insecure HTTP scheme with 400 Bad Request"() {
@@ -159,6 +194,23 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
                 "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query?f=geojson&search=%3Cscript%3E",
                 "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query?f=geojson&onload=eval()"
         ]
+    }
+
+    @Unroll
+    def "REJECT | should reject non-finite or non-positive tolerance: #badTolerance"(Double badTolerance) {
+        given: "a command with an invalid tolerance value"
+        String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
+        def command = new IngestBoundaryCommand(denverUrl, badTolerance)
+
+        when: "attempting boundary ingestion with invalid tolerance"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+
+        then: "a 400 Bad Request is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+
+        where:
+        badTolerance << [Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 0.0d, -0.01d]
     }
 
     def "REJECT | should return 404 Not Found when administrative region does not exist"() {

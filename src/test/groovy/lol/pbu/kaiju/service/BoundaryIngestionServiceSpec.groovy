@@ -9,6 +9,7 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.dto.IngestBoundaryCommand
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLParameters
@@ -52,81 +53,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         }
     }
 
-    static class StubHttpResponse<T> implements HttpResponse<T> {
-        int code
-        T responseBody
 
-        StubHttpResponse(int code, T responseBody) {
-            this.code = code
-            this.responseBody = responseBody
-        }
-
-        @Override
-        int statusCode() { code }
-
-        @Override
-        HttpRequest request() { null }
-
-        @Override
-        Optional<HttpResponse<T>> previousResponse() { Optional.empty() }
-
-        @Override
-        HttpHeaders headers() { null }
-
-        @Override
-        T body() { responseBody }
-
-        @Override
-        Optional<SSLSession> sslSession() { Optional.empty() }
-
-        @Override
-        URI uri() { null }
-
-        @Override
-        HttpClient.Version version() { HttpClient.Version.HTTP_2 }
-    }
-
-    static class StubHttpClient extends HttpClient {
-        Closure sendHandler
-
-        @Override
-        <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) {
-            return sendHandler.call(request, responseBodyHandler) as HttpResponse<T>
-        }
-
-        @Override
-        Optional<CookieHandler> cookieHandler() { Optional.empty() }
-
-        @Override
-        Optional<Duration> connectTimeout() { Optional.empty() }
-
-        @Override
-        HttpClient.Redirect followRedirects() { HttpClient.Redirect.NEVER }
-
-        @Override
-        Optional<ProxySelector> proxy() { Optional.empty() }
-
-        @Override
-        SSLContext sslContext() { null }
-
-        @Override
-        SSLParameters sslParameters() { null }
-
-        @Override
-        Optional<Authenticator> authenticator() { Optional.empty() }
-
-        @Override
-        HttpClient.Version version() { HttpClient.Version.HTTP_2 }
-
-        @Override
-        Optional<Executor> executor() { Optional.empty() }
-
-        @Override
-        <T> CompletableFuture<HttpResponse<T>> sendAsync(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler) { null }
-
-        @Override
-        <T> CompletableFuture<HttpResponse<T>> sendAsync(HttpRequest request, HttpResponse.BodyHandler<T> responseBodyHandler, HttpResponse.PushPromiseHandler<T> pushPromiseHandler) { null }
-    }
 
     def "should validate regionId and command null checks"() {
         when: "regionId is null"
@@ -159,6 +86,38 @@ class BoundaryIngestionServiceSpec extends Specification {
         service.resolveTolerance(0.005d) == 0.005d
     }
 
+    @Unroll
+    def "should reject invalid tolerance values: #tolerance"() {
+        when:
+        service.resolveTolerance(tolerance)
+
+        then:
+        def ex = thrown(HttpStatusException)
+        ex.status == HttpStatus.BAD_REQUEST
+        ex.message.contains(expectedMessage)
+
+        where:
+        tolerance                | expectedMessage
+        Double.NaN               | "Tolerance must be a finite, positive number."
+        Double.POSITIVE_INFINITY | "Tolerance must be a finite, positive number."
+        Double.NEGATIVE_INFINITY | "Tolerance must be a finite, positive number."
+        0.0d                     | "Tolerance must be greater than zero."
+        -0.001d                  | "Tolerance must be greater than zero."
+    }
+
+    @Unroll
+    def "should reject invalid tolerance through ingestBoundary: #badTolerance"() {
+        when:
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", badTolerance))
+
+        then:
+        def ex = thrown(HttpStatusException)
+        ex.status == HttpStatus.BAD_REQUEST
+
+        where:
+        badTolerance << [Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, 0.0d, -0.05d]
+    }
+
     def "should validate and reject disallowed source URLs"() {
         when:
         service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand(url, 0.001))
@@ -180,6 +139,44 @@ class BoundaryIngestionServiceSpec extends Specification {
                 "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query?q=path\\escape",
                 "ht!tp://invalid syntax url"
         ]
+    }
+
+    def "should permit valid query parameters containing words like description"() {
+        given: "a query URL containing description in parameter list"
+        String urlWithDescription = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query?outFields=NAME,DESCRIPTION&f=geojson"
+        String validGeoJson = '''{
+            "type": "Polygon",
+            "coordinates": [[
+                [-105.1, 39.7],
+                [-104.9, 39.7],
+                [-104.9, 39.8],
+                [-105.1, 39.8],
+                [-105.1, 39.7]
+            ]]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(validGeoJson.getBytes("UTF-8")))
+        })
+        UUID testRegionId = UUID.randomUUID()
+        executeSql("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Desc Test Region', ST_GeographyFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))", testRegionId)
+
+        BoundaryIngestionService customService = new BoundaryIngestionService(
+                service.jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when:
+        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand(urlWithDescription, 0.001))
+
+        then:
+        response != null
+        response.name() == "Desc Test Region"
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
     }
 
     def "should reject invalid geojson structures"() {

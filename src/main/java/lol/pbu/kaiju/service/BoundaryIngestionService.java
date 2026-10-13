@@ -1,14 +1,21 @@
 package lol.pbu.kaiju.service;
 
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.jdbc.runtime.JdbcOperations;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.ObjectMapper;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.dto.IngestBoundaryCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
+import lol.pbu.kaiju.serde.JtsGeometrySerde;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +55,7 @@ public class BoundaryIngestionService {
         ),
         simplified AS (
             SELECT
-                ST_Multi(ST_SimplifyPreserveTopology(g, ?)) AS geom,
+                ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(ST_MakeValid(g), ?)), 3)) AS geom,
                 ST_NPoints(g) AS orig_pts
             FROM raw_geom
         )
@@ -57,29 +64,45 @@ public class BoundaryIngestionService {
         FROM simplified s
         WHERE r.id = ?
           AND ST_IsValid(s.geom::geometry)
+          AND NOT ST_IsEmpty(s.geom::geometry)
         RETURNING r.name, s.orig_pts, ST_NPoints(r.geom::geometry) AS simp_pts, ST_IsValid(r.geom::geometry) AS is_valid
     """;
 
     private final JdbcOperations jdbcOperations;
     private final ObjectMapper objectMapper;
+    private final JtsGeometrySerde jtsGeometrySerde;
     private final HttpClient httpClient;
     private final String allowedHost;
     private final String allowedPathPrefix;
 
+    @Inject
     public BoundaryIngestionService(
             JdbcOperations jdbcOperations,
             ObjectMapper objectMapper,
+            JtsGeometrySerde jtsGeometrySerde,
+            @Nullable HttpClient httpClient,
             @Value("${kaiju.tigerweb.allowed-host:tigerweb.geo.census.gov}") String allowedHost,
             @Value("${kaiju.tigerweb.allowed-path-prefix:/arcgis/rest/services/TIGERweb/}") String allowedPathPrefix
     ) {
         this.jdbcOperations = jdbcOperations;
         this.objectMapper = objectMapper;
-        this.allowedHost = allowedHost;
-        this.allowedPathPrefix = allowedPathPrefix;
-        this.httpClient = HttpClient.newBuilder()
+        this.jtsGeometrySerde = jtsGeometrySerde;
+        this.httpClient = httpClient != null ? httpClient : HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
+        this.allowedHost = allowedHost;
+        this.allowedPathPrefix = allowedPathPrefix;
+    }
+
+    public BoundaryIngestionService(
+            JdbcOperations jdbcOperations,
+            ObjectMapper objectMapper,
+            JtsGeometrySerde jtsGeometrySerde,
+            @Value("${kaiju.tigerweb.allowed-host:tigerweb.geo.census.gov}") String allowedHost,
+            @Value("${kaiju.tigerweb.allowed-path-prefix:/arcgis/rest/services/TIGERweb/}") String allowedPathPrefix
+    ) {
+        this(jdbcOperations, objectMapper, jtsGeometrySerde, null, allowedHost, allowedPathPrefix);
     }
 
     public BoundaryIngestionService(
@@ -89,12 +112,10 @@ public class BoundaryIngestionService {
             String allowedHost,
             String allowedPathPrefix
     ) {
-        this.jdbcOperations = jdbcOperations;
-        this.objectMapper = objectMapper;
-        this.httpClient = httpClient;
-        this.allowedHost = allowedHost;
-        this.allowedPathPrefix = allowedPathPrefix;
+        this(jdbcOperations, objectMapper, new JtsGeometrySerde(), httpClient, allowedHost, allowedPathPrefix);
     }
+
+
 
     /**
      * Downloads boundary from authoritative Census Bureau endpoint, validates GeoJSON geometry,
@@ -112,11 +133,15 @@ public class BoundaryIngestionService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Source URL must not be blank.");
         }
 
+        double tolerance = resolveTolerance(command.tolerance());
+
         URI validatedUri = validateSourceUrl(command.sourceUrl());
 
         byte[] payload = fetchPayload(validatedUri);
 
-        JsonNode geomNode = parseAndValidateGeoJson(payload);
+        JsonNode geomNode = extractGeometryNodeFromPayload(payload);
+
+        validateAndDeserializeGeometry(geomNode);
 
         String geomJson;
         try {
@@ -124,8 +149,6 @@ public class BoundaryIngestionService {
         } catch (IOException e) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Failed to serialize geometry: " + e.getMessage());
         }
-
-        double tolerance = resolveTolerance(command.tolerance());
 
         return updateRegionBoundary(regionId, geomJson, tolerance);
     }
@@ -165,9 +188,9 @@ public class BoundaryIngestionService {
         String query = uri.getRawQuery();
         if (query != null) {
             String lower = query.toLowerCase(Locale.ROOT);
-            if (lower.contains("<") || lower.contains(">") || lower.contains("%3c") || lower.contains("%3e")
-                    || lower.contains("script") || lower.contains("javascript:") || lower.contains("onload")
-                    || lower.contains("onerror") || lower.contains("..") || lower.contains("\\")) {
+            if (lower.contains("<script") || lower.contains("%3cscript") || lower.contains("javascript:")
+                    || lower.contains("onload=") || lower.contains("onerror=") || lower.contains("..")
+                    || lower.contains("\\")) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Query parameters contain disallowed script or traversal characters.");
             }
         }
@@ -216,7 +239,7 @@ public class BoundaryIngestionService {
         }
     }
 
-    private JsonNode parseAndValidateGeoJson(byte[] payload) {
+    private JsonNode extractGeometryNodeFromPayload(byte[] payload) {
         JsonNode root;
         try {
             root = objectMapper.readValue(payload, JsonNode.class);
@@ -224,12 +247,10 @@ public class BoundaryIngestionService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Response payload is not valid JSON: " + e.getMessage());
         }
 
-        JsonNode geomNode = extractGeometryNode(root);
-        validateGeometryNode(geomNode);
-        return geomNode;
-    }
+        if (root == null || !root.isObject()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload must be a JSON object.");
+        }
 
-    private JsonNode extractGeometryNode(JsonNode root) {
         JsonNode featuresNode = root.get("features");
         if (featuresNode != null) {
             if (!featuresNode.isArray() || featuresNode.size() == 0) {
@@ -239,95 +260,117 @@ public class BoundaryIngestionService {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains multiple features. A single region feature was expected.");
             }
             JsonNode firstFeature = featuresNode.get(0);
-            return firstFeature != null ? firstFeature.get(GEOMETRY_FIELD) : null;
+            if (firstFeature == null || !firstFeature.isObject()) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Feature must be a JSON object.");
+            }
+            JsonNode geomNode = firstFeature.get(GEOMETRY_FIELD);
+            if (geomNode == null || geomNode.isNull()) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload does not contain a valid geometry object.");
+            }
+            return geomNode;
         }
+
         if (root.get(GEOMETRY_FIELD) != null) {
             return root.get(GEOMETRY_FIELD);
         }
+
         return root;
     }
 
-    private void validateGeometryNode(JsonNode geomNode) {
+    private Geometry validateAndDeserializeGeometry(JsonNode geomNode) {
         if (geomNode == null || !geomNode.isObject()) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload does not contain a valid geometry object.");
         }
 
+        validateRingsClosed(geomNode);
+
+        Geometry geometry;
+        try {
+            geometry = jtsGeometrySerde.deserializeFromNode(geomNode);
+        } catch (Exception e) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Failed to deserialize GeoJSON geometry: " + e.getMessage());
+        }
+
+        if (geometry == null) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload does not contain a valid geometry object.");
+        }
+
+        if (!(geometry instanceof Polygon || geometry instanceof MultiPolygon)) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Geometry type must be Polygon or MultiPolygon, found: " + geometry.getGeometryType());
+        }
+
+        if (!geometry.isValid()) {
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
+        }
+
+        for (Coordinate coord : geometry.getCoordinates()) {
+            if (Double.isNaN(coord.getX()) || Double.isNaN(coord.getY()) || Double.isInfinite(coord.getX()) || Double.isInfinite(coord.getY())) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinates must contain valid finite numbers.");
+            }
+            if (coord.getX() < -180.0 || coord.getX() > 180.0 || coord.getY() < -90.0 || coord.getY() > 90.0) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST,
+                        String.format(Locale.ROOT, "Coordinates out of valid WGS84 bounds (-180..180 lon, -90..90 lat): lon=%.6f, lat=%.6f", coord.getX(), coord.getY()));
+            }
+        }
+
+        return geometry;
+    }
+
+    private void validateRingsClosed(JsonNode geomNode) {
         JsonNode typeNode = geomNode.get("type");
         if (typeNode == null || !typeNode.isString()) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON geometry is missing a valid type field.");
+            return;
         }
-
-        String geomType = typeNode.getStringValue();
-        if (!"Polygon".equalsIgnoreCase(geomType) && !"MultiPolygon".equalsIgnoreCase(geomType)) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Geometry type must be Polygon or MultiPolygon, found: " + geomType);
+        String type = typeNode.getStringValue();
+        JsonNode coords = geomNode.get("coordinates");
+        if (coords == null || !coords.isArray()) {
+            return;
         }
-
-        JsonNode coordsNode = geomNode.get("coordinates");
-        if (coordsNode == null || !coordsNode.isArray() || coordsNode.size() == 0) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON geometry coordinates are missing or empty.");
-        }
-
-        validateCoordinatesTree(coordsNode);
-    }
-
-    private void validateCoordinatesTree(JsonNode node) {
-        if (!node.isArray() || node.size() == 0) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinate ring structure is empty or invalid.");
-        }
-
-        JsonNode firstChild = node.get(0);
-        if (firstChild != null && firstChild.isNumber()) {
-            validatePointCoordinates(node);
-        } else if (firstChild != null && firstChild.isArray()) {
-            JsonNode grandChild = firstChild.get(0);
-            if (grandChild != null && grandChild.isNumber()) {
-                validateLinearRing(node);
+        if ("Polygon".equalsIgnoreCase(type)) {
+            for (JsonNode ring : coords.values()) {
+                checkRingClosure(ring);
             }
-            for (JsonNode child : node.values()) {
-                validateCoordinatesTree(child);
-            }
-        } else {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Unexpected coordinate structure in GeoJSON geometry.");
-        }
-    }
-
-    private void validateLinearRing(JsonNode ring) {
-        if (ring.size() < 4) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must contain at least 4 coordinate positions.");
-        }
-        JsonNode first = ring.get(0);
-        JsonNode last = ring.get(ring.size() - 1);
-        if (first != null && last != null && first.size() >= 2 && last.size() >= 2) {
-            double lonFirst = first.get(0).getNumberValue().doubleValue();
-            double latFirst = first.get(1).getNumberValue().doubleValue();
-            double lonLast = last.get(0).getNumberValue().doubleValue();
-            double latLast = last.get(1).getNumberValue().doubleValue();
-            if (Double.compare(lonFirst, lonLast) != 0 || Double.compare(latFirst, latLast) != 0) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
+        } else if ("MultiPolygon".equalsIgnoreCase(type)) {
+            for (JsonNode poly : coords.values()) {
+                if (poly.isArray()) {
+                    for (JsonNode ring : poly.values()) {
+                        checkRingClosure(ring);
+                    }
+                }
             }
         }
     }
 
-    private void validatePointCoordinates(JsonNode node) {
-        if (node.size() < 2 || node.get(1) == null || !node.get(1).isNumber()) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinate point must contain at least two numeric values.");
-        }
-        double lon = node.get(0).getNumberValue().doubleValue();
-        double lat = node.get(1).getNumberValue().doubleValue();
-
-        if (Double.isNaN(lon) || Double.isNaN(lat) || Double.isInfinite(lon) || Double.isInfinite(lat)) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinates must contain valid finite numbers.");
-        }
-
-        if (lon < -180.0 || lon > 180.0 || lat < -90.0 || lat > 90.0) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST,
-                    String.format(Locale.ROOT, "Coordinates out of valid WGS84 bounds (-180..180 lon, -90..90 lat): lon=%.6f, lat=%.6f", lon, lat));
+    private void checkRingClosure(JsonNode ring) {
+        if (ring != null && ring.isArray() && ring.size() >= 4) {
+            JsonNode first = ring.get(0);
+            JsonNode last = ring.get(ring.size() - 1);
+            if (first != null && last != null && first.isArray() && last.isArray() && first.size() >= 2 && last.size() >= 2) {
+                JsonNode firstLon = first.get(0);
+                JsonNode firstLat = first.get(1);
+                JsonNode lastLon = last.get(0);
+                JsonNode lastLat = last.get(1);
+                if (firstLon.isNumber() && firstLat.isNumber() && lastLon.isNumber() && lastLat.isNumber()) {
+                    if (Double.compare(firstLon.getDoubleValue(), lastLon.getDoubleValue()) != 0
+                            || Double.compare(firstLat.getDoubleValue(), lastLat.getDoubleValue()) != 0) {
+                        throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
+                    }
+                }
+            }
         }
     }
 
     double resolveTolerance(Double requestedTolerance) {
-        double tolerance = requestedTolerance != null ? requestedTolerance : DEFAULT_TOLERANCE;
-        return Math.clamp(tolerance, MIN_TOLERANCE, MAX_TOLERANCE);
+        if (requestedTolerance == null) {
+            return DEFAULT_TOLERANCE;
+        }
+        if (Double.isNaN(requestedTolerance) || Double.isInfinite(requestedTolerance)) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Tolerance must be a finite, positive number.");
+        }
+        if (requestedTolerance <= 0.0) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Tolerance must be greater than zero.");
+        }
+        return Math.clamp(requestedTolerance, MIN_TOLERANCE, MAX_TOLERANCE);
     }
 
     private IngestBoundaryResponse updateRegionBoundary(UUID regionId, String geomJson, double tolerance) {
@@ -359,7 +402,7 @@ public class BoundaryIngestionService {
                 }
             } catch (SQLException e) {
                 LOG.error("Failed executing atomic boundary update for region {}: {}", regionId, e.getMessage(), e);
-                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error updating administrative region boundary: " + e.getMessage());
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error updating administrative region boundary.");
             }
 
             // Zero rows returned: determine if region is missing or geometry is invalid
@@ -370,7 +413,8 @@ public class BoundaryIngestionService {
                     regionExists = rs.next();
                 }
             } catch (SQLException e) {
-                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error verifying administrative region existence: " + e.getMessage());
+                LOG.error("Failed verifying administrative region existence for {}: {}", regionId, e.getMessage(), e);
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error verifying administrative region existence.");
             }
 
             if (!regionExists) {
