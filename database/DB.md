@@ -88,11 +88,49 @@ controls over project submissions.
   find data somewhere if it's eventually needed
 - Reading: [Event Sourcing & Audit Logs]
 
-## Key Queries
+## Dual-Track Geospatial Strategy: Points vs. Regional Polygons
 
-- The Local Radius Search: `ST_DWithin(locations.geom, :user_point, :radius)`
-- The Regional Boundary Match: `ST_Intersects(boundaries.geom, :user_point)`
-- The Remote Search: `WHERE shifts.location_id IS NULL`
+Our spatial architecture separates geographic data into two distinct tracks to preserve database query speed, avoid misleading user interfaces, and enforce strict legal jurisdictions:
+
+1. **Exact Work Sites (`locations` Table)**:
+   * **Shape**: Exclusively stores exact points (`GEOGRAPHY(Point, 4326)`).
+   * **Purpose**: Represents physical addresses where volunteers gather (e.g., a community center, a city park, or a school).
+   * **Why Points**: Local volunteer discovery needs to be fast. Storing only points in `locations` allows spatial radius queries to scan lightweight coordinates without touching heavy, multi-thousand-vertex boundary polygons.
+
+2. **Administrative Jurisdictions & Broad Initiatives (`administrative_regions` & `project_boundaries` Tables)**:
+   * **Shape**: Exclusively stores authoritative shapes (`GEOGRAPHY(Geometry, 4326)` constrained to `Polygon` and `MultiPolygon`).
+   * **Purpose**: Defines municipal and county administrative oversight zones, volunteer management chapters, and broad initiatives that lack a single street address (such as statewide wildfire relief).
+   * **Why Polygons Cannot Be Avoided**:
+     * **Legal Permit & Approval Containment**: A regional leader only has legal authority to approve volunteer projects within their assigned territory. PostGIS evaluates exact polygon containment (`ST_Covers`) to ensure approvals cannot spill into neighboring municipalities.
+     * **Non-Circular Municipal Geography**: Real municipal borders follow rivers, county lines, and irregular corridors. For example, Denver County connects to its airport via an 18-mile corridor. A circular radius or rectangular box either cuts off real community members or oversteps into surrounding cities. Only `MultiPolygon` shapes represent these jurisdictions honestly.
+     * **Automated Geographic Routing**: When a project is created at an address point, PostGIS containment queries instantly determine the parent municipality, county, and state chapter, avoiding manual tagging errors.
+
+### Two-Phase PostGIS Spatial Indexing
+
+You might wonder if storing polygons with thousands of coordinate points slows down lookups. PostGIS solves this through a **two-phase index strategy** using Generalized Search Tree (GiST) spatial indexing:
+
+1. **Phase 1 (Bounding Box Index - Microseconds)**: PostGIS automatically calculates a rectangular bounding envelope for every polygon. When checking if a coordinate is inside a region, it checks the bounding box index first. This instantly eliminates 99.9% of candidate records without doing expensive geometric math.
+2. **Phase 2 (Exact Boundary Test - True Precision)**: Only for the few candidates that fall inside the bounding box does PostGIS run the detailed topological check (`ST_Covers` or `ST_Intersects`).
+
+This gives us the best of both worlds: the lightning-fast speed of rectangular index passes with the exact legal accuracy of authoritative US Census boundaries.
+
+## Key Queries: Three-Tier Search Progression
+
+When volunteers search for opportunities, the platform resolves results through a three-tier spatial progression:
+
+1. **Tier 1 (The Local Radius Search)**:
+   * Used when a volunteer searches near home (e.g., within 5, 10, or 25 miles).
+   * Query: `ST_DWithin(locations.geom, :user_point, :radius_meters)`
+   * Scans lightweight point coordinates using GiST indexes for maximum speed.
+2. **Tier 2 (The Regional Boundary Match)**:
+   * Used for broad community campaigns or emergency initiatives that cover an entire district without a single street pin.
+   * Query: `ST_Intersects(project_boundaries.geom, :user_point)`
+   * Displays honest area highlights in the user interface instead of misleading fake street pins.
+3. **Tier 3 (The Remote Search)**:
+   * Used for virtual, phone, or at-home volunteer opportunities.
+   * Query: `WHERE shifts.location_id IS NULL`
+
+For the architectural decision record behind this strategy, see [ADR 0003: Dual-Track Geospatial Strategy](https://github.com/pbu-projects/Field-Guide/blob/main/docs/technical-spec/adrs/0003-dual-track-geospatial-strategy.adoc).
 
 [4326]: https://epsg.io/4326
 
