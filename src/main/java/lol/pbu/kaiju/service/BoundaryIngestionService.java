@@ -98,16 +98,6 @@ public class BoundaryIngestionService {
     public BoundaryIngestionService(
             JdbcOperations jdbcOperations,
             ObjectMapper objectMapper,
-            JtsGeometrySerde jtsGeometrySerde,
-            @Value("${kaiju.tigerweb.allowed-host:tigerweb.geo.census.gov}") String allowedHost,
-            @Value("${kaiju.tigerweb.allowed-path-prefix:/arcgis/rest/services/TIGERweb/}") String allowedPathPrefix
-    ) {
-        this(jdbcOperations, objectMapper, jtsGeometrySerde, null, allowedHost, allowedPathPrefix);
-    }
-
-    public BoundaryIngestionService(
-            JdbcOperations jdbcOperations,
-            ObjectMapper objectMapper,
             HttpClient httpClient,
             String allowedHost,
             String allowedPathPrefix
