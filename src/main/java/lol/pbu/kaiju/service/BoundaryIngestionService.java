@@ -13,6 +13,7 @@ import lol.pbu.kaiju.dto.IngestBoundaryCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.serde.JtsGeometrySerde;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.geom.Polygon;
@@ -293,7 +294,7 @@ public class BoundaryIngestionService {
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
         }
 
-        for (Coordinate coord : geometry.getCoordinates()) {
+        geometry.apply((CoordinateFilter) coord -> {
             if (Double.isNaN(coord.getX()) || Double.isNaN(coord.getY()) || Double.isInfinite(coord.getX()) || Double.isInfinite(coord.getY())) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinates must contain valid finite numbers.");
             }
@@ -301,7 +302,7 @@ public class BoundaryIngestionService {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST,
                         String.format(Locale.ROOT, "Coordinates out of valid WGS84 bounds (-180..180 lon, -90..90 lat): lon=%.6f, lat=%.6f", coord.getX(), coord.getY()));
             }
-        }
+        });
 
         return geometry;
     }
@@ -332,19 +333,20 @@ public class BoundaryIngestionService {
     }
 
     private void checkRingClosure(JsonNode ring) {
-        if (ring != null && ring.isArray() && ring.size() >= 4) {
-            JsonNode first = ring.get(0);
-            JsonNode last = ring.get(ring.size() - 1);
-            if (first != null && last != null && first.isArray() && last.isArray() && first.size() >= 2 && last.size() >= 2) {
-                JsonNode firstLon = first.get(0);
-                JsonNode firstLat = first.get(1);
-                JsonNode lastLon = last.get(0);
-                JsonNode lastLat = last.get(1);
-                if (firstLon.isNumber() && firstLat.isNumber() && lastLon.isNumber() && lastLat.isNumber()) {
-                    if (Double.compare(firstLon.getDoubleValue(), lastLon.getDoubleValue()) != 0
-                            || Double.compare(firstLat.getDoubleValue(), lastLat.getDoubleValue()) != 0) {
-                        throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
-                    }
+        if (ring == null || !ring.isArray() || ring.size() < 4) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must contain at least 4 coordinate positions.");
+        }
+        JsonNode first = ring.get(0);
+        JsonNode last = ring.get(ring.size() - 1);
+        if (first != null && last != null && first.isArray() && last.isArray() && first.size() >= 2 && last.size() >= 2) {
+            JsonNode firstLon = first.get(0);
+            JsonNode firstLat = first.get(1);
+            JsonNode lastLon = last.get(0);
+            JsonNode lastLat = last.get(1);
+            if (firstLon.isNumber() && firstLat.isNumber() && lastLon.isNumber() && lastLat.isNumber()) {
+                if (Double.compare(firstLon.getDoubleValue(), lastLon.getDoubleValue()) != 0
+                        || Double.compare(firstLat.getDoubleValue(), lastLat.getDoubleValue()) != 0) {
+                    throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
                 }
             }
         }

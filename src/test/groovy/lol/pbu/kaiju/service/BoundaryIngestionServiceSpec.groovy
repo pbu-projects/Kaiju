@@ -496,4 +496,44 @@ class BoundaryIngestionServiceSpec extends Specification {
         def ex = thrown(HttpStatusException)
         ex.status == HttpStatus.NOT_FOUND
     }
+
+    def "should reject linear ring with fewer than 4 coordinates before serde can auto-close"() {
+        given: "a GeoJSON payload with a 3-coordinate unclosed linear ring"
+        String triangleJson = '''{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-105.1, 39.7],
+                            [-104.9, 39.7],
+                            [-104.9, 39.8]
+                        ]]
+                    }
+                }
+            ]
+        }'''
+
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(triangleJson.getBytes("UTF-8")))
+        })
+
+        BoundaryIngestionService customService = new BoundaryIngestionService(
+                service.jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when: "attempting to ingest geometry with fewer than 4 coordinates"
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+
+        then: "a 400 Bad Request exception is thrown specifically for ring length"
+        def ex = thrown(HttpStatusException)
+        ex.status == HttpStatus.BAD_REQUEST
+        ex.message.contains("Linear ring must contain at least 4 coordinate positions.")
+    }
 }

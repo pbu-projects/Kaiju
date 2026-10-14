@@ -1,20 +1,29 @@
 package lol.pbu.kaiju.service
 
+import groovy.transform.CompileStatic
 import io.micronaut.serde.ObjectMapper
 import java.io.ByteArrayInputStream
+import java.io.IOException
 import java.io.InputStream
 import java.net.URI
 import java.net.http.HttpHeaders
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.nio.charset.StandardCharsets
+import java.util.Arrays
+import java.util.Collections
 import java.util.List
+import java.util.Locale
 import java.util.Map
 import java.util.Optional
 
+@CompileStatic
 class TigerwebContractValidator {
 
-    private static final List<String> MANDATORY_CENSUS_PROPERTIES = ["BASENAME", "GEOID", "STATE"]
+    public static final int MAX_PAYLOAD_BYTES = 15 * 1024 * 1024
+    private static final List<String> MANDATORY_CENSUS_PROPERTIES = Collections.unmodifiableList(
+            Arrays.asList("BASENAME", "GEOID", "STATE")
+    )
 
     private final ObjectMapper objectMapper
 
@@ -41,22 +50,35 @@ class TigerwebContractValidator {
             throw new ContractValidationException("Request URI must not be null")
         }
 
-        String scheme = uri.scheme
+        String scheme = uri.getScheme()
         if (!"https".equalsIgnoreCase(scheme)) {
             throw new ContractValidationException("Expected HTTPS scheme for Census TIGERweb, but received: " + scheme)
         }
 
-        String host = uri.host
-        if (host == null || !host.toLowerCase().contains("census.gov")) {
-            throw new ContractValidationException("Expected census.gov host for Census TIGERweb, but received: " + host)
+        String host = uri.getHost()
+        if (host == null) {
+            throw new ContractValidationException("Expected authoritative census.gov host, but received: null")
+        }
+        String lowerHost = host.toLowerCase(Locale.ROOT)
+        if (!lowerHost.equals("tigerweb.geo.census.gov") && !lowerHost.endsWith(".census.gov")) {
+            throw new ContractValidationException("Expected authoritative census.gov host, but received: " + host)
         }
 
-        String path = uri.path
+        if (uri.getUserInfo() != null) {
+            throw new ContractValidationException("User-info is not permitted in Census TIGERweb URI")
+        }
+
+        int port = uri.getPort()
+        if (port != -1 && port != 443) {
+            throw new ContractValidationException("Expected default or 443 port for Census TIGERweb, but received: " + port)
+        }
+
+        String path = uri.getPath()
         if (path == null || !path.startsWith("/arcgis/rest/services/TIGERweb/")) {
             throw new ContractValidationException("Expected path starting with /arcgis/rest/services/TIGERweb/, but received: " + path)
         }
 
-        String rawQuery = uri.rawQuery
+        String rawQuery = uri.getRawQuery()
         if (rawQuery == null || (!rawQuery.contains("f=geojson") && !rawQuery.contains("f=json"))) {
             throw new ContractValidationException("Census TIGERweb request must include query parameter f=geojson or f=json")
         }
@@ -75,6 +97,19 @@ class TigerwebContractValidator {
         }
     }
 
+    private byte[] readBoundedStream(InputStream inputStream) {
+        try {
+            byte[] bytes = inputStream.readNBytes(MAX_PAYLOAD_BYTES + 1)
+            if (bytes.length > MAX_PAYLOAD_BYTES) {
+                throw new SchemaDriftException("Response payload exceeds maximum allowed size of 15MB")
+            }
+            return bytes
+        } catch (IOException e) {
+            throw new SchemaDriftException("Failed reading response stream: " + e.getMessage(), e)
+        }
+    }
+
+    @SuppressWarnings("unchecked")
     <T> HttpResponse<T> validateResponse(HttpResponse<T> response) {
         if (response == null) {
             throw new ContractValidationException("HttpResponse must not be null")
@@ -87,17 +122,25 @@ class TigerwebContractValidator {
             }
 
             if (body instanceof InputStream) {
-                byte[] bytes = ((InputStream) body).readAllBytes()
+                byte[] bytes = readBoundedStream((InputStream) body)
                 validateResponseSchema(bytes)
-                return (HttpResponse<T>) new StubHttpResponse<InputStream>(response.statusCode(), new ByteArrayInputStream(bytes))
+                return (HttpResponse<T>) (HttpResponse<?>) new StubHttpResponse<InputStream>(response.statusCode(), new ByteArrayInputStream(bytes))
             } else if (body instanceof byte[]) {
-                validateResponseSchema((byte[]) body)
+                byte[] bytes = (byte[]) body
+                if (bytes.length > MAX_PAYLOAD_BYTES) {
+                    throw new SchemaDriftException("Response payload exceeds maximum allowed size of 15MB")
+                }
+                validateResponseSchema(bytes)
                 return response
             } else if (body instanceof String) {
-                validateResponseSchema(((String) body).getBytes(StandardCharsets.UTF_8))
+                byte[] bytes = ((String) body).getBytes(StandardCharsets.UTF_8)
+                if (bytes.length > MAX_PAYLOAD_BYTES) {
+                    throw new SchemaDriftException("Response payload exceeds maximum allowed size of 15MB")
+                }
+                validateResponseSchema(bytes)
                 return response
             } else {
-                throw new SchemaDriftException("Unsupported response body type for schema validation: " + body.getClass().name)
+                throw new SchemaDriftException("Unsupported response body type for schema validation: " + body.getClass().getName())
             }
         }
 
@@ -108,12 +151,15 @@ class TigerwebContractValidator {
         if (payload == null || payload.length == 0) {
             throw new SchemaDriftException("Response payload must not be empty")
         }
+        if (payload.length > MAX_PAYLOAD_BYTES) {
+            throw new SchemaDriftException("Response payload exceeds maximum allowed size of 15MB")
+        }
 
         Object parsed
         try {
-            parsed = objectMapper.readValue(payload, Map.class)
+            parsed = objectMapper.readValue(payload, Map)
         } catch (Exception e) {
-            throw new SchemaDriftException("Response payload is not valid JSON: " + e.message, e)
+            throw new SchemaDriftException("Response payload is not valid JSON: " + e.getMessage(), e)
         }
 
         validateParsedGeoJson(parsed)
@@ -130,13 +176,14 @@ class TigerwebContractValidator {
         if (inputStream == null) {
             throw new SchemaDriftException("InputStream must not be null")
         }
-        byte[] bytes = inputStream.readAllBytes()
+        byte[] bytes = readBoundedStream(inputStream)
         validateResponseSchema(bytes)
     }
 
     private void validateParsedGeoJson(Object root) {
         if (!(root instanceof Map)) {
-            throw new SchemaDriftException("Census TIGERweb response must be a JSON object, found: " + (root?.getClass()?.simpleName))
+            String typeName = root != null ? root.getClass().getSimpleName() : "null"
+            throw new SchemaDriftException("Census TIGERweb response must be a JSON object, found: " + typeName)
         }
 
         Map<?, ?> map = (Map<?, ?>) root
@@ -250,8 +297,8 @@ class TigerwebContractValidator {
             }
         }
 
-        List<?> firstPt = (List<?>) ring.first()
-        List<?> lastPt = (List<?>) ring.last()
+        List<?> firstPt = (List<?>) ring.get(0)
+        List<?> lastPt = (List<?>) ring.get(ring.size() - 1)
         double firstLon = ((Number) firstPt.get(0)).doubleValue()
         double firstLat = ((Number) firstPt.get(1)).doubleValue()
         double lastLon = ((Number) lastPt.get(0)).doubleValue()

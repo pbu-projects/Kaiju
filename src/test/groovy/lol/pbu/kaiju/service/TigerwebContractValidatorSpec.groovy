@@ -5,9 +5,11 @@ import spock.lang.Unroll
 
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.io.SequenceInputStream
 import java.net.URI
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.util.Collections
 
 class TigerwebContractValidatorSpec extends Specification {
 
@@ -157,10 +159,11 @@ class TigerwebContractValidatorSpec extends Specification {
         e.message.contains("Expected HTTPS scheme")
     }
 
-    def "REJECT | should reject non-census host"() {
-        given: "a request targeting an external unauthorized host"
+    @Unroll
+    def "REJECT | should reject spoofed or non-census host: #badUri"() {
+        given: "a request targeting an unauthorized or spoofed host"
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create("https://malicious.example.com/arcgis/rest/services/TIGERweb/query?f=geojson"))
+                .uri(URI.create(badUri))
                 .header("Accept", "application/geo+json")
                 .header("User-Agent", "Kaiju-GIS-Ingestion/1.0")
                 .GET()
@@ -171,7 +174,72 @@ class TigerwebContractValidatorSpec extends Specification {
 
         then:
         def e = thrown(ContractValidationException)
-        e.message.contains("Expected census.gov host")
+        e.message.contains("census.gov host")
+
+        where:
+        badUri << [
+                "https://malicious.example.com/arcgis/rest/services/TIGERweb/query?f=geojson",
+                "https://census.gov.attacker.com/arcgis/rest/services/TIGERweb/query?f=geojson",
+                "https://evil-census.gov/arcgis/rest/services/TIGERweb/query?f=geojson",
+                "https://notcensus.gov.org/arcgis/rest/services/TIGERweb/query?f=geojson"
+        ]
+    }
+
+    def "REJECT | should reject URI containing user-info"() {
+        given: "a request with credentials in URI"
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://user:pass@tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query?f=geojson"))
+                .header("Accept", "application/geo+json")
+                .header("User-Agent", "Kaiju-GIS-Ingestion/1.0")
+                .GET()
+                .build()
+
+        when:
+        validator.validateRequest(request)
+
+        then:
+        def e = thrown(ContractValidationException)
+        e.message.contains("User-info is not permitted")
+    }
+
+    def "REJECT | should reject non-standard port in request URI"() {
+        given: "a request specifying a non-standard port"
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create("https://tigerweb.geo.census.gov:8080/arcgis/rest/services/TIGERweb/query?f=geojson"))
+                .header("Accept", "application/geo+json")
+                .header("User-Agent", "Kaiju-GIS-Ingestion/1.0")
+                .GET()
+                .build()
+
+        when:
+        validator.validateRequest(request)
+
+        then:
+        def e = thrown(ContractValidationException)
+        e.message.contains("Expected default or 443 port")
+    }
+
+    def "SUCCESS | should accept valid census.gov hosts with default or 443 port"() {
+        given: "requests targeting valid census domains and ports"
+        HttpRequest req1 = HttpRequest.newBuilder()
+                .uri(URI.create("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?f=geojson"))
+                .header("Accept", "application/geo+json")
+                .header("User-Agent", "Kaiju-GIS-Ingestion/1.0")
+                .GET()
+                .build()
+        HttpRequest req2 = HttpRequest.newBuilder()
+                .uri(URI.create("https://tigerweb.geo.census.gov:443/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?f=geojson"))
+                .header("Accept", "application/geo+json")
+                .header("User-Agent", "Kaiju-GIS-Ingestion/1.0")
+                .GET()
+                .build()
+
+        when:
+        validator.validateRequest(req1)
+        validator.validateRequest(req2)
+
+        then:
+        noExceptionThrown()
     }
 
     def "REJECT | should reject invalid path prefix"() {
@@ -520,5 +588,32 @@ class TigerwebContractValidatorSpec extends Specification {
         then: "recorded requests are cleared"
         stubClient.recordedRequests.isEmpty()
         stubClient.lastRequest == null
+    }
+
+    def "REJECT | should reject response InputStream exceeding 15MB payload limit in validateResponse"() {
+        given: "a response with an InputStream exceeding 15MB"
+        byte[] chunk = new byte[1024 * 1024]
+        InputStream oversizedStream = new SequenceInputStream(Collections.enumeration((1..16).collect { new ByteArrayInputStream(chunk) }))
+        HttpResponse<InputStream> stubResponse = new StubHttpResponse<InputStream>(200, oversizedStream)
+
+        when:
+        validator.validateResponse(stubResponse)
+
+        then:
+        def e = thrown(SchemaDriftException)
+        e.message.contains("Response payload exceeds maximum allowed size of 15MB")
+    }
+
+    def "REJECT | should reject InputStream exceeding 15MB payload limit in validateResponseSchema"() {
+        given: "an InputStream exceeding 15MB"
+        byte[] chunk = new byte[1024 * 1024]
+        InputStream oversizedStream = new SequenceInputStream(Collections.enumeration((1..16).collect { new ByteArrayInputStream(chunk) }))
+
+        when:
+        validator.validateResponseSchema(oversizedStream)
+
+        then:
+        def e = thrown(SchemaDriftException)
+        e.message.contains("Response payload exceeds maximum allowed size of 15MB")
     }
 }

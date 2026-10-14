@@ -7,6 +7,7 @@ import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import lol.pbu.kaiju.dto.IngestBoundaryCommand
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import lol.pbu.kaiju.service.StubHttpClient
@@ -42,7 +43,7 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         return new StubHttpResponse<InputStream>(404, new ByteArrayInputStream(new byte[0]))
     }
 
-    private static final StubHttpClient stubHttpClientInstance = new StubHttpClient(
+    private final StubHttpClient stubHttpClientInstance = new StubHttpClient(
             sendHandler: DEFAULT_HANDLER,
             defaultSendHandler: DEFAULT_HANDLER,
             validateRequestContract: true
@@ -555,5 +556,39 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         then: "the ingestion is blocked by schema validation error"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
+    }
+
+    def "FAILURE | should return 400 Bad Request when linear ring has fewer than 4 coordinates"() {
+        given: "upstream returns a triangle with only 3 coordinates (unclosed)"
+        String triangleJson = '''{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-105.1, 39.7],
+                            [-104.9, 39.7],
+                            [-104.9, 39.8]
+                        ]]
+                    },
+                    "properties": {"BASENAME": "Denver", "GEOID": "08031", "STATE": "08"}
+                }
+            ]
+        }'''
+        stubHttpClientInstance.sendHandler = { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(triangleJson.getBytes("UTF-8")))
+        }
+        String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
+        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+
+        when: "attempting boundary ingestion through HTTP endpoint"
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+
+        then: "the controller returns 400 Bad Request"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+        e.response.getBody(String).orElse("").contains("Linear ring must contain at least 4 coordinate positions.")
     }
 }
