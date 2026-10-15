@@ -104,6 +104,104 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         regions.containsKey(TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID)
         regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].name == "Colorado Springs Downtown"
         regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        and: "Level 3 Municipalities exist with correct parentage"
+        regions.containsKey(TestPersonas.DENVER_CITY_REGION_ID)
+        regions[TestPersonas.DENVER_CITY_REGION_ID].name == "Denver City"
+        regions[TestPersonas.DENVER_CITY_REGION_ID].parentId == TestPersonas.DENVER_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID)
+        regions[TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID].name == "Colorado Springs City"
+        regions[TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.FOUNTAIN_CITY_REGION_ID)
+        regions[TestPersonas.FOUNTAIN_CITY_REGION_ID].name == "Fountain City"
+        regions[TestPersonas.FOUNTAIN_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID)
+        regions[TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID].name == "Manitou Springs City"
+        regions[TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.MONUMENT_TOWN_REGION_ID)
+        regions[TestPersonas.MONUMENT_TOWN_REGION_ID].name == "Monument Town"
+        regions[TestPersonas.MONUMENT_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.PALMER_LAKE_TOWN_REGION_ID)
+        regions[TestPersonas.PALMER_LAKE_TOWN_REGION_ID].name == "Palmer Lake Town"
+        regions[TestPersonas.PALMER_LAKE_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.CALHAN_TOWN_REGION_ID)
+        regions[TestPersonas.CALHAN_TOWN_REGION_ID].name == "Calhan Town"
+        regions[TestPersonas.CALHAN_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID)
+        regions[TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID].name == "Green Mountain Falls Town"
+        regions[TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.RAMAH_TOWN_REGION_ID)
+        regions[TestPersonas.RAMAH_TOWN_REGION_ID].name == "Ramah Town"
+        regions[TestPersonas.RAMAH_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+
+        and: "Level 2 Arapahoe County Region points to Colorado State Region"
+        regions.containsKey(TestPersonas.ARAPAHOE_COUNTY_REGION_ID)
+        regions[TestPersonas.ARAPAHOE_COUNTY_REGION_ID].name == "Arapahoe County Region"
+        regions[TestPersonas.ARAPAHOE_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
+
+        and: "Level 3 Arapahoe municipalities exist with Arapahoe County as parent"
+        regions.containsKey(TestPersonas.AURORA_CITY_REGION_ID)
+        regions[TestPersonas.AURORA_CITY_REGION_ID].name == "Aurora City"
+        regions[TestPersonas.AURORA_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.CENTENNIAL_CITY_REGION_ID)
+        regions[TestPersonas.CENTENNIAL_CITY_REGION_ID].name == "Centennial City"
+        regions[TestPersonas.CENTENNIAL_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.LITTLETON_CITY_REGION_ID)
+        regions[TestPersonas.LITTLETON_CITY_REGION_ID].name == "Littleton City"
+        regions[TestPersonas.LITTLETON_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID)
+        regions[TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID].name == "Greenwood Village City"
+        regions[TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.ENGLEWOOD_CITY_REGION_ID)
+        regions[TestPersonas.ENGLEWOOD_CITY_REGION_ID].name == "Englewood City"
+        regions[TestPersonas.ENGLEWOOD_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID)
+        regions[TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID].name == "Cherry Hills Village City"
+        regions[TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.SHERIDAN_CITY_REGION_ID)
+        regions[TestPersonas.SHERIDAN_CITY_REGION_ID].name == "Sheridan City"
+        regions[TestPersonas.SHERIDAN_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.GLENDALE_CITY_REGION_ID)
+        regions[TestPersonas.GLENDALE_CITY_REGION_ID].name == "Glendale City"
+        regions[TestPersonas.GLENDALE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID)
+        regions[TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID].name == "Columbine Valley Town"
+        regions[TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.BOW_MAR_TOWN_REGION_ID)
+        regions[TestPersonas.BOW_MAR_TOWN_REGION_ID].name == "Bow Mar Town"
+        regions[TestPersonas.BOW_MAR_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.FOXFIELD_TOWN_REGION_ID)
+        regions[TestPersonas.FOXFIELD_TOWN_REGION_ID].name == "Foxfield Town"
+        regions[TestPersonas.FOXFIELD_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.DEER_TRAIL_TOWN_REGION_ID)
+        regions[TestPersonas.DEER_TRAIL_TOWN_REGION_ID].name == "Deer Trail Town"
+        regions[TestPersonas.DEER_TRAIL_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        regions.containsKey(TestPersonas.BENNETT_TOWN_REGION_ID)
+        regions[TestPersonas.BENNETT_TOWN_REGION_ID].name == "Bennett Town"
+        regions[TestPersonas.BENNETT_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+
+        and: "total count matches seeded region IDs"
+        regions.size() == TestPersonas.SEEDED_REGION_IDS.size()
     }
 
     def "seeded county boundaries accurately contain internal landmarks and exclude adjacent municipalities"() {
@@ -136,14 +234,54 @@ class CommunityPersonaAuthenticationSpec extends Specification {
                 ST_Covers(
                     (SELECT geom FROM administrative_regions WHERE id = ?),
                     ST_GeographyFromText('SRID=4326;POINT(-104.6091 38.2544)')
-                ) AS pueblo_inside
+                ) AS pueblo_inside,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8214 38.8339)')
+                ) AS cos_hall_inside_cos_city,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.7008 38.6822)')
+                ) AS fountain_hall_inside_fountain,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.7008 38.6822)')
+                ) AS fountain_hall_inside_cos_city,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8093 39.7088)')
+                ) AS arapahoe_covers_aurora_hall,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8093 39.7088)')
+                ) AS aurora_covers_aurora_hall,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8093 39.7088)')
+                ) AS denver_covers_aurora_hall,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.9942 39.7465)')
+                ) AS denver_downtown_covers_16th_st_mall,
+                ST_Covers(
+                    (SELECT geom FROM administrative_regions WHERE id = ?),
+                    ST_GeographyFromText('SRID=4326;POINT(-104.8214 38.8339)')
+                ) AS cos_downtown_covers_cos_hall
         """, [
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.EL_PASO_COUNTY_REGION_ID,
-                TestPersonas.EL_PASO_COUNTY_REGION_ID
+                TestPersonas.EL_PASO_COUNTY_REGION_ID,
+                TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID,
+                TestPersonas.FOUNTAIN_CITY_REGION_ID,
+                TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID,
+                TestPersonas.ARAPAHOE_COUNTY_REGION_ID,
+                TestPersonas.AURORA_CITY_REGION_ID,
+                TestPersonas.DENVER_COUNTY_REGION_ID,
+                TestPersonas.DENVER_DOWNTOWN_REGION_ID,
+                TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID
         ])
 
         then: "Denver landmarks (City Hall and Denver International Airport) are strictly inside Denver County"
@@ -157,6 +295,53 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         and: "Colorado Springs City Hall is inside El Paso County and Pueblo is strictly excluded"
         spatialResults.cos_city_hall_inside == true
         spatialResults.pueblo_inside == false
+
+        and: "municipal boundaries properly contain local landmarks and exclude sibling municipalities"
+        spatialResults.cos_hall_inside_cos_city == true
+        spatialResults.fountain_hall_inside_fountain == true
+        spatialResults.fountain_hall_inside_cos_city == false
+
+        and: "Aurora landmarks are inside Arapahoe County and Aurora City, and strictly excluded from Denver County"
+        spatialResults.arapahoe_covers_aurora_hall == true
+        spatialResults.aurora_covers_aurora_hall == true
+        spatialResults.denver_covers_aurora_hall == false
+
+        and: "downtown cores contain their respective key district landmarks"
+        spatialResults.denver_downtown_covers_16th_st_mall == true
+        spatialResults.cos_downtown_covers_cos_hall == true
+    }
+
+    def "all seeded administrative regions are mathematically non-rectangular and topologically valid"() {
+        given: "a connection to the test database"
+        Sql sql = new Sql(dataSource)
+
+        when: "evaluating geometric validity and checking against bounding boxes"
+        String regionIds = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(',')
+        def rows = sql.rows("""
+            SELECT
+                id,
+                name,
+                ST_IsValid(geom::geometry) AS is_valid,
+                ST_Equals(geom::geometry, ST_Envelope(geom::geometry)) AS is_axis_aligned_box,
+                ST_Equals(geom::geometry, ST_OrientedEnvelope(geom::geometry)) AS is_oriented_box,
+                ST_NPoints(geom::geometry) AS point_count
+            FROM administrative_regions
+            WHERE id IN (${regionIds})
+            ORDER BY name
+        """.toString())
+
+        then: "all 28 seeded regions are retrieved"
+        rows.size() == TestPersonas.SEEDED_REGION_IDS.size()
+
+        and: "every seeded region is topologically valid PostGIS geometry"
+        rows.every { it.is_valid == true }
+
+        and: "every seeded region has at least 5 vertices"
+        rows.every { ((it.point_count as Number).intValue()) >= 5 }
+
+        and: "zero seeded regions are rectangles or bounding boxes"
+        rows.every { it.is_axis_aligned_box == false }
+        rows.every { it.is_oriented_box == false }
     }
 
     def "all seeded organizations in 3-tier organizational hierarchy exist with correct attributes"() {

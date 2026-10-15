@@ -10,6 +10,7 @@ import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
@@ -47,8 +48,8 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
     UserRepository userRepository
 
     def cleanup() {
-        String SEEDED_ORGS = "'b0000000-0000-0000-0000-000000000001', 'b0000000-0000-0000-0000-000000000002', 'b0000000-0000-0000-0000-000000000003', 'b0000000-0000-0000-0000-000000000004', 'b0000000-0000-0000-0000-000000000005', 'b0000000-0000-0000-0000-000000000006'"
-        String SEEDED_REGIONS = "'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000005'"
+        String SEEDED_ORGS = TestPersonas.SEEDED_ORGANIZATION_IDS.collect { "'${it}'" }.join(", ")
+        String SEEDED_REGIONS = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(", ")
 
         executeUpdate("DELETE FROM shifts")
         executeUpdate("DELETE FROM project_audit_logs")
