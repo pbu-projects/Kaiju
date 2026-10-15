@@ -149,5 +149,3 @@ For the architectural decision record behind this strategy, see ADR 0003: Dual-T
 [Event Sourcing & Audit Logs]: https://microservices.io/patterns/data/event-sourcing.html
 
 [Understanding Spatial Projections and SRID 4326]: https://postgis.net/workshops/postgis-intro/projection.html
-
-[EPSG 4326 vs 3857 in Web Mapping]: https://lyzidiamond.com/posts/4326-vs-3857
