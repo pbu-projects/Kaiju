@@ -12,7 +12,6 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.dto.IngestBoundaryCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.serde.JtsGeometrySerde;
-import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.MultiPolygon;
@@ -244,21 +243,7 @@ public class BoundaryIngestionService {
 
         JsonNode featuresNode = root.get("features");
         if (featuresNode != null) {
-            if (!featuresNode.isArray() || featuresNode.size() == 0) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains no features.");
-            }
-            if (featuresNode.size() > 1) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains multiple features. A single region feature was expected.");
-            }
-            JsonNode firstFeature = featuresNode.get(0);
-            if (firstFeature == null || !firstFeature.isObject()) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Feature must be a JSON object.");
-            }
-            JsonNode geomNode = firstFeature.get(GEOMETRY_FIELD);
-            if (geomNode == null || geomNode.isNull()) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload does not contain a valid geometry object.");
-            }
-            return geomNode;
+            return extractFeatureGeometry(featuresNode);
         }
 
         if (root.get(GEOMETRY_FIELD) != null) {
@@ -266,6 +251,24 @@ public class BoundaryIngestionService {
         }
 
         return root;
+    }
+
+    private JsonNode extractFeatureGeometry(JsonNode featuresNode) {
+        if (!featuresNode.isArray() || featuresNode.size() == 0) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains no features.");
+        }
+        if (featuresNode.size() > 1) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON FeatureCollection contains multiple features. A single region feature was expected.");
+        }
+        JsonNode firstFeature = featuresNode.get(0);
+        if (firstFeature == null || !firstFeature.isObject()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Feature must be a JSON object.");
+        }
+        JsonNode geomNode = firstFeature.get(GEOMETRY_FIELD);
+        if (geomNode == null || geomNode.isNull()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload does not contain a valid geometry object.");
+        }
+        return geomNode;
     }
 
     private Geometry validateAndDeserializeGeometry(JsonNode geomNode) {
@@ -318,15 +321,23 @@ public class BoundaryIngestionService {
             return;
         }
         if ("Polygon".equalsIgnoreCase(type)) {
-            for (JsonNode ring : coords.values()) {
-                checkRingClosure(ring);
-            }
+            validatePolygonRings(coords);
         } else if ("MultiPolygon".equalsIgnoreCase(type)) {
-            for (JsonNode poly : coords.values()) {
-                if (poly.isArray()) {
-                    for (JsonNode ring : poly.values()) {
-                        checkRingClosure(ring);
-                    }
+            validateMultiPolygonRings(coords);
+        }
+    }
+
+    private void validatePolygonRings(JsonNode coords) {
+        for (JsonNode ring : coords.values()) {
+            checkRingClosure(ring);
+        }
+    }
+
+    private void validateMultiPolygonRings(JsonNode coords) {
+        for (JsonNode poly : coords.values()) {
+            if (poly.isArray()) {
+                for (JsonNode ring : poly.values()) {
+                    checkRingClosure(ring);
                 }
             }
         }
@@ -343,11 +354,10 @@ public class BoundaryIngestionService {
             JsonNode firstLat = first.get(1);
             JsonNode lastLon = last.get(0);
             JsonNode lastLat = last.get(1);
-            if (firstLon.isNumber() && firstLat.isNumber() && lastLon.isNumber() && lastLat.isNumber()) {
-                if (Double.compare(firstLon.getDoubleValue(), lastLon.getDoubleValue()) != 0
-                        || Double.compare(firstLat.getDoubleValue(), lastLat.getDoubleValue()) != 0) {
-                    throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
-                }
+            if (firstLon.isNumber() && firstLat.isNumber() && lastLon.isNumber() && lastLat.isNumber()
+                    && (Double.compare(firstLon.getDoubleValue(), lastLon.getDoubleValue()) != 0
+                    || Double.compare(firstLat.getDoubleValue(), lastLat.getDoubleValue()) != 0)) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Linear ring must be closed (first and last coordinate points must match).");
             }
         }
     }
