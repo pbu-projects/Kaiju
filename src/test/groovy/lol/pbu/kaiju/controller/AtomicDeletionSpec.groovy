@@ -14,10 +14,6 @@ import lol.pbu.kaiju.repository.TagRepository
 class AtomicDeletionSpec extends BaseControllerSpec {
 
     @Inject
-    @Client("/")
-    HttpClient httpClient
-
-    @Inject
     TagRepository tagRepository
 
     def cleanup() {
@@ -29,10 +25,8 @@ class AtomicDeletionSpec extends BaseControllerSpec {
         def nonExistentId = UUID.randomUUID()
 
         when: "attempting to delete the resource via HTTP DELETE"
-        httpClient.toBlocking().exchange(
-                HttpRequest.DELETE("/tags/${nonExistentId}")
-                        .header("X-Test-User", "admin-user")
-                        .header("X-Test-Role", "system:admin")
+        client.exchange(
+                asGlobalAdmin(HttpRequest.DELETE("/tags/${nonExistentId}"))
         )
 
         then: "a 404 NOT_FOUND exception is returned directly without TOCTOU race"
@@ -48,10 +42,8 @@ class AtomicDeletionSpec extends BaseControllerSpec {
         def tag = tagRepository.save(new Tag(null, "atomic-test-${UUID.randomUUID()}"))
 
         when: "deleting the tag via HTTP DELETE"
-        def response = httpClient.toBlocking().exchange(
-                HttpRequest.DELETE("/tags/${tag.id()}")
-                        .header("X-Test-User", "admin-user")
-                        .header("X-Test-Role", "system:admin")
+        def response = client.exchange(
+                asGlobalAdmin(HttpRequest.DELETE("/tags/${tag.id()}"))
         )
 
         then: "response indicates success"

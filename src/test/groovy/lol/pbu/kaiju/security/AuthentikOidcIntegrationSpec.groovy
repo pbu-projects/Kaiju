@@ -492,6 +492,26 @@ class AuthentikOidcIntegrationSpec extends Specification {
         UserRole.STANDARD_USER.getPermissions().each { permission ->
             assert auth.getRoles().contains(permission.getClaim())
         }
+
+        cleanup:
+        userRepository.findByEmail(jennyEmail).ifPresent { userRepository.delete(it) }
+    }
+
+    def "live Authentik token for Alice Smith grants access to protected /projects endpoint with 200 OK"() {
+        given: "seeded persona Alice Smith"
+        String aliceEmail = "alice.smith@kaiju.local"
+
+        when: "Alice logs in via Authentik and obtains a genuine signed token"
+        Map<String, String> tokens = obtainLiveTokens(aliceEmail)
+
+        and: "she calls GET /projects presenting the token in the Authorization header"
+        def response = client.exchange(
+                HttpRequest.GET("/projects")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is granted and returns 200 OK"
+        response.status == HttpStatus.OK
     }
 
     def "unauthenticated requests to protected endpoints return 401 Unauthorized"() {

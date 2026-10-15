@@ -14,9 +14,6 @@ import lol.pbu.kaiju.repository.UserRepository
 import java.time.OffsetDateTime
 import java.util.UUID
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class AdminUserControllerSpec extends BaseControllerSpec {
 

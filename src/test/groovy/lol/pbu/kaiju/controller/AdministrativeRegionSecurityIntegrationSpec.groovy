@@ -1,63 +1,28 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.client.BlockingHttpClient
-import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.security.authentication.Authentication
-import io.micronaut.security.filters.AuthenticationFetcher
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import jakarta.inject.Singleton
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
-import org.reactivestreams.Publisher
 import spock.lang.Shared
-import spock.lang.Specification
 
-@Property(name = "spec.name", value = "AdministrativeRegionSecurityIntegrationSpec")
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+import java.util.UUID
+
 @MicronautTest(transactional = false)
-class AdministrativeRegionSecurityIntegrationSpec extends Specification {
-
-    @Requires(property = "spec.name", value = "AdministrativeRegionSecurityIntegrationSpec")
-    @Singleton
-    static class TestAuthenticationFetcher implements AuthenticationFetcher<HttpRequest<?>> {
-        @Override
-        Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
-            String testUser = request.getHeaders().get("X-Test-User")
-            if (testUser) {
-                List<String> roles = request.getHeaders().getAll("X-Test-Role")
-                return Publishers.just(Authentication.build(testUser, roles))
-            }
-            return Publishers.empty()
-        }
-    }
-
-    @Inject
-    @Client("/administrative-regions")
-    HttpClient httpClient
+class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
     @Inject
     AdministrativeRegionRepository administrativeRegionRepository
 
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
-
-    BlockingHttpClient getClient() {
-        return httpClient.toBlocking()
-    }
 
     private AdministrativeRegion createPersistedRegion(String name) {
         Coordinate[] coords = [
@@ -75,7 +40,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated GET /administrative-regions with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller requests the regions list"
-        client.exchange(HttpRequest.GET("/").accept(MediaType.APPLICATION_JSON_TYPE))
+        client.exchange(HttpRequest.GET("/administrative-regions").accept(MediaType.APPLICATION_JSON_TYPE))
 
         then: "an UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -84,7 +49,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated GET /administrative-regions/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller requests a specific region by ID"
-        client.exchange(HttpRequest.GET("/${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE))
+        client.exchange(HttpRequest.GET("/administrative-regions/${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE))
 
         then: "an UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -93,7 +58,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated POST /administrative-regions with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to create a region"
-        client.exchange(HttpRequest.POST("/", [
+        client.exchange(HttpRequest.POST("/administrative-regions", [
                 name       : "Unauthenticated Region",
                 coordinates: [
                         [longitude: -105.0, latitude: 39.0],
@@ -109,7 +74,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated PUT /administrative-regions/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to update a region"
-        client.exchange(HttpRequest.PUT("/${UUID.randomUUID()}", [
+        client.exchange(HttpRequest.PUT("/administrative-regions/${UUID.randomUUID()}", [
                 name       : "Unauthenticated Update",
                 coordinates: [
                         [longitude: -105.0, latitude: 39.0],
@@ -125,7 +90,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should reject unauthenticated DELETE /administrative-regions/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to delete a region"
-        client.exchange(HttpRequest.DELETE("/${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE))
+        client.exchange(HttpRequest.DELETE("/administrative-regions/${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE))
 
         then: "an UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -137,17 +102,18 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
     def "Security | should reject standard volunteer attempting POST /administrative-regions with 403 FORBIDDEN"() {
         when: "a standard authenticated volunteer attempts to create a region"
         client.exchange(
-                HttpRequest.POST("/", [
-                        name       : "Volunteer Rogue Region",
-                        coordinates: [
-                                [longitude: -105.0, latitude: 39.0],
-                                [longitude: -104.0, latitude: 39.0],
-                                [longitude: -104.0, latitude: 40.0]
-                        ]
-                ])
-                        .header("X-Test-User", "volunteer-user")
-                        .header("X-Test-Role", "STANDARD_USER")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                authenticated(
+                        HttpRequest.POST("/administrative-regions", [
+                                name       : "Volunteer Rogue Region",
+                                coordinates: [
+                                        [longitude: -105.0, latitude: 39.0],
+                                        [longitude: -104.0, latitude: 39.0],
+                                        [longitude: -104.0, latitude: 40.0]
+                                ]
+                        ]).accept(MediaType.APPLICATION_JSON_TYPE),
+                        "volunteer-user",
+                        ["STANDARD_USER"]
+                )
         )
 
         then: "a 403 FORBIDDEN response is returned"
@@ -161,17 +127,18 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a standard volunteer attempts to update the region"
         client.exchange(
-                HttpRequest.PUT("/${region.id()}", [
-                        name       : "Unauthorized Update",
-                        coordinates: [
-                                [longitude: -105.0, latitude: 39.0],
-                                [longitude: -104.0, latitude: 39.0],
-                                [longitude: -104.0, latitude: 40.0]
-                        ]
-                ])
-                        .header("X-Test-User", "volunteer-user")
-                        .header("X-Test-Role", "STANDARD_USER")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                authenticated(
+                        HttpRequest.PUT("/administrative-regions/${region.id()}", [
+                                name       : "Unauthorized Update",
+                                coordinates: [
+                                        [longitude: -105.0, latitude: 39.0],
+                                        [longitude: -104.0, latitude: 39.0],
+                                        [longitude: -104.0, latitude: 40.0]
+                                ]
+                        ]).accept(MediaType.APPLICATION_JSON_TYPE),
+                        "volunteer-user",
+                        ["STANDARD_USER"]
+                )
         )
 
         then: "a 403 FORBIDDEN response is returned"
@@ -185,10 +152,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a standard volunteer attempts to delete the region"
         client.exchange(
-                HttpRequest.DELETE("/${region.id()}")
-                        .header("X-Test-User", "volunteer-user")
-                        .header("X-Test-Role", "STANDARD_USER")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                authenticated(
+                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE),
+                        "volunteer-user",
+                        ["STANDARD_USER"]
+                )
         )
 
         then: "a 403 FORBIDDEN response is returned"
@@ -200,21 +168,16 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
     def "Security | should allow standard authenticated volunteer to execute GET /administrative-regions"() {
         when: "an authenticated volunteer reads administrative regions"
-        try {
-            def response = client.exchange(
-                    HttpRequest.GET("/?size=10")
-                            .header("X-Test-User", "volunteer-user")
-                            .header("X-Test-Role", "STANDARD_USER")
-                            .accept(MediaType.APPLICATION_JSON_TYPE)
-            )
-            assert response.status == HttpStatus.OK
-        } catch (HttpClientResponseException e) {
-            System.err.println("GET / FAILED WITH: " + e.status + " BODY: " + (e.response.getBody(String).orElse(null)))
-            throw e
-        }
+        def response = client.exchange(
+                authenticated(
+                        HttpRequest.GET("/administrative-regions?size=10").accept(MediaType.APPLICATION_JSON_TYPE),
+                        "volunteer-user",
+                        ["STANDARD_USER"]
+                )
+        )
 
         then:
-        noExceptionThrown()
+        response.status == HttpStatus.OK
     }
 
     def "Security | should allow standard authenticated volunteer to execute GET /administrative-regions/{id}"() {
@@ -222,21 +185,16 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
         def region = createPersistedRegion("Readable Region")
 
         when: "an authenticated volunteer reads a specific region by ID"
-        try {
-            def response = client.exchange(
-                    HttpRequest.GET("/${region.id()}")
-                            .header("X-Test-User", "volunteer-user")
-                            .header("X-Test-Role", "STANDARD_USER")
-                            .accept(MediaType.APPLICATION_JSON_TYPE)
-            )
-            assert response.status == HttpStatus.OK
-        } catch (HttpClientResponseException e) {
-            System.err.println("GET /{id} FAILED WITH: " + e.status + " BODY: " + (e.response.getBody(String).orElse(null)))
-            throw e
-        }
+        def response = client.exchange(
+                authenticated(
+                        HttpRequest.GET("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE),
+                        "volunteer-user",
+                        ["STANDARD_USER"]
+                )
+        )
 
         then:
-        noExceptionThrown()
+        response.status == HttpStatus.OK
     }
 
     def "Security | should allow regional manager with region:manage claim to execute POST /administrative-regions"() {
@@ -254,10 +212,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a user with region:manage creates a region"
         def response = client.exchange(
-                HttpRequest.POST("/", payload)
-                        .header("X-Test-User", "regional-manager")
-                        .header("X-Test-Role", "region:manage")
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                authenticated(
+                        HttpRequest.POST("/administrative-regions", payload).accept(MediaType.APPLICATION_JSON_TYPE),
+                        "regional-manager",
+                        ["region:manage"]
+                ),
                 Map
         )
 
@@ -286,10 +245,9 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a platform admin posts the region"
         def response = client.exchange(
-                HttpRequest.POST("/", payload)
-                        .header("X-Test-User", "global-admin")
-                        .header("X-Test-Role", "system:admin")
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                asGlobalAdmin(
+                        HttpRequest.POST("/administrative-regions", payload).accept(MediaType.APPLICATION_JSON_TYPE)
+                ),
                 Map
         )
 
@@ -328,10 +286,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a user with region:manage updates the region"
         def response = client.exchange(
-                HttpRequest.PUT("/${region.id()}", updatePayload)
-                        .header("X-Test-User", "regional-manager")
-                        .header("X-Test-Role", "region:manage")
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                authenticated(
+                        HttpRequest.PUT("/administrative-regions/${region.id()}", updatePayload).accept(MediaType.APPLICATION_JSON_TYPE),
+                        "regional-manager",
+                        ["region:manage"]
+                ),
                 Map
         )
 
@@ -355,10 +314,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a regional manager deletes the region"
         def response = client.exchange(
-                HttpRequest.DELETE("/${region.id()}")
-                        .header("X-Test-User", "regional-manager")
-                        .header("X-Test-Role", "region:manage")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                authenticated(
+                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE),
+                        "regional-manager",
+                        ["region:manage"]
+                )
         )
 
         then: "the deletion succeeds with 200 OK"
@@ -374,10 +334,9 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "a platform admin deletes the region"
         def response = client.exchange(
-                HttpRequest.DELETE("/${region.id()}")
-                        .header("X-Test-User", "global-admin")
-                        .header("X-Test-Role", "system:admin")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                asGlobalAdmin(
+                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE)
+                )
         )
 
         then: "the deletion succeeds with 200 OK"
@@ -394,10 +353,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "an authenticated user requests without page/size parameters"
         def response = client.exchange(
-                HttpRequest.GET("/")
-                        .header("X-Test-User", "volunteer-user")
-                        .header("X-Test-Role", "STANDARD_USER")
-                        .accept(MediaType.APPLICATION_JSON_TYPE),
+                authenticated(
+                        HttpRequest.GET("/administrative-regions").accept(MediaType.APPLICATION_JSON_TYPE),
+                        "volunteer-user",
+                        ["STANDARD_USER"]
+                ),
                 Map
         )
 
@@ -423,10 +383,9 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "an administrator attempts to update a non-existent region"
         client.exchange(
-                HttpRequest.PUT("/${nonExistentId}", updatePayload)
-                        .header("X-Test-User", "global-admin")
-                        .header("X-Test-Role", "system:admin")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                asGlobalAdmin(
+                        HttpRequest.PUT("/administrative-regions/${nonExistentId}", updatePayload).accept(MediaType.APPLICATION_JSON_TYPE)
+                )
         )
 
         then: "a 404 NOT FOUND status is thrown"
@@ -440,10 +399,9 @@ class AdministrativeRegionSecurityIntegrationSpec extends Specification {
 
         when: "an administrator attempts to delete a non-existent region"
         client.exchange(
-                HttpRequest.DELETE("/${nonExistentId}")
-                        .header("X-Test-User", "global-admin")
-                        .header("X-Test-Role", "system:admin")
-                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                asGlobalAdmin(
+                        HttpRequest.DELETE("/administrative-regions/${nonExistentId}").accept(MediaType.APPLICATION_JSON_TYPE)
+                )
         )
 
         then: "a 404 NOT FOUND status is thrown"

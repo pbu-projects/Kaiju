@@ -374,6 +374,19 @@ entries:
       groups:
         - !KeyOf group-standard-users
 
+  # Alice Smith test persona (Present in Authentik for happy path OIDC token testing)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: alice.smith@kaiju.local
+    attrs:
+      email: alice.smith@kaiju.local
+      name: Alice Smith
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf group-standard-users
+
   # OAuth2 Provider for Kaiju Application
   - id: kaiju-oauth2-provider
     model: authentik_providers_oauth2.oauth2provider

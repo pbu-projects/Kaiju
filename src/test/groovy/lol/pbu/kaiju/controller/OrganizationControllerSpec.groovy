@@ -24,9 +24,6 @@ import java.util.UUID
 
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class OrganizationControllerSpec extends BaseControllerSpec {
 
@@ -897,14 +894,14 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Emergency Disaster Services', true, 'VERIFIED')", disasterId)
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Friends of The Salvation Army', true, 'VERIFIED')", friendsId)
 
-        when: "searching for 'Denver'"
-        def resDenver = searchByName("Denver", false, Pageable.from(0, 10))
+        when: "searching for 'Denver Citadel'"
+        def resDenver = searchByName("Denver Citadel", false, Pageable.from(0, 10))
 
         and: "searching for 'Aurora'"
         def resAurora = searchByName("Aurora", false, Pageable.from(0, 10))
 
-        and: "searching for 'Colorado Springs'"
-        def resSprings = searchByName("Colorado Springs", false, Pageable.from(0, 10))
+        and: "searching for 'Colorado Springs Corps'"
+        def resSprings = searchByName("Colorado Springs Corps", false, Pageable.from(0, 10))
 
         and: "searching for 'Intermountain'"
         def resIntermountain = searchByName("Intermountain", false, Pageable.from(0, 10))

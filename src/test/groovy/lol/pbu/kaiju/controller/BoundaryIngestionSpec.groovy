@@ -24,9 +24,6 @@ import java.net.http.HttpResponse as JavaHttpResponse
 import java.util.Collections
 import java.util.UUID
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class BoundaryIngestionSpec extends BaseControllerSpec {
 

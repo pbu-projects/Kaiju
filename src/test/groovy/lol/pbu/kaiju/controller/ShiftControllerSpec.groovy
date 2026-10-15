@@ -28,9 +28,6 @@ import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class ShiftControllerSpec extends BaseControllerSpec {
 

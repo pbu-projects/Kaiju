@@ -19,27 +19,20 @@ import org.reactivestreams.Publisher
 import spock.lang.Shared
 import spock.lang.Specification
 
+import io.micronaut.security.token.generator.TokenGenerator
+import lol.pbu.kaiju.fixtures.TestPersonas
+
 import javax.sql.DataSource
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
+@Property(name = "micronaut.security.token.jwt.enabled", value = "true")
+@Property(name = "micronaut.security.token.jwt.signatures.secret.generator.secret", value = "pleaseChangeThisSecretForANewOne32Bits")
 @MicronautTest(transactional = false)
 abstract class BaseControllerSpec extends Specification {
 
-    @Singleton
-    @Requires(env = "test")
-    static class HeaderAuthenticationFetcher implements AuthenticationFetcher<HttpRequest<?>> {
-        @Override
-        Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
-            String testUser = request.getHeaders().get("X-Test-User")
-            if (testUser) {
-                List<String> roles = request.getHeaders().getAll("X-Test-Role")
-                return Publishers.just(Authentication.build(testUser, roles))
-            }
-            return Publishers.empty()
-        }
-    }
+    @Inject
+    TokenGenerator tokenGenerator
 
     @Inject
     @Client("/")
@@ -70,29 +63,29 @@ abstract class BaseControllerSpec extends Specification {
     }
 
     protected void cleanupDatabase() {
-        executeUpdate("""
-            TRUNCATE TABLE 
-                project_audit_logs,
-                organization_audit_logs,
-                shift_signups,
-                shift_tags,
-                shifts,
-                project_locations,
-                project_boundaries,
-                project_users,
-                projects,
-                organization_regions,
-                organization_locations,
-                organization_users,
-                region_users,
-                organizations,
-                locations,
-                boundaries,
-                administrative_regions,
-                tags,
-                users
-            CASCADE
-        """)
+        String SEEDED_USERS = TestPersonas.SEEDED_PERSONAS.collect { "'${it.id}'" }.join(", ")
+        String SEEDED_ORGS = TestPersonas.SEEDED_ORGANIZATION_IDS.collect { "'${it}'" }.join(", ")
+        String SEEDED_REGIONS = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(", ")
+
+        executeUpdate("DELETE FROM shift_signups")
+        executeUpdate("DELETE FROM shift_tags")
+        executeUpdate("DELETE FROM shifts")
+        executeUpdate("DELETE FROM project_audit_logs")
+        executeUpdate("DELETE FROM project_locations")
+        executeUpdate("DELETE FROM project_boundaries")
+        executeUpdate("DELETE FROM project_users")
+        executeUpdate("DELETE FROM projects")
+        executeUpdate("DELETE FROM organization_audit_logs")
+        executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORGS}) OR region_id NOT IN (${SEEDED_REGIONS})")
+        executeUpdate("DELETE FROM organization_locations")
+        executeUpdate("DELETE FROM region_users WHERE region_id NOT IN (${SEEDED_REGIONS})")
+        executeUpdate("DELETE FROM organization_users WHERE organization_id NOT IN (${SEEDED_ORGS})")
+        executeUpdate("DELETE FROM organizations WHERE id NOT IN (${SEEDED_ORGS})")
+        executeUpdate("DELETE FROM locations")
+        executeUpdate("DELETE FROM boundaries")
+        executeUpdate("DELETE FROM administrative_regions WHERE id NOT IN (${SEEDED_REGIONS})")
+        executeUpdate("DELETE FROM tags")
+        executeUpdate("DELETE FROM users WHERE id NOT IN (${SEEDED_USERS}) AND email != 'global-admin@example.com'")
         ensureGlobalAdmin()
     }
 
@@ -101,8 +94,12 @@ abstract class BaseControllerSpec extends Specification {
     }
 
     protected <T> MutableHttpRequest<T> authenticated(MutableHttpRequest<T> request, String userId, List<String> roles) {
-        request.header("X-Test-User", userId)
-        roles.each { role -> request.header("X-Test-Role", role) }
+        Map<String, Object> claims = [
+                "sub": userId,
+                "roles": roles
+        ]
+        String token = tokenGenerator.generateToken(claims).orElseThrow()
+        request.bearerAuth(token)
         return request
     }
 

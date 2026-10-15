@@ -13,6 +13,7 @@ micronaut:
   metrics:
     enabled: true
   security:
+    reject-not-found: false
     authentication: cookie
     endpoints:
       logout:

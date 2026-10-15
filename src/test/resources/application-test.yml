@@ -6,9 +6,17 @@ datasources:
 
 micronaut:
   security:
-    enabled: false
+    enabled: true
+    reject-not-found: false
     oauth2:
       enabled: false
+    token:
+      jwt:
+        enabled: true
+        signatures:
+          secret:
+            generator:
+              secret: pleaseChangeThisSecretForANewOne32Bits
 
 test-resources:
   containers:
