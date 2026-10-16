@@ -16,7 +16,6 @@ import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.UpdateShiftCommand
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.repository.ShiftRepository
-import spock.lang.Shared
 import spock.lang.Unroll
 
 import java.sql.Timestamp

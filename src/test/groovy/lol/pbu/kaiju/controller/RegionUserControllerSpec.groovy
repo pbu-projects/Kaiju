@@ -5,7 +5,6 @@ import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -22,10 +21,6 @@ import java.util.UUID
 @MicronautTest(transactional = false)
 class RegionUserControllerSpec extends BaseControllerSpec {
 
-    private static final String ROLE_STANDARD_USER = "STANDARD_USER"
-    private static final String ROLE_REGION_AGENT = "REGION_AGENT"
-    private static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
-    private static final String CLAIM_REGION_MANAGE = "region:manage"
     private static final String BASE_PATH = "/region-users"
 
     @Inject

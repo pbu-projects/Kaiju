@@ -65,8 +65,12 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
             executeUpdate("DELETE FROM project_locations WHERE project_id = ?", projectBId)
             executeUpdate("DELETE FROM projects WHERE id = ?", projectBId)
         }
-        if (shiftAId != null) executeUpdate("DELETE FROM shifts WHERE id = ?", shiftAId)
-        if (shiftBId != null) executeUpdate("DELETE FROM shifts WHERE id = ?", shiftBId)
+        if (shiftAId != null) {
+            executeUpdate("DELETE FROM shifts WHERE id = ?", shiftAId)
+        }
+        if (shiftBId != null) {
+            executeUpdate("DELETE FROM shifts WHERE id = ?", shiftBId)
+        }
         if (locationAId != null) {
             executeUpdate("DELETE FROM organization_locations WHERE location_id = ?", locationAId)
             executeUpdate("DELETE FROM locations WHERE id = ?", locationAId)
