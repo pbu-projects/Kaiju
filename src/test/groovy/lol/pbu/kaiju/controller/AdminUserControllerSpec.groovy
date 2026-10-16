@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -57,7 +56,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
         User user = userRepository.save(new User(null, "admin-test-${UUID.randomUUID()}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
 
         when: "a standard user attempts to update role"
-        client.exchange(authenticated(HttpRequest.PUT("/admin/users/${user.id()}/role", new RoleUpdateRequest(UserRole.REGION_AGENT)), UUID.randomUUID().toString(), ["STANDARD_USER"]), User)
+        client.exchange(asVolunteer(HttpRequest.PUT("/admin/users/${user.id()}/role", new RoleUpdateRequest(UserRole.REGION_AGENT))), User)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)

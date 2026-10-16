@@ -23,12 +23,10 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
     }
 
     def "Security | should reject non-admin authenticated users from /organizations with 403 FORBIDDEN"() {
-        when: "a standard authenticated user (lacking system:admin claim) requests bulk organizations"
+        when: "a standard authenticated volunteer (lacking system:admin claim) requests bulk organizations"
         client.exchange(
-                authenticated(
-                        HttpRequest.GET("/organizations").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["volunteer"]
+                asVolunteer(
+                        HttpRequest.GET("/organizations").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -74,12 +72,10 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
     }
 
     def "Security | should allow authenticated standard users to search by name"() {
-        when: "a standard authenticated user searches organizations by name"
+        when: "a standard authenticated volunteer searches organizations by name"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.GET("/organizations/search-by-name?name=Salvation").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "regular-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.GET("/organizations/search-by-name?name=Salvation").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -97,12 +93,10 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
     }
 
     def "Security | should allow authenticated standard users to search by location"() {
-        when: "a standard authenticated user searches organizations by location"
+        when: "a standard authenticated volunteer searches organizations by location"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.GET("/organizations/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=5000").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "regular-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.GET("/organizations/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=5000").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -120,12 +114,10 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
     }
 
     def "Security | should allow authenticated standard users to search by region"() {
-        when: "a standard authenticated user searches organizations by region"
+        when: "a standard authenticated volunteer searches organizations by region"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.GET("/organizations/search-by-region?regionId=${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "regular-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.GET("/organizations/search-by-region?regionId=${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 

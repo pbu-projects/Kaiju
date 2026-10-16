@@ -102,7 +102,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
     def "Security | should reject standard volunteer attempting POST /administrative-regions with 403 FORBIDDEN"() {
         when: "a standard authenticated volunteer attempts to create a region"
         client.exchange(
-                authenticated(
+                asVolunteer(
                         HttpRequest.POST("/administrative-regions", [
                                 name       : "Volunteer Rogue Region",
                                 coordinates: [
@@ -110,9 +110,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
                                         [longitude: -104.0, latitude: 39.0],
                                         [longitude: -104.0, latitude: 40.0]
                                 ]
-                        ]).accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["STANDARD_USER"]
+                        ]).accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -127,7 +125,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "a standard volunteer attempts to update the region"
         client.exchange(
-                authenticated(
+                asVolunteer(
                         HttpRequest.PUT("/administrative-regions/${region.id()}", [
                                 name       : "Unauthorized Update",
                                 coordinates: [
@@ -135,9 +133,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
                                         [longitude: -104.0, latitude: 39.0],
                                         [longitude: -104.0, latitude: 40.0]
                                 ]
-                        ]).accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["STANDARD_USER"]
+                        ]).accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -152,10 +148,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "a standard volunteer attempts to delete the region"
         client.exchange(
-                authenticated(
-                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -169,10 +163,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
     def "Security | should allow standard authenticated volunteer to execute GET /administrative-regions"() {
         when: "an authenticated volunteer reads administrative regions"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.GET("/administrative-regions?size=10").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.GET("/administrative-regions?size=10").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -186,10 +178,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "an authenticated volunteer reads a specific region by ID"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.GET("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.GET("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -212,10 +202,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "a user with region:manage creates a region"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.POST("/administrative-regions", payload).accept(MediaType.APPLICATION_JSON_TYPE),
-                        "regional-manager",
-                        ["region:manage"]
+                asRegionDirector(
+                        HttpRequest.POST("/administrative-regions", payload).accept(MediaType.APPLICATION_JSON_TYPE)
                 ),
                 Map
         )
@@ -286,10 +274,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "a user with region:manage updates the region"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.PUT("/administrative-regions/${region.id()}", updatePayload).accept(MediaType.APPLICATION_JSON_TYPE),
-                        "regional-manager",
-                        ["region:manage"]
+                asRegionDirector(
+                        HttpRequest.PUT("/administrative-regions/${region.id()}", updatePayload).accept(MediaType.APPLICATION_JSON_TYPE)
                 ),
                 Map
         )
@@ -314,10 +300,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "a regional manager deletes the region"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "regional-manager",
-                        ["region:manage"]
+                asRegionDirector(
+                        HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
@@ -353,10 +337,8 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
 
         when: "an authenticated user requests without page/size parameters"
         def response = client.exchange(
-                authenticated(
-                        HttpRequest.GET("/administrative-regions").accept(MediaType.APPLICATION_JSON_TYPE),
-                        "volunteer-user",
-                        ["STANDARD_USER"]
+                asVolunteer(
+                        HttpRequest.GET("/administrative-regions").accept(MediaType.APPLICATION_JSON_TYPE)
                 ),
                 Map
         )

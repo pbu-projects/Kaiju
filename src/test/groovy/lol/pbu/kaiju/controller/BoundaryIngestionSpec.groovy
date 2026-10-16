@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpRequest
@@ -49,14 +48,6 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     @MockBean(JavaHttpClient)
     JavaHttpClient javaHttpClient() {
         return stubHttpClientInstance
-    }
-
-    protected <T> MutableHttpRequest<T> asRegionalAdmin(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
-        authenticated(request, userId, ["REGION_DIRECTOR", "region:manage"])
-    }
-
-    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
-        authenticated(request, userId, ["STANDARD_USER"])
     }
 
     def setup() {
@@ -263,7 +254,7 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         def command = new IngestBoundaryCommand(validUrl, null)
 
         when: "a regional director attempts boundary ingestion"
-        client.exchange(asRegionalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asRegionDirector(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
 
         then: "a 403 Forbidden exception is returned"
         def e = thrown(HttpClientResponseException)
@@ -276,7 +267,7 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         def command = new IngestBoundaryCommand(validUrl, null)
 
         when: "a standard user attempts boundary ingestion"
-        client.exchange(asStandardUser(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
 
         then: "a 403 Forbidden exception is returned"
         def e = thrown(HttpClientResponseException)

@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Pageable
@@ -14,6 +13,7 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.dto.CreateOrganizationCommand
 import lol.pbu.kaiju.dto.UpdateOrganizationCommand
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
@@ -37,19 +37,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     Faker faker = new Faker()
 
     @Shared
-    UUID adminId = UUID.randomUUID()
-
-    @Shared
     List<UUID> createdUserIds = []
-
-    def setupSpec() {
-        executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'global-admin@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'org-admin-test@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
-    }
-
-    def cleanupSpec() {
-        executeUpdate("DELETE FROM users WHERE id = ?", adminId)
-    }
 
     def cleanup() {
         executeUpdate("DELETE FROM organization_locations")
@@ -97,7 +85,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def setup() {
         cleanup()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'org-admin-test@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
     }
 
     static class PageResponse<T> {
@@ -144,7 +131,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             }
         }
         def uri = builder.build().toString()
-        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri), adminId.toString()), Map)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
         toPage(response.body())
     }
 
@@ -163,7 +150,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             }
         }
         def uri = builder.build().toString()
-        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri), adminId.toString()), Map)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
         toPage(response.body())
     }
 
@@ -180,7 +167,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             }
         }
         def uri = builder.build().toString()
-        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri), adminId.toString()), Map)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
         toPage(response.body())
     }
 
@@ -196,7 +183,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         )
 
         when: "the organization is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command), adminId.toString()), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
         Organization saved = response.body()
 
         then: "the organization is persisted with a generated ID"
@@ -219,7 +206,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     @Unroll
     def "CREATE | should fail to save organization with invalid data: #testCase"(String testCase, Map payload) {
         when: "an attempt is made to add an organization with invalid data via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", payload), adminId.toString()), Organization)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", payload)), Organization)
 
         then: "a 400 Bad Request exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -242,7 +229,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         UUID id = org.id()
 
         when: "the organization is requested by its ID via HTTP GET"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${id}"), adminId.toString()), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${id}")), Organization)
 
         then: "the correct organization is returned"
         response.status == HttpStatus.OK
@@ -254,7 +241,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "READ | should return 404 for a non-existent organization ID"() {
         when: "a non-existent organization is requested via HTTP GET"
-        client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${UUID.randomUUID()}"), adminId.toString()), Organization)
+        client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${UUID.randomUUID()}")), Organization)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -272,7 +259,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def updateCommand = new UpdateOrganizationCommand(newName, newUrl, null, true)
 
         when: "the organization is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateCommand), adminId.toString()), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateCommand)), Organization)
         Organization updated = response.body()
 
         then: "the returned organization contains the updated data"
@@ -297,7 +284,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def updateCommand = new UpdateOrganizationCommand("Test Org", "https://example.com", null, true)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateCommand), adminId.toString()), Organization)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateCommand)), Organization)
 
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpClientResponseException)
@@ -310,7 +297,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def org = organizationRepository.save(new Organization(null, "Valid Org For Update", "https://example.com", null, true, UNVERIFIED, null, []))
 
         when: "an update with invalid data is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${org.id()}", payload), adminId.toString()), Organization)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${org.id()}", payload)), Organization)
 
         then: "a 400 Bad Request exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -331,7 +318,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         UUID id = org.id()
 
         when: "an update is submitted via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", payload), adminId.toString()), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", payload)), Organization)
         Organization updated = response.body()
 
         then: "the safe fields are updated correctly"
@@ -358,12 +345,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 null,
                 true
         )
-        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command), adminId.toString()), Organization)
+        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
         UUID id = createResponse.body().id()
         assert organizationRepository.existsById(id)
 
         when: "the organization is deleted via HTTP DELETE"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${id}"), adminId.toString()))
+        def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${id}")))
 
         then: "the organization no longer exists in the repository or database"
         response.status == HttpStatus.OK
@@ -378,7 +365,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def nonExistentId = UUID.randomUUID()
 
         when: "a delete is attempted via HTTP DELETE"
-        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${nonExistentId}"), adminId.toString()))
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${nonExistentId}")))
 
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpClientResponseException)
@@ -418,7 +405,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "requesting organizations via HTTP GET as global admin"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5"), adminId.toString()), Map)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5")), Map)
 
         then: "the response is 200 OK with content list"
         response.status == HttpStatus.OK
@@ -434,7 +421,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         when: "requesting organizations via HTTP GET as global admin with sort"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5&sort=name,asc"), adminId.toString()), Map)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5&sort=name,asc")), Map)
 
         then: "the response is 200 OK with content list"
         response.status == HttpStatus.OK
@@ -1045,12 +1032,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should return 403 FORBIDDEN when standard user without system admin claim accesses GET /organizations"() {
         given: "a standard user"
-        def standardUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", standardUserId, "std-${UUID.randomUUID()}@example.com".toString())
-        createdUserIds.add(standardUserId)
-
         when: "standard user attempts GET /organizations"
-        client.exchange(authenticated(HttpRequest.GET("/organizations"), standardUserId.toString(), ["STANDARD_USER"]))
+        client.exchange(asVolunteer(HttpRequest.GET("/organizations"), TestPersonas.VICTOR_VOLUNTEER))
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -1060,14 +1043,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority updates organization"() {
         given: "an organization and a standard unauthorized user"
         def org = organizationRepository.save(new Organization(null, "Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
-        def unauthUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-${UUID.randomUUID()}@example.com".toString())
-        createdUserIds.add(unauthUserId)
-
         def updated = new UpdateOrganizationCommand("Hacked Name", "https://hacked.com", null, true)
 
         when: "unauthorized user attempts to update the organization"
-        client.exchange(authenticated(HttpRequest.PUT("/organizations/${org.id()}", updated), unauthUserId.toString(), ["STANDARD_USER"]), Organization)
+        client.exchange(asVolunteer(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.VICTOR_VOLUNTEER), Organization)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1077,12 +1056,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority deletes organization"() {
         given: "an organization and a standard unauthorized user"
         def org = organizationRepository.save(new Organization(null, "Delete Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
-        def unauthUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-del-${UUID.randomUUID()}@example.com".toString())
-        createdUserIds.add(unauthUserId)
 
         when: "unauthorized user attempts to delete the organization"
-        client.exchange(authenticated(HttpRequest.DELETE("/organizations/${org.id()}"), unauthUserId.toString(), ["STANDARD_USER"]))
+        client.exchange(asVolunteer(HttpRequest.DELETE("/organizations/${org.id()}"), TestPersonas.VICTOR_VOLUNTEER))
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1092,25 +1068,26 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "AUTHORIZATION | should allow organization admin to update and delete organization"() {
         given: "an organization and an ORG_ADMIN for that organization"
         def org = organizationRepository.save(new Organization(null, "Allowed Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
-        def adminUser = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", adminUser, "admin-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", adminUser, org.id())
-        createdUserIds.add(adminUser)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", TestPersonas.LEO_LOCAL_ADMIN.id, org.id())
 
         def updated = new UpdateOrganizationCommand("Updated By Admin", "https://example.com", null, true)
 
         when: "org admin updates the organization via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/organizations/${org.id()}", updated), adminUser.toString(), ["STANDARD_USER"]), Organization)
+        def response = client.exchange(asOrgAdmin(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.LEO_LOCAL_ADMIN), Organization)
 
         then: "it succeeds"
         response.status == HttpStatus.OK
         response.body().name() == "Updated By Admin"
 
         when: "org admin deletes the organization via HTTP DELETE"
-        def delResponse = client.exchange(authenticated(HttpRequest.DELETE("/organizations/${org.id()}"), adminUser.toString(), ["STANDARD_USER"]))
+        def delResponse = client.exchange(asOrgAdmin(HttpRequest.DELETE("/organizations/${org.id()}"), TestPersonas.LEO_LOCAL_ADMIN))
 
         then: "it is removed"
         delResponse.status == HttpStatus.OK
         !organizationRepository.findById(org.id()).isPresent()
+
+        cleanup:
+        executeUpdate("DELETE FROM organization_users WHERE organization_id = ?", org.id())
+        executeUpdate("DELETE FROM organizations WHERE id = ?", org.id())
     }
 }

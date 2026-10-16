@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -13,6 +12,7 @@ import lol.pbu.kaiju.dto.ProjectBoundaryCommand
 import lol.pbu.kaiju.dto.UpdateLocationCommand
 import lol.pbu.kaiju.dto.UpdateProjectCommand
 import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 
@@ -23,15 +23,10 @@ import java.util.UUID
 @MicronautTest(transactional = false)
 class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
-    static final String ROLE_STANDARD_USER = "STANDARD_USER"
-    static final String ROLE_ORG_MANAGER = "ORG_MANAGER"
-    static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
-    static final String CLAIM_PROJECT_APPROVE = "project:approve"
     static final String STATUS_VERIFIED = "VERIFIED"
     static final String STATUS_PENDING = "PENDING"
     static final String COUNTRY_CODE_US = "US"
 
-    static final String DENVER_WKT = "POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))"
     static final String DENVER_POINT = "POINT(-104.9903 39.7392)"
     static final String BOULDER_POINT = "POINT(-105.2705 40.0150)"
 
@@ -41,77 +36,76 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     static final String STATUS_SUBPATH = "/status"
 
     UUID orgAId
-    UUID userAId
+    TestPersonas.Persona userA
     UUID locationAId
     UUID projectAId
     UUID shiftAId
 
     UUID orgBId
-    UUID userBId
+    TestPersonas.Persona userB
     UUID locationBId
     UUID projectBId
     UUID shiftBId
 
     UUID denverRegionId
-    UUID denverDirectorId
+    TestPersonas.Persona denverDirector
 
     def setup() {
         provisionTenantFixtures()
     }
 
-    private void provisionTenantFixtures() {
-        denverRegionId = UUID.randomUUID()
-        denverDirectorId = UUID.randomUUID()
+    def cleanup() {
+        if (projectAId != null) {
+            executeUpdate("DELETE FROM shifts WHERE project_id = ?", projectAId)
+            executeUpdate("DELETE FROM project_locations WHERE project_id = ?", projectAId)
+            executeUpdate("DELETE FROM projects WHERE id = ?", projectAId)
+        }
+        if (projectBId != null) {
+            executeUpdate("DELETE FROM shifts WHERE project_id = ?", projectBId)
+            executeUpdate("DELETE FROM project_locations WHERE project_id = ?", projectBId)
+            executeUpdate("DELETE FROM projects WHERE id = ?", projectBId)
+        }
+        if (shiftAId != null) executeUpdate("DELETE FROM shifts WHERE id = ?", shiftAId)
+        if (shiftBId != null) executeUpdate("DELETE FROM shifts WHERE id = ?", shiftBId)
+        if (locationAId != null) {
+            executeUpdate("DELETE FROM organization_locations WHERE location_id = ?", locationAId)
+            executeUpdate("DELETE FROM locations WHERE id = ?", locationAId)
+        }
+        if (locationBId != null) {
+            executeUpdate("DELETE FROM organization_locations WHERE location_id = ?", locationBId)
+            executeUpdate("DELETE FROM locations WHERE id = ?", locationBId)
+        }
+        if (orgBId != null && orgBId != TestPersonas.DENVER_METRO_BRANCH_ID) {
+            executeUpdate("DELETE FROM organization_users WHERE organization_id = ?", orgBId)
+            executeUpdate("DELETE FROM organization_regions WHERE organization_id = ?", orgBId)
+            executeUpdate("DELETE FROM organizations WHERE id = ?", orgBId)
+        }
+    }
 
-        orgAId = UUID.randomUUID()
-        userAId = UUID.randomUUID()
+    private void provisionTenantFixtures() {
+        denverRegionId = TestPersonas.DENVER_COUNTY_REGION_ID
+        denverDirector = TestPersonas.DANIEL_COUNTY_DIRECTOR
+
+        orgAId = TestPersonas.DENVER_METRO_BRANCH_ID
+        userA = TestPersonas.LAURA_LOCAL_MANAGER
         locationAId = UUID.randomUUID()
         projectAId = UUID.randomUUID()
         shiftAId = UUID.randomUUID()
 
         orgBId = UUID.randomUUID()
-        userBId = UUID.randomUUID()
+        userB = TestPersonas.URSULA_UTAH_ADMIN
         locationBId = UUID.randomUUID()
         projectBId = UUID.randomUUID()
         shiftBId = UUID.randomUUID()
 
-        // 1. Regional boundary setup for Denver
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Denver Metro Region', ST_GeogFromText(?))
-        """, denverRegionId, DENVER_WKT)
-
-        executeUpdate("""
-            INSERT INTO users (id, email, role)
-            VALUES (?, 'denver-director@example.com', ?)
-        """, denverDirectorId, ROLE_REGION_DIRECTOR)
-
-        executeUpdate("""
-            INSERT INTO region_users (user_id, region_id, role)
-            VALUES (?, ?, ?)
-        """, denverDirectorId, denverRegionId, ROLE_REGION_DIRECTOR)
-
-        // 2. Organization Alpha (Org A) in Denver
-        executeUpdate("""
-            INSERT INTO organizations (id, name, is_public, verification_status)
-            VALUES (?, 'Organization Alpha', true, ?)
-        """, orgAId, STATUS_VERIFIED)
-
+        // 1. Link Denver Metro Branch to Denver County Region if not already present
         executeUpdate("""
             INSERT INTO organization_regions (organization_id, region_id)
             VALUES (?, ?)
+            ON CONFLICT DO NOTHING
         """, orgAId, denverRegionId)
 
-        executeUpdate("""
-            INSERT INTO users (id, email, role)
-            VALUES (?, 'user-a@example.com', ?)
-        """, userAId, ROLE_STANDARD_USER)
-
-        executeUpdate("""
-            INSERT INTO organization_users (user_id, organization_id, role)
-            VALUES (?, ?, ?)
-        """, userAId, orgAId, ROLE_ORG_MANAGER)
-
+        // 2. Organization Alpha (Org A) in Denver
         executeUpdate("""
             INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom)
             VALUES (?, 'Denver Location Alpha', '1600 California St', 'Denver', 'CO', '80202', ?, ST_GeogFromText(?))
@@ -144,16 +138,6 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
             INSERT INTO organizations (id, name, is_public, verification_status)
             VALUES (?, 'Organization Beta', true, ?)
         """, orgBId, STATUS_VERIFIED)
-
-        executeUpdate("""
-            INSERT INTO users (id, email, role)
-            VALUES (?, 'user-b@example.com', ?)
-        """, userBId, ROLE_STANDARD_USER)
-
-        executeUpdate("""
-            INSERT INTO organization_users (user_id, organization_id, role)
-            VALUES (?, ?, ?)
-        """, userBId, orgBId, ROLE_ORG_MANAGER)
 
         executeUpdate("""
             INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom)
@@ -259,10 +243,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         )
 
         when: "User A attempts to update Project B via HTTP PUT"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.PUT("${PROJECTS_PATH}/${projectBId}", command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ), Project)
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -272,10 +255,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to delete Project B with 403 FORBIDDEN"() {
         when: "User A attempts to delete Project B via HTTP DELETE"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.DELETE("${PROJECTS_PATH}/${projectBId}"),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ))
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -288,10 +270,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         def command = createShiftCommand(projectBId)
 
         when: "User A attempts to create a shift for Project B via HTTP POST"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.POST(SHIFTS_PATH, command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ), Shift)
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -304,10 +285,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         def command = createUpdateShiftCommand()
 
         when: "User A attempts to update Shift B via HTTP PUT"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.PUT("${SHIFTS_PATH}/${shiftBId}", command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ), Shift)
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -317,10 +297,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to delete Shift B with 403 FORBIDDEN"() {
         when: "User A attempts to delete Shift B via HTTP DELETE"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.DELETE("${SHIFTS_PATH}/${shiftBId}"),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ))
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -333,10 +312,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         def command = createUpdateLocationCommand()
 
         when: "User A attempts to update Location B via HTTP PUT"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.PUT("${LOCATIONS_PATH}/${locationBId}", command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ))
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -346,10 +324,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to delete Location B with 403 FORBIDDEN"() {
         when: "User A attempts to delete Location B via HTTP DELETE"
-        client.exchange(authenticated(
+        client.exchange(asOrgManager(
                 HttpRequest.DELETE("${LOCATIONS_PATH}/${locationBId}"),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ))
 
         then: "a 403 FORBIDDEN exception is returned"
@@ -361,10 +338,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     def "SPATIAL BOUNDARY ISOLATION | should reject Denver Regional Director attempting to approve Boulder Project B with 403 FORBIDDEN"() {
         when: "Denver Regional Director attempts to approve Boulder Project B via HTTP PUT"
-        client.exchange(authenticated(
+        client.exchange(asRegionDirector(
                 HttpRequest.PUT("${PROJECTS_PATH}/${projectBId}${STATUS_SUBPATH}", ""),
-                denverDirectorId.toString(),
-                [ROLE_REGION_DIRECTOR, CLAIM_PROJECT_APPROVE]
+                denverDirector
         ), Project)
 
         then: "a 403 FORBIDDEN exception is returned because Project B is outside Denver boundary polygon"
@@ -383,10 +359,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         )
 
         when: "User A updates Project A via HTTP PUT"
-        def response = client.exchange(authenticated(
+        def response = client.exchange(asOrgManager(
                 HttpRequest.PUT("${PROJECTS_PATH}/${projectAId}", command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ), Project)
 
         then: "the response is 200 OK and project title is updated"
@@ -399,10 +374,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         def command = createShiftCommand(projectAId)
 
         when: "User A creates a shift for Project A via HTTP POST"
-        def response = client.exchange(authenticated(
+        def response = client.exchange(asOrgManager(
                 HttpRequest.POST(SHIFTS_PATH, command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ), Shift)
 
         then: "the response is 200 OK and shift is persisted"
@@ -416,10 +390,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         def command = createUpdateShiftCommand()
 
         when: "User A updates Shift A via HTTP PUT"
-        def response = client.exchange(authenticated(
+        def response = client.exchange(asOrgManager(
                 HttpRequest.PUT("${SHIFTS_PATH}/${shiftAId}", command),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ), Shift)
 
         then: "the response is 200 OK"
@@ -429,10 +402,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     def "HAPPY PATH | should allow User A to successfully delete Shift A with 200 OK"() {
         when: "User A deletes Shift A via HTTP DELETE"
-        def response = client.exchange(authenticated(
+        def response = client.exchange(asOrgManager(
                 HttpRequest.DELETE("${SHIFTS_PATH}/${shiftAId}"),
-                userAId.toString(),
-                [ROLE_STANDARD_USER]
+                userA
         ))
 
         then: "the response is 200 OK or 204 NO_CONTENT"
@@ -442,10 +414,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
     def "HAPPY PATH | should allow Denver Regional Director to approve Denver Project A with 200 OK"() {
         when: "Denver Regional Director approves Denver Project A via HTTP PUT"
-        def response = client.exchange(authenticated(
+        def response = client.exchange(asRegionDirector(
                 HttpRequest.PUT("${PROJECTS_PATH}/${projectAId}${STATUS_SUBPATH}", ""),
-                denverDirectorId.toString(),
-                [ROLE_REGION_DIRECTOR, CLAIM_PROJECT_APPROVE]
+                denverDirector
         ), Project)
 
         then: "the response is 200 OK and project status transitions to ACTIVE"

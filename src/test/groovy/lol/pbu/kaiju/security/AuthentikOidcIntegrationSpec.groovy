@@ -22,7 +22,6 @@ import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import org.reactivestreams.Publisher

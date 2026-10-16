@@ -146,7 +146,7 @@ tasks.register("lighthouse") {
     description = "Lighthouse Markdown audit: validates syntax, block rendering, and link integrity."
     doLast {
         val rootDir = projectDir
-        val ignoreDirs = setOf(".git", ".gradle", "build", "node_modules", ".idea", ".vscode", ".agent", ".gemini")
+        val ignoreDirs = setOf(".git", ".gradle", "build", "node_modules", ".idea", ".vscode", ".agent", ".gemini", ".context")
         val mdFiles = rootDir.walkTopDown()
             .onEnter { it.name !in ignoreDirs }
             .filter { it.isFile && it.extension == "md" }

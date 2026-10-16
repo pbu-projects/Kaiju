@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -48,12 +49,14 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
             if (emailObj instanceof String email && !email.isBlank()) {
                 String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
                 User user = userService.provisionOrGetUser(canonicalEmail);
-                List<String> permissions = user.role().getPermissions().stream()
+                List<String> roles = new ArrayList<>();
+                roles.add(user.role().name());
+                user.role().getPermissions().stream()
                         .map(Permission::getClaim)
-                        .toList();
+                        .forEach(roles::add);
                 return Optional.of(Authentication.build(
                         user.id().toString(),
-                        permissions,
+                        roles,
                         claims
                 ));
             }
