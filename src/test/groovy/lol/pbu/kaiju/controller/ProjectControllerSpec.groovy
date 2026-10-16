@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -35,13 +34,9 @@ import java.util.UUID
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING
-import static lol.pbu.kaiju.model.ProjectStatus.PENDING_UPDATE
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class ProjectControllerSpec extends BaseControllerSpec {
 
@@ -70,7 +65,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     Faker faker = new Faker()
 
     @Shared
-    String adminId = "00000000-0000-0000-0000-000000000000"
+    String adminId = TestPersonas.SARAH_ADMIN.id.toString()
 
     def setupSpec() {
         executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'test-principal@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
@@ -89,8 +84,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("DELETE FROM project_users")
         executeUpdate("DELETE FROM projects")
         executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORG_IDS})")
-        executeUpdate("DELETE FROM organization_users WHERE user_id NOT IN (${SEEDED_USER_IDS})")
-        executeUpdate("DELETE FROM region_users WHERE user_id NOT IN (${SEEDED_USER_IDS})")
+        executeUpdate("DELETE FROM organization_users WHERE user_id NOT IN (${SEEDED_USER_IDS}) OR organization_id NOT IN (${SEEDED_ORG_IDS})")
+        executeUpdate("DELETE FROM region_users WHERE user_id NOT IN (${SEEDED_USER_IDS}) OR region_id NOT IN (${SEEDED_REGION_IDS})")
         executeUpdate("DELETE FROM locations WHERE name LIKE '%Loc%' OR name LIKE '%St%' OR address_line LIKE '%St%' OR city = 'Denver' OR city = 'Boulder' OR city = 'Toronto' OR city = 'Colo Springs'")
         executeUpdate("DELETE FROM administrative_regions WHERE id NOT IN (${SEEDED_REGION_IDS})")
         executeUpdate("DELETE FROM organizations WHERE (name LIKE '%Org%' OR name LIKE '%Denver%' OR name LIKE '%Boulder%' OR name LIKE '%Default%' OR name LIKE '%Test%') AND id NOT IN (${SEEDED_ORG_IDS})")
@@ -480,15 +475,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject reassignment to another organization when user is ORG_MANAGER"() {
         given: "two organizations Org A and Org B"
-        def orgAId = UUID.randomUUID()
-        def orgBId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
-
-        and: "a user who is an ORG_MANAGER of Org A only"
-        def userId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-a-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgAId)
+        def orgAId = TestPersonas.DENVER_METRO_BRANCH_ID
+        def orgBId = TestPersonas.UTAH_STATE_CHAPTER_ID
 
         and: "a project belonging to Org A"
         def projectId = UUID.randomUUID()
@@ -501,7 +489,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def updateCmd = updateProjectCommand(orgBId, "Hijacked Title", "Hijacked Description that is at least twenty chars long.")
 
         when: "the Org Manager attempts to reassign the project to Org B via HTTP PUT"
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), userId.toString(), ["STANDARD_USER"]), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
 
         then: "the request is rejected with 403 Forbidden"
         def e = thrown(HttpClientResponseException)
@@ -515,13 +503,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow legitimate update by Org Manager preserving existing organization"() {
         given: "an organization Org A"
-        def orgAId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
-
-        and: "a user who is an ORG_MANAGER of Org A"
-        def userId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-legit-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgAId)
+        def orgAId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         and: "a project belonging to Org A"
         def projectId = UUID.randomUUID()
@@ -534,7 +516,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def updateCmd = updateProjectCommand(orgAId, "Legit Updated Title", "Legit Updated Description that is at least twenty chars long.")
 
         when: "the Org Manager updates the project via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), userId.toString(), ["STANDARD_USER"]), Project)
+        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
         Project updated = response.body()
 
         then: "the update succeeds"
@@ -588,10 +570,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
 
         and: "a user who is an ORG_MANAGER of both Org A and Org B"
-        def dualManagerId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", dualManagerId, "dual-mgr-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", dualManagerId, orgAId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", dualManagerId, orgBId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgAId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgBId)
 
         and: "a project belonging to Org A"
         def projectId = UUID.randomUUID()
@@ -604,7 +584,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def updateCmd = updateProjectCommand(orgBId, "Reassigned by Dual Manager", "Desc with plenty of characters to pass validation.")
 
         when: "the dual manager attempts to reassign the project to Org B via HTTP PUT"
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), dualManagerId.toString(), ["STANDARD_USER"]), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
 
         then: "the update is rejected with 403 Forbidden"
         def e = thrown(HttpClientResponseException)
@@ -656,9 +636,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regionId)
 
         and: "an Org Manager for the organization"
-        def userId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "manager-demote-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", userId, orgId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
 
         and: "an ACTIVE project belonging to the organization"
         def projectId = UUID.randomUUID()
@@ -681,7 +659,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def updateCmd = updateProjectCommand(orgId, "Updated Active Project", "Updated Description with plenty of words to exceed twenty chars.", STANDARD, null, [outsideLoc])
 
         when: "the Org Manager updates the project with outside locations via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projectId}", updateCmd), userId.toString(), ["STANDARD_USER"]), Project)
+        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
         Project updated = response.body()
 
         then: "the project status is demoted to PENDING for regional review"
@@ -938,18 +916,19 @@ class ProjectControllerSpec extends BaseControllerSpec {
         """, projId, orgId)
 
         and: "a REGION_DIRECTOR of that region"
-        def directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-appr-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR') ON CONFLICT DO NOTHING", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
 
         when: "the REGION_DIRECTOR approves the virtual project via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
         Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
         response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
+
+        cleanup:
+        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
     }
 
     def "APPROVE | should reject REGION_AGENT approval of virtual project with 403 Forbidden"() {
@@ -962,12 +941,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
             VALUES (?, ?, 'Agent VProj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
         """, projId, orgId)
 
-        and: "a REGION_AGENT user"
-        def agentId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_AGENT')", agentId, "agent-appr-${UUID.randomUUID()}@example.com".toString())
-
         when: "the REGION_AGENT attempts to approve the virtual project via HTTP PUT"
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), agentId.toString(), ["REGION_AGENT"]), Project)
+        client.exchange(asRegionAgent(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.CONNIE_COUNTY_AGENT), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1075,18 +1050,19 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, locId)
 
         and: "a REGION_DIRECTOR assigned to that region"
-        def directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-phys-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR') ON CONFLICT DO NOTHING", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
 
         when: "the REGION_DIRECTOR approves the physical project via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
         Project approved = response.body()
 
         then: "the physical project transitions to ACTIVE"
         response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
+
+        cleanup:
+        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
     }
 
     def "APPROVE | should allow REGION_DIRECTOR to approve virtual project assigned via managing_region_id"() {
@@ -1102,18 +1078,19 @@ class ProjectControllerSpec extends BaseControllerSpec {
         """, projId, orgId, regId)
 
         and: "a REGION_DIRECTOR assigned to that managing region"
-        def directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-mgr-appr-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, regId)
+        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR') ON CONFLICT DO NOTHING", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
 
         when: "the REGION_DIRECTOR approves the virtual project via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
         Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
         response.status == HttpStatus.OK
         approved.id() == projId
         approved.status() == ACTIVE
+
+        cleanup:
+        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
     }
 
     def "APPROVE | should reject approval of DRAFT project with 400 Bad Request"() {
@@ -1131,18 +1108,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "APPROVE | should reject approval when REGION_DIRECTOR lacks geographic jurisdiction over physical locations"() {
-        given: "a Denver region and a Region Director for Denver"
-        def denverRegId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Denver Approval Region', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
-        """, denverRegId)
-
-        def directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, "dir-denver-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", directorId, denverRegId)
-
-        and: "a PENDING project with physical locations in Colorado Springs (outside Denver)"
+        given: "a PENDING project with physical locations in Colorado Springs (outside Denver County)"
         def org = getRandomOrganization()
         def csLocId = UUID.randomUUID()
         def projId = UUID.randomUUID()
@@ -1155,7 +1121,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, csLocId)
 
         when: "the Denver Region Director attempts to approve the project via HTTP PUT"
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${projId}/status", ""), directorId.toString(), ["REGION_DIRECTOR", "project:approve"]), Project)
+        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1225,15 +1191,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def regId = UUID.randomUUID()
         executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Auth Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
 
-        and: "an organization and an unauthorized standard user"
+        and: "an organization"
         def org = getRandomOrganization()
-        def unauthUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unauth-${UUID.randomUUID()}@example.com".toString())
 
         def command = createProjectCommand(org.id(), "Unauthorized Region Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
 
         when: "submitting the project via HTTP POST by unauthorized user"
-        client.exchange(authenticated(HttpRequest.POST("/projects", command), unauthUserId.toString(), ["STANDARD_USER"]), Project)
+        client.exchange(asVolunteer(HttpRequest.POST("/projects", command)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1282,9 +1246,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should throw 403 when user lacks authority to assign new managingRegion on update"() {
-        given: "an organization with a manager and a separate foreign region"
+        given: "an organization with an Org Manager and a separate foreign region"
         def orgId = UUID.randomUUID()
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Update Region Org', true, 'VERIFIED')", orgId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
 
         def foreignRegionId = UUID.randomUUID()
         executeUpdate("""
@@ -1292,16 +1257,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
             VALUES (?, 'Foreign Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
         """, foreignRegionId)
 
-        def managerId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unauth-reg-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
-
         def createCmd = createProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
         when: "the Org Manager attempts to assign a foreign region not linked to their organization via HTTP PUT"
         def updateCmd = updateProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, foreignRegionId)
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), managerId.toString(), ["STANDARD_USER"]), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1318,17 +1279,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         def orgId = UUID.randomUUID()
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Unassign Region', true, 'VERIFIED')", orgId)
-
-        def managerId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unauth-unassign-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
 
         def createCmd = createProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, DRAFT, regBId)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
         when: "the Org Manager attempts to unassign the managingRegion via HTTP PUT"
         def updateCmd = updateProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, null)
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), managerId.toString(), ["STANDARD_USER"]), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1346,17 +1304,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def orgId = UUID.randomUUID()
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org For Unassign', true, 'VERIFIED')", orgId)
         executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
-
-        def managerId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-unassign-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
 
         def createCmd = createProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
         when: "the Org Manager updates the project setting managingRegion to null via HTTP PUT"
         def updateCmd = updateProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, null)
-        def response = client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), managerId.toString(), ["STANDARD_USER"]), Project)
+        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
         Project updated = response.body()
 
         then: "managingRegion is successfully unassigned"
@@ -1448,12 +1403,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def createCmd = createProjectCommand(org.id(), "Protected Project", "Description with at least twenty characters here.")
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        def unauthUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unaffil-update-${UUID.randomUUID()}@example.com".toString())
-
         when: "unaffiliated user attempts to update the project via HTTP PUT"
         def updateCmd = updateProjectCommand(org.id(), "Tampered Title", "Description with at least twenty characters here.")
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}", updateCmd), unauthUserId.toString(), ["STANDARD_USER"]), Project)
+        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1466,11 +1418,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def createCmd = createProjectCommand(org.id(), "Protected Delete Proj", "Description with at least twenty characters here.")
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
-        def unauthUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", unauthUserId, "unaffil-del-${UUID.randomUUID()}@example.com".toString())
-
         when: "unaffiliated user attempts to delete the project via HTTP DELETE"
-        client.exchange(authenticated(HttpRequest.DELETE("/projects/${saved.id()}"), unauthUserId.toString(), ["STANDARD_USER"]))
+        client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${saved.id()}")))
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1481,16 +1430,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an organization with an Org Manager and a project"
         def orgId = UUID.randomUUID()
         executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Delete Test Org', true, 'VERIFIED')", orgId)
-
-        def managerId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", managerId, "mgr-del-${UUID.randomUUID()}@example.com".toString())
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", managerId, orgId)
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
 
         def createCmd = createProjectCommand(orgId, "Project to Delete", "Description with at least twenty characters here.")
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
 
         when: "the Org Manager deletes the project via HTTP DELETE"
-        def response = client.exchange(authenticated(HttpRequest.DELETE("/projects/${saved.id()}"), managerId.toString(), ["STANDARD_USER"]))
+        def response = client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${saved.id()}")))
 
         then: "the project is deleted from the database"
         response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT

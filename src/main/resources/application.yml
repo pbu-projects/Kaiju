@@ -13,16 +13,21 @@ micronaut:
   metrics:
     enabled: true
   security:
+    reject-not-found: false
     authentication: cookie
     endpoints:
       logout:
         get-allowed: true
     token:
       jwt:
+        enabled: true
         signatures:
           secret:
             generator:
               secret: ${JWT_GENERATOR_SIGNATURE_SECRET:pleaseChangeThisSecretForANewOne}
+          jwks:
+            authentik:
+              url: ${OAUTH_JWKS_URL:http://localhost:9000/application/o/kaiju/jwks/}
     oauth2:
       clients:
         authentik:

@@ -82,3 +82,22 @@ This test plan outlines the scenarios required to validate the migration to the 
 - [x] **Project Reassignment:** A `STANDARD_USER` attempts to reassign a project's ownership.
   - **Expected:** `403 Forbidden` (Only applicable admins can reassign).
 - [ ] **User Management/Banning:** A `REGION_DIRECTOR` attempts to ban or delete a user (`403 Forbidden`). A `GLOBAL_ADMIN` attempts the same (`200 OK`).
+
+## 10. Identity Provider & Live Token Verification (Issue #59)
+
+**Objective:** Validate live cryptographic authentication, token lifecycles, claim mapping, and newcomer provisioning against an identity provider stub without mocks.
+- [x] **Cryptographic Signature Verification:** A user authenticates using a valid token signed with the IdP private key (RS256). The application verifies the signature against the live JWKS keys endpoint.
+  - **Expected:** `200 OK` or authorized access matching granted permissions.
+- [x] **Expired Token Rejection:** A client submits a request with an expired token (`exp` timestamp in the past).
+  - **Expected:** `401 Unauthorized` without accessing protected services.
+- [x] **Tampered Token Rejection:** A client submits a token where the header, payload claims, or signature were altered in transit.
+  - **Expected:** `401 Unauthorized`.
+- [x] **Wrong Issuer Rejection:** A client submits a well-formed token issued by an untrusted or mismatched issuer URL.
+  - **Expected:** `401 Unauthorized`.
+- [x] **Deterministic Claim to Permission Mapping:** Authenticated personas from different administrative tiers (Global Admins, Regional Directors/Agents, Org Admins/Managers, and Volunteers) receive exact discrete permissions corresponding to their system and regional assignments.
+  - **Expected:** Personas can access endpoints permitted by their discrete role permissions, while unauthorized endpoints reject them with `403 Forbidden`.
+- [x] **Just-In-Time (JIT) Newcomer Provisioning:** An unseeded community volunteer (`jenny.new@kaiju.local`) signs in for the first time through the identity provider without an existing database record.
+  - **Expected:** A new database record is automatically provisioned with the `STANDARD_USER` role, allowing immediate participation.
+- [ ] **Cross-Tenant Regional & Organizational Hierarchy Containment:** Validated tokens for regional and organizational personas are checked against live controller endpoints to confirm vertical authority delegation and horizontal boundary isolation across the 3-tier structure.
+  - **Expected:** Access granted within assigned jurisdiction or hierarchy; access denied (`403 Forbidden`) outside jurisdiction.
+

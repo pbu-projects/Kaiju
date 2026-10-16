@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -20,9 +19,6 @@ import java.util.UUID
 
 import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
 

@@ -373,3 +373,53 @@ entries:
       password: "KaijuCommunity2026!"
       groups:
         - !KeyOf group-standard-users
+
+  # Alice Smith test persona (Present in Authentik for happy path OIDC token testing)
+  - model: authentik_core.user
+    state: present
+    identifiers:
+      username: alice.smith@kaiju.local
+    attrs:
+      email: alice.smith@kaiju.local
+      name: Alice Smith
+      is_active: true
+      password: "KaijuCommunity2026!"
+      groups:
+        - !KeyOf group-standard-users
+
+  # OAuth2 Provider for Kaiju Application
+  - id: kaiju-oauth2-provider
+    model: authentik_providers_oauth2.oauth2provider
+    state: present
+    identifiers:
+      name: Kaiju OAuth2 Provider
+    attrs:
+      client_type: confidential
+      client_id: kaiju-client
+      client_secret: kaiju-secret
+      grant_types:
+        - authorization_code
+        - client_credentials
+        - refresh_token
+      authorization_flow: !Find [authentik_flows.flow, [slug, default-provider-authorization-implicit-consent]]
+      invalidation_flow: !Find [authentik_flows.flow, [slug, default-invalidation-flow]]
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, "authentik Self-signed Certificate"]]
+      redirect_uris:
+        - matching_mode: regex
+          url: "^http://(localhost|127\\.0\\.0\\.1):[0-9]+/oauth/callback/authentik$"
+        - matching_mode: strict
+          url: "http://localhost:8080/oauth/callback/authentik"
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+
+  # Kaiju Application Entry
+  - model: authentik_core.application
+    state: present
+    identifiers:
+      slug: kaiju
+    attrs:
+      name: Kaiju
+      provider: !KeyOf kaiju-oauth2-provider
+

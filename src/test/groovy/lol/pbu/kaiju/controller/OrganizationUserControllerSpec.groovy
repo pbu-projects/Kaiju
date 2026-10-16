@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -13,15 +12,13 @@ import lol.pbu.kaiju.domain.OrganizationUser
 import lol.pbu.kaiju.domain.OrganizationUserId
 import lol.pbu.kaiju.dto.CreateOrganizationUserCommand
 import lol.pbu.kaiju.dto.UpdateOrganizationUserCommand
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.OrganizationUserRole
 import lol.pbu.kaiju.repository.OrganizationUserRepository
 import spock.lang.Unroll
 
 import java.util.UUID
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class OrganizationUserControllerSpec extends BaseControllerSpec {
 
@@ -31,33 +28,18 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
     @Inject
     OrganizationUserController organizationUserController
 
-    UUID adminId = UUID.randomUUID()
-
-    def setup() {
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, 'admin-ou@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING", adminId)
-    }
-
-    def cleanup() {
-        executeUpdate("DELETE FROM users WHERE id = ?", adminId)
-    }
-
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid organization user when called by org admin"() {
         given: "a new organization user connection and an org admin"
-        UUID orgAdminId = UUID.randomUUID()
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", orgAdminId, "orgadmin@example.com")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "orguser@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Test Org for User")
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", orgAdminId, orgId)
+        UUID userId = TestPersonas.VICTOR_VOLUNTEER.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         def command = new CreateOrganizationUserCommand(userId, orgId, OrganizationUserRole.ORG_ADMIN)
 
         when: "the organization user is added by org admin via HTTP POST"
         def response = client.exchange(
-                authenticated(HttpRequest.POST("/organization-users", command), orgAdminId.toString(), ["STANDARD_USER"]),
+                asOrgAdmin(HttpRequest.POST("/organization-users", command), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
         OrganizationUser saved = response.body()
@@ -74,35 +56,24 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
         cleanup:
         executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", userId, orgId)
-        executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", orgAdminId, orgId)
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id IN (?, ?)", userId, orgAdminId)
     }
 
     def "CREATE | should throw 403 Forbidden when standard user attempts to add org user"() {
         given: "an unauthorized standard user"
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        UUID targetUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "attacker-org@example.com")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "target-org@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Target Org")
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
+        UUID targetUserId = TestPersonas.VALERIE_VOLUNTEER.id
 
         def command = new CreateOrganizationUserCommand(targetUserId, orgId, OrganizationUserRole.ORG_ADMIN)
 
         when: "the standard user attempts to add org user via HTTP POST"
         client.exchange(
-                authenticated(HttpRequest.POST("/organization-users", command), userId.toString(), ["STANDARD_USER"]),
+                asVolunteer(HttpRequest.POST("/organization-users", command), TestPersonas.VICTOR_VOLUNTEER),
                 OrganizationUser
         )
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
-
-        cleanup:
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id IN (?, ?)", userId, targetUserId)
     }
 
     @Unroll
@@ -134,11 +105,8 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing organization user by composite ID"() {
         given: "an existing user and organization"
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "orguser-read@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Test Org for User Read")
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", userId, orgId)
+        UUID userId = TestPersonas.LEO_LOCAL_ADMIN.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         when: "the organization user is requested via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organization-users/${userId}/${orgId}")), OrganizationUser)
@@ -149,11 +117,6 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         result.id().userId() == userId
         result.id().organizationId() == orgId
         result.role() == OrganizationUserRole.ORG_ADMIN
-
-        cleanup:
-        executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", userId, orgId)
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id = ?", userId)
     }
 
     def "READ | should return 404 for a non-existent composite ID"() {
@@ -178,20 +141,14 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing organization user role when called by org admin"() {
         given: "an existing organization user and an org admin"
-        UUID orgAdminId = UUID.randomUUID()
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", orgAdminId, "orgadmin-upd@example.com")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "orguser-update@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Test Org for User Update")
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", orgAdminId, orgId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MEMBER')", userId, orgId)
+        UUID userId = TestPersonas.LUKE_LOCAL_MEMBER.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)
 
         when: "the organization user is updated by org admin via HTTP PUT"
         def response = client.exchange(
-                authenticated(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), orgAdminId.toString(), ["STANDARD_USER"]),
+                asOrgAdmin(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
         OrganizationUser updated = response.body()
@@ -205,35 +162,25 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         role == 'ORG_ADMIN'
 
         cleanup:
-        executeUpdate("DELETE FROM organization_users WHERE user_id IN (?, ?) AND organization_id = ?", userId, orgAdminId, orgId)
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id IN (?, ?)", userId, orgAdminId)
+        executeUpdate("UPDATE organization_users SET role = 'ORG_MEMBER' WHERE user_id = ? AND organization_id = ?", userId, orgId)
     }
 
     def "UPDATE | should throw 403 Forbidden when standard user attempts to update org user"() {
         given: "an unauthorized standard user"
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        UUID targetUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "attacker-upd@example.com")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "target-upd@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Target Org Upd")
+        UUID userId = TestPersonas.LUKE_LOCAL_MEMBER.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)
 
         when: "the standard user attempts to update org user via HTTP PUT"
         client.exchange(
-                authenticated(HttpRequest.PUT("/organization-users/${targetUserId}/${orgId}", command), userId.toString(), ["STANDARD_USER"]),
+                asVolunteer(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), TestPersonas.VICTOR_VOLUNTEER),
                 OrganizationUser
         )
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
-
-        cleanup:
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id IN (?, ?)", userId, targetUserId)
     }
 
     def "UPDATE | should fail to update a non-existent organization user when called by admin"() {
@@ -243,7 +190,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organization-users/${nonExistentUserId}/${nonExistentOrgId}", command), adminId.toString()), OrganizationUser)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organization-users/${nonExistentUserId}/${nonExistentOrgId}", command)), OrganizationUser)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -263,18 +210,13 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing organization user when called by org admin"() {
         given: "an existing organization user and an org admin"
-        UUID orgAdminId = UUID.randomUUID()
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", orgAdminId, "orgadmin-del@example.com")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "orguser-delete@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Test Org for User Delete")
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", orgAdminId, orgId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MEMBER')", userId, orgId)
+        UUID userId = TestPersonas.VALERIE_VOLUNTEER.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
+        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MEMBER') ON CONFLICT DO NOTHING", userId, orgId)
 
         when: "the organization user is deleted by org admin via HTTP DELETE"
         def response = client.exchange(
-                authenticated(HttpRequest.DELETE("/organization-users/${userId}/${orgId}"), orgAdminId.toString(), ["STANDARD_USER"])
+                asOrgAdmin(HttpRequest.DELETE("/organization-users/${userId}/${orgId}"), TestPersonas.LEO_LOCAL_ADMIN)
         )
 
         then: "200 OK is returned"
@@ -284,32 +226,22 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         !organizationUserRepository.findById(new OrganizationUserId(userId, orgId)).isPresent()
 
         cleanup:
-        executeUpdate("DELETE FROM organization_users WHERE user_id IN (?, ?) AND organization_id = ?", userId, orgAdminId, orgId)
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id IN (?, ?)", userId, orgAdminId)
+        executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", userId, orgId)
     }
 
     def "DELETE | should throw 403 Forbidden when standard user attempts to delete org user"() {
         given: "an unauthorized standard user"
-        UUID userId = UUID.randomUUID()
-        UUID orgId = UUID.randomUUID()
-        UUID targetUserId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "attacker-del-ou@example.com")
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "target-del-ou@example.com")
-        executeUpdate("INSERT INTO organizations (id, name, website_url) VALUES (?, ?, 'http://test.org')", orgId, "Target Org Del OU")
+        UUID targetUserId = TestPersonas.LUKE_LOCAL_MEMBER.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         when: "the standard user attempts to delete org user via HTTP DELETE"
         client.exchange(
-                authenticated(HttpRequest.DELETE("/organization-users/${targetUserId}/${orgId}"), userId.toString(), ["STANDARD_USER"])
+                asVolunteer(HttpRequest.DELETE("/organization-users/${targetUserId}/${orgId}"), TestPersonas.VICTOR_VOLUNTEER)
         )
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
-
-        cleanup:
-        executeUpdate("DELETE FROM organizations WHERE id = ?", orgId)
-        executeUpdate("DELETE FROM users WHERE id IN (?, ?)", userId, targetUserId)
     }
 
     def "DELETE | should fail to delete a non-existent organization user when called by admin"() {
@@ -318,7 +250,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         def nonExistentOrgId = UUID.randomUUID()
 
         when: "a delete is attempted via HTTP DELETE"
-        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organization-users/${nonExistentUserId}/${nonExistentOrgId}"), adminId.toString()))
+        client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organization-users/${nonExistentUserId}/${nonExistentOrgId}")))
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)

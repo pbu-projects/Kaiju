@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.data.model.CursoredPage
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
@@ -10,13 +9,11 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.ProjectAuditLog
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 
 import java.util.UUID
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class ProjectAuditLogControllerSpec extends BaseControllerSpec {
 
@@ -27,8 +24,7 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
     ProjectAuditLogController projectAuditLogController
 
     def setup() {
-        def userRow = sql.firstRow("SELECT id FROM users LIMIT 1")
-        UUID actorId = userRow ? (userRow.id as UUID) : UUID.fromString("00000000-0000-0000-0000-000000000000")
+        UUID actorId = TestPersonas.SARAH_ADMIN.id
 
         def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
         UUID projectId
