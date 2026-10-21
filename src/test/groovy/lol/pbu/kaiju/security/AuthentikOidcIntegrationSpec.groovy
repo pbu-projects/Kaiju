@@ -441,6 +441,33 @@ class AuthentikOidcIntegrationSpec extends Specification {
         response.status == HttpStatus.OK
     }
 
+    def "HTTP requests with untrusted or mismatched audience token return 401 Unauthorized"() {
+        given: "a cryptographically valid HMAC-signed token intended for a different audience"
+        byte[] secretBytes = "pleaseChangeThisSecretForANewOne32Bits".getBytes(StandardCharsets.UTF_8)
+        def signer = new MACSigner(secretBytes)
+        JWTClaimsSet untrustedAudienceClaims = new JWTClaimsSet.Builder()
+                .issuer(OIDC_ISSUER)
+                .audience("untrusted-audience-client")
+                .subject("sarah.admin1@kaiju.local")
+                .claim("email", "sarah.admin1@kaiju.local")
+                .claim("email_verified", true)
+                .expirationTime(new Date(System.currentTimeMillis() + 60000))
+                .build()
+        SignedJWT untrustedAudienceJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), untrustedAudienceClaims)
+        untrustedAudienceJWT.sign(signer)
+        String untrustedAudienceToken = untrustedAudienceJWT.serialize()
+
+        when: "calling a secured endpoint with the mismatched audience token"
+        client.exchange(
+                HttpRequest.GET("/projects")
+                        .header("Authorization", "Bearer ${untrustedAudienceToken}")
+        )
+
+        then: "access is rejected with 401 Unauthorized"
+        HttpClientResponseException ex = thrown()
+        ex.status == HttpStatus.UNAUTHORIZED
+    }
+
     def "HTTP requests with tampered token signature return 401 Unauthorized"() {
         given: "a genuine token from Authentik with altered signature"
         Map<String, String> tokens = obtainLiveTokens("sarah.admin1@kaiju.local")
@@ -491,7 +518,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         and: "the token claims are processed by AuthentikAuthenticationMapper"
         OpenIdClaims openIdClaims = [
-                getEmail: { -> claims.getStringClaim("email") }
+                getEmail: { -> claims.getStringClaim("email") },
+                get: { String key -> key == "email_verified" ? true : claims.getClaim(key) }
         ] as OpenIdClaims
         OpenIdTokenResponse tokenResponse = new OpenIdTokenResponse()
         def publisher = mapper.createAuthenticationResponse("authentik", tokenResponse, openIdClaims, null)

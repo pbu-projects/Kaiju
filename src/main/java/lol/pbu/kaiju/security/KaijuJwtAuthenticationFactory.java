@@ -59,25 +59,29 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
                 return Optional.empty();
             }
 
-            try {
-                String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
-                User user = userService.provisionOrGetUser(canonicalEmail);
-                List<String> roles = new ArrayList<>();
-                roles.add(user.role().name());
-                user.role().getPermissions().stream()
-                        .map(Permission::getClaim)
-                        .forEach(roles::add);
-                return Optional.of(Authentication.build(
-                        user.id().toString(),
-                        roles,
-                        claims
-                ));
-            } catch (Exception e) {
-                LOG.error("Failed to authenticate user due to database or service error", e);
-                return Optional.empty();
-            }
+            return authenticateUser(email, claims);
         } catch (ParseException e) {
             LOG.error("Failed to parse JWT claims when creating authentication", e);
+            return Optional.empty();
+        }
+    }
+
+    private Optional<Authentication> authenticateUser(String email, Map<String, Object> claims) {
+        try {
+            String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
+            User user = userService.provisionOrGetUser(canonicalEmail);
+            List<String> roles = new ArrayList<>();
+            roles.add(user.role().name());
+            user.role().getPermissions().stream()
+                    .map(Permission::getClaim)
+                    .forEach(roles::add);
+            return Optional.of(Authentication.build(
+                    user.id().toString(),
+                    roles,
+                    claims
+            ));
+        } catch (Exception e) {
+            LOG.error("Failed to authenticate user due to database or service error", e);
             return Optional.empty();
         }
     }

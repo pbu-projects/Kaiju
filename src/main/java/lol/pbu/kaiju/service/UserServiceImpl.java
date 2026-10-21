@@ -106,17 +106,18 @@ public class UserServiceImpl implements UserService {
     @Override
     @NonNull
     public User provisionOrGetUser(@NonNull String email) {
-        return userRepository.findByEmail(email).orElseGet(() -> {
+        String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
+        return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
-                User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC));
+                User newUser = new User(null, canonicalEmail, UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC));
                 return userRepository.save(newUser);
             } catch (Exception ex) {
                 if (isUniqueConstraintViolation(ex)) {
-                    LOG.info("Concurrent user insertion detected for email: {}. Retrieving existing record.", email);
-                    return userRepository.findByEmail(email)
-                            .orElseThrow(() -> new IllegalStateException("User record could not be found after unique violation on email: " + email, ex));
+                    LOG.info("Concurrent user insertion detected for email: {}. Retrieving existing record.", canonicalEmail);
+                    return userRepository.findByEmail(canonicalEmail)
+                            .orElseThrow(() -> new IllegalStateException("User record could not be found after unique violation on email: " + canonicalEmail, ex));
                 }
-                LOG.error("Database error occurred during user provisioning for email: {}", email, ex);
+                LOG.error("Database error occurred during user provisioning for email: {}", canonicalEmail, ex);
                 if (ex instanceof RuntimeException runtimeException) {
                     throw runtimeException;
                 }

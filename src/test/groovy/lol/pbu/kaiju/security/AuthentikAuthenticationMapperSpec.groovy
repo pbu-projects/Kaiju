@@ -13,6 +13,7 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 import java.util.concurrent.CompletableFuture
@@ -57,7 +58,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
     def "should return failure if email is missing from claims"() {
         given: "a fake incoming token with no email"
-        OpenIdClaims claims = [getEmail: { -> null }] as OpenIdClaims
+        OpenIdClaims claims = [getEmail: { -> null }, get: { String k -> k == "email_verified" ? true : null }] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "the mapper processes the login"
@@ -71,7 +72,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
     def "should return failure if email is blank in claims"() {
         given: "a fake incoming token with blank email"
-        OpenIdClaims claims = [getEmail: { -> "   " }] as OpenIdClaims
+        OpenIdClaims claims = [getEmail: { -> "   " }, get: { String k -> k == "email_verified" ? true : null }] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "the mapper processes the login"
@@ -83,22 +84,47 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         response.getMessage().get() == "No email present in OpenID claims"
     }
 
-    def "should lookup existing user and return authentication response with db role"() {
-        given: "a real user saved in the actual PostGIS database"
-        String email = "existing-${UUID.randomUUID()}@example.com"
-        User existingUser = userRepository.save(new User(null, email, UserRole.GLOBAL_ADMIN, OffsetDateTime.now()))
-
-        and: "an incoming token for that email"
-        OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
+    @Unroll
+    def "should return failure if email_verified claim is '#verifiedValue'"() {
+        given: "an incoming token with unverified or missing email_verified claim"
+        OpenIdClaims claims = [
+                getEmail: { -> "unverified@example.com" },
+                get: { String k -> k == "email_verified" ? verifiedValue : null }
+        ] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
         AuthenticationResponse response = await(publisher)
 
-        then: "it logs them in with their actual database role"
+        then: "authentication fails with unverified email message"
+        !response.isAuthenticated()
+        response.getMessage().get() == "Email is not verified in OpenID claims"
+
+        where:
+        verifiedValue << [null, false, "false", "no", 123]
+    }
+
+    def "should lookup existing user and return authentication response with db role and permissions"() {
+        given: "a real user saved in the actual PostGIS database"
+        String email = "existing-${UUID.randomUUID()}@example.com"
+        User existingUser = userRepository.save(new User(null, email, UserRole.GLOBAL_ADMIN, OffsetDateTime.now()))
+
+        and: "an incoming token for that email with verified email"
+        OpenIdClaims claims = [
+                getEmail: { -> email },
+                get: { String k -> k == "email_verified" ? true : null }
+        ] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login"
+        def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = await(publisher)
+
+        then: "it logs them in with their actual database role and permissions"
         response.isAuthenticated()
         response.getAuthentication().get().getName() == existingUser.id().toString()
+        response.getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
         response.getAuthentication().get().getRoles().contains("system:admin")
         response.getAuthentication().get().getAttributes().get("email") == email
     }
@@ -108,16 +134,20 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         String email = "new-${UUID.randomUUID()}@example.com"
         assert !userRepository.findByEmail(email).isPresent()
 
-        and: "an incoming token for that email"
-        OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
+        and: "an incoming token for that email with verified email"
+        OpenIdClaims claims = [
+                getEmail: { -> email },
+                get: { String k -> k == "email_verified" ? true : null }
+        ] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
         AuthenticationResponse response = await(publisher)
 
-        then: "the authentication is successful and assigned the default role"
+        then: "the authentication is successful and assigned the default role and permissions"
         response.isAuthenticated()
+        response.getAuthentication().get().getRoles().contains("STANDARD_USER")
         response.getAuthentication().get().getRoles().contains("project:create")
         response.getAuthentication().get().getAttributes().get("email") == email
 
@@ -138,7 +168,10 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
         and: "a mapper using the mock UserService"
         AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService)
-        OpenIdClaims claims = [getEmail: { -> email }] as OpenIdClaims
+        OpenIdClaims claims = [
+                getEmail: { -> email },
+                get: { String k -> k == "email_verified" ? true : null }
+        ] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "the mapper processes the login"
@@ -149,6 +182,31 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         1 * mockUserService.provisionOrGetUser(email) >> mockUser
         response.isAuthenticated()
         response.getAuthentication().get().getName() == mockUser.id().toString()
+        response.getAuthentication().get().getRoles().contains("STANDARD_USER")
         response.getAuthentication().get().getAttributes().get("email") == email
+    }
+
+    def "should canonicalize email to lowercase trimmed string"() {
+        given: "a mock UserService"
+        UserService mockUserService = Mock()
+        String rawEmail = "  User.MixEdCase@Example.COM  "
+        String canonicalEmail = "user.mixedcase@example.com"
+        User mockUser = new User(UUID.randomUUID(), canonicalEmail, UserRole.STANDARD_USER, OffsetDateTime.now())
+
+        and: "a mapper using the mock UserService"
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService)
+        OpenIdClaims claims = [
+                getEmail: { -> rawEmail },
+                get: { String k -> k == "email_verified" ? true : null }
+        ] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login"
+        def publisher = testMapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = await(publisher)
+
+        then: "provisionOrGetUser is invoked with the canonical lowercase trimmed email"
+        1 * mockUserService.provisionOrGetUser(canonicalEmail) >> mockUser
+        response.isAuthenticated()
     }
 }

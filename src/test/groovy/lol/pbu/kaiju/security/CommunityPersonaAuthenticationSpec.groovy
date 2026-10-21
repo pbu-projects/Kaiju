@@ -417,7 +417,10 @@ class CommunityPersonaAuthenticationSpec extends Specification {
     @Unroll
     def "Authentik mapper authenticates persona '#persona.displayName' and assigns correct claims"() {
         given: "an OpenID token containing the persona email"
-        OpenIdClaims claims = [getEmail: { -> persona.email }] as OpenIdClaims
+        OpenIdClaims claims = [
+                getEmail: { -> persona.email },
+                get: { String k -> k == "email_verified" ? true : null }
+        ] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "AuthentikAuthenticationMapper processes the login"
@@ -446,7 +449,10 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         assert !userRepository.findByEmail(jenny.email).isPresent(): "Jenny should not initially exist in DB"
 
         and: "an incoming token for Jenny"
-        OpenIdClaims claims = [getEmail: { -> jenny.email }] as OpenIdClaims
+        OpenIdClaims claims = [
+                getEmail: { -> jenny.email },
+                get: { String k -> k == "email_verified" ? true : null }
+        ] as OpenIdClaims
         OpenIdTokenResponse token = new OpenIdTokenResponse()
 
         when: "the Authentik mapper processes Jenny's initial login"
