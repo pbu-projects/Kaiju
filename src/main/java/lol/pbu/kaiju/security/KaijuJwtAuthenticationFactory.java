@@ -46,7 +46,21 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
             }
             Map<String, Object> claims = claimsSet.getClaims();
             Object emailObj = claims.get("email");
-            if (emailObj instanceof String email && !email.isBlank()) {
+            if (!(emailObj instanceof String email) || email.isBlank()) {
+                LOG.warn("Rejecting JWT: missing or invalid email claim");
+                return Optional.empty();
+            }
+
+            Object emailVerifiedObj = claims.get("email_verified");
+            if (emailVerifiedObj != null) {
+                if (Boolean.FALSE.equals(emailVerifiedObj)
+                        || (emailVerifiedObj instanceof String s && "false".equalsIgnoreCase(s.trim()))) {
+                    LOG.warn("Rejecting JWT: unverified email claim");
+                    return Optional.empty();
+                }
+            }
+
+            try {
                 String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
                 User user = userService.provisionOrGetUser(canonicalEmail);
                 List<String> roles = new ArrayList<>();
@@ -59,8 +73,10 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
                         roles,
                         claims
                 ));
+            } catch (Exception e) {
+                LOG.error("Failed to authenticate user due to database or service error", e);
+                return Optional.empty();
             }
-            return super.createAuthentication(token);
         } catch (ParseException e) {
             LOG.error("Failed to parse JWT claims when creating authentication", e);
             return Optional.empty();

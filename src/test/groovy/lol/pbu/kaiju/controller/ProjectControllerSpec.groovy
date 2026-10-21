@@ -6,6 +6,7 @@ import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -1134,13 +1135,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def command = createProjectCommand(org.id(), "Actor 404 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
 
-        when: "calling approveProject with a principal UUID that is not in the users table via HTTP PUT"
+        when: "calling approveProject directly with a principal UUID that is not in the users table"
         def nonExistentUserId = UUID.randomUUID()
-        client.exchange(authenticated(HttpRequest.PUT("/projects/${saved.id()}/status", ""), nonExistentUserId.toString(), ["GLOBAL_ADMIN", "project:approve"]), Project)
+        projectController.approveProject(saved.id(), createPrincipal(nonExistentUserId))
 
         then: "a 404 Not Found is thrown"
-        def e = thrown(HttpClientResponseException)
+        def e = thrown(HttpStatusException)
         e.status == HttpStatus.NOT_FOUND
+        e.message == "User not found"
     }
 
     /********** MANAGING REGION Tests **********/

@@ -2,6 +2,7 @@ package lol.pbu.kaiju.security
 
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
+import com.nimbusds.jose.crypto.MACSigner
 import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.JWKSet
@@ -49,6 +50,7 @@ import java.util.concurrent.TimeUnit
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.token.jwt.enabled", value = "true")
 @Property(name = "micronaut.security.token.jwt.signatures.jwks.authentik.url", value = "http://localhost:9000/application/o/kaiju/jwks/")
+@Property(name = "micronaut.security.token.jwt.signatures.secret.generator.secret", value = "pleaseChangeThisSecretForANewOne32Bits")
 @MicronautTest(transactional = false)
 @Requires({ AuthentikOidcIntegrationSpec.isAuthentikAvailable() })
 class AuthentikOidcIntegrationSpec extends Specification {
@@ -392,18 +394,18 @@ class AuthentikOidcIntegrationSpec extends Specification {
     }
 
     def "HTTP requests with untrusted or mismatched issuer token return 401 Unauthorized"() {
-        given: "a signed token issued by an untrusted issuer"
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA")
-        gen.initialize(2048)
-        def keyPair = gen.generateKeyPair()
-        RSASSASigner signer = new RSASSASigner((RSAPrivateKey) keyPair.private)
+        given: "a cryptographically valid HMAC-signed token issued by an untrusted issuer"
+        byte[] secretBytes = "pleaseChangeThisSecretForANewOne32Bits".getBytes(StandardCharsets.UTF_8)
+        def signer = new MACSigner(secretBytes)
         JWTClaimsSet untrustedClaims = new JWTClaimsSet.Builder()
                 .issuer("http://untrusted-idp.example.com/application/o/evil/")
                 .audience(CLIENT_ID)
                 .subject("sarah.admin1@kaiju.local")
+                .claim("email", "sarah.admin1@kaiju.local")
+                .claim("email_verified", true)
                 .expirationTime(new Date(System.currentTimeMillis() + 60000))
                 .build()
-        SignedJWT untrustedJWT = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("untrusted-key").build(), untrustedClaims)
+        SignedJWT untrustedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), untrustedClaims)
         untrustedJWT.sign(signer)
         String untrustedToken = untrustedJWT.serialize()
 
@@ -416,6 +418,27 @@ class AuthentikOidcIntegrationSpec extends Specification {
         then: "access is rejected with 401 Unauthorized"
         HttpClientResponseException ex = thrown()
         ex.status == HttpStatus.UNAUTHORIZED
+
+        when: "calling the same secured endpoint with a token signed with the identical HMAC key but a trusted issuer"
+        JWTClaimsSet validClaims = new JWTClaimsSet.Builder()
+                .issuer(OIDC_ISSUER)
+                .audience(CLIENT_ID)
+                .subject("sarah.admin1@kaiju.local")
+                .claim("email", "sarah.admin1@kaiju.local")
+                .claim("email_verified", true)
+                .expirationTime(new Date(System.currentTimeMillis() + 60000))
+                .build()
+        SignedJWT validJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), validClaims)
+        validJWT.sign(signer)
+        String validToken = validJWT.serialize()
+
+        def response = client.exchange(
+                HttpRequest.GET("/projects")
+                        .header("Authorization", "Bearer ${validToken}")
+        )
+
+        then: "access is granted with 200 OK, confirming signature verification passed and rejection was due to issuer claim validation"
+        response.status == HttpStatus.OK
     }
 
     def "HTTP requests with tampered token signature return 401 Unauthorized"() {

@@ -15,6 +15,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.sql.DataSource
+import java.security.Principal
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.oauth2.enabled", value = "false")
@@ -22,6 +23,9 @@ import javax.sql.DataSource
 @Property(name = "micronaut.security.token.jwt.signatures.secret.generator.secret", value = "pleaseChangeThisSecretForANewOne32Bits")
 @MicronautTest(transactional = false)
 abstract class BaseControllerSpec extends Specification {
+
+    public static final String TEST_ISSUER = "http://localhost:9000/application/o/kaiju/"
+    public static final String TEST_AUDIENCE = "kaiju-client"
 
     @Inject
     TokenGenerator tokenGenerator
@@ -91,6 +95,8 @@ abstract class BaseControllerSpec extends Specification {
                 "email"             : persona.email,
                 "preferred_username": persona.displayName,
                 "email_verified"    : true,
+                "iss"               : TEST_ISSUER,
+                "aud"               : TEST_AUDIENCE,
                 "roles"             : [persona.systemRole.name()]
         ]
         String token = tokenGenerator.generateToken(claims).orElseThrow()
@@ -103,13 +109,43 @@ abstract class BaseControllerSpec extends Specification {
     }
 
     protected <T> MutableHttpRequest<T> authenticated(MutableHttpRequest<T> request, String userId, List<String> roles) {
+        String email = null
+        try {
+            def row = sql.firstRow("SELECT email FROM users WHERE id = ?::uuid", [userId])
+            if (row != null && row.email != null) {
+                email = row.email as String
+            }
+        } catch (Exception ignored) {
+        }
+        if (!email) {
+            def persona = TestPersonas.SEEDED_PERSONAS.find { it.id.toString() == userId }
+            if (persona) {
+                email = persona.email
+            } else {
+                email = "user-${userId}@kaiju.local"
+                String roleToSet = roles ? roles.find { ["GLOBAL_ADMIN", "REGION_DIRECTOR", "REGION_AGENT", "ORG_ADMIN", "ORG_MANAGER", "ORG_MEMBER", "STANDARD_USER"].contains(it) } ?: "STANDARD_USER" : "STANDARD_USER"
+                try {
+                    executeUpdate("INSERT INTO users (id, email, role) VALUES (?::uuid, ?, ?) ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role", userId, email, roleToSet)
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
         Map<String, Object> claims = [
-                "sub": userId,
-                "roles": roles
+                "sub"           : userId,
+                "email"         : email,
+                "email_verified": true,
+                "iss"           : TEST_ISSUER,
+                "aud"           : TEST_AUDIENCE,
+                "roles"         : roles
         ]
         String token = tokenGenerator.generateToken(claims).orElseThrow()
         request.bearerAuth(token)
         return request
+    }
+
+    protected Principal createPrincipal(UUID userId) {
+        return ({ userId.toString() } as Principal)
     }
 
     protected <T> MutableHttpRequest<T> asGlobalAdmin(MutableHttpRequest<T> request, TestPersonas.Persona persona = TestPersonas.SARAH_ADMIN) {

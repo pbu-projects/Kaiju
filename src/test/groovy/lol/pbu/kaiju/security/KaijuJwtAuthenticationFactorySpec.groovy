@@ -85,7 +85,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         authOpt.get().name == userOpt.get().id().toString()
     }
 
-    def "createAuthentication | should fallback to default factory when email claim is missing"() {
+    def "createAuthentication | should return empty when email claim is missing"() {
         given: "a JWT with no email claim"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .subject("legacy-subject-456")
@@ -96,13 +96,11 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
 
-        then: "authentication falls back to the default factory behavior"
-        authOpt.isPresent()
-        authOpt.get().name == "legacy-subject-456"
-        authOpt.get().roles.contains("STANDARD_USER")
+        then: "authentication is rejected with empty optional"
+        authOpt.isEmpty()
     }
 
-    def "createAuthentication | should fallback to default factory when email claim is blank or non-string"() {
+    def "createAuthentication | should return empty when email claim is blank or non-string"() {
         given: "a JWT with a blank email claim"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .subject("blank-email-user")
@@ -113,9 +111,46 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
 
-        then: "authentication falls back to the default factory behavior"
-        authOpt.isPresent()
-        authOpt.get().name == "blank-email-user"
+        then: "authentication is rejected with empty optional"
+        authOpt.isEmpty()
+    }
+
+    def "createAuthentication | should return empty when email_verified claim is boolean false or string false"() {
+        given: "a JWT with unverified email claim"
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("unverified-user")
+                .claim("email", "unverified@kaiju.local")
+                .claim("email_verified", verifiedClaim)
+                .build()
+        JWT token = new PlainJWT(claimsSet)
+
+        when: "the factory creates authentication"
+        def authOpt = factory.createAuthentication(token)
+
+        then: "authentication is rejected with empty optional"
+        authOpt.isEmpty()
+
+        where:
+        verifiedClaim << [false, "false", "FALSE"]
+    }
+
+    def "createAuthentication | should return empty when database lookup fails gracefully"() {
+        given: "a factory with a user service that throws an exception"
+        UserService failingUserService = Mock(UserService)
+        failingUserService.provisionOrGetUser(_ as String) >> { throw new RuntimeException("DB connection error") }
+        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService)
+
+        and: "a JWT with a valid email claim"
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .claim("email", "transient.failure@kaiju.local")
+                .build()
+        JWT token = new PlainJWT(claimsSet)
+
+        when: "the factory creates authentication"
+        def authOpt = failingFactory.createAuthentication(token)
+
+        then: "empty optional is returned without throwing exception"
+        authOpt.isEmpty()
     }
 
     def "createAuthentication | should return empty when claims set is null"() {
