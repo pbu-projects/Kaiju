@@ -106,10 +106,17 @@ public class UserServiceImpl implements UserService {
     @Override
     @NonNull
     public User provisionOrGetUser(@NonNull String email) {
+        return provisionOrGetUser(email, UserRole.STANDARD_USER);
+    }
+
+    @Override
+    @NonNull
+    public User provisionOrGetUser(@NonNull String email, @NonNull UserRole initialRole) {
         String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
         return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
-                User newUser = new User(null, canonicalEmail, UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC));
+                UserRole roleToAssign = initialRole != null ? initialRole : UserRole.STANDARD_USER;
+                User newUser = new User(null, canonicalEmail, roleToAssign, OffsetDateTime.now(ZoneOffset.UTC));
                 return userRepository.save(newUser);
             } catch (Exception ex) {
                 if (isUniqueConstraintViolation(ex)) {

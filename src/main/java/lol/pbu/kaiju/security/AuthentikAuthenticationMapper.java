@@ -11,6 +11,7 @@ import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.service.UserService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -27,9 +28,11 @@ import java.util.Map;
 public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper {
 
     private final UserService userService;
+    private final IdpRoleMapper idpRoleMapper;
 
-    public AuthentikAuthenticationMapper(UserService userService) {
+    public AuthentikAuthenticationMapper(@NonNull UserService userService, @NonNull IdpRoleMapper idpRoleMapper) {
         this.userService = userService;
+        this.idpRoleMapper = idpRoleMapper;
     }
 
     @Override
@@ -52,7 +55,9 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
         }
 
         String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
-        User user = userService.provisionOrGetUser(canonicalEmail);
+        Object groupsObj = openIdClaims.get(IdpRoleMapper.CLAIMS_GROUPS_KEY);
+        UserRole initialRole = idpRoleMapper.resolveRoleFromGroupObject(groupsObj);
+        User user = userService.provisionOrGetUser(canonicalEmail, initialRole);
 
         // Map database role to Micronaut Security Context
         // Using the user's UUID as the principal name is best practice since emails can change

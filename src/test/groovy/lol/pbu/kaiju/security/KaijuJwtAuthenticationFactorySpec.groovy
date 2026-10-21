@@ -8,6 +8,7 @@ import io.micronaut.security.token.config.TokenConfiguration
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.UserService
 import spock.lang.Specification
@@ -27,12 +28,15 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     UserService userService
 
     @Inject
+    IdpRoleMapper idpRoleMapper
+
+    @Inject
     UserRepository userRepository
 
     KaijuJwtAuthenticationFactory factory
 
     def setup() {
-        factory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, userService)
+        factory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, userService, idpRoleMapper)
     }
 
     def "createAuthentication | should successfully authenticate and map permissions when valid email claim is present"() {
@@ -65,6 +69,32 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
 
         and: "attributes preserve incoming token claims"
         auth.attributes.get("custom_attribute") == "custom_val"
+    }
+
+    def "createAuthentication | should provision user with role derived from upstream groups claim"() {
+        given: "a JWT containing groups claim for a new user"
+        String email = "jwt.admin.new@kaiju.local"
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("admin-subject-789")
+                .claim("email", email)
+                .claim("email_verified", true)
+                .claim("groups", ["Kaiju Global Admins"])
+                .build()
+        JWT token = new PlainJWT(claimsSet)
+
+        when: "the factory creates authentication"
+        def authOpt = factory.createAuthentication(token)
+
+        then: "authentication is present"
+        authOpt.isPresent()
+        def auth = authOpt.get()
+
+        and: "the newly provisioned user in database has GLOBAL_ADMIN role"
+        Optional<User> userOpt = userRepository.findByEmail(email)
+        userOpt.isPresent()
+        userOpt.get().role() == UserRole.GLOBAL_ADMIN
+        auth.roles.contains("GLOBAL_ADMIN")
+        auth.roles.contains(Permission.SYSTEM_ADMIN.getClaim())
     }
 
     def "createAuthentication | should canonicalize email to lowercase and trim whitespace before user lookup"() {
@@ -140,8 +170,8 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     def "createAuthentication | should return empty when database lookup fails gracefully"() {
         given: "a factory with a user service that throws an exception"
         UserService failingUserService = Mock(UserService)
-        failingUserService.provisionOrGetUser(_ as String) >> { throw new RuntimeException("DB connection error") }
-        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService)
+        failingUserService.provisionOrGetUser(*_) >> { throw new RuntimeException("DB connection error") }
+        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService, idpRoleMapper)
 
         and: "a JWT with a valid email claim"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()

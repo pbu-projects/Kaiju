@@ -29,6 +29,9 @@ class AuthentikAuthenticationMapperSpec extends Specification {
     UserService userService
 
     @Inject
+    IdpRoleMapper idpRoleMapper
+
+    @Inject
     AuthentikAuthenticationMapper mapper
 
     private static <T> T await(Publisher<T> publisher) {
@@ -167,7 +170,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         User mockUser = new User(UUID.randomUUID(), email, UserRole.STANDARD_USER, OffsetDateTime.now())
 
         and: "a mapper using the mock UserService"
-        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService)
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService, idpRoleMapper)
         OpenIdClaims claims = [
                 getEmail: { -> email },
                 get: { String k -> k == "email_verified" ? true : null }
@@ -179,7 +182,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "authentication succeeds with user from UserService"
-        1 * mockUserService.provisionOrGetUser(email) >> mockUser
+        1 * mockUserService.provisionOrGetUser(email, UserRole.STANDARD_USER) >> mockUser
         response.isAuthenticated()
         response.getAuthentication().get().getName() == mockUser.id().toString()
         response.getAuthentication().get().getRoles().contains("STANDARD_USER")
@@ -194,7 +197,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         User mockUser = new User(UUID.randomUUID(), canonicalEmail, UserRole.STANDARD_USER, OffsetDateTime.now())
 
         and: "a mapper using the mock UserService"
-        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService)
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService, idpRoleMapper)
         OpenIdClaims claims = [
                 getEmail: { -> rawEmail },
                 get: { String k -> k == "email_verified" ? true : null }
@@ -206,7 +209,77 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "provisionOrGetUser is invoked with the canonical lowercase trimmed email"
-        1 * mockUserService.provisionOrGetUser(canonicalEmail) >> mockUser
+        1 * mockUserService.provisionOrGetUser(canonicalEmail, UserRole.STANDARD_USER) >> mockUser
         response.isAuthenticated()
+    }
+
+    @Unroll
+    def "should provision new user with role '#expectedRole' derived from upstream IdP group '#groupClaim'"() {
+        given: "an unseeded email"
+        String email = "idp-role-${UUID.randomUUID()}@example.com"
+        assert !userRepository.findByEmail(email).isPresent()
+
+        and: "an incoming token for that email with groups claim"
+        OpenIdClaims claims = [
+                getEmail: { -> email },
+                get: { String k ->
+                    if (k == "email_verified") return true
+                    if (k == "groups") return groupClaim
+                    return null
+                }
+        ] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login"
+        def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = await(publisher)
+
+        then: "authentication succeeds with expected role and permissions"
+        response.isAuthenticated()
+        response.getAuthentication().get().getRoles().contains(expectedRole.name())
+
+        and: "the user record in PostgreSQL is saved with the mapped role"
+        def dbUser = userRepository.findByEmail(email).get()
+        dbUser.role() == expectedRole
+
+        where:
+        groupClaim                                                              | expectedRole
+        ["Kaiju Global Admins"]                                                 | UserRole.GLOBAL_ADMIN
+        ["Kaiju Region Directors"]                                              | UserRole.REGION_DIRECTOR
+        ["Kaiju Region Agents"]                                                 | UserRole.REGION_AGENT
+        ["Kaiju Org Admins"]                                                    | UserRole.STANDARD_USER
+        ["Kaiju Standard Users"]                                                | UserRole.STANDARD_USER
+        []                                                                      | UserRole.STANDARD_USER
+        null                                                                    | UserRole.STANDARD_USER
+        ["Kaiju Region Agents", "Kaiju Global Admins"]                          | UserRole.GLOBAL_ADMIN
+        ["Kaiju Region Agents", "Kaiju Region Directors"]                       | UserRole.REGION_DIRECTOR
+        "Kaiju Global Admins"                                                   | UserRole.GLOBAL_ADMIN
+        (["Kaiju Region Directors"] as String[])                                | UserRole.REGION_DIRECTOR
+    }
+
+    def "should maintain database role as authoritative when existing user logs in with different IdP group"() {
+        given: "an existing user with REGION_DIRECTOR role in database"
+        String email = "existing-director-${UUID.randomUUID()}@example.com"
+        User existingUser = userRepository.save(new User(null, email, UserRole.REGION_DIRECTOR, OffsetDateTime.now()))
+
+        and: "an incoming token with different IdP group"
+        OpenIdClaims claims = [
+                getEmail: { -> email },
+                get: { String k ->
+                    if (k == "email_verified") return true
+                    if (k == "groups") return ["Kaiju Global Admins"]
+                    return null
+                }
+        ] as OpenIdClaims
+        OpenIdTokenResponse token = new OpenIdTokenResponse()
+
+        when: "the mapper processes the login"
+        def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
+        AuthenticationResponse response = await(publisher)
+
+        then: "authentication succeeds using the authoritative database role"
+        response.isAuthenticated()
+        response.getAuthentication().get().getRoles().contains("REGION_DIRECTOR")
+        !response.getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
     }
 }

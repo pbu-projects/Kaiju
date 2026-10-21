@@ -32,4 +32,7 @@ public interface UserService {
 
     @NonNull
     User provisionOrGetUser(@NonNull String email);
+
+    @NonNull
+    User provisionOrGetUser(@NonNull String email, @NonNull UserRole initialRole);
 }

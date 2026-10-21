@@ -9,6 +9,7 @@ import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.security.token.jwt.validator.DefaultJwtAuthenticationFactory;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.service.UserService;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
@@ -28,12 +29,15 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
     private static final Logger LOG = LoggerFactory.getLogger(KaijuJwtAuthenticationFactory.class);
 
     private final UserService userService;
+    private final IdpRoleMapper idpRoleMapper;
 
-    public KaijuJwtAuthenticationFactory(TokenConfiguration tokenConfiguration,
-                                         RolesFinder rolesFinder,
-                                         UserService userService) {
+    public KaijuJwtAuthenticationFactory(@NonNull TokenConfiguration tokenConfiguration,
+                                         @NonNull RolesFinder rolesFinder,
+                                         @NonNull UserService userService,
+                                         @NonNull IdpRoleMapper idpRoleMapper) {
         super(tokenConfiguration, rolesFinder);
         this.userService = userService;
+        this.idpRoleMapper = idpRoleMapper;
     }
 
     @Override
@@ -66,10 +70,12 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
         }
     }
 
-    private Optional<Authentication> authenticateUser(String email, Map<String, Object> claims) {
+    @NonNull
+    private Optional<Authentication> authenticateUser(@NonNull String email, @NonNull Map<String, Object> claims) {
         try {
             String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
-            User user = userService.provisionOrGetUser(canonicalEmail);
+            UserRole initialRole = idpRoleMapper.resolveRoleFromClaims(claims);
+            User user = userService.provisionOrGetUser(canonicalEmail, initialRole);
             List<String> roles = new ArrayList<>();
             roles.add(user.role().name());
             user.role().getPermissions().stream()
