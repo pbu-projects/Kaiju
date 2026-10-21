@@ -14,12 +14,13 @@ micronaut:
       virtual: true
   security:
     enabled: true
-    reject-not-found: false
     oauth2:
       enabled: false
     token:
       jwt:
         enabled: true
+        nimbus:
+          reactive-validator-execute-on-blocking: true
         signatures:
           secret:
             generator:

@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,9 +59,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @NonNull
     public User createUser(@NonNull User user) {
+        String canonicalEmail = user.email() != null ? user.email().toLowerCase(Locale.ROOT).trim() : null;
         User toSave = new User(
                 null,
-                user.email(),
+                canonicalEmail,
                 user.role() != null ? user.role() : UserRole.STANDARD_USER,
                 user.createdAt() != null ? user.createdAt() : OffsetDateTime.now(ZoneOffset.UTC)
         );
@@ -74,9 +76,10 @@ public class UserServiceImpl implements UserService {
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
 
+        String canonicalEmail = user.email() != null ? user.email().toLowerCase(Locale.ROOT).trim() : null;
         User safeUpdate = new User(
                 id,
-                user.email(),
+                canonicalEmail,
                 existing.role(),
                 existing.createdAt()
         );

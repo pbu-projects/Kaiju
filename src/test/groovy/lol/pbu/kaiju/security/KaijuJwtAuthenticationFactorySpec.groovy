@@ -41,6 +41,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .subject("auth-subject-123")
                 .claim("email", email)
+                .claim("email_verified", true)
                 .claim("custom_attribute", "custom_val")
                 .build()
         JWT token = new PlainJWT(claimsSet)
@@ -72,6 +73,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         String expectedEmail = "canonical.user@kaiju.local"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .claim("email", rawEmail)
+                .claim("email_verified", true)
                 .build()
         JWT token = new PlainJWT(claimsSet)
 
@@ -115,14 +117,15 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         authOpt.isEmpty()
     }
 
-    def "createAuthentication | should return empty when email_verified claim is boolean false or string false"() {
-        given: "a JWT with unverified email claim"
-        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+    def "createAuthentication | should return empty when email_verified claim is missing, false, or invalid"() {
+        given: "a JWT with unverified or missing email_verified claim"
+        def builder = new JWTClaimsSet.Builder()
                 .subject("unverified-user")
                 .claim("email", "unverified@kaiju.local")
-                .claim("email_verified", verifiedClaim)
-                .build()
-        JWT token = new PlainJWT(claimsSet)
+        if (verifiedClaim != "MISSING") {
+            builder.claim("email_verified", verifiedClaim)
+        }
+        JWT token = new PlainJWT(builder.build())
 
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
@@ -131,7 +134,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         authOpt.isEmpty()
 
         where:
-        verifiedClaim << [false, "false", "FALSE"]
+        verifiedClaim << ["MISSING", null, false, "false", "FALSE", "unverified", "no", 0]
     }
 
     def "createAuthentication | should return empty when database lookup fails gracefully"() {
@@ -143,6 +146,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         and: "a JWT with a valid email claim"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
                 .claim("email", "transient.failure@kaiju.local")
+                .claim("email_verified", true)
                 .build()
         JWT token = new PlainJWT(claimsSet)
 

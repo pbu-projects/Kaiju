@@ -52,12 +52,11 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
             }
 
             Object emailVerifiedObj = claims.get("email_verified");
-            if (emailVerifiedObj != null) {
-                if (Boolean.FALSE.equals(emailVerifiedObj)
-                        || (emailVerifiedObj instanceof String s && "false".equalsIgnoreCase(s.trim()))) {
-                    LOG.warn("Rejecting JWT: unverified email claim");
-                    return Optional.empty();
-                }
+            boolean isVerified = Boolean.TRUE.equals(emailVerifiedObj)
+                    || (emailVerifiedObj instanceof String s && "true".equalsIgnoreCase(s.trim()));
+            if (!isVerified) {
+                LOG.warn("Rejecting JWT: email is not verified or verification claim is missing for {}", email);
+                return Optional.empty();
             }
 
             try {

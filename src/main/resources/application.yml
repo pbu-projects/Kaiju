@@ -23,6 +23,8 @@ micronaut:
     token:
       jwt:
         enabled: true
+        nimbus:
+          reactive-validator-execute-on-blocking: true
         claims-validators:
           issuer: ${OAUTH_ISSUER:`http://localhost:9000/application/o/kaiju/`}
           audience: ${OAUTH_CLIENT_ID:kaiju-client}
