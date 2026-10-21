@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -14,9 +13,6 @@ import lol.pbu.kaiju.repository.UserRepository
 import java.time.OffsetDateTime
 import java.util.UUID
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class AdminUserControllerSpec extends BaseControllerSpec {
 
@@ -60,7 +56,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
         User user = userRepository.save(new User(null, "admin-test-${UUID.randomUUID()}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
 
         when: "a standard user attempts to update role"
-        client.exchange(authenticated(HttpRequest.PUT("/admin/users/${user.id()}/role", new RoleUpdateRequest(UserRole.REGION_AGENT)), UUID.randomUUID().toString(), ["STANDARD_USER"]), User)
+        client.exchange(asVolunteer(HttpRequest.PUT("/admin/users/${user.id()}/role", new RoleUpdateRequest(UserRole.REGION_AGENT))), User)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)

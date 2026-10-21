@@ -1,9 +1,7 @@
 package lol.pbu.kaiju.controller
 
-import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -21,16 +19,9 @@ import spock.lang.Unroll
 
 import java.util.UUID
 
-@Property(name = "micronaut.security.enabled", value = "true")
-@Property(name = "micronaut.security.oauth2.enabled", value = "false")
-@Property(name = "micronaut.security.token.jwt.enabled", value = "false")
 @MicronautTest(transactional = false)
 class LocationControllerSpec extends BaseControllerSpec {
 
-    private static final String ROLE_STANDARD_USER = "STANDARD_USER"
-    private static final String ROLE_REGION_AGENT = "REGION_AGENT"
-    private static final String ROLE_REGION_DIRECTOR = "REGION_DIRECTOR"
-    private static final String CLAIM_REGION_MANAGE = "region:manage"
     private static final String BASE_PATH = "/locations"
 
     @Inject
@@ -41,18 +32,6 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
-
-    protected <T> MutableHttpRequest<T> asStandardUser(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
-        authenticated(request, userId, [ROLE_STANDARD_USER])
-    }
-
-    protected <T> MutableHttpRequest<T> asRegionAgent(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
-        authenticated(request, userId, [ROLE_REGION_AGENT])
-    }
-
-    protected <T> MutableHttpRequest<T> asRegionDirector(MutableHttpRequest<T> request, String userId = UUID.randomUUID().toString()) {
-        authenticated(request, userId, [ROLE_REGION_DIRECTOR, CLAIM_REGION_MANAGE])
-    }
 
     private Point createPoint(double lon = 0, double lat = 0) {
         geometryFactory.createPoint(new Coordinate(lon, lat))

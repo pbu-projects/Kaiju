@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -58,9 +59,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @NonNull
     public User createUser(@NonNull User user) {
+        String canonicalEmail = user.email() != null ? user.email().toLowerCase(Locale.ROOT).trim() : null;
         User toSave = new User(
                 null,
-                user.email(),
+                canonicalEmail,
                 user.role() != null ? user.role() : UserRole.STANDARD_USER,
                 user.createdAt() != null ? user.createdAt() : OffsetDateTime.now(ZoneOffset.UTC)
         );
@@ -74,9 +76,10 @@ public class UserServiceImpl implements UserService {
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
 
+        String canonicalEmail = user.email() != null ? user.email().toLowerCase(Locale.ROOT).trim() : null;
         User safeUpdate = new User(
                 id,
-                user.email(),
+                canonicalEmail,
                 existing.role(),
                 existing.createdAt()
         );
@@ -103,17 +106,18 @@ public class UserServiceImpl implements UserService {
     @Override
     @NonNull
     public User provisionOrGetUser(@NonNull String email) {
-        return userRepository.findByEmail(email).orElseGet(() -> {
+        String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
+        return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
-                User newUser = new User(null, email, UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC));
+                User newUser = new User(null, canonicalEmail, UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC));
                 return userRepository.save(newUser);
             } catch (Exception ex) {
                 if (isUniqueConstraintViolation(ex)) {
-                    LOG.info("Concurrent user insertion detected for email: {}. Retrieving existing record.", email);
-                    return userRepository.findByEmail(email)
-                            .orElseThrow(() -> new IllegalStateException("User record could not be found after unique violation on email: " + email, ex));
+                    LOG.info("Concurrent user insertion detected for email: {}. Retrieving existing record.", canonicalEmail);
+                    return userRepository.findByEmail(canonicalEmail)
+                            .orElseThrow(() -> new IllegalStateException("User record could not be found after unique violation on email: " + canonicalEmail, ex));
                 }
-                LOG.error("Database error occurred during user provisioning for email: {}", email, ex);
+                LOG.error("Database error occurred during user provisioning for email: {}", canonicalEmail, ex);
                 if (ex instanceof RuntimeException runtimeException) {
                     throw runtimeException;
                 }

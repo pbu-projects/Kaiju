@@ -5,13 +5,39 @@ datasources:
     db-type: postgres
 
 micronaut:
+  executors:
+    io:
+      type: THREAD_PER_TASK
+      virtual: true
+    blocking:
+      type: THREAD_PER_TASK
+      virtual: true
   security:
-    enabled: false
+    enabled: true
     oauth2:
       enabled: false
+    token:
+      jwt:
+        enabled: true
+        nimbus:
+          reactive-validator-execute-on-blocking: true
+        signatures:
+          secret:
+            generator:
+              secret: pleaseChangeThisSecretForANewOne32Bits
 
 test-resources:
   containers:
+    postgres:
+      image-name: postgis/postgis:15-3.5
+      db-name: volunteer_monster
+      username: jimmy
+      password: warm-farts-smell-worse
+    postgis:
+      image-name: postgis/postgis:15-3.5
+      db-name: volunteer_monster
+      username: jimmy
+      password: warm-farts-smell-worse
     keycloak:
       enabled: false
 

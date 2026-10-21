@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -10,6 +11,7 @@ import spock.lang.Unroll
 
 import java.util.UUID
 
+@Property(name = "micronaut.security.reject-not-found", value = "false")
 @MicronautTest(transactional = false)
 class AuditImmutabilitySpec extends BaseControllerSpec {
 

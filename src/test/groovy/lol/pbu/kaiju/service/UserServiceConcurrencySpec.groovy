@@ -20,7 +20,25 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
     UserRepository userRepository
 
     def cleanup() {
-        executeUpdate("DELETE FROM users WHERE email LIKE 'concurrent-%@example.com'")
+        executeUpdate("DELETE FROM users WHERE email LIKE 'concurrent-%@example.com' OR email LIKE 'canonical-%@example.com'")
+    }
+
+    def "JIT Provisioning | canonicalizes mixed-case and untrimmed email"() {
+        given: "a mixed-case and untrimmed email"
+        def rawEmail = "   Canonical-${UUID.randomUUID()}@EXAMPLE.COM   "
+        def canonicalEmail = rawEmail.toLowerCase(Locale.ROOT).trim()
+
+        when: "provisioning with untrimmed mixed-case email"
+        def user1 = userService.provisionOrGetUser(rawEmail)
+
+        and: "retrieving with canonical lowercase email"
+        def user2 = userService.provisionOrGetUser(canonicalEmail)
+
+        then: "both calls return the same persisted user with canonical lowercase email"
+        user1.id() == user2.id()
+        user1.email() == canonicalEmail
+        user2.email() == canonicalEmail
+        userRepository.findByEmail(canonicalEmail).isPresent()
     }
 
     def "JIT Provisioning | handles concurrent insertion for same email gracefully via SQLState 23505"() {

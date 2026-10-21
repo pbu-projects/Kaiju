@@ -16,6 +16,9 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Named("authentik")
@@ -41,13 +44,27 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
             return Publishers.just(AuthenticationResponse.failure("No email present in OpenID claims"));
         }
 
-        User user = userService.provisionOrGetUser(email);
+        Object emailVerifiedObj = openIdClaims.get("email_verified");
+        boolean isVerified = Boolean.TRUE.equals(emailVerifiedObj)
+                || (emailVerifiedObj instanceof String s && "true".equalsIgnoreCase(s.trim()));
+        if (!isVerified) {
+            return Publishers.just(AuthenticationResponse.failure("Email is not verified in OpenID claims"));
+        }
+
+        String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
+        User user = userService.provisionOrGetUser(canonicalEmail);
 
         // Map database role to Micronaut Security Context
         // Using the user's UUID as the principal name is best practice since emails can change
+        List<String> roles = new ArrayList<>();
+        roles.add(user.role().name());
+        user.role().getPermissions().stream()
+                .map(Permission::getClaim)
+                .forEach(roles::add);
+
         AuthenticationResponse response = AuthenticationResponse.success(
                 user.id().toString(),
-                user.role().getPermissions().stream().map(Permission::getClaim).toList(),
+                roles,
                 Map.of("email", user.email())
         );
 

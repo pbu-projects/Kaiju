@@ -7,6 +7,9 @@ micronaut:
     io:
       type: THREAD_PER_TASK
       virtual: true
+    blocking:
+      type: THREAD_PER_TASK
+      virtual: true
     scheduled:
       type: SCHEDULED
       virtual: true
@@ -19,10 +22,16 @@ micronaut:
         get-allowed: true
     token:
       jwt:
+        enabled: true
+        nimbus:
+          reactive-validator-execute-on-blocking: true
+        claims-validators:
+          issuer: ${OAUTH_ISSUER:`http://localhost:9000/application/o/kaiju/`}
+          audience: ${OAUTH_CLIENT_ID:kaiju-client}
         signatures:
-          secret:
-            generator:
-              secret: ${JWT_GENERATOR_SIGNATURE_SECRET:pleaseChangeThisSecretForANewOne}
+          jwks:
+            authentik:
+              url: ${OAUTH_JWKS_URL:http://localhost:9000/application/o/kaiju/jwks/}
     oauth2:
       clients:
         authentik:
@@ -47,18 +56,6 @@ flyway:
         - filesystem:database/init
       sql-migration-prefix: ""
       sql-migration-separator: "-"
-test-resources:
-  containers:
-    postgres:
-      image-name: postgis/postgis:15-3.5
-      db-name: volunteer_monster
-      username: jimmy
-      password: warm-farts-smell-worse
-    postgis:
-      image-name: postgis/postgis:15-3.5
-      db-name: volunteer_monster
-      username: jimmy
-      password: warm-farts-smell-worse
 micrometer:
   observation:
     http:
