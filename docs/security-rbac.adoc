@@ -1,129 +1,128 @@
-= Security & Access Control: Role-Based Access and Capability Permissions
+= Security and Access Control: Roles and Permissions
 :toc:
 :toc-levels: 3
 :icons: font
 
-== Practical Intent and Community Value
+== Why We Protect the App
 
-Kaiju serves community volunteers, neighborhood organizations, and regional coordinators. 
-Protecting user privacy, maintaining trusted regional boundaries, and preventing accidental or unauthorized changes are essential to building community trust.
+Kaiju helps people find community projects and volunteer their time. 
+We want everyone to have an easy time helping out, but we also need to keep information safe. 
 
-Rather than relying on vague, one-size-fits-all administrator badges, Kaiju separates permissions into specific, practical actions. 
-This ensures that a neighborhood team leader can easily manage volunteer shifts for their local park cleanup without ever having the ability to alter regional civic boundaries or view private user records across the entire state.
+Different people have different jobs in the system:
+* A volunteer who signs up to clean a park only needs to see projects and join shifts.
+* A regional leader needs to approve local projects and set city boundaries.
+* A platform administrator needs to fix system settings and help users with their accounts.
 
-== Real-World Roles and Clear Boundaries
+If everyone could do everything, someone could change a town boundary or delete an account by mistake!
 
-Every person interacting with the platform operates with an assigned role that fits their practical day-to-day responsibilities:
+== Signing In and Getting a Token
 
-[cols="25%,35%,40%",options="header"]
+When you sign into Kaiju, you use a sign-in service like https://goauthentik.io/[Authentik]. 
+
+1. You type your email and password into the sign-in page.
+2. The sign-in service checks your password.
+3. If your password is correct, it gives your phone or computer a digital pass called a **token** (a JSON Web Token).
+4. The token lists your email and the groups you belong to:
+
+[source,json]
+----
+{
+  "email": "victor.volunteer1@kaiju.local",
+  "email_verified": true,
+  "groups": ["Kaiju Standard Users"]
+}
+----
+
+Kaiju checks the digital signature on the token. 
+This check makes sure the token is genuine and that nobody changed the words inside it.
+
+== The Difference Between Roles and Permissions
+
+Kaiju splits access into two simple parts:
+
+* **Roles**: Your title or job in the system (like Volunteer or Regional Director).
+* **Permissions**: The exact actions you are allowed to take.
+
+We do not just check your title. We check if your title gives you the exact permission for the action you want to take.
+
+[cols="25%,25%,50%",options="header"]
 |===
-| Role | Who They Are | What They Can Do in Practice
+| User | System Role (`UserRole`) | Allowed Permissions (`Permission`)
 
-| *Platform Administrator* +
-(`GLOBAL_ADMIN`)
-| Global stewards (like Sarah or Gary) responsible for system reliability and platform-wide integrity.
-| Manage platform-wide settings, ingest official government boundaries, manage user accounts, and resolve cross-regional issues.
+| *Victor Volunteer*
+| `STANDARD_USER`
+| `project:read`, `project:create`, `project:update`, `project:delete`, `org:read`
 
-| *Regional Director* +
-(`REGION_DIRECTOR`)
-| Local civic leaders (like Rachel or Daniel) who guide community initiatives across a state, county, or city district.
-| Create and update civic boundaries in their jurisdiction and approve community service projects within their assigned territory. They cannot view or edit user accounts across other regions.
+| *Rachel Regional Director*
+| `REGION_DIRECTOR`
+| Everything a volunteer can do, plus `region:manage` and `project:approve`
 
-| *Regional Agent* +
-(`REGION_AGENT`)
-| Field coordinators (like Samuel or Connie) supporting local directors.
-| Review and approve community projects within their geographic area. They cannot alter regional boundary lines or manage system settings.
-
-| *Organization Manager* +
-(`ORG_ADMIN` / `ORG_MANAGER`)
-| Community partners (like Nathan or Laura) running local charities, food pantries, or service clubs.
-| Create community projects, schedule volunteer shifts, and coordinate team members for their organization.
-
-| *Community Volunteer* +
-(`STANDARD_USER`)
-| Neighbors (like Victor or Alice) offering their time and energy to help others.
-| Discover nearby service opportunities, register for shifts, and track their personal volunteering commitments. They cannot access administrative tools.
-|===
-
-== Two-Layer Security Architecture
-
-Kaiju separates access control into two complementary layers: **High-Level Roles** and **Discrete Capability Permissions**.
-
-=== Layer 1: Identity Providers and Initial Onboarding
-When someone signs into Kaiju, they authenticate through an OpenID Connect identity provider such as https://goauthentik.io/[Authentik] (or Okta, Keycloak, or Google in production environments).
-
-1. *Cryptographic Verification*: The incoming login token is cryptographically verified against the identity provider's published key set (JWKS) to guarantee it has not been altered or forged.
-2. *Group Translation*: The identity provider passes along the groups the user belongs to (such as `Kaiju Global Admins` or `Kaiju Region Directors`). 
-3. *Just-In-Time Account Setup*: If this is the user's first time visiting Kaiju, `IdpRoleMapper` translates their identity group into the appropriate starting role and creates their local database account seamlessly.
-
-=== Layer 2: Discrete Capability Permissions
-Titles and role names can mean different things across various organizations. 
-To prevent ambiguity, Kaiju maps every system role to a concrete list of specific capability permissions:
-
-[cols="30%,70%",options="header"]
-|===
-| Role | Allotted Capability Permissions
-
-| *GLOBAL_ADMIN*
-| `system:admin`, `system:user-manage`, `region:manage`, `org:manage-users`, `org:edit`, `org:read`, `project:approve`, `project:reassign`, `project:create`, `project:read`, `project:update`, `project:delete`
-
-| *REGION_DIRECTOR*
-| `region:manage`, `project:approve`, `project:reassign`, `org:read`, `project:create`, `project:read`, `project:update`, `project:delete`
-
-| *REGION_AGENT*
-| `project:approve`, `project:reassign`, `org:read`, `project:create`, `project:read`, `project:update`, `project:delete`
-
-| *STANDARD_USER*
-| `org:read`, `project:create`, `project:read`, `project:update`, `project:delete`
+| *Sarah Platform Admin*
+| `GLOBAL_ADMIN`
+| Every permission, including `system:user-manage` and `system:admin`
 |===
 
-When an API request arrives, the authentication factory attaches these exact permission strings to the active security context. 
+When a new user signs in for the first time, a helper class called `IdpRoleMapper` reads the groups on their token and sets their starting role:
 
-== Declarative Route Protection
+[source,java]
+----
+if (groups.contains("Kaiju Global Admins")) {
+    return UserRole.GLOBAL_ADMIN;
+}
+if (groups.contains("Kaiju Region Directors")) {
+    return UserRole.REGION_DIRECTOR;
+}
+return UserRole.STANDARD_USER;
+----
 
-Controllers protect endpoints by declaring the exact permission required for the action, using https://micronaut-projects.github.io/micronaut-security/latest/guide/index.html[Micronaut Security] annotations.
+== Protecting Actions in the Code
 
-For example, creating a new civic boundary requires the `region:manage` permission:
+Every web action in Kaiju is protected by a rule using https://micronaut-projects.github.io/micronaut-security/latest/guide/index.html[Micronaut Security]. 
+The rule names the exact permission needed.
+
+=== Adding an Administrative Region
+Creating a new regional boundary requires the `region:manage` permission:
 
 [source,java]
 ----
 @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
 @Post
 public AdministrativeRegion addAdministrativeRegion(...) {
-    // Both Platform Admins and Regional Directors can reach this endpoint
+    return administrativeRegionRepository.save(region);
 }
 ----
 
-Meanwhile, browsing sensitive platform account lists requires the stricter `system:user-manage` permission:
+* When **Rachel Regional Director** sends this request, she has `region:manage`. The app says yes and returns **200 OK**.
+* When **Victor Volunteer** tries to send this request, he does not have that permission. The app stops him and returns **403 Forbidden**.
+
+=== Viewing the Full User List
+Looking at all user accounts across the entire platform requires the `system:user-manage` permission:
 
 [source,java]
 ----
 @Get
 @Secured(SYSTEM_USER_MANAGE_CLAIM)
 public CursoredPage<User> getUsers(...) {
-    // Only Platform Admins hold this capability; Regional Directors and Volunteers receive 403 Forbidden
+    return userService.getUsers(pageable);
 }
 ----
 
-Because endpoints check specific permissions rather than hardcoded role names:
-- Security rules are self-documenting and auditable directly in code.
-- Individual permissions can be tailored or granted without needing to rewrite controller logic.
+* When **Sarah Platform Admin** calls this, she has `system:user-manage`. The app returns the list with **200 OK**.
+* If **Rachel Regional Director** or **Victor Volunteer** tries to call this, neither has that permission. The app stops them with **403 Forbidden**.
 
-== Live Database Authority and Instant Protection
+== Instant Updates Without Logging Out
 
-In many distributed systems, updating a user's permissions requires them to log out and log back in, or wait for an access token to expire. 
-If an account is compromised or someone leaves a leadership role, that delay represents a real security risk.
+In many apps, if someone changes your role, you have to log out and sign back in, or wait for your token to expire.
 
-In Kaiju, the PostgreSQL database is the active source of truth for user permissions:
+In Kaiju, the database is checked on every single request:
 
-1. *Every Request Checks the Live Account*: When an authenticated request arrives, Kaiju verifies the token's cryptographic signature, looks up the active user record in PostgreSQL, and applies the user's current permissions.
-2. *Instant Promotion*: If an administrator promotes a volunteer to a Regional Director in the database, the volunteer immediately gains access to regional management tools on their very next request using their existing login token.
-3. *Instant Demotion and Revocation*: If an administrator demotes an account or removes elevated privileges, the user is immediately turned away (receiving a `403 Forbidden`) on their very next action. No cached token can bypass the live database guardrail.
+1. **Instant Promotion**: If an administrator promotes a volunteer to a Regional Director in the database, the volunteer can do their new tasks right away. They do not need to sign out or get a new token.
+2. **Instant Demotion**: If an account has its privileges removed, the user is stopped on their very next click. An old token cannot bypass the database check.
 
-== Verification and Testing
+== Summary of What We Test
 
-This security model is continuously tested under live conditions to guarantee reliability:
+To make sure this always works, our automated tests check three things:
 
-- *Live Identity Provider Integration*: Automated tests log genuine test personas through Authentik, minting genuine RS256 signed tokens to test real network flows.
-- *Privilege Containment Tests*: Every administrative level is tested to prove that unauthorized actions are turned away at the door with clean `403 Forbidden` responses.
-- *Dynamic Role Reflection Tests*: Automated tests confirm that changing a user's role in the database instantly updates their live clearance under the wire without requiring a new token.
+1. **Real Tokens**: We test with real tokens from Authentik to confirm that real digital signatures work.
+2. **Proper Stops**: We test that people without the right permission always receive a **403 Forbidden**.
+3. **Instant Changes**: We test that changing a role in the database takes effect right away on the next request using the exact same token.
