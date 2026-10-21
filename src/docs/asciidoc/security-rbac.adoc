@@ -19,22 +19,21 @@ If everyone could do everything, someone could change a town boundary or delete 
 
 When you sign into Kaiju, you use a sign-in service like https://goauthentik.io/[Authentik]. 
 
-1. You type your email and password into the sign-in page.
-2. The sign-in service checks your password.
-3. If your password is correct, it gives your phone or computer a digital pass called a **token** (a JSON Web Token).
-4. The token lists your email and the groups you belong to:
-
+. You sign in with your username and password.
+. If your password is correct, it gives your browser a https://auth0.com/docs/secure/tokens/json-web-tokens[JWT] token.
+. The token lists your email and the groups you belong to:
++
 [source,json]
 ----
 {
   "email": "victor.volunteer1@kaiju.local",
   "email_verified": true,
-  "groups": ["Kaiju Standard Users"]
+  "groups": ["Kaiju Standard Users"],
+  "favorite food": "Döner Kebab"
 }
 ----
-
-Kaiju checks the digital signature on the token. 
-This check makes sure the token is genuine and that nobody changed the words inside it.
++
+. Kaiju checks that the token is kosher, and you're signed in!
 
 == The Difference Between Roles and Permissions
 
