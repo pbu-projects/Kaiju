@@ -1,0 +1,127 @@
+= Security and Access Control: Roles and Permissions
+:toc:
+:toc-levels: 3
+:icons: font
+
+== Why We Protect the App
+
+Kaiju helps people find community projects and volunteer their time. 
+We want everyone to have an easy time helping out, but we also need to keep information safe. 
+
+Different people have different jobs in the system:
+* A volunteer who signs up to clean a park only needs to see projects and join shifts.
+* A regional leader needs to approve local projects and set city boundaries.
+* A platform administrator needs to fix system settings and help users with their accounts.
+
+If everyone could do everything, someone could change a town boundary or delete an account by mistake!
+
+== Signing In and Getting a Token
+
+When you sign into Kaiju, you use a sign-in service like https://goauthentik.io/[Authentik]. 
+
+. You sign in with your username and password.
+. If your password is correct, it gives your browser a https://auth0.com/docs/secure/tokens/json-web-tokens[JWT] token.
+. The token lists your email and the groups you belong to:
++
+[source,json]
+----
+{
+  "email": "victor.volunteer1@kaiju.local",
+  "email_verified": true,
+  "groups": ["Kaiju Standard Users"],
+  "favorite food": "Döner Kebab"
+}
+----
++
+. Kaiju checks that the token is kosher, and you're signed in!
+
+== The Difference Between Roles and Permissions
+
+Kaiju splits access into two simple parts:
+
+* **Roles**: Your title or job in the system (like Volunteer or Regional Director).
+* **Permissions**: The exact actions you are allowed to take.
+
+We do not just check your title. We check if your title gives you the exact permission for the action you want to take.
+
+[cols="25%,25%,50%",options="header"]
+|===
+| User | System Role (`UserRole`) | Allowed Permissions (`Permission`)
+
+| *Victor Volunteer*
+| `STANDARD_USER`
+| `project:read`, `project:create`, `project:update`, `project:delete`, `org:read`
+
+| *Rachel Regional Director*
+| `REGION_DIRECTOR`
+| Everything a volunteer can do, plus `region:manage` and `project:approve`
+
+| *Sarah Platform Admin*
+| `GLOBAL_ADMIN`
+| Every permission, including `system:user-manage` and `system:admin`
+|===
+
+When a new user signs in for the first time, a helper class called `IdpRoleMapper` reads the groups on their token and sets their starting role:
+
+[source,java]
+----
+if (groups.contains("Kaiju Global Admins")) {
+    return UserRole.GLOBAL_ADMIN;
+}
+if (groups.contains("Kaiju Region Directors")) {
+    return UserRole.REGION_DIRECTOR;
+}
+return UserRole.STANDARD_USER;
+----
+
+== Protecting Actions in the Code
+
+Every web action in Kaiju is protected by a rule using https://micronaut-projects.github.io/micronaut-security/latest/guide/index.html[Micronaut Security]. 
+The rule names the exact permission needed.
+
+=== Adding an Administrative Region
+Creating a new regional boundary requires the `region:manage` permission:
+
+[source,java]
+----
+@Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+@Post
+public AdministrativeRegion addAdministrativeRegion(...) {
+    return administrativeRegionRepository.save(region);
+}
+----
+
+* When **Rachel Regional Director** sends this request, she has `region:manage`. The app says yes and returns **200 OK**.
+* When **Victor Volunteer** tries to send this request, he does not have that permission. The app stops him and returns **403 Forbidden**.
+
+=== Viewing the Full User List
+Looking at all user accounts across the entire platform requires the `system:user-manage` permission:
+
+[source,java]
+----
+@Get
+@Secured(SYSTEM_USER_MANAGE_CLAIM)
+public CursoredPage<User> getUsers(...) {
+    return userService.getUsers(pageable);
+}
+----
+
+* When **Sarah Platform Admin** calls this, she has `system:user-manage`. The app returns the list with **200 OK**.
+* If **Rachel Regional Director** or **Victor Volunteer** tries to call this, neither has that permission. The app stops them with **403 Forbidden**.
+
+== Instant Updates Without Logging Out
+
+In many apps, if someone changes your role, you have to log out and sign back in, or wait for your token to expire.
+
+In Kaiju, the database is checked on every single request:
+
+1. **Instant Promotion**: If an administrator promotes a volunteer to a Regional Director in the database, the volunteer can do their new tasks right away. They do not need to sign out or get a new token.
+2. **Instant Demotion**: If an account has its privileges removed, the user is stopped on their very next click. An old token cannot bypass the database check.
+
+== Summary of What We Test
+
+To make sure this always works, our automated tests check three things:
+
+1. **Real Tokens**: We test with real tokens from Authentik to confirm that real digital signatures work.
+2. **Proper Stops**: We test that people without the right permission always receive a **403 Forbidden**.
+3. **Instant Changes**: We test that changing a role in the database takes effect right away on the next request using the exact same token.

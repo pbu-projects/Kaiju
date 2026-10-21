@@ -22,9 +22,12 @@ import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
+import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.UserRole
+import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.UserRepository
+import lol.pbu.kaiju.service.UserService
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -75,6 +78,12 @@ class AuthentikOidcIntegrationSpec extends Specification {
     UserRepository userRepository
 
     @Inject
+    UserService userService
+
+    @Inject
+    AdministrativeRegionRepository administrativeRegionRepository
+
+    @Inject
     AuthentikAuthenticationMapper mapper
 
     @Inject
@@ -83,6 +92,20 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     BlockingHttpClient getClient() {
         httpClient.toBlocking()
+    }
+
+    private static Map<String, Object> createTestRegionPayload(String name) {
+        return [
+                name: name,
+                parentRegionId: null,
+                coordinates: [
+                        [longitude: -105.0, latitude: 40.0],
+                        [longitude: -105.0, latitude: 41.0],
+                        [longitude: -104.0, latitude: 41.0],
+                        [longitude: -104.0, latitude: 40.0],
+                        [longitude: -105.0, latitude: 40.0]
+                ]
+        ]
     }
 
     static boolean isAuthentikAvailable() {
@@ -583,5 +606,216 @@ class AuthentikOidcIntegrationSpec extends Specification {
         then: "access is rejected with 401 Unauthorized"
         HttpClientResponseException ex = thrown()
         ex.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "Sarah Admin (GLOBAL_ADMIN) has full administrative access via live Authentik token"() {
+        given: "a live Authentik token for Sarah Admin"
+        Map<String, String> tokens = obtainLiveTokens("sarah.admin1@kaiju.local")
+        UUID createdRegionId = null
+
+        when: "Sarah calls GET /users to manage system users"
+        def usersResponse = client.exchange(
+                HttpRequest.GET("/users")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is granted with 200 OK verifying system:user-manage permission"
+        usersResponse.status == HttpStatus.OK
+
+        when: "Sarah calls POST /administrative-regions to create an administrative boundary"
+        def regionPayload = createTestRegionPayload("Sarah Admin Region " + UUID.randomUUID())
+        def regionResponse = client.exchange(
+                HttpRequest.POST("/administrative-regions", regionPayload)
+                        .header("Authorization", "Bearer ${tokens.idToken}"),
+                AdministrativeRegion
+        )
+        createdRegionId = regionResponse.body().id()
+
+        then: "region creation is granted with 200 OK verifying region:manage permission"
+        regionResponse.status == HttpStatus.OK
+        createdRegionId != null
+
+        cleanup:
+        if (createdRegionId != null) {
+            administrativeRegionRepository.deleteById(createdRegionId)
+        }
+    }
+
+    def "Rachel State Director (REGION_DIRECTOR) can manage regions but is denied system user management"() {
+        given: "a live Authentik token for Rachel State Director"
+        Map<String, String> tokens = obtainLiveTokens("rachel.state.director1@kaiju.local")
+        UUID createdRegionId = null
+
+        when: "Rachel calls POST /administrative-regions to create an administrative boundary"
+        def regionPayload = createTestRegionPayload("Rachel Director Region " + UUID.randomUUID())
+        def regionResponse = client.exchange(
+                HttpRequest.POST("/administrative-regions", regionPayload)
+                        .header("Authorization", "Bearer ${tokens.idToken}"),
+                AdministrativeRegion
+        )
+        createdRegionId = regionResponse.body().id()
+
+        then: "region creation is granted with 200 OK verifying region:manage permission"
+        regionResponse.status == HttpStatus.OK
+        createdRegionId != null
+
+        when: "Rachel calls GET /users to attempt system user administration"
+        client.exchange(
+                HttpRequest.GET("/users")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is strictly rejected with 403 Forbidden demonstrating privilege containment"
+        HttpClientResponseException ex = thrown()
+        ex.status == HttpStatus.FORBIDDEN
+
+        cleanup:
+        if (createdRegionId != null) {
+            administrativeRegionRepository.deleteById(createdRegionId)
+        }
+    }
+
+    def "Nathan National Admin (ORG_ADMIN / system STANDARD_USER) can access projects but is denied regional and system administration"() {
+        given: "a live Authentik token for Nathan National Admin"
+        Map<String, String> tokens = obtainLiveTokens("nathan.national.admin1@kaiju.local")
+
+        when: "Nathan calls GET /projects"
+        def projectsResponse = client.exchange(
+                HttpRequest.GET("/projects")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is granted with 200 OK"
+        projectsResponse.status == HttpStatus.OK
+
+        when: "Nathan attempts to create an administrative region via POST /administrative-regions"
+        client.exchange(
+                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Nathan Region Attempt"))
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is rejected with 403 Forbidden"
+        HttpClientResponseException regionEx = thrown()
+        regionEx.status == HttpStatus.FORBIDDEN
+
+        when: "Nathan attempts to list users via GET /users"
+        client.exchange(
+                HttpRequest.GET("/users")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is rejected with 403 Forbidden"
+        HttpClientResponseException usersEx = thrown()
+        usersEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "Victor Volunteer (STANDARD_USER) can access projects but is denied administrative region operations"() {
+        given: "a live Authentik token for Victor Volunteer"
+        Map<String, String> tokens = obtainLiveTokens("victor.volunteer1@kaiju.local")
+
+        when: "Victor calls GET /projects"
+        def projectsResponse = client.exchange(
+                HttpRequest.GET("/projects")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is granted with 200 OK"
+        projectsResponse.status == HttpStatus.OK
+
+        when: "Victor attempts to create an administrative region via POST /administrative-regions"
+        client.exchange(
+                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Region Attempt"))
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is rejected with 403 Forbidden"
+        HttpClientResponseException regionEx = thrown()
+        regionEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "dynamic RBAC reflects immediate permission elevation and revocation with the same live Authentik token"() {
+        given: "Victor Volunteer with standard user role and a valid live Authentik token"
+        String victorEmail = "victor.volunteer1@kaiju.local"
+        Map<String, String> tokens = obtainLiveTokens(victorEmail)
+        User victor = userRepository.findByEmail(victorEmail).get()
+        assert victor.role() == UserRole.STANDARD_USER
+        UUID createdRegionId = null
+
+        when: "Victor calls POST /administrative-regions with his initial STANDARD_USER role"
+        client.exchange(
+                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Pre-Promotion Region"))
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is rejected with 403 Forbidden"
+        HttpClientResponseException preEx = thrown()
+        preEx.status == HttpStatus.FORBIDDEN
+
+        when: "Victor is dynamically promoted to REGION_DIRECTOR in the authoritative database"
+        userService.updateRole(victor.id(), UserRole.REGION_DIRECTOR)
+
+        and: "Victor presents the exact same live Authentik token to POST /administrative-regions"
+        def elevatedResponse = client.exchange(
+                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Promoted Region"))
+                        .header("Authorization", "Bearer ${tokens.idToken}"),
+                AdministrativeRegion
+        )
+        createdRegionId = elevatedResponse.body().id()
+
+        then: "access is immediately granted with 200 OK reflecting the updated database authority"
+        elevatedResponse.status == HttpStatus.OK
+        createdRegionId != null
+
+        when: "Victor is dynamically demoted back to STANDARD_USER in the database"
+        userService.updateRole(victor.id(), UserRole.STANDARD_USER)
+
+        and: "Victor presents the exact same live Authentik token once again"
+        client.exchange(
+                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Demoted Region"))
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is immediately rejected with 403 Forbidden"
+        HttpClientResponseException postEx = thrown()
+        postEx.status == HttpStatus.FORBIDDEN
+
+        cleanup:
+        userService.updateRole(victor.id(), UserRole.STANDARD_USER)
+        if (createdRegionId != null) {
+            administrativeRegionRepository.deleteById(createdRegionId)
+        }
+    }
+
+    def "unseeded Authentik user with admin group is JIT provisioned into PostgreSQL with mapped role on first presentation"() {
+        given: "an unseeded admin persona in Authentik with Kaiju Global Admins group"
+        String garyEmail = "gary.admin2@kaiju.local"
+        User originalGary = userRepository.findByEmail(garyEmail).orElse(null)
+        if (originalGary != null) {
+            userRepository.delete(originalGary)
+        }
+        assert !userRepository.findByEmail(garyEmail).isPresent(): "Gary must not exist in database before first presentation"
+
+        when: "Gary logs in via Authentik and calls GET /users presenting his live token"
+        Map<String, String> tokens = obtainLiveTokens(garyEmail)
+        def response = client.exchange(
+                HttpRequest.GET("/users")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
+
+        then: "access is granted with 200 OK due to JIT provisioning with mapped GLOBAL_ADMIN role"
+        response.status == HttpStatus.OK
+
+        and: "Gary now exists in the PostgreSQL database with GLOBAL_ADMIN role"
+        Optional<User> provisionedUser = userRepository.findByEmail(garyEmail)
+        provisionedUser.isPresent()
+        provisionedUser.get().role() == UserRole.GLOBAL_ADMIN
+
+        cleanup:
+        if (originalGary != null) {
+            userRepository.findByEmail(garyEmail).ifPresent { userRepository.removeById(it.id()) }
+            userRepository.save(new User(null, originalGary.email(), originalGary.role(), originalGary.createdAt()))
+        } else {
+            userRepository.findByEmail(garyEmail).ifPresent { userRepository.removeById(it.id()) }
+        }
     }
 }
