@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_USER_MANAGE_CLAIM;
 
@@ -47,6 +48,13 @@ public class UserController {
     public UserController(UserService userService, UserRepository userRepository) {
         this.userService = userService;
         this.userRepository = userRepository;
+    }
+
+    @Get("/me")
+    public User getCurrentUser(Principal principal) {
+        UUID userId = UUID.fromString(principal.getName());
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
     }
 
     @Get
