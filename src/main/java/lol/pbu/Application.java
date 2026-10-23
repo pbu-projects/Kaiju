@@ -12,7 +12,7 @@ import io.swagger.v3.oas.annotations.servers.Server;
 @OpenAPIDefinition(
         info = @Info(
                 title = "Kaiju Civic Engine API",
-                version = "0.0.6",
+                version = "0.0.5",
                 description = "High-performance spatial volunteer management and civic engagement engine",
                 contact = @Contact(name = "Peanut Butter Unicorn", url = "https://kaiju.pbu.lol")
         ),
