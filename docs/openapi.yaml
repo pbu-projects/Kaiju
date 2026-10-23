@@ -1,0 +1,3586 @@
+openapi: 3.0.1
+info:
+  title: Kaiju Civic Engine API
+  description: High-performance spatial volunteer management and civic engagement
+    engine
+  contact:
+    name: Peanut Butter Unicorn
+    url: https://kaiju.pbu.lol
+  version: 0.0.6
+servers:
+- url: /
+  description: Current Server
+security:
+- bearerAuth: []
+paths:
+  /admin/users/{id}/role:
+    put:
+      summary: Explicit endpoint for role elevation.
+      description: Explicit endpoint for role elevation. Prevents Mass Assignment
+        by only accepting a RoleUpdateRequest.
+      operationId: updateUserRole
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the user to promote/demote
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the requested role
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: the updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /administrative-regions:
+    get:
+      summary: Retrieves a paginated list of administrative regions using cursor-based
+        pagination.
+      description: Retrieves a paginated list of administrative regions using cursor-based
+        pagination. Accessible to all authenticated platform roles.
+      operationId: getAdministrativeRegions
+      parameters:
+      - name: pageable
+        in: query
+        description: "cursor pagination parameters (cursor, limit, sort)"
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: a CursoredPage containing administrative region entities and
+            next cursor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_AdministrativeRegion_"
+    post:
+      summary: Creates and persists a new administrative region polygon.
+      description: Creates and persists a new administrative region polygon. Restricted
+        to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
+      operationId: addAdministrativeRegion
+      requestBody:
+        description: "the administrative region creation command, including its geographic\
+          \ boundary coordinates"
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdministrativeRegionCommand"
+        required: true
+      responses:
+        "200":
+          description: the persisted AdministrativeRegion with its assigned identifier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdministrativeRegion"
+  /administrative-regions/{id}:
+    get:
+      summary: Retrieves an administrative region by its unique identifier.
+      description: Retrieves an administrative region by its unique identifier. Accessible
+        to all authenticated platform roles.
+      operationId: getAdministrativeRegion
+      parameters:
+      - name: id
+        in: path
+        description: the unique UUID of the administrative region
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: "an Optional containing the matching AdministrativeRegion,\
+            \ or empty if not found"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdministrativeRegion"
+    put:
+      summary: Updates an existing administrative region by ID.
+      description: Updates an existing administrative region by ID. Restricted to
+        platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
+      operationId: updateAdministrativeRegion
+      parameters:
+      - name: id
+        in: path
+        description: the unique UUID of the administrative region to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated region command data
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdministrativeRegionCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated AdministrativeRegion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdministrativeRegion"
+    delete:
+      summary: Deletes an administrative region by its unique identifier.
+      description: Deletes an administrative region by its unique identifier. Restricted
+        to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
+      operationId: deleteAdministrativeRegion
+      parameters:
+      - name: id
+        in: path
+        description: the unique UUID of the administrative region to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteAdministrativeRegion 200 response
+  /administrative-regions/{id}/boundary/ingest:
+    post:
+      summary: "Ingests, simplifies, and validates a geographic boundary for an administrative\
+        \ region from an authoritative external source such as US Census Bureau TIGERweb."
+      description: "Ingests, simplifies, and validates a geographic boundary for an\
+        \ administrative region from an authoritative external source such as US Census\
+        \ Bureau TIGERweb. Restricted strictly to platform administrators (`GLOBAL_ADMIN`)."
+      operationId: ingestBoundary
+      parameters:
+      - name: id
+        in: path
+        description: the unique UUID of the administrative region to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the boundary ingestion command containing source URL and optional
+          tolerance
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestBoundaryCommand"
+        required: true
+      responses:
+        "200":
+          description: the ingestion summary response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestBoundaryResponse"
+  /boundaries:
+    get:
+      summary: Retrieves a paginated list of geographic boundaries.
+      description: Retrieves a paginated list of geographic boundaries.
+      operationId: getBoundaries
+      parameters:
+      - name: pageable
+        in: query
+        description: pagination and sorting parameters
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: a cursored page of Boundary records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_Boundary_"
+    post:
+      summary: Creates a new boundary polygon.
+      description: Creates a new boundary polygon. Restricted to platform administrators
+        (`system:admin`) and regional managers (`region:manage`).
+      operationId: addBoundary
+      requestBody:
+        description: the payload containing boundary name and polygon coordinates
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBoundaryCommand"
+        required: true
+      responses:
+        "200":
+          description: the persisted Boundary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Boundary"
+  /boundaries/{id}:
+    get:
+      summary: Retrieves a specific boundary by its identifier.
+      description: Retrieves a specific boundary by its identifier.
+      operationId: getBoundary
+      parameters:
+      - name: id
+        in: path
+        description: the unique identifier of the boundary
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: an optional containing the Boundary if found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Boundary"
+    put:
+      summary: Updates an existing boundary by its ID after validating that it exists.
+      description: Updates an existing boundary by its ID after validating that it
+        exists. Restricted to platform administrators (`system:admin`) and regional
+        managers (`region:manage`). Throws 404 NOT_FOUND if the boundary does not
+        exist.
+      operationId: updateBoundary
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the boundary to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated boundary details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateBoundaryCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated boundary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Boundary"
+    delete:
+      summary: Deletes a boundary by its ID after validating that it exists.
+      description: Deletes a boundary by its ID after validating that it exists. Restricted
+        to platform administrators (`system:admin`) and regional managers (`region:manage`).
+        Throws 404 NOT_FOUND if the boundary does not exist.
+      operationId: deleteBoundary
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the boundary to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteBoundary 200 response
+  /locations:
+    get:
+      operationId: getLocations
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getLocations 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_Location_"
+    post:
+      summary: Creates a new location.
+      description: Creates a new location. Restricted to platform administrators and
+        regional managers.
+      operationId: addLocation
+      requestBody:
+        description: the payload containing location details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateLocationCommand"
+        required: true
+      responses:
+        "200":
+          description: the persisted location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+  /locations/{id}:
+    get:
+      operationId: getLocation
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getLocation 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+    put:
+      summary: Updates an existing location by its ID after validating that it exists.
+      description: Updates an existing location by its ID after validating that it
+        exists. Restricted to platform administrators and regional managers. Throws
+        404 NOT_FOUND if the location does not exist.
+      operationId: updateLocation
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the location to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated location details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated location
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Location"
+    delete:
+      summary: Deletes a location by its ID after validating that it exists.
+      description: Deletes a location by its ID after validating that it exists. Restricted
+        to platform administrators and regional managers. Throws 404 NOT_FOUND if
+        the location does not exist.
+      operationId: deleteById
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the location to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteById 200 response
+  /organization-audit-logs:
+    get:
+      operationId: getOrganizationAuditLogs
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getOrganizationAuditLogs 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_OrganizationAuditLog_"
+  /organization-audit-logs/{id}:
+    get:
+      operationId: getOrganizationAuditLog
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getOrganizationAuditLog 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationAuditLog"
+  /organization-users:
+    get:
+      operationId: getOrganizationUsers
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getOrganizationUsers 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_OrganizationUser_"
+    post:
+      operationId: addOrganizationUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationUserCommand"
+        required: true
+      responses:
+        "200":
+          description: addOrganizationUser 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationUser"
+  /organization-users/{userId}/{organizationId}:
+    get:
+      operationId: getOrganizationUser
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getOrganizationUser 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationUser"
+    put:
+      operationId: updateOrganizationUser
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationUserCommand"
+        required: true
+      responses:
+        "200":
+          description: updateOrganizationUser 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationUser"
+    delete:
+      operationId: deleteOrganizationUser
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: organizationId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteOrganizationUser 200 response
+  /organizations:
+    get:
+      operationId: getOrganizations
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getOrganizations 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_Organization_"
+    post:
+      operationId: addOrganization
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrganizationCommand"
+        required: true
+      responses:
+        "200":
+          description: addOrganization 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+  /organizations/search-by-location:
+    get:
+      summary: Searches organizations by geographic coordinates and radius.
+      description: "Searches organizations by geographic coordinates and radius. Finds\
+        \ organizations associated with locations within `radiusMeters` of the given\
+        \ point, ordered by distance ascending."
+      operationId: searchByLocation
+      parameters:
+      - name: longitude
+        in: query
+        description: the longitude of the center point
+        required: true
+        explode: false
+        schema:
+          maximum: 180
+          minimum: -180
+          type: number
+          format: double
+      - name: latitude
+        in: query
+        description: the latitude of the center point
+        required: true
+        explode: false
+        schema:
+          maximum: 90
+          minimum: -90
+          type: number
+          format: double
+      - name: radiusMeters
+        in: query
+        description: the search radius in meters
+        required: true
+        explode: false
+        schema:
+          maximum: 500000
+          minimum: 0
+          exclusiveMinimum: true
+          type: number
+          format: double
+      - name: pageable
+        in: query
+        description: pagination parameters
+        required: true
+        explode: false
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: "a page of organizations within range, closest first"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page_Organization_"
+  /organizations/search-by-name:
+    get:
+      summary: Searches organizations by name.
+      description: "Searches organizations by name. Supports exact name matching when\
+        \ `exact=true` or when the search query is enclosed in quotes (e.g. \"The\
+        \ Salvation Army\"). Otherwise, performs an intelligent tiered ranking search\
+        \ where exact matches are ranked first, followed by prefix matches, word-boundary\
+        \ matches, general substring matches, and typo-tolerant trigram similarity\
+        \ matches."
+      operationId: searchByName
+      parameters:
+      - name: name
+        in: query
+        description: the organization name or query string
+        required: true
+        explode: false
+        schema:
+          type: string
+      - name: exact
+        in: query
+        description: whether to force an exact case-insensitive match
+        explode: false
+        schema:
+          type: boolean
+          default: false
+      - name: pageable
+        in: query
+        description: pagination parameters
+        required: true
+        explode: false
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: a page of matching organizations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page_Organization_"
+  /organizations/search-by-region:
+    get:
+      summary: Searches organizations associated with an administrative region.
+      description: "Searches organizations associated with an administrative region.\
+        \ Only returns verified, public organizations operating within the specified\
+        \ region."
+      operationId: searchByRegion
+      parameters:
+      - name: regionId
+        in: query
+        description: the unique identifier of the administrative region
+        required: true
+        explode: false
+        schema:
+          type: string
+          format: uuid
+      - name: pageable
+        in: query
+        description: pagination parameters
+        required: true
+        explode: false
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: a page of matching organizations in the region
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page_Organization_"
+  /organizations/{id}:
+    get:
+      operationId: getOrganization
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getOrganization 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+    put:
+      summary: Updates an existing organization by its ID after validating that it
+        exists.
+      description: Updates an existing organization by its ID after validating that
+        it exists. Throws 404 NOT_FOUND if the organization does not exist.
+      operationId: updateOrganization
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the organization to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated organization command
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated organization
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+    delete:
+      summary: Deletes an organization by its ID after validating that it exists.
+      description: Deletes an organization by its ID after validating that it exists.
+        Throws 404 NOT_FOUND if the organization does not exist.
+      operationId: deleteOrganization
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the organization to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteOrganization 200 response
+  /project-audit-logs:
+    get:
+      operationId: getProjectAuditLogs
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getProjectAuditLogs 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_ProjectAuditLog_"
+  /project-audit-logs/{id}:
+    get:
+      operationId: getProjectAuditLog
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getProjectAuditLog 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectAuditLog"
+  /projects:
+    get:
+      operationId: getProjects
+      parameters:
+      - name: title
+        in: query
+        explode: false
+        schema:
+          type: string
+          nullable: true
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getProjects 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_Project_"
+    post:
+      operationId: submitProject
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectCommand"
+        required: true
+      responses:
+        "200":
+          description: submitProject 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/search-by-location:
+    get:
+      summary: Searches active projects by their closest location coordinates within
+        a given radius.
+      description: "Searches active projects by their closest location coordinates\
+        \ within a given radius. Each project is returned only once, representing\
+        \ its closest location within range."
+      operationId: searchByLocation_1
+      parameters:
+      - name: longitude
+        in: query
+        description: the longitude of the center point
+        required: true
+        explode: false
+        schema:
+          maximum: 180
+          minimum: -180
+          type: number
+          format: double
+      - name: latitude
+        in: query
+        description: the latitude of the center point
+        required: true
+        explode: false
+        schema:
+          maximum: 90
+          minimum: -90
+          type: number
+          format: double
+      - name: radiusMeters
+        in: query
+        description: the search radius in meters
+        required: true
+        explode: false
+        schema:
+          maximum: 500000
+          minimum: 0
+          exclusiveMinimum: true
+          type: number
+          format: double
+      - name: pageable
+        in: query
+        description: pagination information
+        required: true
+        explode: false
+        schema:
+          $ref: "#/components/schemas/Pageable"
+      responses:
+        "200":
+          description: a page of project search cards sorted by distance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Page_ProjectSearchCard_"
+  /projects/{id}:
+    get:
+      operationId: getProject
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getProject 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    put:
+      summary: Updates an existing project by its ID after validating that it exists.
+      description: Updates an existing project by its ID after validating that it
+        exists.
+      operationId: updateProject
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProjectCommand"
+        required: true
+      responses:
+        "200":
+          description: updateProject 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+    delete:
+      summary: Deletes a project by its ID after validating that it exists.
+      description: Deletes a project by its ID after validating that it exists.
+      operationId: deleteProject
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteProject 200 response
+  /projects/{id}/status:
+    put:
+      summary: Endpoint for Regional Admins to approve a pending project.
+      description: Endpoint for Regional Admins to approve a pending project. The
+        service layer enforces that the Regional Admin actually has geographic jurisdiction.
+      operationId: approveProject
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: approveProject 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /region-users:
+    get:
+      summary: Retrieves a paginated list of regional user associations.
+      description: Retrieves a paginated list of regional user associations.
+      operationId: getRegionUsers
+      parameters:
+      - name: pageable
+        in: query
+        description: pagination and sorting parameters
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: a cursored page of RegionUser records
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_RegionUser_"
+    post:
+      summary: Associates a user with an administrative region under a designated
+        role.
+      description: Associates a user with an administrative region under a designated
+        role. Restricted to platform administrators (`system:admin`) and regional
+        managers (`region:manage`).
+      operationId: addRegionUser
+      requestBody:
+        description: "the payload containing the target user ID, region ID, and role"
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRegionUserCommand"
+        required: true
+      responses:
+        "200":
+          description: the persisted RegionUser relationship
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegionUser"
+  /region-users/{userId}/{regionId}:
+    get:
+      summary: Retrieves a specific region-user association by composite identifier.
+      description: Retrieves a specific region-user association by composite identifier.
+      operationId: getRegionUser
+      parameters:
+      - name: userId
+        in: path
+        description: the unique identifier of the user
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: regionId
+        in: path
+        description: the unique identifier of the region
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: an optional containing the RegionUser if found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegionUser"
+    put:
+      summary: Updates an existing user role assignment within an administrative region.
+      description: Updates an existing user role assignment within an administrative
+        region. Restricted to platform administrators (`system:admin`) and regional
+        managers (`region:manage`).
+      operationId: updateRegionUser
+      parameters:
+      - name: userId
+        in: path
+        description: the unique identifier of the user
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: regionId
+        in: path
+        description: the unique identifier of the region
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the payload containing the new role assignment
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRegionUserCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated RegionUser relationship
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegionUser"
+    delete:
+      summary: Removes a user role assignment from an administrative region.
+      description: Removes a user role assignment from an administrative region. Restricted
+        to platform administrators (`system:admin`) and regional managers (`region:manage`).
+      operationId: deleteRegionUser
+      parameters:
+      - name: userId
+        in: path
+        description: the unique identifier of the user to remove
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: regionId
+        in: path
+        description: the unique identifier of the region
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteRegionUser 200 response
+  /shifts:
+    get:
+      operationId: getShifts
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getShifts 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_Shift_"
+    post:
+      operationId: addShift
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateShiftCommand"
+        required: true
+      responses:
+        "200":
+          description: addShift 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+  /shifts/{id}:
+    get:
+      operationId: getShift
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getShift 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+    put:
+      summary: Updates an existing shift by its ID after validating that it exists.
+      description: Updates an existing shift by its ID after validating that it exists.
+        Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project.
+        Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND
+        if the shift does not exist.
+      operationId: updateShift
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the shift to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated shift details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateShiftCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated shift
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Shift"
+    delete:
+      summary: Deletes a shift by its ID after validating that it exists.
+      description: Deletes a shift by its ID after validating that it exists. Enforces
+        that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws
+        403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND
+        if the shift does not exist.
+      operationId: deleteShift
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the shift to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteShift 200 response
+  /tags:
+    get:
+      summary: Retrieves a paginated list of tags.
+      description: Retrieves a paginated list of tags.
+      operationId: getTags
+      parameters:
+      - name: pageable
+        in: query
+        description: pagination and sorting parameters
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: a cursored page of tags
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_Tag_"
+    post:
+      summary: Creates a new tag.
+      description: Creates a new tag. Restricted to platform administrators and regional
+        managers.
+      operationId: addTag
+      requestBody:
+        description: the payload containing tag details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTagCommand"
+        required: true
+      responses:
+        "200":
+          description: the persisted tag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tag"
+  /tags/{id}:
+    get:
+      summary: Retrieves a specific tag by its identifier.
+      description: Retrieves a specific tag by its identifier.
+      operationId: getTag
+      parameters:
+      - name: id
+        in: path
+        description: the unique identifier of the tag
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: an optional containing the tag if found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tag"
+    put:
+      summary: Updates an existing tag by its ID after validating that it exists.
+      description: Updates an existing tag by its ID after validating that it exists.
+        Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND
+        if the tag does not exist.
+      operationId: updateTag
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the tag to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated tag details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateTagCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated tag
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tag"
+    delete:
+      summary: Deletes a tag by its ID after validating that it exists.
+      description: Deletes a tag by its ID after validating that it exists. Restricted
+        to platform administrators and regional managers. Throws 404 NOT_FOUND if
+        the tag does not exist.
+      operationId: deleteTag
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the tag to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteTag 200 response
+  /users:
+    get:
+      operationId: getUsers
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getUsers 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_User_"
+    post:
+      operationId: addUser
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserCommand"
+        required: true
+      responses:
+        "200":
+          description: addUser 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /users/me:
+    get:
+      operationId: getCurrentUser
+      responses:
+        "200":
+          description: getCurrentUser 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /users/{id}:
+    get:
+      operationId: getUser
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getUser 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    put:
+      summary: Updates an existing user by its ID.
+      description: "Updates an existing user by its ID. Prevents Mass Assignment by\
+        \ explicitly retaining the existing user's role and createdAt timestamp. Enforces\
+        \ horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.\
+        \ Throws 403 FORBIDDEN if the user attempts to modify another account without\
+        \ system manage privileges. Throws 404 NOT_FOUND if the user does not exist."
+      operationId: updateUser
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the user to update
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        description: the updated user details
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserCommand"
+        required: true
+      responses:
+        "200":
+          description: the updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      summary: Deletes a user by its ID after validating that it exists.
+      description: "Deletes a user by its ID after validating that it exists. Enforces\
+        \ horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.\
+        \ Throws 403 FORBIDDEN if the user attempts to delete another account without\
+        \ system manage privileges. Throws 404 NOT_FOUND if the user does not exist."
+      operationId: deleteUser
+      parameters:
+      - name: id
+        in: path
+        description: the ID of the user to delete
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: deleteUser 200 response
+components:
+  schemas:
+    AdministrativeRegion:
+      required:
+      - geom
+      - id
+      - name
+      type: object
+      properties:
+        geom:
+          $ref: "#/components/schemas/Geometry"
+        id:
+          type: string
+          format: uuid
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Administrative region name must be between 1 and 255 characters.
+        parentRegionId:
+          type: string
+          format: uuid
+          nullable: true
+    AuditAction:
+      type: string
+      enum:
+      - CREATED
+      - APPROVED
+      - REJECTED
+      - EDITED
+    Boundary:
+      required:
+      - geom
+      - id
+      - name
+      type: object
+      properties:
+        geom:
+          $ref: "#/components/schemas/Geometry"
+        id:
+          type: string
+          format: uuid
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Boundary name must be between 1 and 255 characters.
+    Coordinate:
+      required:
+      - x
+      - "y"
+      - z
+      type: object
+      properties:
+        coordinate:
+          $ref: "#/components/schemas/Coordinate"
+        x:
+          type: number
+          format: double
+        "y":
+          type: number
+          format: double
+        z:
+          type: number
+          format: double
+        m:
+          type: number
+          format: double
+        valid:
+          type: boolean
+    CoordinateDto:
+      required:
+      - latitude
+      - longitude
+      type: object
+      properties:
+        longitude:
+          maximum: 180
+          minimum: -180
+          type: number
+          format: double
+          x-maximum-message: Longitude must be less than or equal to 180.
+          x-minimum-message: Longitude must be greater than or equal to -180.
+          x-not-null-message: Longitude is required.
+        latitude:
+          maximum: 90
+          minimum: -90
+          type: number
+          format: double
+          x-maximum-message: Latitude must be less than or equal to 90.
+          x-minimum-message: Latitude must be greater than or equal to -90.
+          x-not-null-message: Latitude is required.
+    CoordinateSequence:
+      type: object
+      properties:
+        dimension:
+          type: integer
+          format: int32
+        measures:
+          type: integer
+          format: int32
+    CoordinateSequenceFactory:
+      type: object
+    CreateAdministrativeRegionCommand:
+      required:
+      - coordinates
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Administrative region name must be between 1 and 255 characters.
+        parentRegionId:
+          type: string
+          format: uuid
+          nullable: true
+        coordinates:
+          minItems: 3
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinateDto"
+          x-size-message: A region polygon must contain at least 3 coordinates.
+          x-not-null-message: Region coordinates are required.
+    CreateBoundaryCommand:
+      required:
+      - coordinates
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Boundary name must be between 1 and 255 characters.
+        coordinates:
+          minItems: 3
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinateDto"
+          x-size-message: A polygon boundary must contain at least 3 coordinates.
+          x-not-null-message: Boundary coordinates are required.
+    CreateLocationCommand:
+      required:
+      - addressLine
+      - city
+      - countryCode
+      - latitude
+      - longitude
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location name must be between 1 and 255 characters.
+        addressLine:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location address line must be between 1 and 255 characters.
+        city:
+          maxLength: 100
+          minLength: 1
+          type: string
+          x-size-message: Location city must be between 1 and 100 characters.
+        stateProvince:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location state/province must be between 1 and 100 characters.
+        postalCode:
+          maxLength: 20
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location postal code must be between 1 and 20 characters.
+        countryCode:
+          maxLength: 2
+          minLength: 2
+          type: string
+          x-size-message: Location country code must be 2 characters.
+        longitude:
+          maximum: 180
+          minimum: -180
+          type: number
+          format: double
+          x-maximum-message: Longitude must be less than or equal to 180.
+          x-minimum-message: Longitude must be greater than or equal to -180.
+          x-not-null-message: Longitude is required.
+        latitude:
+          maximum: 90
+          minimum: -90
+          type: number
+          format: double
+          x-maximum-message: Latitude must be less than or equal to 90.
+          x-minimum-message: Latitude must be greater than or equal to -90.
+          x-not-null-message: Latitude is required.
+        timezone:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location timezone must be between 1 and 100 characters.
+    CreateOrganizationCommand:
+      required:
+      - isPublic
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Organization name must be between 1 and 255 characters.
+        websiteUrl:
+          maxLength: 255
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Organization website URL must be between 1 and 255 characters.
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        isPublic:
+          type: boolean
+          x-not-null-message: isPublic is required.
+    CreateOrganizationUserCommand:
+      required:
+      - organizationId
+      - role
+      - userId
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          x-not-null-message: User ID is required.
+        organizationId:
+          type: string
+          format: uuid
+          x-not-null-message: Organization ID is required.
+        role:
+          $ref: "#/components/schemas/OrganizationUserRole"
+    CreateProjectCommand:
+      required:
+      - boundaries
+      - description
+      - organizationId
+      - projectType
+      - title
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+          x-not-null-message: Project organization ID is required.
+        managingRegionId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Project title must be between 1 and 255 characters.
+        description:
+          maxLength: 4000
+          minLength: 20
+          type: string
+          x-size-message: Project description must be between 20 and 4000 characters.
+        projectType:
+          $ref: "#/components/schemas/ProjectType"
+        status:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/ProjectStatus"
+        locations:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ProjectLocationCommand"
+        boundaries:
+          minItems: 1
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectBoundaryCommand"
+          x-size-message: Project boundaries must not be empty.
+          x-not-null-message: Project boundaries are required.
+    CreateRegionUserCommand:
+      required:
+      - regionId
+      - role
+      - userId
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          x-not-null-message: User ID is required.
+        regionId:
+          type: string
+          format: uuid
+          x-not-null-message: Region ID is required.
+        role:
+          $ref: "#/components/schemas/RegionUserRole"
+    CreateShiftCommand:
+      required:
+      - endTime
+      - isVirtual
+      - projectId
+      - startTime
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+          x-not-null-message: Shift project is required.
+        isVirtual:
+          type: boolean
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+          x-not-null-message: Shift start time is required.
+        endTime:
+          type: string
+          format: date-time
+          x-not-null-message: Shift end time is required.
+        tagIds:
+          type: array
+          nullable: true
+          items:
+            type: string
+            format: uuid
+    CreateTagCommand:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 50
+          minLength: 1
+          type: string
+          x-size-message: Tag name must be between 1 and 50 characters.
+    CreateUserCommand:
+      required:
+      - email
+      type: object
+      properties:
+        email:
+          maxLength: 255
+          minLength: 1
+          type: string
+          format: email
+          x-pattern-message: User email must be a valid email address.
+          x-size-message: User email must be between 1 and 255 characters.
+        role:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/UserRole"
+      description: "Note: 'role' is @Nullable to guarantee registration defaults safely\
+        \ to STANDARD_USER. Role Escalation Guard: Only callers holding SYSTEM_USER_MANAGE_CLAIM\
+        \ may assign an elevated role."
+    CursoredPage_AdministrativeRegion_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_AdministrativeRegion_"
+      - $ref: "#/components/schemas/Slice_AdministrativeRegion_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_Boundary_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_Boundary_"
+      - $ref: "#/components/schemas/Slice_Boundary_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_Location_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_Location_"
+      - $ref: "#/components/schemas/Slice_Location_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_OrganizationAuditLog_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_OrganizationAuditLog_"
+      - $ref: "#/components/schemas/Slice_OrganizationAuditLog_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_OrganizationUser_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_OrganizationUser_"
+      - $ref: "#/components/schemas/Slice_OrganizationUser_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_Organization_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_Organization_"
+      - $ref: "#/components/schemas/Slice_Organization_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_ProjectAuditLog_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_ProjectAuditLog_"
+      - $ref: "#/components/schemas/Slice_ProjectAuditLog_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_Project_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_Project_"
+      - $ref: "#/components/schemas/Slice_Project_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_RegionUser_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_RegionUser_"
+      - $ref: "#/components/schemas/Slice_RegionUser_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_Shift_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_Shift_"
+      - $ref: "#/components/schemas/Slice_Shift_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_Tag_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_Tag_"
+      - $ref: "#/components/schemas/Slice_Tag_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPage_User_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_User_"
+      - $ref: "#/components/schemas/Slice_User_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
+    CursoredPageable:
+      required:
+      - backward
+      - mode
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Pageable"
+      - $ref: "#/components/schemas/Sort"
+      - type: object
+        properties:
+          backward:
+            type: boolean
+          mode:
+            $ref: "#/components/schemas/Pageable.Mode"
+    Envelope:
+      type: object
+      properties:
+        "null":
+          type: boolean
+        width:
+          type: number
+          format: double
+        height:
+          type: number
+          format: double
+        diameter:
+          type: number
+          format: double
+        minX:
+          type: number
+          format: double
+        maxX:
+          type: number
+          format: double
+        minY:
+          type: number
+          format: double
+        maxY:
+          type: number
+          format: double
+        area:
+          type: number
+          format: double
+    Geometry:
+      required:
+      - factory
+      type: object
+      properties:
+        geometryType:
+          type: string
+        SRID:
+          type: integer
+          format: int32
+        factory:
+          $ref: "#/components/schemas/GeometryFactory"
+        userData:
+          type: object
+        numGeometries:
+          type: integer
+          format: int32
+        precisionModel:
+          $ref: "#/components/schemas/PrecisionModel"
+        coordinate:
+          $ref: "#/components/schemas/Coordinate"
+        coordinates:
+          type: array
+          items:
+            $ref: "#/components/schemas/Coordinate"
+        numPoints:
+          type: integer
+          format: int32
+        simple:
+          type: boolean
+        valid:
+          type: boolean
+        empty:
+          type: boolean
+        rectangle:
+          type: boolean
+        area:
+          type: number
+          format: double
+        length:
+          type: number
+          format: double
+        centroid:
+          $ref: "#/components/schemas/Point"
+        interiorPoint:
+          $ref: "#/components/schemas/Point"
+        dimension:
+          type: integer
+          format: int32
+        boundary:
+          $ref: "#/components/schemas/Geometry"
+        boundaryDimension:
+          type: integer
+          format: int32
+        envelope:
+          $ref: "#/components/schemas/Geometry"
+        envelopeInternal:
+          $ref: "#/components/schemas/Envelope"
+        geometryCollection:
+          type: boolean
+        typeCode:
+          type: integer
+          format: int32
+    GeometryFactory:
+      required:
+      - SRID
+      - coordinateSequenceFactory
+      - precisionModel
+      type: object
+      properties:
+        precisionModel:
+          $ref: "#/components/schemas/PrecisionModel"
+        SRID:
+          type: integer
+          format: int32
+        coordinateSequenceFactory:
+          $ref: "#/components/schemas/CoordinateSequenceFactory"
+    IngestBoundaryCommand:
+      required:
+      - sourceUrl
+      type: object
+      properties:
+        sourceUrl:
+          minLength: 1
+          type: string
+          x-size-message: Source URL is required.
+        tolerance:
+          type: number
+          format: double
+          nullable: true
+    IngestBoundaryResponse:
+      required:
+      - name
+      - originalPoints
+      - reductionRatio
+      - regionId
+      - simplifiedPoints
+      - valid
+      type: object
+      properties:
+        regionId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        originalPoints:
+          type: integer
+          format: int32
+        simplifiedPoints:
+          type: integer
+          format: int32
+        reductionRatio:
+          type: string
+        valid:
+          type: boolean
+    Location:
+      required:
+      - addressLine
+      - city
+      - countryCode
+      - geom
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location name must be between 1 and 255 characters.
+        addressLine:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location address line must be between 1 and 255 characters.
+        city:
+          maxLength: 100
+          minLength: 1
+          type: string
+          x-size-message: Location city must be between 1 and 100 characters.
+        stateProvince:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location state/province must be between 1 and 100 characters.
+        postalCode:
+          maxLength: 20
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location postal code must be between 1 and 20 characters.
+        countryCode:
+          maxLength: 2
+          minLength: 2
+          type: string
+          x-size-message: Location country code must be 2 characters.
+        geom:
+          $ref: "#/components/schemas/Point"
+        timezone:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location timezone must be between 1 and 100 characters.
+    Organization:
+      required:
+      - id
+      - isPublic
+      - locations
+      - name
+      - verificationStatus
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Organization name must be between 1 and 255 characters.
+        websiteUrl:
+          maxLength: 255
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Organization website URL must be between 1 and 255 characters.
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        isPublic:
+          type: boolean
+          x-not-null-message: isPublic is required.
+        verificationStatus:
+          $ref: "#/components/schemas/VerificationStatus"
+        verificationExpiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"
+    OrganizationAuditLog:
+      required:
+      - actor
+      - createdAt
+      - id
+      - newStatus
+      - organization
+      - previousStatus
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization:
+          $ref: "#/components/schemas/Organization"
+        actor:
+          $ref: "#/components/schemas/User"
+        previousStatus:
+          minLength: 1
+          type: string
+          x-size-message: Previous status is required.
+        newStatus:
+          minLength: 1
+          type: string
+          x-size-message: New status is required.
+        reason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+    OrganizationUser:
+      required:
+      - id
+      - role
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/OrganizationUserId"
+        role:
+          $ref: "#/components/schemas/OrganizationUserRole"
+    OrganizationUserId:
+      required:
+      - organizationId
+      - userId
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+    OrganizationUserRole:
+      type: string
+      enum:
+      - ORG_MEMBER
+      - ORG_MANAGER
+      - ORG_ADMIN
+    Page_AdministrativeRegion_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_AdministrativeRegion_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_Boundary_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_Boundary_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_Location_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_Location_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_OrganizationAuditLog_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_OrganizationAuditLog_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_OrganizationUser_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_OrganizationUser_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_Organization_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_Organization_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_ProjectAuditLog_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_ProjectAuditLog_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_ProjectSearchCard_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_ProjectSearchCard_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_Project_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_Project_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_RegionUser_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_RegionUser_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_Shift_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_Shift_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_Tag_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_Tag_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Page_User_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_User_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+    Pageable:
+      required:
+      - mode
+      - number
+      - size
+      - sort
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Sort"
+      - type: object
+        properties:
+          number:
+            type: integer
+            format: int32
+          size:
+            type: integer
+            format: int32
+          mode:
+            $ref: "#/components/schemas/Pageable.Mode"
+          sort:
+            $ref: "#/components/schemas/Sort"
+    Pageable.Cursor:
+      type: object
+    Pageable.Mode:
+      type: string
+      enum:
+      - CURSOR_NEXT
+      - CURSOR_PREVIOUS
+      - OFFSET
+    Point:
+      required:
+      - coordinate
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Geometry"
+      - type: object
+        properties:
+          coordinates:
+            type: array
+            items:
+              $ref: "#/components/schemas/Coordinate"
+          numPoints:
+            type: integer
+            format: int32
+          empty:
+            type: boolean
+          simple:
+            type: boolean
+          dimension:
+            type: integer
+            format: int32
+          boundaryDimension:
+            type: integer
+            format: int32
+          x:
+            type: number
+            format: double
+          "y":
+            type: number
+            format: double
+          coordinate:
+            $ref: "#/components/schemas/Coordinate"
+          geometryType:
+            type: string
+          boundary:
+            $ref: "#/components/schemas/Geometry"
+          typeCode:
+            type: integer
+            format: int32
+          coordinateSequence:
+            $ref: "#/components/schemas/CoordinateSequence"
+    PrecisionModel:
+      type: object
+      properties:
+        floating:
+          type: boolean
+        maximumSignificantDigits:
+          type: integer
+          format: int32
+        scale:
+          type: number
+          format: double
+        type:
+          $ref: "#/components/schemas/PrecisionModel.Type"
+        offsetX:
+          type: number
+          format: double
+        offsetY:
+          type: number
+          format: double
+    PrecisionModel.Type:
+      type: object
+    Project:
+      required:
+      - boundaries
+      - createdAt
+      - description
+      - id
+      - locations
+      - organization
+      - projectType
+      - status
+      - title
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organization:
+          $ref: "#/components/schemas/Organization"
+        managingRegion:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/AdministrativeRegion"
+        title:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Project title must be between 1 and 255 characters.
+        description:
+          minLength: 1
+          type: string
+          x-size-message: Project description is required.
+        projectType:
+          $ref: "#/components/schemas/ProjectType"
+        status:
+          $ref: "#/components/schemas/ProjectStatus"
+        createdAt:
+          type: string
+          format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+          nullable: true
+        deletedBy:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/User"
+        locations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"
+        boundaries:
+          type: array
+          items:
+            $ref: "#/components/schemas/Boundary"
+    ProjectAuditLog:
+      required:
+      - action
+      - actor
+      - createdAt
+      - id
+      - project
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project:
+          $ref: "#/components/schemas/Project"
+        actor:
+          $ref: "#/components/schemas/User"
+        action:
+          $ref: "#/components/schemas/AuditAction"
+        createdAt:
+          type: string
+          format: date-time
+    ProjectBoundaryCommand:
+      required:
+      - coordinates
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Boundary name must be between 1 and 255 characters.
+        coordinates:
+          minItems: 3
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinateDto"
+          x-size-message: A polygon boundary must contain at least 3 coordinates.
+          x-not-null-message: Boundary coordinates are required.
+      description: "Child boundary command embedded inside Project commands. CRITICAL:\
+        \ Contains NO 'id' field, eliminating child entity mass assignment (Issue\
+        \ #26)."
+    ProjectLocationCommand:
+      required:
+      - addressLine
+      - city
+      - countryCode
+      - latitude
+      - longitude
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location name must be between 1 and 255 characters.
+        addressLine:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location address line must be between 1 and 255 characters.
+        city:
+          maxLength: 100
+          minLength: 1
+          type: string
+          x-size-message: Location city must be between 1 and 100 characters.
+        stateProvince:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location state/province must be between 1 and 100 characters.
+        postalCode:
+          maxLength: 20
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location postal code must be between 1 and 20 characters.
+        countryCode:
+          maxLength: 2
+          minLength: 2
+          type: string
+          x-size-message: Location country code must be 2 characters.
+        longitude:
+          maximum: 180
+          minimum: -180
+          type: number
+          format: double
+          x-maximum-message: Longitude must be less than or equal to 180.
+          x-minimum-message: Longitude must be greater than or equal to -180.
+          x-not-null-message: Longitude is required.
+        latitude:
+          maximum: 90
+          minimum: -90
+          type: number
+          format: double
+          x-maximum-message: Latitude must be less than or equal to 90.
+          x-minimum-message: Latitude must be greater than or equal to -90.
+          x-not-null-message: Latitude is required.
+      description: "Child location command embedded inside Project commands. CRITICAL:\
+        \ Contains NO 'id' field, eliminating child entity mass assignment (Issue\
+        \ #26)."
+    ProjectSearchCard:
+      required:
+      - locationId
+      - locationName
+      - nextShiftStart
+      - projectId
+      - projectTitle
+      type: object
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        projectTitle:
+          type: string
+        locationId:
+          type: string
+          format: uuid
+        locationName:
+          type: string
+        nextShiftStart:
+          type: string
+          format: date-time
+    ProjectStatus:
+      type: string
+      enum:
+      - DRAFT
+      - PENDING
+      - PENDING_UPDATE
+      - ACTIVE
+      - FLAGGED
+      - REJECTED
+    ProjectType:
+      type: string
+      enum:
+      - STANDARD
+      - OPEN_DOOR
+      - REGIONAL
+    RegionUser:
+      required:
+      - id
+      - role
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/RegionUserId"
+        role:
+          $ref: "#/components/schemas/RegionUserRole"
+    RegionUserId:
+      required:
+      - regionId
+      - userId
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        regionId:
+          type: string
+          format: uuid
+    RegionUserRole:
+      type: string
+      enum:
+      - REGION_AGENT
+      - REGION_DIRECTOR
+    RoleUpdateRequest:
+      required:
+      - role
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/UserRole"
+    Shift:
+      required:
+      - endTime
+      - id
+      - isVirtual
+      - project
+      - startTime
+      - tags
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        project:
+          $ref: "#/components/schemas/Project"
+        isVirtual:
+          type: boolean
+        location:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/Location"
+        startTime:
+          type: string
+          format: date-time
+          x-not-null-message: Shift start time is required.
+        endTime:
+          type: string
+          format: date-time
+          x-not-null-message: Shift end time is required.
+        tags:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+    Slice_AdministrativeRegion_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdministrativeRegion"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_Boundary_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Boundary"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_Location_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Location"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_OrganizationAuditLog_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationAuditLog"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_OrganizationUser_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrganizationUser"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_Organization_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Organization"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_ProjectAuditLog_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectAuditLog"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_ProjectSearchCard_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectSearchCard"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_Project_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Project"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_RegionUser_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/RegionUser"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_Shift_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Shift"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_Tag_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/Tag"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Slice_User_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
+    Sort:
+      required:
+      - orderBy
+      type: object
+      properties:
+        orderBy:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sort.Order"
+    Sort.Order:
+      required:
+      - ascending
+      - direction
+      - ignoreCase
+      - property
+      type: object
+      properties:
+        ignoreCase:
+          type: boolean
+        direction:
+          $ref: "#/components/schemas/Sort.Order.Direction"
+        property:
+          type: string
+        ascending:
+          type: boolean
+    Sort.Order.Direction:
+      type: string
+      enum:
+      - ASC
+      - DESC
+    Tag:
+      required:
+      - id
+      - name
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          maxLength: 50
+          minLength: 1
+          type: string
+          x-size-message: Tag name must be between 1 and 50 characters.
+    UpdateAdministrativeRegionCommand:
+      required:
+      - coordinates
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Administrative region name must be between 1 and 255 characters.
+        parentRegionId:
+          type: string
+          format: uuid
+          nullable: true
+        coordinates:
+          minItems: 3
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinateDto"
+          x-size-message: A region polygon must contain at least 3 coordinates.
+          x-not-null-message: Region coordinates are required.
+    UpdateBoundaryCommand:
+      required:
+      - coordinates
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Boundary name must be between 1 and 255 characters.
+        coordinates:
+          minItems: 3
+          type: array
+          items:
+            $ref: "#/components/schemas/CoordinateDto"
+          x-size-message: A polygon boundary must contain at least 3 coordinates.
+          x-not-null-message: Boundary coordinates are required.
+    UpdateLocationCommand:
+      required:
+      - addressLine
+      - city
+      - countryCode
+      - latitude
+      - longitude
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location name must be between 1 and 255 characters.
+        addressLine:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Location address line must be between 1 and 255 characters.
+        city:
+          maxLength: 100
+          minLength: 1
+          type: string
+          x-size-message: Location city must be between 1 and 100 characters.
+        stateProvince:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location state/province must be between 1 and 100 characters.
+        postalCode:
+          maxLength: 20
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location postal code must be between 1 and 20 characters.
+        countryCode:
+          maxLength: 2
+          minLength: 2
+          type: string
+          x-size-message: Location country code must be 2 characters.
+        longitude:
+          maximum: 180
+          minimum: -180
+          type: number
+          format: double
+          x-maximum-message: Longitude must be less than or equal to 180.
+          x-minimum-message: Longitude must be greater than or equal to -180.
+          x-not-null-message: Longitude is required.
+        latitude:
+          maximum: 90
+          minimum: -90
+          type: number
+          format: double
+          x-maximum-message: Latitude must be less than or equal to 90.
+          x-minimum-message: Latitude must be greater than or equal to -90.
+          x-not-null-message: Latitude is required.
+        timezone:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location timezone must be between 1 and 100 characters.
+    UpdateOrganizationCommand:
+      required:
+      - isPublic
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Organization name must be between 1 and 255 characters.
+        websiteUrl:
+          maxLength: 255
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Organization website URL must be between 1 and 255 characters.
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+        isPublic:
+          type: boolean
+          x-not-null-message: isPublic is required.
+    UpdateOrganizationUserCommand:
+      required:
+      - role
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/OrganizationUserRole"
+    UpdateProjectCommand:
+      required:
+      - boundaries
+      - description
+      - projectType
+      - title
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+        managingRegionId:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          maxLength: 255
+          minLength: 1
+          type: string
+          x-size-message: Project title must be between 1 and 255 characters.
+        description:
+          maxLength: 4000
+          minLength: 20
+          type: string
+          x-size-message: Project description must be between 20 and 4000 characters.
+        projectType:
+          $ref: "#/components/schemas/ProjectType"
+        locations:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/ProjectLocationCommand"
+        boundaries:
+          minItems: 1
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectBoundaryCommand"
+          x-size-message: Project boundaries must not be empty.
+          x-not-null-message: Project boundaries are required.
+    UpdateRegionUserCommand:
+      required:
+      - role
+      type: object
+      properties:
+        role:
+          $ref: "#/components/schemas/RegionUserRole"
+    UpdateShiftCommand:
+      required:
+      - endTime
+      - isVirtual
+      - startTime
+      type: object
+      properties:
+        isVirtual:
+          type: boolean
+        locationId:
+          type: string
+          format: uuid
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+          x-not-null-message: Shift start time is required.
+        endTime:
+          type: string
+          format: date-time
+          x-not-null-message: Shift end time is required.
+        tagIds:
+          type: array
+          nullable: true
+          items:
+            type: string
+            format: uuid
+    UpdateTagCommand:
+      required:
+      - name
+      type: object
+      properties:
+        name:
+          maxLength: 50
+          minLength: 1
+          type: string
+          x-size-message: Tag name must be between 1 and 50 characters.
+    UpdateUserCommand:
+      required:
+      - email
+      type: object
+      properties:
+        email:
+          maxLength: 255
+          minLength: 1
+          type: string
+          format: email
+          x-pattern-message: User email must be a valid email address.
+          x-size-message: User email must be between 1 and 255 characters.
+      description: "Note: 'role' is intentionally excluded to prevent self-privilege\
+        \ escalation during profile update. Roles are modified exclusively via AdminUserController#updateUserRole."
+    User:
+      required:
+      - createdAt
+      - email
+      - id
+      - role
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          maxLength: 255
+          minLength: 1
+          type: string
+          format: email
+          x-pattern-message: User email must be a valid email address.
+          x-size-message: User email must be between 1 and 255 characters.
+        role:
+          $ref: "#/components/schemas/UserRole"
+        createdAt:
+          type: string
+          format: date-time
+    UserRole:
+      type: string
+      enum:
+      - STANDARD_USER
+      - REGION_AGENT
+      - REGION_DIRECTOR
+      - GLOBAL_ADMIN
+    VerificationStatus:
+      type: string
+      enum:
+      - UNVERIFIED
+      - PENDING_REVIEW
+      - VERIFIED
+      - SUSPENDED
+      - REVOKED
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

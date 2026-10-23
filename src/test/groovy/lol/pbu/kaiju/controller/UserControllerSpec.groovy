@@ -5,6 +5,7 @@ import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -17,6 +18,7 @@ import net.datafaker.Faker
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import java.security.Principal
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -346,5 +348,46 @@ class UserControllerSpec extends BaseControllerSpec {
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
+    }
+
+    /********** ME Endpoint Tests **********/
+
+    def "ME | should return the authenticated caller's profile via GET /users/me"() {
+        given: "an existing user in the database"
+        def user = createDbUser("me-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
+
+        when: "the user requests their own profile via GET /users/me"
+        def response = client.exchange(authenticated(HttpRequest.GET("/users/me"), user.id().toString(), ["STANDARD_USER"]), User)
+
+        then: "the response status is 200 OK and matches the caller"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body() != null
+            body().id() == user.id()
+            body().email() == user.email()
+            body().role() == UserRole.STANDARD_USER
+        }
+    }
+
+    def "ME | should reject unauthenticated GET /users/me with 401 UNAUTHORIZED"() {
+        when: "an unauthenticated caller requests /users/me"
+        client.exchange(HttpRequest.GET("/users/me"))
+
+        then: "a 401 UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "ME | should throw 404 NOT_FOUND when principal ID is not in repository"() {
+        given: "a random user ID not present in the database"
+        UUID missingUserId = UUID.randomUUID()
+        Principal principal = () -> missingUserId.toString()
+
+        when: "calling getCurrentUser directly"
+        userController.getCurrentUser(principal)
+
+        then: "an HttpStatusException with 404 NOT_FOUND is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == HttpStatus.NOT_FOUND
     }
 }

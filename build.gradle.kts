@@ -1,6 +1,7 @@
 plugins {
     id("groovy") 
     id("io.micronaut.application") version "5.0.2"
+    id("io.micronaut.openapi") version "5.0.2"
     id("com.gradleup.shadow") version "9.4.1"
     id("io.micronaut.aot") version "5.0.2"
     id("io.micronaut.test-resources") version "5.0.2"
@@ -20,11 +21,13 @@ repositories {
 dependencies {
     annotationProcessor("io.micronaut.data:micronaut-data-processor")
     annotationProcessor("io.micronaut:micronaut-http-validation")
+    annotationProcessor("io.micronaut.openapi:micronaut-openapi")
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
 
     compileOnly("io.micronaut:micronaut-http-client")
+    compileOnly("io.swagger.core.v3:swagger-annotations")
 
     implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.data:micronaut-data-jdbc")
@@ -103,12 +106,49 @@ micronaut {
         optimizeNetty = true
         replaceLogbackXml = true
     }
+    openapi {
+        client(file("docs/openapi.yaml")) {
+            clientId.set("/")
+            apiPackageName.set("lol.pbu.kaiju.client.api")
+            modelPackageName.set("lol.pbu.kaiju.client.model")
+            useReactive.set(false)
+            noArgsConstructor.set(true)
+            schemaMapping.put("Geometry", "org.locationtech.jts.geom.Geometry")
+            schemaMapping.put("Point", "org.locationtech.jts.geom.Point")
+        }
+    }
+}
+
+sourceSets {
+    main {
+        java {
+            exclude("**/lol/pbu/kaiju/client/**")
+        }
+    }
+}
+
+val isGeneratingClient = gradle.startParameter.taskNames.any { it.contains("generateApiClient") }
+tasks.named("generateClientOpenApiApis") {
+    enabled = isGeneratingClient
+}
+tasks.named("generateClientOpenApiModels") {
+    enabled = isGeneratingClient
+}
+
+tasks.register<Copy>("generateApiClient") {
+    group = "openapi"
+    description = "Generates and updates test HTTP client files from docs/openapi.yaml into src/test/java."
+    dependsOn("generateClientOpenApiApis", "generateClientOpenApiModels")
+    from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiApis/src/main/java"))
+    from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiModels/src/main/java"))
+    into("src/test/java")
 }
 sonar {
     properties {
         property("sonar.projectKey", "PeanutButter-Unicorn_kaiju")
         property("sonar.organization", "peanutbutter-unicorn")
         property("sonar.host.url", "https://sonarcloud.io")
+        property("sonar.coverage.exclusions", "**/Application.java")
         property("sonar.coverage.jacoco.xmlReportPath", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.absolutePath)
         (System.getenv("SONAR_TOKEN") ?: System.getenv("sonar_token"))?.let { token ->
             if (token.isNotBlank()) {
@@ -120,6 +160,22 @@ sonar {
 
 tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
     baseImage = "eclipse-temurin:25-jre"
+}
+
+tasks.withType<JavaCompile>().configureEach {
+    val specVersion = project.findProperty("kaijuVersion")?.toString() ?: "0.0.6"
+    options.compilerArgs.add("-Amicronaut.openapi.filename=kaiju-$specVersion")
+}
+
+tasks.register<Copy>("generateOpenApiSpec") {
+    group = "documentation"
+    description = "Exports the compile-time generated OpenAPI specification to docs/openapi.yaml."
+    dependsOn("compileJava")
+    from(layout.buildDirectory.dir("classes/java/main/META-INF/swagger")) {
+        include("kaiju-*.yml")
+        rename { "openapi.yaml" }
+    }
+    into(layout.projectDirectory.dir("docs"))
 }
 // https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
 tasks.withType<AbstractTestTask>().configureEach {
@@ -316,6 +372,7 @@ tasks.register("lighthouse") {
 
 tasks.named("check") {
     dependsOn("lighthouse")
+    dependsOn("generateOpenApiSpec")
 }
 
 tasks.jacocoTestReport {
