@@ -167,7 +167,7 @@ tasks.withType<io.micronaut.gradle.docker.NativeImageDockerfile>().configureEach
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    val specVersion = project.findProperty("kaijuVersion")?.toString() ?: "0.0.6"
+    val specVersion = project.findProperty("kaijuVersion")?.toString() ?: "0.0.5"
     options.compilerArgs.add("-Amicronaut.openapi.filename=kaiju-$specVersion")
 }
 
