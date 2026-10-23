@@ -23,6 +23,7 @@ import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
+import org.locationtech.jts.geom.Point;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -77,6 +78,7 @@ public class LocationController {
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
     public Location addLocation(@Valid @Body CreateLocationCommand command) {
+        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
         Location location = new Location(
                 null,
                 command.name(),
@@ -85,7 +87,8 @@ public class LocationController {
                 command.stateProvince(),
                 command.postalCode(),
                 command.countryCode(),
-                spatialMappingService.toPoint(command.longitude(), command.latitude())
+                point,
+                resolveTimezone(point, command.timezone())
         );
         return locationRepository.save(location);
     }
@@ -102,8 +105,10 @@ public class LocationController {
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
     public Location updateLocation(@PathVariable UUID id, @Valid @Body UpdateLocationCommand command) {
-        locationRepository.findById(id)
+        Location existing = locationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, LOCATION_NOT_FOUND));
+        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
+        String timezone = resolveUpdatedTimezone(existing, point, command.timezone());
         Location location = new Location(
                 id,
                 command.name(),
@@ -112,7 +117,8 @@ public class LocationController {
                 command.stateProvince(),
                 command.postalCode(),
                 command.countryCode(),
-                spatialMappingService.toPoint(command.longitude(), command.latitude())
+                point,
+                timezone
         );
         return locationRepository.update(location);
     }
@@ -131,5 +137,20 @@ public class LocationController {
         if (deletedCount == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, LOCATION_NOT_FOUND);
         }
+    }
+
+    private String resolveUpdatedTimezone(Location existing, Point point, String requestedTimezone) {
+        if (existing.geom() != null && existing.geom().equalsExact(point) && existing.timezone() != null) {
+            return requestedTimezone != null ? requestedTimezone : existing.timezone();
+        }
+        return resolveTimezone(point, requestedTimezone);
+    }
+
+    String resolveTimezone(Point point, String fallbackTimezone) {
+        if (point == null) {
+            return fallbackTimezone;
+        }
+        return locationRepository.findTimezoneByPoint(point)
+                .orElse(fallbackTimezone);
     }
 }

@@ -42,5 +42,22 @@ public record UpdateLocationCommand(
         @NotNull(message = "Latitude is required.")
         @Min(value = -90, message = "Latitude must be greater than or equal to -90.")
         @Max(value = 90, message = "Latitude must be less than or equal to 90.")
-        Double latitude
-) {}
+        Double latitude,
+
+        @Nullable
+        @Size(min = 1, max = 100, message = "Location timezone must be between 1 and 100 characters.")
+        String timezone
+) {
+    public UpdateLocationCommand(
+            String name,
+            String addressLine,
+            String city,
+            String stateProvince,
+            String postalCode,
+            String countryCode,
+            Double longitude,
+            Double latitude
+    ) {
+        this(name, addressLine, city, stateProvince, postalCode, countryCode, longitude, latitude, null);
+    }
+}

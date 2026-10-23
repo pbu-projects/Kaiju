@@ -48,8 +48,25 @@ public record Location(
         String countryCode,
 
         @TypeDef(type = OBJECT, converter = JtsPointConverter.class)
-        Point geom
+        Point geom,
+
+        @Nullable
+        @Size(min = 1, max = 100, message = "Location timezone must be between 1 and 100 characters.")
+        String timezone
 ) {
+    public Location(
+            UUID id,
+            String name,
+            String addressLine,
+            String city,
+            String stateProvince,
+            String postalCode,
+            String countryCode,
+            Point geom
+    ) {
+        this(id, name, addressLine, city, stateProvince, postalCode, countryCode, geom, null);
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing location ID and assign that to
      * the location properties in this location record.
@@ -66,7 +83,22 @@ public record Location(
                 this.stateProvince(),
                 this.postalCode(),
                 this.countryCode(),
-                this.geom()
+                this.geom(),
+                this.timezone()
+        );
+    }
+
+    public Location withTimezone(@Nullable String newTimezone) {
+        return new Location(
+                this.id(),
+                this.name(),
+                this.addressLine(),
+                this.city(),
+                this.stateProvince(),
+                this.postalCode(),
+                this.countryCode(),
+                this.geom(),
+                newTimezone
         );
     }
 }

@@ -27,6 +27,9 @@ class LocationControllerSpec extends BaseControllerSpec {
     @Inject
     LocationRepository locationRepository
 
+    @Inject
+    LocationController locationController
+
     @Shared
     Faker faker = new Faker()
 
@@ -194,6 +197,85 @@ class LocationControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
+    def "CREATE | should automatically resolve timezone for coordinates inside known boundary"() {
+        given: "a location in Denver"
+        String name = "Test Denver Location ${faker.company().name()}"
+        def command = new CreateLocationCommand(name, "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+
+        when: "the location is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location)
+        Location saved = response.body()
+
+        then: "the location is persisted with timezone America/Denver"
+        response.status == HttpStatus.OK
+        saved.timezone() == "America/Denver"
+
+        and: "the timezone is persisted in the database"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [saved.id()])
+        result.timezone == "America/Denver"
+
+        cleanup:
+        if (saved?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [saved.id()])
+        }
+    }
+
+    def "CREATE | should leave timezone null gracefully when coordinates are outside known boundaries"() {
+        given: "a location outside known boundaries"
+        String name = "Test London Location ${faker.company().name()}"
+        def command = new CreateLocationCommand(name, "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+
+        when: "the location is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location)
+        Location saved = response.body()
+
+        then: "the location is persisted with null timezone without error"
+        response.status == HttpStatus.OK
+        saved.timezone() == null
+
+        and: "the timezone in the database is null"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [saved.id()])
+        result.timezone == null
+
+        cleanup:
+        if (saved?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [saved.id()])
+        }
+    }
+
+    def "CREATE | should persist explicit fallback timezone when coordinates are outside boundary polygons"() {
+        given: "a location outside known boundaries with an explicit fallback timezone"
+        String name = "Test London With Fallback ${faker.company().name()}"
+        def command = new CreateLocationCommand(
+                name,
+                "10 Downing St",
+                "London",
+                null,
+                "SW1A 2AA",
+                "GB",
+                -0.1276,
+                51.5072,
+                "Europe/London"
+        )
+
+        when: "the location is added via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location)
+        Location saved = response.body()
+
+        then: "the location is persisted with the fallback timezone"
+        response.status == HttpStatus.OK
+        saved.timezone() == "Europe/London"
+
+        and: "the database reflects the fallback timezone"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [saved.id()])
+        result.timezone == "Europe/London"
+
+        cleanup:
+        if (saved?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [saved.id()])
+        }
+    }
+
     /********** READ Tests **********/
 
     def "READ | should retrieve an existing location by ID"() {
@@ -209,6 +291,25 @@ class LocationControllerSpec extends BaseControllerSpec {
         verifyAll {
             response.body().id() == id
             response.body().name() == "Test Location Read"
+        }
+    }
+
+    def "READ | should include timezone when retrieving location by ID"() {
+        given: "an existing location with timezone in Denver"
+        def command = new CreateLocationCommand("Test Denver Read ${faker.company().name()}", "1600 Glenarm Pl", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        def created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "the location is requested by its ID via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("${BASE_PATH}/${created.id()}")), Location)
+
+        then: "the returned location includes the timezone field"
+        response.status == HttpStatus.OK
+        response.body().timezone() == "America/Denver"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
         }
     }
 
@@ -258,6 +359,206 @@ class LocationControllerSpec extends BaseControllerSpec {
             name == newName
             city == newCity
         }
+    }
+
+    def "UPDATE | should update resolved timezone when coordinates change"() {
+        given: "an existing location in Denver"
+        def command = new CreateLocationCommand("Test TZ Move ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "updating the location coordinates to Chicago"
+        def updateToChicago = new UpdateLocationCommand(
+                created.name(),
+                created.addressLine(),
+                "Chicago",
+                "IL",
+                "60601",
+                "US",
+                -87.6298,
+                41.8781
+        )
+        def responseChicago = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateToChicago)), Location)
+        Location updatedChicago = responseChicago.body()
+
+        then: "the timezone changes to America/Chicago"
+        responseChicago.status == HttpStatus.OK
+        updatedChicago.timezone() == "America/Chicago"
+
+        and: "the database reflects the updated timezone"
+        def resultChicago = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        resultChicago.timezone == "America/Chicago"
+
+        when: "updating coordinates to an unknown boundary area"
+        def updateToLondon = new UpdateLocationCommand(
+                created.name(),
+                created.addressLine(),
+                "London",
+                null,
+                "SW1A 2AA",
+                "GB",
+                -0.1276,
+                51.5072
+        )
+        def responseLondon = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateToLondon)), Location)
+        Location updatedLondon = responseLondon.body()
+
+        then: "the timezone becomes null"
+        responseLondon.status == HttpStatus.OK
+        updatedLondon.timezone() == null
+
+        and: "the database reflects null timezone"
+        def resultLondon = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        resultLondon.timezone == null
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UPDATE | should preserve existing timezone when updating non-coordinate fields"() {
+        given: "an existing location in Denver with resolved timezone"
+        def command = new CreateLocationCommand("Denver Original ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "updating only the location name without altering coordinates"
+        def newName = "Denver Renamed ${faker.company().name()}"
+        def updateCommand = new UpdateLocationCommand(
+                newName,
+                created.addressLine(),
+                created.city(),
+                created.stateProvince(),
+                created.postalCode(),
+                created.countryCode(),
+                -104.9903,
+                39.7392
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the name is updated and the timezone is preserved"
+        response.status == HttpStatus.OK
+        updated.name() == newName
+        updated.timezone() == "America/Denver"
+
+        and: "the database preserves the timezone"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        result.timezone == "America/Denver"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UPDATE | should apply explicit fallback timezone when moving to unmapped coordinates"() {
+        given: "an existing location in Denver"
+        def command = new CreateLocationCommand("Denver To London ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "updating to London coordinates with an explicit fallback timezone"
+        def updateCommand = new UpdateLocationCommand(
+                created.name(),
+                "10 Downing St",
+                "London",
+                null,
+                "SW1A 2AA",
+                "GB",
+                -0.1276,
+                51.5072,
+                "Europe/London"
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the timezone is set to the provided fallback"
+        response.status == HttpStatus.OK
+        updated.timezone() == "Europe/London"
+
+        and: "the database reflects the fallback timezone"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        result.timezone == "Europe/London"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UPDATE | should override timezone when explicit timezone is passed with unchanged coordinates"() {
+        given: "an existing location in Denver"
+        def command = new CreateLocationCommand("Denver Override ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "updating with the same coordinates but an explicit timezone override"
+        def updateCommand = new UpdateLocationCommand(
+                created.name(),
+                created.addressLine(),
+                created.city(),
+                created.stateProvince(),
+                created.postalCode(),
+                created.countryCode(),
+                -104.9903,
+                39.7392,
+                "America/Boise"
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the explicit timezone override is applied"
+        response.status == HttpStatus.OK
+        updated.timezone() == "America/Boise"
+
+        and: "the database reflects the updated timezone"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        result.timezone == "America/Boise"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UPDATE | should resolve timezone when updating an existing location that had null timezone"() {
+        given: "an existing location outside boundaries with null timezone"
+        def command = new CreateLocationCommand("London Original ${faker.company().name()}", "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == null
+
+        when: "updating the location to Denver coordinates"
+        def updateCommand = new UpdateLocationCommand(
+                created.name(),
+                "1600 Glenarm Pl",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9903,
+                39.7392
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the timezone is resolved to America/Denver"
+        response.status == HttpStatus.OK
+        updated.timezone() == "America/Denver"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UNIT | resolveTimezone should return fallback when point is null"() {
+        when: "resolving timezone with a null point"
+        def result = locationController.resolveTimezone(null, "UTC")
+
+        then: "the fallback timezone is returned"
+        result == "UTC"
     }
 
     def "UPDATE | should fail to update a non-existent location"() {
@@ -459,6 +760,29 @@ class LocationControllerSpec extends BaseControllerSpec {
         Map body = response.body()
         body.content instanceof List
         body.content.size() >= 2
+    }
+
+    def "LIST | should include timezone field in location list items"() {
+        given: "a persisted location in Denver"
+        def command = new CreateLocationCommand("Test Denver List ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "requesting locations via HTTP GET"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET("${BASE_PATH}?size=20")), Map)
+
+        then: "the response includes the location with its timezone"
+        response.status == HttpStatus.OK
+        Map body = response.body()
+        List items = body.content as List
+        def item = items.find { it.id == created.id().toString() }
+        item != null
+        item.timezone == "America/Denver"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
     }
 
     def "LIST | should reject unauthenticated GET /locations with 401 UNAUTHORIZED"() {
