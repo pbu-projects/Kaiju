@@ -27,6 +27,9 @@ class LocationControllerSpec extends BaseControllerSpec {
     @Inject
     LocationRepository locationRepository
 
+    @Inject
+    LocationController locationController
+
     @Shared
     Faker faker = new Faker()
 
@@ -448,6 +451,114 @@ class LocationControllerSpec extends BaseControllerSpec {
         if (created?.id()) {
             sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
         }
+    }
+
+    def "UPDATE | should apply explicit fallback timezone when moving to unmapped coordinates"() {
+        given: "an existing location in Denver"
+        def command = new CreateLocationCommand("Denver To London ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "updating to London coordinates with an explicit fallback timezone"
+        def updateCommand = new UpdateLocationCommand(
+                created.name(),
+                "10 Downing St",
+                "London",
+                null,
+                "SW1A 2AA",
+                "GB",
+                -0.1276,
+                51.5072,
+                "Europe/London"
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the timezone is set to the provided fallback"
+        response.status == HttpStatus.OK
+        updated.timezone() == "Europe/London"
+
+        and: "the database reflects the fallback timezone"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        result.timezone == "Europe/London"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UPDATE | should override timezone when explicit timezone is passed with unchanged coordinates"() {
+        given: "an existing location in Denver"
+        def command = new CreateLocationCommand("Denver Override ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == "America/Denver"
+
+        when: "updating with the same coordinates but an explicit timezone override"
+        def updateCommand = new UpdateLocationCommand(
+                created.name(),
+                created.addressLine(),
+                created.city(),
+                created.stateProvince(),
+                created.postalCode(),
+                created.countryCode(),
+                -104.9903,
+                39.7392,
+                "America/Boise"
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the explicit timezone override is applied"
+        response.status == HttpStatus.OK
+        updated.timezone() == "America/Boise"
+
+        and: "the database reflects the updated timezone"
+        def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
+        result.timezone == "America/Boise"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UPDATE | should resolve timezone when updating an existing location that had null timezone"() {
+        given: "an existing location outside boundaries with null timezone"
+        def command = new CreateLocationCommand("London Original ${faker.company().name()}", "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+        Location created = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body()
+        assert created.timezone() == null
+
+        when: "updating the location to Denver coordinates"
+        def updateCommand = new UpdateLocationCommand(
+                created.name(),
+                "1600 Glenarm Pl",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9903,
+                39.7392
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        Location updated = response.body()
+
+        then: "the timezone is resolved to America/Denver"
+        response.status == HttpStatus.OK
+        updated.timezone() == "America/Denver"
+
+        cleanup:
+        if (created?.id()) {
+            sql.execute("DELETE FROM locations WHERE id = ?", [created.id()])
+        }
+    }
+
+    def "UNIT | resolveTimezone should return fallback when point is null"() {
+        when: "resolving timezone with a null point"
+        def result = locationController.resolveTimezone(null, "UTC")
+
+        then: "the fallback timezone is returned"
+        result == "UTC"
     }
 
     def "UPDATE | should fail to update a non-existent location"() {

@@ -141,7 +141,7 @@ public class LocationController {
         }
     }
 
-    private String resolveTimezone(Point point, String fallbackTimezone) {
+    String resolveTimezone(Point point, String fallbackTimezone) {
         if (point == null) {
             return fallbackTimezone;
         }
