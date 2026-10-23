@@ -1,6 +1,7 @@
 plugins {
     id("groovy") 
     id("io.micronaut.application") version "5.0.2"
+    id("io.micronaut.openapi") version "5.0.2"
     id("com.gradleup.shadow") version "9.4.1"
     id("io.micronaut.aot") version "5.0.2"
     id("io.micronaut.test-resources") version "5.0.2"
@@ -104,6 +105,17 @@ micronaut {
         deduceEnvironment = true
         optimizeNetty = true
         replaceLogbackXml = true
+    }
+    openapi {
+        client(file("docs/openapi.yaml")) {
+            clientId.set("/")
+            apiPackageName.set("lol.pbu.kaiju.client.api")
+            modelPackageName.set("lol.pbu.kaiju.client.model")
+            useReactive.set(false)
+            noArgsConstructor.set(true)
+            schemaMapping.put("Geometry", "org.locationtech.jts.geom.Geometry")
+            schemaMapping.put("Point", "org.locationtech.jts.geom.Point")
+        }
     }
 }
 sonar {
