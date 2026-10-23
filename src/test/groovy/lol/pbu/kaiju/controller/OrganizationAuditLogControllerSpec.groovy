@@ -58,8 +58,10 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
         OrganizationAuditLog result = response.body()
 
         then: "200 OK is returned with the correct organization audit log"
-        response.status == HttpStatus.OK
-        result.id() == id
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.id() == id
+        }
 
         cleanup:
         executeUpdate("DELETE FROM organization_audit_logs WHERE id = ?", id)
@@ -90,9 +92,11 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organization-audit-logs?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+        }
     }
 
     def "LIST | should fully drain all organization audit logs sequentially using cursors"() {

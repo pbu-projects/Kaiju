@@ -32,8 +32,10 @@ class AdminUserControllerSpec extends BaseControllerSpec {
         User result = response.body()
 
         then: "the returned user has the updated role"
-        response.status == HttpStatus.OK
-        result.role() == UserRole.REGION_AGENT
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.role() == UserRole.REGION_AGENT
+        }
 
         and: "the database reflects the change"
         userRepository.findById(user.id()).get().role() == UserRole.REGION_AGENT

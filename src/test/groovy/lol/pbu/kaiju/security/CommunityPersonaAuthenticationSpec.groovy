@@ -66,9 +66,10 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         TestPersonas.SEEDED_PERSONAS.each { persona ->
             Optional<User> userOpt = userRepository.findById(persona.id)
             assert userOpt.isPresent(): "User not found for ${persona.displayName} (${persona.id})"
-            User user = userOpt.get()
-            assert user.email() == persona.email
-            assert user.role() == persona.systemRole
+            verifyAll(userOpt.get()) {
+                email() == persona.email
+                role() == persona.systemRole
+            }
         }
     }
 
@@ -82,126 +83,122 @@ class CommunityPersonaAuthenticationSpec extends Specification {
             regions[id] = [name: name, parentId: parentId]
         }
 
-        then: "Level 1 Colorado State Region exists with no parent"
-        regions.containsKey(TestPersonas.COLORADO_STATE_REGION_ID)
-        regions[TestPersonas.COLORADO_STATE_REGION_ID].name == "Colorado State Region"
-        regions[TestPersonas.COLORADO_STATE_REGION_ID].parentId == null
+        then: "Level 1, Level 2, and Level 3 regions exist with correct parentage and total count matches"
+        verifyAll {
+            regions.containsKey(TestPersonas.COLORADO_STATE_REGION_ID)
+            regions[TestPersonas.COLORADO_STATE_REGION_ID].name == "Colorado State Region"
+            regions[TestPersonas.COLORADO_STATE_REGION_ID].parentId == null
 
-        and: "Level 2 Denver County and El Paso County regions point to Colorado State Region"
-        regions.containsKey(TestPersonas.DENVER_COUNTY_REGION_ID)
-        regions[TestPersonas.DENVER_COUNTY_REGION_ID].name == "Denver County Region"
-        regions[TestPersonas.DENVER_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
+            regions.containsKey(TestPersonas.DENVER_COUNTY_REGION_ID)
+            regions[TestPersonas.DENVER_COUNTY_REGION_ID].name == "Denver County Region"
+            regions[TestPersonas.DENVER_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
 
-        regions.containsKey(TestPersonas.EL_PASO_COUNTY_REGION_ID)
-        regions[TestPersonas.EL_PASO_COUNTY_REGION_ID].name == "El Paso County Region"
-        regions[TestPersonas.EL_PASO_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
+            regions.containsKey(TestPersonas.EL_PASO_COUNTY_REGION_ID)
+            regions[TestPersonas.EL_PASO_COUNTY_REGION_ID].name == "El Paso County Region"
+            regions[TestPersonas.EL_PASO_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
 
-        and: "Level 3 Downtown Core regions point to their respective county regions"
-        regions.containsKey(TestPersonas.DENVER_DOWNTOWN_REGION_ID)
-        regions[TestPersonas.DENVER_DOWNTOWN_REGION_ID].name == "Denver Downtown Core"
-        regions[TestPersonas.DENVER_DOWNTOWN_REGION_ID].parentId == TestPersonas.DENVER_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.DENVER_DOWNTOWN_REGION_ID)
+            regions[TestPersonas.DENVER_DOWNTOWN_REGION_ID].name == "Denver Downtown Core"
+            regions[TestPersonas.DENVER_DOWNTOWN_REGION_ID].parentId == TestPersonas.DENVER_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID)
-        regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].name == "Colorado Springs Downtown"
-        regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID)
+            regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].name == "Colorado Springs Downtown"
+            regions[TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        and: "Level 3 Municipalities exist with correct parentage"
-        regions.containsKey(TestPersonas.DENVER_CITY_REGION_ID)
-        regions[TestPersonas.DENVER_CITY_REGION_ID].name == "Denver City"
-        regions[TestPersonas.DENVER_CITY_REGION_ID].parentId == TestPersonas.DENVER_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.DENVER_CITY_REGION_ID)
+            regions[TestPersonas.DENVER_CITY_REGION_ID].name == "Denver City"
+            regions[TestPersonas.DENVER_CITY_REGION_ID].parentId == TestPersonas.DENVER_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID)
-        regions[TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID].name == "Colorado Springs City"
-        regions[TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID)
+            regions[TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID].name == "Colorado Springs City"
+            regions[TestPersonas.COLORADO_SPRINGS_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.FOUNTAIN_CITY_REGION_ID)
-        regions[TestPersonas.FOUNTAIN_CITY_REGION_ID].name == "Fountain City"
-        regions[TestPersonas.FOUNTAIN_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.FOUNTAIN_CITY_REGION_ID)
+            regions[TestPersonas.FOUNTAIN_CITY_REGION_ID].name == "Fountain City"
+            regions[TestPersonas.FOUNTAIN_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID)
-        regions[TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID].name == "Manitou Springs City"
-        regions[TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID)
+            regions[TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID].name == "Manitou Springs City"
+            regions[TestPersonas.MANITOU_SPRINGS_CITY_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.MONUMENT_TOWN_REGION_ID)
-        regions[TestPersonas.MONUMENT_TOWN_REGION_ID].name == "Monument Town"
-        regions[TestPersonas.MONUMENT_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.MONUMENT_TOWN_REGION_ID)
+            regions[TestPersonas.MONUMENT_TOWN_REGION_ID].name == "Monument Town"
+            regions[TestPersonas.MONUMENT_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.PALMER_LAKE_TOWN_REGION_ID)
-        regions[TestPersonas.PALMER_LAKE_TOWN_REGION_ID].name == "Palmer Lake Town"
-        regions[TestPersonas.PALMER_LAKE_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.PALMER_LAKE_TOWN_REGION_ID)
+            regions[TestPersonas.PALMER_LAKE_TOWN_REGION_ID].name == "Palmer Lake Town"
+            regions[TestPersonas.PALMER_LAKE_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.CALHAN_TOWN_REGION_ID)
-        regions[TestPersonas.CALHAN_TOWN_REGION_ID].name == "Calhan Town"
-        regions[TestPersonas.CALHAN_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.CALHAN_TOWN_REGION_ID)
+            regions[TestPersonas.CALHAN_TOWN_REGION_ID].name == "Calhan Town"
+            regions[TestPersonas.CALHAN_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID)
-        regions[TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID].name == "Green Mountain Falls Town"
-        regions[TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID)
+            regions[TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID].name == "Green Mountain Falls Town"
+            regions[TestPersonas.GREEN_MOUNTAIN_FALLS_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.RAMAH_TOWN_REGION_ID)
-        regions[TestPersonas.RAMAH_TOWN_REGION_ID].name == "Ramah Town"
-        regions[TestPersonas.RAMAH_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.RAMAH_TOWN_REGION_ID)
+            regions[TestPersonas.RAMAH_TOWN_REGION_ID].name == "Ramah Town"
+            regions[TestPersonas.RAMAH_TOWN_REGION_ID].parentId == TestPersonas.EL_PASO_COUNTY_REGION_ID
 
-        and: "Level 2 Arapahoe County Region points to Colorado State Region"
-        regions.containsKey(TestPersonas.ARAPAHOE_COUNTY_REGION_ID)
-        regions[TestPersonas.ARAPAHOE_COUNTY_REGION_ID].name == "Arapahoe County Region"
-        regions[TestPersonas.ARAPAHOE_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
+            regions.containsKey(TestPersonas.ARAPAHOE_COUNTY_REGION_ID)
+            regions[TestPersonas.ARAPAHOE_COUNTY_REGION_ID].name == "Arapahoe County Region"
+            regions[TestPersonas.ARAPAHOE_COUNTY_REGION_ID].parentId == TestPersonas.COLORADO_STATE_REGION_ID
 
-        and: "Level 3 Arapahoe municipalities exist with Arapahoe County as parent"
-        regions.containsKey(TestPersonas.AURORA_CITY_REGION_ID)
-        regions[TestPersonas.AURORA_CITY_REGION_ID].name == "Aurora City"
-        regions[TestPersonas.AURORA_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.AURORA_CITY_REGION_ID)
+            regions[TestPersonas.AURORA_CITY_REGION_ID].name == "Aurora City"
+            regions[TestPersonas.AURORA_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.CENTENNIAL_CITY_REGION_ID)
-        regions[TestPersonas.CENTENNIAL_CITY_REGION_ID].name == "Centennial City"
-        regions[TestPersonas.CENTENNIAL_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.CENTENNIAL_CITY_REGION_ID)
+            regions[TestPersonas.CENTENNIAL_CITY_REGION_ID].name == "Centennial City"
+            regions[TestPersonas.CENTENNIAL_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.LITTLETON_CITY_REGION_ID)
-        regions[TestPersonas.LITTLETON_CITY_REGION_ID].name == "Littleton City"
-        regions[TestPersonas.LITTLETON_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.LITTLETON_CITY_REGION_ID)
+            regions[TestPersonas.LITTLETON_CITY_REGION_ID].name == "Littleton City"
+            regions[TestPersonas.LITTLETON_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID)
-        regions[TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID].name == "Greenwood Village City"
-        regions[TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID)
+            regions[TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID].name == "Greenwood Village City"
+            regions[TestPersonas.GREENWOOD_VILLAGE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.ENGLEWOOD_CITY_REGION_ID)
-        regions[TestPersonas.ENGLEWOOD_CITY_REGION_ID].name == "Englewood City"
-        regions[TestPersonas.ENGLEWOOD_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.ENGLEWOOD_CITY_REGION_ID)
+            regions[TestPersonas.ENGLEWOOD_CITY_REGION_ID].name == "Englewood City"
+            regions[TestPersonas.ENGLEWOOD_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID)
-        regions[TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID].name == "Cherry Hills Village City"
-        regions[TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID)
+            regions[TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID].name == "Cherry Hills Village City"
+            regions[TestPersonas.CHERRY_HILLS_VILLAGE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.SHERIDAN_CITY_REGION_ID)
-        regions[TestPersonas.SHERIDAN_CITY_REGION_ID].name == "Sheridan City"
-        regions[TestPersonas.SHERIDAN_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.SHERIDAN_CITY_REGION_ID)
+            regions[TestPersonas.SHERIDAN_CITY_REGION_ID].name == "Sheridan City"
+            regions[TestPersonas.SHERIDAN_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.GLENDALE_CITY_REGION_ID)
-        regions[TestPersonas.GLENDALE_CITY_REGION_ID].name == "Glendale City"
-        regions[TestPersonas.GLENDALE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.GLENDALE_CITY_REGION_ID)
+            regions[TestPersonas.GLENDALE_CITY_REGION_ID].name == "Glendale City"
+            regions[TestPersonas.GLENDALE_CITY_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID)
-        regions[TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID].name == "Columbine Valley Town"
-        regions[TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID)
+            regions[TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID].name == "Columbine Valley Town"
+            regions[TestPersonas.COLUMBINE_VALLEY_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.BOW_MAR_TOWN_REGION_ID)
-        regions[TestPersonas.BOW_MAR_TOWN_REGION_ID].name == "Bow Mar Town"
-        regions[TestPersonas.BOW_MAR_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.BOW_MAR_TOWN_REGION_ID)
+            regions[TestPersonas.BOW_MAR_TOWN_REGION_ID].name == "Bow Mar Town"
+            regions[TestPersonas.BOW_MAR_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.FOXFIELD_TOWN_REGION_ID)
-        regions[TestPersonas.FOXFIELD_TOWN_REGION_ID].name == "Foxfield Town"
-        regions[TestPersonas.FOXFIELD_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.FOXFIELD_TOWN_REGION_ID)
+            regions[TestPersonas.FOXFIELD_TOWN_REGION_ID].name == "Foxfield Town"
+            regions[TestPersonas.FOXFIELD_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.DEER_TRAIL_TOWN_REGION_ID)
-        regions[TestPersonas.DEER_TRAIL_TOWN_REGION_ID].name == "Deer Trail Town"
-        regions[TestPersonas.DEER_TRAIL_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.DEER_TRAIL_TOWN_REGION_ID)
+            regions[TestPersonas.DEER_TRAIL_TOWN_REGION_ID].name == "Deer Trail Town"
+            regions[TestPersonas.DEER_TRAIL_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        regions.containsKey(TestPersonas.BENNETT_TOWN_REGION_ID)
-        regions[TestPersonas.BENNETT_TOWN_REGION_ID].name == "Bennett Town"
-        regions[TestPersonas.BENNETT_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
+            regions.containsKey(TestPersonas.BENNETT_TOWN_REGION_ID)
+            regions[TestPersonas.BENNETT_TOWN_REGION_ID].name == "Bennett Town"
+            regions[TestPersonas.BENNETT_TOWN_REGION_ID].parentId == TestPersonas.ARAPAHOE_COUNTY_REGION_ID
 
-        and: "total count matches seeded region IDs"
-        regions.size() == TestPersonas.SEEDED_REGION_IDS.size()
+            regions.size() == TestPersonas.SEEDED_REGION_IDS.size()
+        }
     }
 
     def "seeded county boundaries accurately contain internal landmarks and exclude adjacent municipalities"() {
@@ -284,31 +281,23 @@ class CommunityPersonaAuthenticationSpec extends Specification {
                 TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID
         ])
 
-        then: "Denver landmarks (City Hall and Denver International Airport) are strictly inside Denver County"
-        spatialResults.denver_city_hall_inside == true
-        spatialResults.dia_inside == true
-
-        and: "neighboring municipalities (Lakewood and Aurora) are strictly excluded from Denver County"
-        spatialResults.lakewood_inside == false
-        spatialResults.aurora_inside == false
-
-        and: "Colorado Springs City Hall is inside El Paso County and Pueblo is strictly excluded"
-        spatialResults.cos_city_hall_inside == true
-        spatialResults.pueblo_inside == false
-
-        and: "municipal boundaries properly contain local landmarks and exclude sibling municipalities"
-        spatialResults.cos_hall_inside_cos_city == true
-        spatialResults.fountain_hall_inside_fountain == true
-        spatialResults.fountain_hall_inside_cos_city == false
-
-        and: "Aurora landmarks are inside Arapahoe County and Aurora City, and strictly excluded from Denver County"
-        spatialResults.arapahoe_covers_aurora_hall == true
-        spatialResults.aurora_covers_aurora_hall == true
-        spatialResults.denver_covers_aurora_hall == false
-
-        and: "downtown cores contain their respective key district landmarks"
-        spatialResults.denver_downtown_covers_16th_st_mall == true
-        spatialResults.cos_downtown_covers_cos_hall == true
+        then: "landmarks, municipal boundaries, and downtown cores match expected containment"
+        verifyAll(spatialResults) {
+            denver_city_hall_inside == true
+            dia_inside == true
+            lakewood_inside == false
+            aurora_inside == false
+            cos_city_hall_inside == true
+            pueblo_inside == false
+            cos_hall_inside_cos_city == true
+            fountain_hall_inside_fountain == true
+            fountain_hall_inside_cos_city == false
+            arapahoe_covers_aurora_hall == true
+            aurora_covers_aurora_hall == true
+            denver_covers_aurora_hall == false
+            denver_downtown_covers_16th_st_mall == true
+            cos_downtown_covers_cos_hall == true
+        }
     }
 
     def "all seeded administrative regions are mathematically non-rectangular and topologically valid"() {
@@ -330,18 +319,14 @@ class CommunityPersonaAuthenticationSpec extends Specification {
             ORDER BY name
         """.toString())
 
-        then: "all 28 seeded regions are retrieved"
-        rows.size() == TestPersonas.SEEDED_REGION_IDS.size()
-
-        and: "every seeded region is topologically valid PostGIS geometry"
-        rows.every { it.is_valid == true }
-
-        and: "every seeded region has at least 5 vertices"
-        rows.every { ((it.point_count as Number).intValue()) >= 5 }
-
-        and: "zero seeded regions are rectangles or bounding boxes"
-        rows.every { it.is_axis_aligned_box == false }
-        rows.every { it.is_oriented_box == false }
+        then: "all 28 seeded regions are retrieved and meet geometric validity constraints"
+        verifyAll {
+            rows.size() == TestPersonas.SEEDED_REGION_IDS.size()
+            rows.every { it.is_valid == true }
+            rows.every { ((it.point_count as Number).intValue()) >= 5 }
+            rows.every { it.is_axis_aligned_box == false }
+            rows.every { it.is_oriented_box == false }
+        }
     }
 
     def "all seeded organizations in 3-tier organizational hierarchy exist with correct attributes"() {
@@ -356,35 +341,34 @@ class CommunityPersonaAuthenticationSpec extends Specification {
             orgs[id] = [name: name, parentId: parentId, isPublic: isPublic, status: status]
         }
 
-        then: "Level 1 National Relief Network is public, verified, and has no parent"
-        orgs.containsKey(TestPersonas.NATIONAL_RELIEF_NETWORK_ID)
-        orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].name == "National Relief Network"
-        orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].parentId == null
-        orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].isPublic == true
-        orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].status == "VERIFIED"
+        then: "Level 1, Level 2, Level 3 organizations and standalone co-op exist with correct attributes"
+        verifyAll {
+            orgs.containsKey(TestPersonas.NATIONAL_RELIEF_NETWORK_ID)
+            orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].name == "National Relief Network"
+            orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].parentId == null
+            orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].isPublic == true
+            orgs[TestPersonas.NATIONAL_RELIEF_NETWORK_ID].status == "VERIFIED"
 
-        and: "Level 2 State Chapters point to National Relief Network and are verified"
-        orgs.containsKey(TestPersonas.COLORADO_STATE_CHAPTER_ID)
-        orgs[TestPersonas.COLORADO_STATE_CHAPTER_ID].parentId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
-        orgs[TestPersonas.COLORADO_STATE_CHAPTER_ID].status == "VERIFIED"
+            orgs.containsKey(TestPersonas.COLORADO_STATE_CHAPTER_ID)
+            orgs[TestPersonas.COLORADO_STATE_CHAPTER_ID].parentId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+            orgs[TestPersonas.COLORADO_STATE_CHAPTER_ID].status == "VERIFIED"
 
-        orgs.containsKey(TestPersonas.UTAH_STATE_CHAPTER_ID)
-        orgs[TestPersonas.UTAH_STATE_CHAPTER_ID].parentId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
-        orgs[TestPersonas.UTAH_STATE_CHAPTER_ID].status == "VERIFIED"
+            orgs.containsKey(TestPersonas.UTAH_STATE_CHAPTER_ID)
+            orgs[TestPersonas.UTAH_STATE_CHAPTER_ID].parentId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+            orgs[TestPersonas.UTAH_STATE_CHAPTER_ID].status == "VERIFIED"
 
-        and: "Level 3 Local Branches point to Colorado State Chapter and are verified"
-        orgs.containsKey(TestPersonas.DENVER_METRO_BRANCH_ID)
-        orgs[TestPersonas.DENVER_METRO_BRANCH_ID].parentId == TestPersonas.COLORADO_STATE_CHAPTER_ID
-        orgs[TestPersonas.DENVER_METRO_BRANCH_ID].status == "VERIFIED"
+            orgs.containsKey(TestPersonas.DENVER_METRO_BRANCH_ID)
+            orgs[TestPersonas.DENVER_METRO_BRANCH_ID].parentId == TestPersonas.COLORADO_STATE_CHAPTER_ID
+            orgs[TestPersonas.DENVER_METRO_BRANCH_ID].status == "VERIFIED"
 
-        orgs.containsKey(TestPersonas.COLORADO_SPRINGS_BRANCH_ID)
-        orgs[TestPersonas.COLORADO_SPRINGS_BRANCH_ID].parentId == TestPersonas.COLORADO_STATE_CHAPTER_ID
-        orgs[TestPersonas.COLORADO_SPRINGS_BRANCH_ID].status == "VERIFIED"
+            orgs.containsKey(TestPersonas.COLORADO_SPRINGS_BRANCH_ID)
+            orgs[TestPersonas.COLORADO_SPRINGS_BRANCH_ID].parentId == TestPersonas.COLORADO_STATE_CHAPTER_ID
+            orgs[TestPersonas.COLORADO_SPRINGS_BRANCH_ID].status == "VERIFIED"
 
-        and: "Standalone Local Grassroots Co-op has no parent and is unverified"
-        orgs.containsKey(TestPersonas.LOCAL_GRASSROOTS_COOP_ID)
-        orgs[TestPersonas.LOCAL_GRASSROOTS_COOP_ID].parentId == null
-        orgs[TestPersonas.LOCAL_GRASSROOTS_COOP_ID].status == "UNVERIFIED"
+            orgs.containsKey(TestPersonas.LOCAL_GRASSROOTS_COOP_ID)
+            orgs[TestPersonas.LOCAL_GRASSROOTS_COOP_ID].parentId == null
+            orgs[TestPersonas.LOCAL_GRASSROOTS_COOP_ID].status == "UNVERIFIED"
+        }
     }
 
     def "region_users and organization_users bindings match expected persona assignments"() {
@@ -430,8 +414,10 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         then: "authentication succeeds with user ID as name and full permission claims"
         response.isAuthenticated()
         def auth = response.getAuthentication().get()
-        auth.getName() == persona.id.toString()
-        auth.getAttributes().get("email") == persona.email
+        verifyAll(auth) {
+            getName() == persona.id.toString()
+            getAttributes().get("email") == persona.email
+        }
 
         and: "all permissions mapped to the persona role are granted as claims"
         persona.systemRole.getPermissions().each { permission ->
@@ -462,13 +448,17 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         then: "authentication succeeds and returns a valid session"
         response.isAuthenticated()
         def auth = response.getAuthentication().get()
-        auth.getAttributes().get("email") == jenny.email
 
         and: "Jenny was created in PostgreSQL as a STANDARD_USER"
-        def dbUser = userRepository.findByEmail(jenny.email).get()
-        dbUser.email() == jenny.email
-        dbUser.role() == UserRole.STANDARD_USER
-        auth.getName() == dbUser.id().toString()
+        def dbUserOpt = userRepository.findByEmail(jenny.email)
+        dbUserOpt.isPresent()
+        def dbUser = dbUserOpt.get()
+        verifyAll {
+            auth.getAttributes().get("email") == jenny.email
+            dbUser.email() == jenny.email
+            dbUser.role() == UserRole.STANDARD_USER
+            auth.getName() == dbUser.id().toString()
+        }
 
         and: "STANDARD_USER claims are assigned"
         UserRole.STANDARD_USER.getPermissions().each { permission ->
@@ -486,8 +476,10 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "authentication fails with an informative error message"
-        !response.isAuthenticated()
-        response.getMessage().get() == "No email present in OpenID claims"
+        verifyAll(response) {
+            !isAuthenticated()
+            getMessage().get() == "No email present in OpenID claims"
+        }
     }
 
     def "should reject authentication when email is blank in claims"() {
@@ -500,7 +492,9 @@ class CommunityPersonaAuthenticationSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "authentication fails with an informative error message"
-        !response.isAuthenticated()
-        response.getMessage().get() == "No email present in OpenID claims"
+        verifyAll(response) {
+            !isAuthenticated()
+            getMessage().get() == "No email present in OpenID claims"
+        }
     }
 }

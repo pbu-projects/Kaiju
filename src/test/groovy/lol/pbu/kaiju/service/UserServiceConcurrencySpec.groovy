@@ -35,10 +35,12 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
         def user2 = userService.provisionOrGetUser(canonicalEmail)
 
         then: "both calls return the same persisted user with canonical lowercase email"
-        user1.id() == user2.id()
-        user1.email() == canonicalEmail
-        user2.email() == canonicalEmail
-        userRepository.findByEmail(canonicalEmail).isPresent()
+        verifyAll {
+            user1.id() == user2.id()
+            user1.email() == canonicalEmail
+            user2.email() == canonicalEmail
+            userRepository.findByEmail(canonicalEmail).isPresent()
+        }
     }
 
     def "JIT Provisioning | handles concurrent insertion for same email gracefully via SQLState 23505"() {
@@ -55,12 +57,12 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
         List<User> results = futures.collect { it.get() }
 
         then: "all tasks succeed and return the exact same user ID"
-        results.size() == concurrency
         def firstUserId = results[0].id()
-        results.every { it.id() == firstUserId }
-        results.every { it.email() == email }
-
-        and: "only exactly one user row was inserted into the database"
-        userRepository.findByEmail(email).isPresent()
+        verifyAll {
+            results.size() == concurrency
+            results.every { it.id() == firstUserId }
+            results.every { it.email() == email }
+            userRepository.findByEmail(email).isPresent()
+        }
     }
 }

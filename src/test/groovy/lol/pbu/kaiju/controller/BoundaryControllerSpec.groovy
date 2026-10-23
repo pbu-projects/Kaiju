@@ -76,8 +76,8 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         Boundary saved = response.body()
 
         then: "the boundary is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.name() == name
             saved.geom() != null
@@ -101,8 +101,8 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         Boundary saved = response.body()
 
         then: "the boundary is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.name() == name
             saved.geom() != null
@@ -188,10 +188,10 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/boundaries/${id}")), Boundary)
 
         then: "the correct boundary is returned with 200 OK"
-        response.status == HttpStatus.OK
-        verifyAll {
-            response.body().id() == id
-            response.body().name() == "Test Boundary Read"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == id
+            body().name() == "Test Boundary Read"
         }
     }
 
@@ -227,8 +227,8 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         Boundary updated = response.body()
 
         then: "the returned boundary contains the updated data with 200 OK"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.name() == newName
         }
@@ -295,8 +295,8 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         Boundary updated = response.body()
 
         then: "the returned boundary contains the updated data with 200 OK"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.name() == newName
         }
@@ -423,10 +423,12 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/boundaries?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     def "LIST | should reject unauthenticated GET /boundaries with 401 UNAUTHORIZED"() {

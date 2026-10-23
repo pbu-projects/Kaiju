@@ -1,12 +1,18 @@
 package lol.pbu.kaiju.serde
 
+import io.micronaut.core.type.Argument
 import io.micronaut.json.JsonMapper
+import io.micronaut.serde.Decoder
+import io.micronaut.serde.Deserializer
+import io.micronaut.serde.Encoder
+import io.micronaut.serde.Serializer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LineString
+import org.locationtech.jts.geom.LinearRing
 import org.locationtech.jts.geom.MultiPolygon
 import org.locationtech.jts.geom.Point
 import org.locationtech.jts.geom.Polygon
@@ -64,8 +70,10 @@ class JtsSerdeSpec extends Specification {
         String json = jsonMapper.writeValueAsString(point)
 
         then: "it produces expected GeoJSON structure"
-        json.contains('"type":"Point"')
-        json.contains('"coordinates":[-104.9903,39.7392]')
+        verifyAll {
+            json.contains('"type":"Point"')
+            json.contains('"coordinates":[-104.9903,39.7392]')
+        }
     }
 
     def "JtsGeometrySerde | should serialize Polygon to valid GeoJSON"() {
@@ -76,8 +84,10 @@ class JtsSerdeSpec extends Specification {
         String json = jsonMapper.writeValueAsString(polygon)
 
         then: "it produces expected GeoJSON structure"
-        json.contains('"type":"Polygon"')
-        json.contains('"coordinates":[[[-105.0,39.0],[-104.0,39.0],[-104.0,40.0],[-105.0,40.0],[-105.0,39.0]]]')
+        verifyAll {
+            json.contains('"type":"Polygon"')
+            json.contains('"coordinates":[[[-105.0,39.0],[-104.0,39.0],[-104.0,40.0],[-105.0,40.0],[-105.0,39.0]]]')
+        }
     }
 
     def "JtsGeometrySerde | should serialize MultiPolygon to valid GeoJSON"() {
@@ -88,8 +98,10 @@ class JtsSerdeSpec extends Specification {
         String json = jsonMapper.writeValueAsString(multiPolygon)
 
         then: "it produces expected GeoJSON structure"
-        json.contains('"type":"MultiPolygon"')
-        json.contains('"coordinates":[[[[')
+        verifyAll {
+            json.contains('"type":"MultiPolygon"')
+            json.contains('"coordinates":[[[[')
+        }
     }
 
     def "JtsGeometrySerde | should fail fast when serializing unsupported geometry type"() {
@@ -118,9 +130,11 @@ class JtsSerdeSpec extends Specification {
         Geometry geom = jsonMapper.readValue(json, Geometry)
 
         then: "it is a Point with matching coordinates"
-        geom instanceof Point
-        geom.coordinate.x == -104.9903
-        geom.coordinate.y == 39.7392
+        verifyAll {
+            geom instanceof Point
+            geom.coordinate.x == -104.9903
+            geom.coordinate.y == 39.7392
+        }
     }
 
     def "JtsGeometrySerde | should deserialize GeoJSON Polygon to JTS Polygon"() {
@@ -131,10 +145,12 @@ class JtsSerdeSpec extends Specification {
         Geometry geom = jsonMapper.readValue(json, Geometry)
 
         then: "it is a Polygon with matching coordinates"
-        geom instanceof Polygon
-        geom.coordinates.length == 5
-        geom.coordinates[0].x == -105.0
-        geom.coordinates[0].y == 39.0
+        verifyAll {
+            geom instanceof Polygon
+            geom.coordinates.length == 5
+            geom.coordinates[0].x == -105.0
+            geom.coordinates[0].y == 39.0
+        }
     }
 
     def "JtsGeometrySerde | should auto-close unclosed GeoJSON Polygon linear rings"() {
@@ -145,9 +161,11 @@ class JtsSerdeSpec extends Specification {
         Geometry geom = jsonMapper.readValue(json, Geometry)
 
         then: "it is automatically closed into a valid 4-coordinate Polygon"
-        geom instanceof Polygon
-        geom.coordinates.length == 4
-        geom.coordinates[0].equals2D(geom.coordinates[3])
+        verifyAll {
+            geom instanceof Polygon
+            geom.coordinates.length == 4
+            geom.coordinates[0].equals2D(geom.coordinates[3])
+        }
     }
 
     def "JtsGeometrySerde | should deserialize GeoJSON MultiPolygon to JTS MultiPolygon"() {
@@ -158,8 +176,10 @@ class JtsSerdeSpec extends Specification {
         Geometry geom = jsonMapper.readValue(json, Geometry)
 
         then: "it is a MultiPolygon"
-        geom instanceof MultiPolygon
-        geom.numGeometries == 1
+        verifyAll {
+            geom instanceof MultiPolygon
+            geom.numGeometries == 1
+        }
     }
 
     def "JtsGeometrySerde | should reject unsupported geometry type on deserialization"() {
@@ -185,8 +205,10 @@ class JtsSerdeSpec extends Specification {
         Point pt = jsonMapper.readValue(pointJson, Point)
 
         then: "Point deserialization succeeds"
-        pt != null
-        pt.x == -105.0
+        verifyAll(pt) {
+            it != null
+            x == -105.0
+        }
 
         when: "deserializing Polygon into Point type"
         jsonMapper.readValue(polyJson, Point)
@@ -247,10 +269,12 @@ class JtsSerdeSpec extends Specification {
         Geometry deserialized = jsonMapper.readValue(json, Geometry)
 
         then: "Z coordinate is preserved on deserialized Point"
-        deserialized instanceof Point
-        deserialized.coordinate.x == -105.0
-        deserialized.coordinate.y == 39.0
-        deserialized.coordinate.z == 1600.0
+        verifyAll {
+            deserialized instanceof Point
+            deserialized.coordinate.x == -105.0
+            deserialized.coordinate.y == 39.0
+            deserialized.coordinate.z == 1600.0
+        }
     }
 
     def "JtsGeometrySerde | should serialize and deserialize Polygon with interior ring (hole)"() {
@@ -271,7 +295,7 @@ class JtsSerdeSpec extends Specification {
         ]
         Polygon polygonWithHole = geometryFactory.createPolygon(
                 geometryFactory.createLinearRing(shellCoords),
-                [geometryFactory.createLinearRing(holeCoords)] as org.locationtech.jts.geom.LinearRing[]
+                [geometryFactory.createLinearRing(holeCoords)] as LinearRing[]
         )
 
         when: "serialized to JSON"
@@ -284,9 +308,10 @@ class JtsSerdeSpec extends Specification {
         Geometry deserialized = jsonMapper.readValue(json, Geometry)
 
         then: "polygon retains its interior ring"
-        deserialized instanceof Polygon
-        Polygon resultPoly = (Polygon) deserialized
-        resultPoly.numInteriorRing == 1
+        verifyAll {
+            deserialized instanceof Polygon
+            ((Polygon) deserialized).numInteriorRing == 1
+        }
     }
 
     def "JtsGeometrySerde | should serialize and deserialize MultiPolygon with interior ring"() {
@@ -307,7 +332,7 @@ class JtsSerdeSpec extends Specification {
         ]
         Polygon polygonWithHole = geometryFactory.createPolygon(
                 geometryFactory.createLinearRing(shellCoords),
-                [geometryFactory.createLinearRing(holeCoords)] as org.locationtech.jts.geom.LinearRing[]
+                [geometryFactory.createLinearRing(holeCoords)] as LinearRing[]
         )
         MultiPolygon multiPolygon = geometryFactory.createMultiPolygon([polygonWithHole] as Polygon[])
 
@@ -316,21 +341,22 @@ class JtsSerdeSpec extends Specification {
         Geometry deserialized = jsonMapper.readValue(json, Geometry)
 
         then: "deserialized MultiPolygon has member polygon with 1 hole"
-        deserialized instanceof MultiPolygon
-        MultiPolygon resultMp = (MultiPolygon) deserialized
-        resultMp.numGeometries == 1
-        ((Polygon) resultMp.getGeometryN(0)).numInteriorRing == 1
+        verifyAll {
+            deserialized instanceof MultiPolygon
+            ((MultiPolygon) deserialized).numGeometries == 1
+            ((Polygon) ((MultiPolygon) deserialized).getGeometryN(0)).numInteriorRing == 1
+        }
     }
 
     /********** Null Handling & Direct Constructor Tests **********/
 
     def "JtsGeometrySerde | should handle null values gracefully"() {
         given: "mock encoder"
-        io.micronaut.serde.Encoder encoder = Mock(io.micronaut.serde.Encoder)
-        io.micronaut.serde.Serializer.EncoderContext context = Mock(io.micronaut.serde.Serializer.EncoderContext)
+        Encoder encoder = Mock(Encoder)
+        Serializer.EncoderContext context = Mock(Serializer.EncoderContext)
 
         when: "serializing null Geometry via serde"
-        geometrySerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(Geometry), null)
+        geometrySerde.serialize(encoder, context, Argument.of(Geometry), null)
 
         then: "encodeNull is invoked"
         1 * encoder.encodeNull()
@@ -342,21 +368,23 @@ class JtsSerdeSpec extends Specification {
         MultiPolygon nullMultiPoly = jsonMapper.readValue("null", MultiPolygon)
 
         then: "nulls are returned without exception"
-        nullGeom == null
-        nullPoint == null
-        nullPoly == null
-        nullMultiPoly == null
+        verifyAll {
+            nullGeom == null
+            nullPoint == null
+            nullPoly == null
+            nullMultiPoly == null
+        }
     }
 
     def "Specialized serdes | should serialize nulls without error"() {
         given: "mock encoder"
-        io.micronaut.serde.Encoder encoder = Mock(io.micronaut.serde.Encoder)
-        io.micronaut.serde.Serializer.EncoderContext context = Mock(io.micronaut.serde.Serializer.EncoderContext)
+        Encoder encoder = Mock(Encoder)
+        Serializer.EncoderContext context = Mock(Serializer.EncoderContext)
 
         when: "serializing nulls"
-        pointSerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(Point), null)
-        polygonSerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(Polygon), null)
-        multiPolygonSerde.serialize(encoder, context, io.micronaut.core.type.Argument.of(MultiPolygon), null)
+        pointSerde.serialize(encoder, context, Argument.of(Point), null)
+        polygonSerde.serialize(encoder, context, Argument.of(Polygon), null)
+        multiPolygonSerde.serialize(encoder, context, Argument.of(MultiPolygon), null)
 
         then: "encodeNull is called each time"
         3 * encoder.encodeNull()
@@ -364,14 +392,16 @@ class JtsSerdeSpec extends Specification {
 
     def "Specialized serdes | should handle null return from delegate when decoding null node"() {
         given: "mock decoder returning null node"
-        io.micronaut.serde.Decoder decoder = Mock(io.micronaut.serde.Decoder)
-        io.micronaut.serde.Deserializer.DecoderContext context = Mock(io.micronaut.serde.Deserializer.DecoderContext)
+        Decoder decoder = Mock(Decoder)
+        Deserializer.DecoderContext context = Mock(Deserializer.DecoderContext)
         decoder.decodeNode() >> null
 
         expect:
-        pointSerde.deserialize(decoder, context, io.micronaut.core.type.Argument.of(Point)) == null
-        polygonSerde.deserialize(decoder, context, io.micronaut.core.type.Argument.of(Polygon)) == null
-        multiPolygonSerde.deserialize(decoder, context, io.micronaut.core.type.Argument.of(MultiPolygon)) == null
+        verifyAll {
+            pointSerde.deserialize(decoder, context, Argument.of(Point)) == null
+            polygonSerde.deserialize(decoder, context, Argument.of(Polygon)) == null
+            multiPolygonSerde.deserialize(decoder, context, Argument.of(MultiPolygon)) == null
+        }
     }
 
     def "JtsGeometrySerde | direct constructor and getter instantiate default factory"() {
@@ -379,8 +409,10 @@ class JtsSerdeSpec extends Specification {
         JtsGeometrySerde directSerde = new JtsGeometrySerde()
 
         then: "geometryFactory is available"
-        directSerde.geometryFactory != null
-        directSerde.geometryFactory.SRID == 4326
+        verifyAll(directSerde.geometryFactory) {
+            it != null
+            SRID == 4326
+        }
     }
 
     /********** Error Validation Branches **********/

@@ -45,10 +45,12 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         OrganizationUser saved = response.body()
 
         then: "200 OK is returned and record is persisted"
-        response.status == HttpStatus.OK
-        saved.id().userId() == userId
-        saved.id().organizationId() == orgId
-        saved.role() == OrganizationUserRole.ORG_ADMIN
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id().userId() == userId
+            saved.id().organizationId() == orgId
+            saved.role() == OrganizationUserRole.ORG_ADMIN
+        }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT role FROM organization_users WHERE user_id = ? AND organization_id = ?", [userId, orgId])
@@ -113,10 +115,12 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         OrganizationUser result = response.body()
 
         then: "200 OK is returned with the correct record"
-        response.status == HttpStatus.OK
-        result.id().userId() == userId
-        result.id().organizationId() == orgId
-        result.role() == OrganizationUserRole.ORG_ADMIN
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.id().userId() == userId
+            result.id().organizationId() == orgId
+            result.role() == OrganizationUserRole.ORG_ADMIN
+        }
     }
 
     def "READ | should return 404 for a non-existent composite ID"() {
@@ -154,8 +158,10 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         OrganizationUser updated = response.body()
 
         then: "the update is reflected in the response"
-        response.status == HttpStatus.OK
-        updated.role() == OrganizationUserRole.ORG_ADMIN
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.role() == OrganizationUserRole.ORG_ADMIN
+        }
 
         and: "persisted in the database"
         def role = sql.firstRow("SELECT role FROM organization_users WHERE user_id = ? AND organization_id = ?", [userId, orgId]).role
@@ -219,11 +225,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
                 asOrgAdmin(HttpRequest.DELETE("/organization-users/${userId}/${orgId}"), TestPersonas.LEO_LOCAL_ADMIN)
         )
 
-        then: "200 OK is returned"
-        response.status == HttpStatus.OK
-
-        and: "the record is removed from the database"
-        !organizationUserRepository.findById(new OrganizationUserId(userId, orgId)).isPresent()
+        then: "200 OK is returned and record is removed from the database"
+        verifyAll {
+            response.status == HttpStatus.OK
+            !organizationUserRepository.findById(new OrganizationUserId(userId, orgId)).isPresent()
+        }
 
         cleanup:
         executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", userId, orgId)
@@ -273,9 +279,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organization-users?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+        }
     }
 
     def "LIST | should fully drain all organization users sequentially using cursors"() {

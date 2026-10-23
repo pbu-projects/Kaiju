@@ -67,10 +67,12 @@ class UserControllerSpec extends BaseControllerSpec {
         }
 
         then: "the user is persisted with 200 OK and default STANDARD_USER role"
-        response.status == HttpStatus.OK
-        saved.id() != null
-        saved.email() == email
-        saved.role() == UserRole.STANDARD_USER
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id() != null
+            saved.email() == email
+            saved.role() == UserRole.STANDARD_USER
+        }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM users WHERE id = ?", [saved.id()])
@@ -135,8 +137,10 @@ class UserControllerSpec extends BaseControllerSpec {
         }
 
         then: "the user is saved with the elevated role"
-        response.status == HttpStatus.OK
-        saved.role() == UserRole.GLOBAL_ADMIN
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.role() == UserRole.GLOBAL_ADMIN
+        }
     }
 
     /********** READ Tests **********/
@@ -149,9 +153,11 @@ class UserControllerSpec extends BaseControllerSpec {
         def response = client.exchange(authenticated(HttpRequest.GET("/users/${user.id()}"), user.id().toString(), ["STANDARD_USER"]), User)
 
         then: "200 OK is returned with the correct user"
-        response.status == HttpStatus.OK
-        response.body().id() == user.id()
-        response.body().email() == user.email()
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == user.id()
+            body().email() == user.email()
+        }
     }
 
     def "READ | should allow admin to view any user profile"() {
@@ -163,8 +169,10 @@ class UserControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/users/${user.id()}"), admin.id().toString()), User)
 
         then: "200 OK is returned with the target user"
-        response.status == HttpStatus.OK
-        response.body().id() == user.id()
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == user.id()
+        }
     }
 
     def "READ | IDOR | should throw 403 when user attempts to view another user's profile"() {
@@ -206,10 +214,12 @@ class UserControllerSpec extends BaseControllerSpec {
         User updated = response.body()
 
         then: "the returned user contains updated email and retains original role"
-        response.status == HttpStatus.OK
-        updated.id() == user.id()
-        updated.email() == newEmail
-        updated.role() == UserRole.STANDARD_USER
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.id() == user.id()
+            updated.email() == newEmail
+            updated.role() == UserRole.STANDARD_USER
+        }
 
         and: "the database reflects the update"
         def result = sql.firstRow("SELECT email, role FROM users WHERE id = ?", [user.id()])
@@ -256,11 +266,11 @@ class UserControllerSpec extends BaseControllerSpec {
         when: "the user deletes themselves via HTTP DELETE"
         def response = client.exchange(authenticated(HttpRequest.DELETE("/users/${user.id()}"), user.id().toString(), ["STANDARD_USER"]))
 
-        then: "the response is 200 OK"
-        response.status == HttpStatus.OK
-
-        and: "the user is removed from the database"
-        sql.firstRow("SELECT count(*) as count FROM users WHERE id = ?", [user.id()]).count == 0
+        then: "the response is 200 OK and user is removed from the database"
+        verifyAll {
+            response.status == HttpStatus.OK
+            sql.firstRow("SELECT count(*) as count FROM users WHERE id = ?", [user.id()]).count == 0
+        }
     }
 
     def "DELETE | IDOR | should throw 403 Forbidden when standard user attempts to delete another user"() {
@@ -299,10 +309,12 @@ class UserControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/users?size=5"), admin.id().toString()), Map)
 
         then: "the response is 200 OK with paginated content"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 1
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 1
+        }
     }
 
     def "LIST | should reject unauthenticated GET /users with 401 UNAUTHORIZED"() {

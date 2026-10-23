@@ -88,8 +88,10 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
 
         then: "a BAD_REQUEST exception is thrown"
         def e = thrown(HttpStatusException)
-        e.status == HttpStatus.BAD_REQUEST
-        e.message == "Managing region does not exist"
+        verifyAll(e) {
+            status == HttpStatus.BAD_REQUEST
+            message == "Managing region does not exist"
+        }
     }
 
     def "ManagingRegion | rejects creation when project locations fall outside managing region polygon"() {
@@ -116,8 +118,10 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
 
         then: "a BAD_REQUEST is thrown for locations not falling in managing region"
         def e = thrown(HttpStatusException)
-        e.status == HttpStatus.BAD_REQUEST
-        e.message.contains("Project locations do not fall within the specified managing region")
+        verifyAll(e) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("Project locations do not fall within the specified managing region")
+        }
     }
 
     def "ManagingRegion | rejects creation when caller lacks authority to assign managing region"() {
@@ -137,8 +141,10 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
 
         then: "a FORBIDDEN exception is thrown"
         def e = thrown(HttpStatusException)
-        e.status == HttpStatus.FORBIDDEN
-        e.message == "You do not have authority to assign this managing region"
+        verifyAll(e) {
+            status == HttpStatus.FORBIDDEN
+            message == "You do not have authority to assign this managing region"
+        }
     }
 
     def "ProjectService | approves and rejects project with audit records"() {

@@ -56,19 +56,18 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         then: "authentication is present"
         authOpt.isPresent()
         def auth = authOpt.get()
-
-        and: "the principal name is the database user UUID"
         Optional<User> userOpt = userRepository.findByEmail(email)
         userOpt.isPresent()
-        auth.name == userOpt.get().id().toString()
+        def user = userOpt.get()
 
-        and: "roles include all standard capability permissions"
-        userOpt.get().role().permissions.each { permission ->
-            assert auth.roles.contains(permission.claim)
+        and: "the principal name, permissions, and attributes match"
+        verifyAll(auth) {
+            name == user.id().toString()
+            user.role().permissions.every { permission ->
+                roles.contains(permission.claim)
+            }
+            attributes.get("custom_attribute") == "custom_val"
         }
-
-        and: "attributes preserve incoming token claims"
-        auth.attributes.get("custom_attribute") == "custom_val"
     }
 
     def "createAuthentication | should provision user with role derived from upstream groups claim"() {
@@ -88,13 +87,16 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         then: "authentication is present"
         authOpt.isPresent()
         def auth = authOpt.get()
-
-        and: "the newly provisioned user in database has GLOBAL_ADMIN role"
         Optional<User> userOpt = userRepository.findByEmail(email)
         userOpt.isPresent()
-        userOpt.get().role() == UserRole.GLOBAL_ADMIN
-        auth.roles.contains("GLOBAL_ADMIN")
-        auth.roles.contains(Permission.SYSTEM_ADMIN.getClaim())
+        def user = userOpt.get()
+
+        and: "the newly provisioned user in database has GLOBAL_ADMIN role"
+        verifyAll {
+            user.role() == UserRole.GLOBAL_ADMIN
+            auth.roles.contains("GLOBAL_ADMIN")
+            auth.roles.contains(Permission.SYSTEM_ADMIN.getClaim())
+        }
     }
 
     def "createAuthentication | should canonicalize email to lowercase and trim whitespace before user lookup"() {
@@ -111,10 +113,12 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         def authOpt = factory.createAuthentication(token)
 
         then: "authentication is created under the normalized lowercase email"
-        authOpt.isPresent()
         Optional<User> userOpt = userRepository.findByEmail(expectedEmail)
+        authOpt.isPresent()
         userOpt.isPresent()
-        authOpt.get().name == userOpt.get().id().toString()
+        verifyAll(authOpt.get()) {
+            name == userOpt.get().id().toString()
+        }
     }
 
     def "createAuthentication | should return empty when email claim is missing"() {

@@ -10,8 +10,10 @@ class IdpRoleMapperSpec extends Specification {
 
     def "should return STANDARD_USER when groups collection is null or empty"() {
         expect:
-        mapper.resolveRoleFromGroups(null) == UserRole.STANDARD_USER
-        mapper.resolveRoleFromGroups([]) == UserRole.STANDARD_USER
+        verifyAll {
+            mapper.resolveRoleFromGroups(null) == UserRole.STANDARD_USER
+            mapper.resolveRoleFromGroups([]) == UserRole.STANDARD_USER
+        }
     }
 
     def "should return STANDARD_USER when collection contains only null or unmapped elements"() {
@@ -53,21 +55,25 @@ class IdpRoleMapperSpec extends Specification {
 
     def "should resolve role from claims map"() {
         expect:
-        mapper.resolveRoleFromClaims(null) == UserRole.STANDARD_USER
-        mapper.resolveRoleFromClaims([:]) == UserRole.STANDARD_USER
-        mapper.resolveRoleFromClaims([(IdpRoleMapper.CLAIMS_GROUPS_KEY): [IdpRoleMapper.GROUP_GLOBAL_ADMINS]]) == UserRole.GLOBAL_ADMIN
-        mapper.resolveRoleFromClaims([(IdpRoleMapper.CLAIMS_GROUPS_KEY): [IdpRoleMapper.GROUP_REGION_DIRECTORS]]) == UserRole.REGION_DIRECTOR
-        mapper.resolveRoleFromClaims([(IdpRoleMapper.CLAIMS_GROUPS_KEY): "Kaiju Standard Users"]) == UserRole.STANDARD_USER
+        verifyAll {
+            mapper.resolveRoleFromClaims(null) == UserRole.STANDARD_USER
+            mapper.resolveRoleFromClaims([:]) == UserRole.STANDARD_USER
+            mapper.resolveRoleFromClaims([(IdpRoleMapper.CLAIMS_GROUPS_KEY): [IdpRoleMapper.GROUP_GLOBAL_ADMINS]]) == UserRole.GLOBAL_ADMIN
+            mapper.resolveRoleFromClaims([(IdpRoleMapper.CLAIMS_GROUPS_KEY): [IdpRoleMapper.GROUP_REGION_DIRECTORS]]) == UserRole.REGION_DIRECTOR
+            mapper.resolveRoleFromClaims([(IdpRoleMapper.CLAIMS_GROUPS_KEY): "Kaiju Standard Users"]) == UserRole.STANDARD_USER
+        }
     }
 
     def "should handle various groups object types gracefully"() {
         expect:
-        mapper.resolveRoleFromGroupObject(null) == UserRole.STANDARD_USER
-        mapper.resolveRoleFromGroupObject(IdpRoleMapper.GROUP_GLOBAL_ADMINS) == UserRole.GLOBAL_ADMIN
-        mapper.resolveRoleFromGroupObject([IdpRoleMapper.GROUP_REGION_DIRECTORS] as String[]) == UserRole.REGION_DIRECTOR
-        mapper.resolveRoleFromGroupObject([IdpRoleMapper.GROUP_REGION_AGENTS] as Object[]) == UserRole.REGION_AGENT
-        mapper.resolveRoleFromGroupObject(12345) == UserRole.STANDARD_USER
-        mapper.resolveRoleFromGroupObject(true) == UserRole.STANDARD_USER
-        mapper.resolveRoleFromGroupObject([null, 999]) == UserRole.STANDARD_USER
+        verifyAll {
+            mapper.resolveRoleFromGroupObject(null) == UserRole.STANDARD_USER
+            mapper.resolveRoleFromGroupObject(IdpRoleMapper.GROUP_GLOBAL_ADMINS) == UserRole.GLOBAL_ADMIN
+            mapper.resolveRoleFromGroupObject([IdpRoleMapper.GROUP_REGION_DIRECTORS] as String[]) == UserRole.REGION_DIRECTOR
+            mapper.resolveRoleFromGroupObject([IdpRoleMapper.GROUP_REGION_AGENTS] as Object[]) == UserRole.REGION_AGENT
+            mapper.resolveRoleFromGroupObject(12345) == UserRole.STANDARD_USER
+            mapper.resolveRoleFromGroupObject(true) == UserRole.STANDARD_USER
+            mapper.resolveRoleFromGroupObject([null, 999]) == UserRole.STANDARD_USER
+        }
     }
 }

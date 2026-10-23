@@ -75,26 +75,32 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         IngestBoundaryResponse body = response.body()
 
         then: "the endpoint responds with 200 OK and valid ingestion metrics"
-        response.status == HttpStatus.OK
-        body != null
-        body.regionId() == testRegionId
-        body.name() == "Ingestion Test Region"
-        body.originalPoints() > 1000
-        body.simplifiedPoints() > 0
-        body.simplifiedPoints() < body.originalPoints()
-        body.reductionRatio() != null
-        body.reductionRatio().contains("%")
-        body.valid() == true
+        verifyAll {
+            response.status == HttpStatus.OK
+            body != null
+            body.regionId() == testRegionId
+            body.name() == "Ingestion Test Region"
+            body.originalPoints() > 1000
+            body.simplifiedPoints() > 0
+            body.simplifiedPoints() < body.originalPoints()
+            body.reductionRatio() != null
+            body.reductionRatio().contains("%")
+            body.valid() == true
+        }
 
         and: "the updated geometry in PostGIS is valid and simplified"
         def dbRow = sql.firstRow("SELECT ST_IsValid(geom::geometry) AS is_valid, ST_NPoints(geom::geometry) AS pts FROM administrative_regions WHERE id = ?", [testRegionId])
-        dbRow.is_valid == true
-        dbRow.pts == body.simplifiedPoints()
+        verifyAll(dbRow) {
+            is_valid == true
+            pts == body.simplifiedPoints()
+        }
 
         and: "the mock HTTP client recorded the intercepted request and confirmed the contract"
-        stubHttpClientInstance.recordedRequests.size() == 1
-        stubHttpClientInstance.lastRequest.method() == "GET"
-        stubHttpClientInstance.lastRequest.uri().toString().contains("tigerweb.geo.census.gov")
+        verifyAll {
+            stubHttpClientInstance.recordedRequests.size() == 1
+            stubHttpClientInstance.lastRequest.method() == "GET"
+            stubHttpClientInstance.lastRequest.uri().toString().contains("tigerweb.geo.census.gov")
+        }
     }
 
     def "SUCCESS | should permit valid query parameters containing words like description"() {
@@ -107,10 +113,12 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         def response = client.exchange(request, IngestBoundaryResponse)
 
         then: "the request succeeds with 200 OK"
-        response.status == HttpStatus.OK
-        response.body() != null
-        response.body().regionId() == testRegionId
-        response.body().valid() == true
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body() != null
+            body().regionId() == testRegionId
+            body().valid() == true
+        }
     }
 
     def "REJECT | should reject insecure HTTP scheme with 400 Bad Request"() {
@@ -323,8 +331,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
 
         then: "the controller returns 413 Payload Too Large"
         def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.REQUEST_ENTITY_TOO_LARGE
-        e.status.code == 413
+        verifyAll(e) {
+            status == HttpStatus.REQUEST_ENTITY_TOO_LARGE
+            status.code == 413
+        }
     }
 
     def "FAILURE | should return 400 Bad Request when upstream payload is malformed non-JSON"() {
@@ -574,7 +584,9 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
 
         then: "the controller returns 400 Bad Request"
         def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.BAD_REQUEST
-        e.response.getBody(String).orElse("").contains("Linear ring must contain at least 4 coordinate positions.")
+        verifyAll(e) {
+            status == HttpStatus.BAD_REQUEST
+            response.getBody(String).orElse("").contains("Linear ring must contain at least 4 coordinate positions.")
+        }
     }
 }

@@ -94,10 +94,12 @@ class BoundaryIngestionServiceSpec extends Specification {
 
     def "should clamp tolerance values properly"() {
         expect:
-        service.resolveTolerance(null) == 0.001d
-        service.resolveTolerance(0.000001d) == 0.0001d
-        service.resolveTolerance(0.1d) == 0.05d
-        service.resolveTolerance(0.005d) == 0.005d
+        verifyAll {
+            service.resolveTolerance(null) == 0.001d
+            service.resolveTolerance(0.000001d) == 0.0001d
+            service.resolveTolerance(0.1d) == 0.05d
+            service.resolveTolerance(0.005d) == 0.005d
+        }
     }
 
     @Unroll
@@ -107,8 +109,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_REQUEST
-        ex.message.contains(expectedMessage)
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains(expectedMessage)
+        }
 
         where:
         tolerance                | expectedMessage
@@ -194,8 +198,10 @@ class BoundaryIngestionServiceSpec extends Specification {
         IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand(urlWithDescription, 0.001))
 
         then:
-        response != null
-        response.name() == "Desc Test Region"
+        verifyAll(response) {
+            it != null
+            name() == "Desc Test Region"
+        }
 
         cleanup:
         executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
@@ -311,8 +317,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then: "a 400 Bad Request exception is thrown with appropriate explanation"
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_REQUEST
-        ex.message.contains("GeoJSON FeatureCollection contains multiple features")
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("GeoJSON FeatureCollection contains multiple features")
+        }
     }
 
     def "should enforce payload size limits"() {
@@ -447,13 +455,15 @@ class BoundaryIngestionServiceSpec extends Specification {
         IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
-        response != null
-        response.regionId() == testRegionId
-        response.name() == "Spec Region"
-        response.originalPoints() == 5
-        response.simplifiedPoints() == 5
-        response.reductionRatio() == "0.00%"
-        response.valid() == true
+        verifyAll(response) {
+            it != null
+            regionId() == testRegionId
+            name() == "Spec Region"
+            originalPoints() == 5
+            simplifiedPoints() == 5
+            reductionRatio() == "0.00%"
+            valid() == true
+        }
 
         cleanup:
         executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
@@ -500,11 +510,13 @@ class BoundaryIngestionServiceSpec extends Specification {
         IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
-        response != null
-        response.regionId() == testRegionId
-        response.name() == "MultiPolygon Region"
-        response.originalPoints() == 10
-        response.valid() == true
+        verifyAll(response) {
+            it != null
+            regionId() == testRegionId
+            name() == "MultiPolygon Region"
+            originalPoints() == 10
+            valid() == true
+        }
 
         cleanup:
         executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
@@ -580,8 +592,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then: "a 400 Bad Request exception is thrown specifically for ring length"
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_REQUEST
-        ex.message.contains("Linear ring must contain at least 4 coordinate positions.")
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("Linear ring must contain at least 4 coordinate positions.")
+        }
     }
 
     def "should initialize default HttpClient when null httpClient is provided"() {
@@ -634,8 +648,10 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         then:
-        response != null
-        response.name() == "Port 443 Region"
+        verifyAll(response) {
+            it != null
+            name() == "Port 443 Region"
+        }
 
         cleanup:
         executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
@@ -676,10 +692,12 @@ class BoundaryIngestionServiceSpec extends Specification {
         IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
-        response != null
-        response.regionId() == testRegionId
-        response.name() == "Feature Region"
-        response.valid() == true
+        verifyAll(response) {
+            it != null
+            regionId() == testRegionId
+            name() == "Feature Region"
+            valid() == true
+        }
 
         cleanup:
         executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
@@ -703,8 +721,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.SERVICE_UNAVAILABLE
-        ex.message.contains("Boundary download request was interrupted")
+        verifyAll(ex) {
+            status == HttpStatus.SERVICE_UNAVAILABLE
+            message.contains("Boundary download request was interrupted")
+        }
         Thread.interrupted()
     }
 
@@ -732,8 +752,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_GATEWAY
-        ex.message.contains("Failed reading boundary response payload")
+        verifyAll(ex) {
+            status == HttpStatus.BAD_GATEWAY
+            message.contains("Failed reading boundary response payload")
+        }
     }
 
     def "should throw 400 when geometry serde produces null"() {
@@ -771,8 +793,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_REQUEST
-        ex.message.contains("GeoJSON payload does not contain a valid geometry object")
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("GeoJSON payload does not contain a valid geometry object")
+        }
     }
 
     def "should throw 400 when serializing geometry fails"() {
@@ -798,8 +822,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_REQUEST
-        ex.message.contains("Failed to serialize geometry")
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("Failed to serialize geometry")
+        }
     }
 
     def "should handle database exceptions and topology invalidation states during update"() {
@@ -838,8 +864,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex1 = thrown(HttpStatusException)
-        ex1.status == HttpStatus.INTERNAL_SERVER_ERROR
-        ex1.message.contains("Database error updating administrative region boundary.")
+        verifyAll(ex1) {
+            status == HttpStatus.INTERNAL_SERVER_ERROR
+            message.contains("Database error updating administrative region boundary.")
+        }
 
         when: "verifying region existence throws SQLException"
         PreparedStatement updateStmt2 = Mock(PreparedStatement) {
@@ -867,8 +895,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex2 = thrown(HttpStatusException)
-        ex2.status == HttpStatus.INTERNAL_SERVER_ERROR
-        ex2.message.contains("Database error verifying administrative region existence.")
+        verifyAll(ex2) {
+            status == HttpStatus.INTERNAL_SERVER_ERROR
+            message.contains("Database error verifying administrative region existence.")
+        }
 
         when: "region exists but update returned zero rows due to invalid resulting geometry"
         PreparedStatement updateStmt3 = Mock(PreparedStatement) {
@@ -899,8 +929,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex3 = thrown(HttpStatusException)
-        ex3.status == HttpStatus.UNPROCESSABLE_ENTITY
-        ex3.message.contains("Resulting geometry is topologically invalid")
+        verifyAll(ex3) {
+            status == HttpStatus.UNPROCESSABLE_ENTITY
+            message.contains("Resulting geometry is topologically invalid")
+        }
 
         when: "update succeeds with orig_pts equal to 0"
         ResultSet rs4 = Mock(ResultSet) {
@@ -929,8 +961,10 @@ class BoundaryIngestionServiceSpec extends Specification {
         IngestBoundaryResponse res4 = svc4.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
-        res4 != null
-        res4.reductionRatio() == "0.00%"
+        verifyAll(res4) {
+            it != null
+            reductionRatio() == "0.00%"
+        }
     }
 
     @Unroll
@@ -979,8 +1013,10 @@ class BoundaryIngestionServiceSpec extends Specification {
 
         then:
         def ex = thrown(HttpStatusException)
-        ex.status == HttpStatus.BAD_REQUEST
-        ex.message.contains("Coordinates must contain valid finite numbers.")
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("Coordinates must contain valid finite numbers.")
+        }
 
         where:
         x                        | y
