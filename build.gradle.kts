@@ -118,6 +118,31 @@ micronaut {
         }
     }
 }
+
+sourceSets {
+    main {
+        java {
+            exclude("**/lol/pbu/kaiju/client/**")
+        }
+    }
+}
+
+val isGeneratingClient = gradle.startParameter.taskNames.any { it.contains("generateApiClient") }
+tasks.named("generateClientOpenApiApis") {
+    enabled = isGeneratingClient
+}
+tasks.named("generateClientOpenApiModels") {
+    enabled = isGeneratingClient
+}
+
+tasks.register<Copy>("generateApiClient") {
+    group = "openapi"
+    description = "Generates and updates test HTTP client files from docs/openapi.yaml into src/test/java."
+    dependsOn("generateClientOpenApiApis", "generateClientOpenApiModels")
+    from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiApis/src/main/java"))
+    from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiModels/src/main/java"))
+    into("src/test/java")
+}
 sonar {
     properties {
         property("sonar.projectKey", "PeanutButter-Unicorn_kaiju")
