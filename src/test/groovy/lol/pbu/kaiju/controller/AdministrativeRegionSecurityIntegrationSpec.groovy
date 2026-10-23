@@ -209,9 +209,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         )
 
         then: "the region is created with 200 OK"
-        response.status == HttpStatus.OK
-        response.body().id != null
-        response.body().name == "Regional Created Region"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id != null
+            body().name == "Regional Created Region"
+        }
 
         and: "the region is persisted in the database"
         UUID createdId = UUID.fromString(response.body().id.toString())
@@ -240,20 +242,24 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         )
 
         then: "the response is 200 OK with fully serialized GeoJSON geometry"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.id != null
-        body.name == "Front Range Metro"
-        body.geom instanceof Map
-        body.geom.type == "Polygon"
-        body.geom.coordinates != null
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.id != null
+            body.name == "Front Range Metro"
+            body.geom instanceof Map
+            body.geom.type == "Polygon"
+            body.geom.coordinates != null
+        }
 
         and: "the database entity has proper persisted Geometry"
         UUID createdId = UUID.fromString(body.id.toString())
         def persistedOpt = administrativeRegionRepository.findById(createdId)
         persistedOpt.isPresent()
-        persistedOpt.get().geom() != null
-        persistedOpt.get().geom().geometryType == "Polygon"
+        verifyAll(persistedOpt.get()) {
+            geom() != null
+            geom().geometryType == "Polygon"
+        }
     }
 
     def "Round-trip | should allow authorized PUT with full GeoJSON payload to update existing region"() {
@@ -281,17 +287,21 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         )
 
         then: "the update succeeds with 200 OK and updated GeoJSON response"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.id.toString() == region.id().toString()
-        body.name == "Updated Front Range"
-        body.geom.type == "Polygon"
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.id.toString() == region.id().toString()
+            body.name == "Updated Front Range"
+            body.geom.type == "Polygon"
+        }
 
         and: "the database contains the updated data"
         def updatedOpt = administrativeRegionRepository.findById(region.id())
         updatedOpt.isPresent()
-        updatedOpt.get().name() == "Updated Front Range"
-        updatedOpt.get().geom() != null
+        verifyAll(updatedOpt.get()) {
+            name() == "Updated Front Range"
+            geom() != null
+        }
     }
 
     def "Security | should allow regional manager with region:manage claim to delete region"() {
@@ -305,11 +315,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
                 )
         )
 
-        then: "the deletion succeeds with 200 OK"
-        response.status == HttpStatus.OK
-
-        and: "the region is removed from the database"
-        !administrativeRegionRepository.findById(region.id()).isPresent()
+        then: "the deletion succeeds with 200 OK and region is removed from the database"
+        verifyAll {
+            response.status == HttpStatus.OK
+            !administrativeRegionRepository.findById(region.id()).isPresent()
+        }
     }
 
     def "Security | should allow global admin with system:admin claim to delete region"() {
@@ -323,11 +333,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
                 )
         )
 
-        then: "the deletion succeeds with 200 OK"
-        response.status == HttpStatus.OK
-
-        and: "the region is removed from the database"
-        !administrativeRegionRepository.findById(region.id()).isPresent()
+        then: "the deletion succeeds with 200 OK and region is removed from the database"
+        verifyAll {
+            response.status == HttpStatus.OK
+            !administrativeRegionRepository.findById(region.id()).isPresent()
+        }
     }
 
     def "Pagination | should apply default pagination and sort when requesting unpaged GET /administrative-regions"() {
@@ -344,9 +354,11 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         )
 
         then: "response is 200 OK with default pagination content"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+        }
     }
 
     def "Not Found | should return 404 NOT FOUND when updating non-existent administrative region"() {

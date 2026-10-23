@@ -57,8 +57,8 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location saved = response.body()
 
         then: "the location is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.name() == name
             saved.countryCode() == countryCode
@@ -152,8 +152,8 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location saved = response.body()
 
         then: "the location is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.name() == name
             saved.countryCode() == "US"
@@ -207,8 +207,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location saved = response.body()
 
         then: "the location is persisted with timezone America/Denver"
-        response.status == HttpStatus.OK
-        saved.timezone() == "America/Denver"
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.timezone() == "America/Denver"
+        }
 
         and: "the timezone is persisted in the database"
         def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [saved.id()])
@@ -230,8 +232,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location saved = response.body()
 
         then: "the location is persisted with null timezone without error"
-        response.status == HttpStatus.OK
-        saved.timezone() == null
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.timezone() == null
+        }
 
         and: "the timezone in the database is null"
         def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [saved.id()])
@@ -263,8 +267,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location saved = response.body()
 
         then: "the location is persisted with the fallback timezone"
-        response.status == HttpStatus.OK
-        saved.timezone() == "Europe/London"
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.timezone() == "Europe/London"
+        }
 
         and: "the database reflects the fallback timezone"
         def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [saved.id()])
@@ -287,10 +293,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/locations/${id}")), Location)
 
         then: "the correct location is returned with 200 OK"
-        response.status == HttpStatus.OK
-        verifyAll {
-            response.body().id() == id
-            response.body().name() == "Test Location Read"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == id
+            body().name() == "Test Location Read"
         }
     }
 
@@ -304,8 +310,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("${BASE_PATH}/${created.id()}")), Location)
 
         then: "the returned location includes the timezone field"
-        response.status == HttpStatus.OK
-        response.body().timezone() == "America/Denver"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().timezone() == "America/Denver"
+        }
 
         cleanup:
         if (created?.id()) {
@@ -346,8 +354,8 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updated = response.body()
 
         then: "the returned location contains the updated data with 200 OK"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.name() == newName
             updated.city() == newCity
@@ -382,8 +390,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updatedChicago = responseChicago.body()
 
         then: "the timezone changes to America/Chicago"
-        responseChicago.status == HttpStatus.OK
-        updatedChicago.timezone() == "America/Chicago"
+        verifyAll {
+            responseChicago.status == HttpStatus.OK
+            updatedChicago.timezone() == "America/Chicago"
+        }
 
         and: "the database reflects the updated timezone"
         def resultChicago = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
@@ -404,8 +414,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updatedLondon = responseLondon.body()
 
         then: "the timezone becomes null"
-        responseLondon.status == HttpStatus.OK
-        updatedLondon.timezone() == null
+        verifyAll {
+            responseLondon.status == HttpStatus.OK
+            updatedLondon.timezone() == null
+        }
 
         and: "the database reflects null timezone"
         def resultLondon = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
@@ -439,9 +451,11 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updated = response.body()
 
         then: "the name is updated and the timezone is preserved"
-        response.status == HttpStatus.OK
-        updated.name() == newName
-        updated.timezone() == "America/Denver"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.name() == newName
+            updated.timezone() == "America/Denver"
+        }
 
         and: "the database preserves the timezone"
         def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
@@ -475,8 +489,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updated = response.body()
 
         then: "the timezone is set to the provided fallback"
-        response.status == HttpStatus.OK
-        updated.timezone() == "Europe/London"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.timezone() == "Europe/London"
+        }
 
         and: "the database reflects the fallback timezone"
         def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
@@ -510,8 +526,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updated = response.body()
 
         then: "the explicit timezone override is applied"
-        response.status == HttpStatus.OK
-        updated.timezone() == "America/Boise"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.timezone() == "America/Boise"
+        }
 
         and: "the database reflects the updated timezone"
         def result = sql.firstRow("SELECT timezone FROM locations WHERE id = ?", [created.id()])
@@ -544,8 +562,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updated = response.body()
 
         then: "the timezone is resolved to America/Denver"
-        response.status == HttpStatus.OK
-        updated.timezone() == "America/Denver"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.timezone() == "America/Denver"
+        }
 
         cleanup:
         if (created?.id()) {
@@ -620,8 +640,8 @@ class LocationControllerSpec extends BaseControllerSpec {
         Location updated = response.body()
 
         then: "the returned location contains the updated data with 200 OK"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.name() == newName
             updated.city() == "Denver"
@@ -756,10 +776,12 @@ class LocationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/locations?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     def "LIST | should include timezone field in location list items"() {
@@ -772,12 +794,14 @@ class LocationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("${BASE_PATH}?size=20")), Map)
 
         then: "the response includes the location with its timezone"
-        response.status == HttpStatus.OK
         Map body = response.body()
         List items = body.content as List
         def item = items.find { it.id == created.id().toString() }
-        item != null
-        item.timezone == "America/Denver"
+        verifyAll {
+            response.status == HttpStatus.OK
+            item != null
+            item.timezone == "America/Denver"
+        }
 
         cleanup:
         if (created?.id()) {

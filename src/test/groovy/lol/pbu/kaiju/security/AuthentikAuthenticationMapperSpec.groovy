@@ -69,8 +69,10 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "it refuses to authenticate without an email"
-        !response.isAuthenticated()
-        response.getMessage().get() == "No email present in OpenID claims"
+        verifyAll(response) {
+            !isAuthenticated()
+            getMessage().get() == "No email present in OpenID claims"
+        }
     }
 
     def "should return failure if email is blank in claims"() {
@@ -83,8 +85,10 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "it refuses to authenticate with a blank email"
-        !response.isAuthenticated()
-        response.getMessage().get() == "No email present in OpenID claims"
+        verifyAll(response) {
+            !isAuthenticated()
+            getMessage().get() == "No email present in OpenID claims"
+        }
     }
 
     @Unroll
@@ -101,8 +105,10 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "authentication fails with unverified email message"
-        !response.isAuthenticated()
-        response.getMessage().get() == "Email is not verified in OpenID claims"
+        verifyAll(response) {
+            !isAuthenticated()
+            getMessage().get() == "Email is not verified in OpenID claims"
+        }
 
         where:
         verifiedValue << [null, false, "false", "no", 123]
@@ -125,11 +131,13 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "it logs them in with their actual database role and permissions"
-        response.isAuthenticated()
-        response.getAuthentication().get().getName() == existingUser.id().toString()
-        response.getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
-        response.getAuthentication().get().getRoles().contains("system:admin")
-        response.getAuthentication().get().getAttributes().get("email") == email
+        verifyAll(response) {
+            isAuthenticated()
+            getAuthentication().get().getName() == existingUser.id().toString()
+            getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
+            getAuthentication().get().getRoles().contains("system:admin")
+            getAuthentication().get().getAttributes().get("email") == email
+        }
     }
 
     def "should provision new user if they do not exist in the database"() {
@@ -148,19 +156,17 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
         AuthenticationResponse response = await(publisher)
 
-        then: "the authentication is successful and assigned the default role and permissions"
-        response.isAuthenticated()
-        response.getAuthentication().get().getRoles().contains("STANDARD_USER")
-        response.getAuthentication().get().getRoles().contains("project:create")
-        response.getAuthentication().get().getAttributes().get("email") == email
-
-        and: "the user was actually physically persisted into the real PostGIS database"
+        then: "the authentication is successful, matches default role, and persists to database"
         def dbUser = userRepository.findByEmail(email).get()
-        dbUser.email() == email
-        dbUser.role() == UserRole.STANDARD_USER
-
-        and: "their new database UUID was used as the session ID"
-        response.getAuthentication().get().getName() == dbUser.id().toString()
+        verifyAll {
+            response.isAuthenticated()
+            response.getAuthentication().get().getRoles().contains("STANDARD_USER")
+            response.getAuthentication().get().getRoles().contains("project:create")
+            response.getAuthentication().get().getAttributes().get("email") == email
+            dbUser.email() == email
+            dbUser.role() == UserRole.STANDARD_USER
+            response.getAuthentication().get().getName() == dbUser.id().toString()
+        }
     }
 
     def "should delegate to UserService to provision or get user"() {
@@ -183,10 +189,12 @@ class AuthentikAuthenticationMapperSpec extends Specification {
 
         then: "authentication succeeds with user from UserService"
         1 * mockUserService.provisionOrGetUser(email, UserRole.STANDARD_USER) >> mockUser
-        response.isAuthenticated()
-        response.getAuthentication().get().getName() == mockUser.id().toString()
-        response.getAuthentication().get().getRoles().contains("STANDARD_USER")
-        response.getAuthentication().get().getAttributes().get("email") == email
+        verifyAll(response) {
+            isAuthenticated()
+            getAuthentication().get().getName() == mockUser.id().toString()
+            getAuthentication().get().getRoles().contains("STANDARD_USER")
+            getAuthentication().get().getAttributes().get("email") == email
+        }
     }
 
     def "should canonicalize email to lowercase trimmed string"() {
@@ -235,12 +243,12 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "authentication succeeds with expected role and permissions"
-        response.isAuthenticated()
-        response.getAuthentication().get().getRoles().contains(expectedRole.name())
-
-        and: "the user record in PostgreSQL is saved with the mapped role"
         def dbUser = userRepository.findByEmail(email).get()
-        dbUser.role() == expectedRole
+        verifyAll {
+            response.isAuthenticated()
+            response.getAuthentication().get().getRoles().contains(expectedRole.name())
+            dbUser.role() == expectedRole
+        }
 
         where:
         groupClaim                                                              | expectedRole
@@ -278,8 +286,10 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         AuthenticationResponse response = await(publisher)
 
         then: "authentication succeeds using the authoritative database role"
-        response.isAuthenticated()
-        response.getAuthentication().get().getRoles().contains("REGION_DIRECTOR")
-        !response.getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
+        verifyAll(response) {
+            isAuthenticated()
+            getAuthentication().get().getRoles().contains("REGION_DIRECTOR")
+            !getAuthentication().get().getRoles().contains("GLOBAL_ADMIN")
+        }
     }
 }

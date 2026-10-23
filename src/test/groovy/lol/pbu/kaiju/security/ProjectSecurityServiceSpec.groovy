@@ -221,8 +221,10 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         )
 
         expect:
-        service.areAllLocationsInOrgRegion(projectNoLocs, orgId) == false
-        service.areAllLocationsInOrgRegion(projectNullLocs, orgId) == false
+        verifyAll {
+            service.areAllLocationsInOrgRegion(projectNoLocs, orgId) == false
+            service.areAllLocationsInOrgRegion(projectNullLocs, orgId) == false
+        }
     }
 
     def "areAllLocationsInOrgRegion evaluates geographic boundaries correctly"() {
@@ -255,8 +257,10 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         )
 
         expect:
-        service.areAllLocationsInOrgRegion(projectInside, testOrgId) == true
-        service.areAllLocationsInOrgRegion(projectOutside, testOrgId) == false
+        verifyAll {
+            service.areAllLocationsInOrgRegion(projectInside, testOrgId) == true
+            service.areAllLocationsInOrgRegion(projectOutside, testOrgId) == false
+        }
     }
 
     def "authorizeRegionalAdminApproval allows REGION_DIRECTOR to approve virtual project when org is in their region"() {
@@ -330,8 +334,10 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
         then:
         HttpStatusException e = thrown()
-        e.status == HttpStatus.FORBIDDEN
-        e.message.contains("virtual")
+        verifyAll(e) {
+            status == HttpStatus.FORBIDDEN
+            message.contains("virtual")
+        }
     }
 
     def "hasJurisdictionOverAllProjectLocations recognizes REGION_DIRECTOR in addition to REGION_AGENT"() {
@@ -349,8 +355,10 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
 
         expect:
-        queryRepository.hasJurisdictionOverAllProjectLocations(director.id(), pId) == true
-        service.canReassignProject(director.id(), new Project(pId, null, null, "Loc Project", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])) == true
+        verifyAll {
+            queryRepository.hasJurisdictionOverAllProjectLocations(director.id(), pId) == true
+            service.canReassignProject(director.id(), new Project(pId, null, null, "Loc Project", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])) == true
+        }
     }
 
     def "canModifyProject allows REGION_DIRECTOR to modify a virtual project in their region"() {
@@ -430,11 +438,11 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", dirA.id(), regAId)
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", dirB.id(), regBId)
 
-        expect: "Director A has jurisdiction because managing_region_id matches Region A"
-        queryRepository.isVirtualProjectInDirectorJurisdiction(dirA.id(), projAId) == true
-
-        and: "Director B is denied despite org presence in Region B, because managing_region_id takes precedence"
-        queryRepository.isVirtualProjectInDirectorJurisdiction(dirB.id(), projAId) == false
+        expect: "Director A has jurisdiction while Director B is denied because managing_region_id takes precedence"
+        verifyAll {
+            queryRepository.isVirtualProjectInDirectorJurisdiction(dirA.id(), projAId) == true
+            queryRepository.isVirtualProjectInDirectorJurisdiction(dirB.id(), projAId) == false
+        }
     }
 
     def "isVirtualProjectInDirectorJurisdiction rejects unverified organizations"() {
@@ -558,8 +566,10 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         def projectWithOut = new Project(UUID.randomUUID(), null, null, "P2", "D", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, locOut], [])
 
         expect:
-        service.areAllLocationsInOrgRegion(projectAllIn, testOrgId) == true
-        service.areAllLocationsInOrgRegion(projectWithOut, testOrgId) == false
+        verifyAll {
+            service.areAllLocationsInOrgRegion(projectAllIn, testOrgId) == true
+            service.areAllLocationsInOrgRegion(projectWithOut, testOrgId) == false
+        }
     }
 
     def "canAssignManagingRegion evaluates roles and organization presence"() {
@@ -581,9 +591,11 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", regionalAgent.id(), regId)
 
         expect:
-        service.canAssignManagingRegion(admin.id(), testOrgId, regId) == true
-        service.canAssignManagingRegion(orgManager.id(), testOrgId, regId) == true
-        service.canAssignManagingRegion(regionalAgent.id(), testOrgId, regId) == true
-        service.canAssignManagingRegion(standardUser.id(), testOrgId, regId) == false
+        verifyAll {
+            service.canAssignManagingRegion(admin.id(), testOrgId, regId) == true
+            service.canAssignManagingRegion(orgManager.id(), testOrgId, regId) == true
+            service.canAssignManagingRegion(regionalAgent.id(), testOrgId, regId) == true
+            service.canAssignManagingRegion(standardUser.id(), testOrgId, regId) == false
+        }
     }
 }

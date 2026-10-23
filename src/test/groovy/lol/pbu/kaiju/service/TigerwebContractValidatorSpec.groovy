@@ -109,11 +109,13 @@ class TigerwebContractValidatorSpec extends Specification {
         HttpResponse<InputStream> validatedResponse = validator.validateResponse(stubResponse)
 
         then: "the returned response contains a readable InputStream"
-        validatedResponse != null
-        validatedResponse.statusCode() == 200
-        validatedResponse.body() != null
         String readBack = new String(validatedResponse.body().readAllBytes(), "UTF-8")
-        readBack.contains("FeatureCollection")
+        verifyAll {
+            validatedResponse != null
+            validatedResponse.statusCode() == 200
+            validatedResponse.body() != null
+            readBack.contains("FeatureCollection")
+        }
     }
 
     def "REJECT | should throw ContractValidationException when HttpRequest is null"() {
@@ -572,8 +574,10 @@ class TigerwebContractValidatorSpec extends Specification {
         stubClient.send(req, HttpResponse.BodyHandlers.ofInputStream())
 
         then: "request is recorded and contract is verified"
-        stubClient.recordedRequests.size() == 1
-        stubClient.lastRequest == req
+        verifyAll {
+            stubClient.recordedRequests.size() == 1
+            stubClient.lastRequest == req
+        }
         noExceptionThrown()
 
         when: "validating recorded requests explicitly"
@@ -586,8 +590,10 @@ class TigerwebContractValidatorSpec extends Specification {
         stubClient.reset()
 
         then: "recorded requests are cleared"
-        stubClient.recordedRequests.isEmpty()
-        stubClient.lastRequest == null
+        verifyAll {
+            stubClient.recordedRequests.isEmpty()
+            stubClient.lastRequest == null
+        }
     }
 
     def "REJECT | should reject response InputStream exceeding 15MB payload limit in validateResponse"() {

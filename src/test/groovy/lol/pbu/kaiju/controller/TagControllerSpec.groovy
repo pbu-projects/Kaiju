@@ -47,9 +47,11 @@ class TagControllerSpec extends BaseControllerSpec {
         Tag saved = response.body()
 
         then: "the tag is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
-        saved.id() != null
-        saved.name() == tagName
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id() != null
+            saved.name() == tagName
+        }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
@@ -94,9 +96,11 @@ class TagControllerSpec extends BaseControllerSpec {
         Tag saved = response.body()
 
         then: "the tag is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
-        saved.id() != null
-        saved.name() == tagName
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id() != null
+            saved.name() == tagName
+        }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
@@ -146,9 +150,11 @@ class TagControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/tags/${id}")), Tag)
 
         then: "200 OK is returned with the correct tag"
-        response.status == HttpStatus.OK
-        response.body().id() == id
-        response.body().name() == tag.name()
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == id
+            body().name() == tag.name()
+        }
     }
 
     def "READ | should return 404 for a non-existent tag ID"() {
@@ -183,9 +189,11 @@ class TagControllerSpec extends BaseControllerSpec {
         Tag updated = response.body()
 
         then: "200 OK is returned with updated data"
-        response.status == HttpStatus.OK
-        updated.id() == id
-        updated.name() == newName
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.id() == id
+            updated.name() == newName
+        }
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
@@ -246,9 +254,11 @@ class TagControllerSpec extends BaseControllerSpec {
         Tag updated = response.body()
 
         then: "200 OK is returned with updated data"
-        response.status == HttpStatus.OK
-        updated.id() == id
-        updated.name() == newName
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.id() == id
+            updated.name() == newName
+        }
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
@@ -372,10 +382,12 @@ class TagControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/tags?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     def "LIST | should reject unauthenticated GET /tags with 401 UNAUTHORIZED"() {

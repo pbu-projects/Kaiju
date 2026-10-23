@@ -22,15 +22,17 @@ class LocationSpec extends Specification {
         def location = new Location(id, "Community Center", "123 Main St", "Denver", "CO", "80202", "US", point)
 
         then: "all fields are populated and timezone is null"
-        location.id() == id
-        location.name() == "Community Center"
-        location.addressLine() == "123 Main St"
-        location.city() == "Denver"
-        location.stateProvince() == "CO"
-        location.postalCode() == "80202"
-        location.countryCode() == "US"
-        location.geom() == point
-        location.timezone() == null
+        verifyAll(location) {
+            it.id() == id
+            name() == "Community Center"
+            addressLine() == "123 Main St"
+            city() == "Denver"
+            stateProvince() == "CO"
+            postalCode() == "80202"
+            countryCode() == "US"
+            geom() == point
+            timezone() == null
+        }
     }
 
     def "positive testing | constructor with timezone stores given value"() {
@@ -56,15 +58,17 @@ class LocationSpec extends Specification {
         def updated = location.withId(newId)
 
         then: "the new location has the new id while preserving all other properties"
-        updated.id() == newId
-        updated.name() == "Food Hub"
-        updated.addressLine() == "456 Market St"
-        updated.city() == "Denver"
-        updated.stateProvince() == "CO"
-        updated.postalCode() == "80202"
-        updated.countryCode() == "US"
-        updated.geom() == point
-        updated.timezone() == "America/Denver"
+        verifyAll(updated) {
+            id() == newId
+            name() == "Food Hub"
+            addressLine() == "456 Market St"
+            city() == "Denver"
+            stateProvince() == "CO"
+            postalCode() == "80202"
+            countryCode() == "US"
+            geom() == point
+            timezone() == "America/Denver"
+        }
     }
 
     def "positive testing | withTimezone creates a new copy with the updated timezone"() {
@@ -77,14 +81,16 @@ class LocationSpec extends Specification {
         def updated = location.withTimezone("America/Denver")
 
         then: "the new location has the updated timezone while keeping everything else identical"
-        updated.id() == id
-        updated.name() == "Food Hub"
-        updated.addressLine() == "456 Market St"
-        updated.city() == "Denver"
-        updated.stateProvince() == "CO"
-        updated.postalCode() == "80202"
-        updated.countryCode() == "US"
-        updated.geom() == point
-        updated.timezone() == "America/Denver"
+        verifyAll(updated) {
+            it.id() == id
+            name() == "Food Hub"
+            addressLine() == "456 Market St"
+            city() == "Denver"
+            stateProvince() == "CO"
+            postalCode() == "80202"
+            countryCode() == "US"
+            geom() == point
+            timezone() == "America/Denver"
+        }
     }
 }

@@ -187,8 +187,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         Organization saved = response.body()
 
         then: "the organization is persisted with a generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.name() == command.name()
             saved.websiteUrl() == command.websiteUrl()
@@ -232,10 +232,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations/${id}")), Organization)
 
         then: "the correct organization is returned"
-        response.status == HttpStatus.OK
-        verifyAll {
-            response.body().id() == id
-            response.body().name() == "Test Organization Read"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == id
+            body().name() == "Test Organization Read"
         }
     }
 
@@ -263,8 +263,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         Organization updated = response.body()
 
         then: "the returned organization contains the updated data"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.name() == newName
             updated.websiteUrl() == newUrl
@@ -321,11 +321,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", payload)), Organization)
         Organization updated = response.body()
 
-        then: "the safe fields are updated correctly"
-        updated.name() == (shouldNameChange ? payload.name : "Original Name")
-
-        and: "the sensitive fields are NOT updated"
-        updated.verificationStatus() == expectedStatus
+        then: "the safe fields are updated correctly and sensitive fields are NOT updated"
+        verifyAll(updated) {
+            name() == (shouldNameChange ? payload.name : "Original Name")
+            verificationStatus() == expectedStatus
+        }
 
         where:
         testCase                           | payload                                                                                                   || shouldNameChange | expectedStatus
@@ -353,8 +353,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/organizations/${id}")))
 
         then: "the organization no longer exists in the repository or database"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             !organizationRepository.findById(id).isPresent()
             sql.firstRow("SELECT count(*) as count FROM organizations WHERE id = ?", [id]).count == 0
         }
@@ -408,10 +408,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     def "LIST | should retrieve organizations with pagination and sorting via HTTP GET"() {
@@ -424,10 +426,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/organizations?size=5&sort=name,asc")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     /********** SEARCH Tests **********/
@@ -452,8 +456,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByName('"The Salvation Army"', false, Pageable.from(0, 10))
 
         then: "only the exact match is returned"
-        results.content.size() == 1
-        results.content[0].name == "The Salvation Army"
+        verifyAll {
+            results.content.size() == 1
+            results.content[0].name == "The Salvation Army"
+        }
     }
 
     def "SEARCH BY NAME | exact search with single quotes should return strictly the exact organization"() {
@@ -471,8 +477,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByName("'The Salvation Army'", false, Pageable.from(0, 10))
 
         then: "only the exact match is returned"
-        results.content.size() == 1
-        results.content[0].name == "The Salvation Army"
+        verifyAll {
+            results.content.size() == 1
+            results.content[0].name == "The Salvation Army"
+        }
     }
 
     def "SEARCH BY NAME | exact search with exact=true parameter should return strictly the exact organization"() {
@@ -490,8 +498,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByName("The Salvation Army", true, Pageable.from(0, 10))
 
         then: "only the exact match is returned"
-        results.content.size() == 1
-        results.content[0].name == "The Salvation Army"
+        verifyAll {
+            results.content.size() == 1
+            results.content[0].name == "The Salvation Army"
+        }
     }
 
     def "SEARCH BY NAME | case-insensitive exact search should match regardless of casing"() {
@@ -503,8 +513,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByName('"the salvation army"', false, Pageable.from(0, 10))
 
         then: "it matches the organization case-insensitively"
-        results.content.size() == 1
-        results.content[0].name == "The Salvation Army"
+        verifyAll {
+            results.content.size() == 1
+            results.content[0].name == "The Salvation Army"
+        }
     }
 
     def "SEARCH BY NAME | ranked search for 'Salvation Army' without quotes should return all matches with exact/prefix/word-boundary ranked at the top"() {
@@ -526,12 +538,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         when: "performing a non-exact ranked search"
         PageResponse<Organization> results = searchByName("Salvation Army", false, Pageable.from(0, 20))
 
-        then: "all 7 Salvation Army organizations are returned, excluding the unrelated one"
-        results.content.size() == 7
-        results.content.every { it.name().contains("Salvation Army") }
-
-        and: "The Salvation Army is ranked at the very top"
-        results.content[0].name() == "The Salvation Army"
+        then: "all 7 Salvation Army organizations are returned, ranked at the very top"
+        verifyAll(results) {
+            content.size() == 7
+            content.every { it.name().contains("Salvation Army") }
+            content[0].name() == "The Salvation Army"
+        }
     }
 
     def "SEARCH BY NAME | prefix search 'The Salvation Army -' should return only Corps branches"() {
@@ -551,11 +563,13 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByName("The Salvation Army -", false, Pageable.from(0, 10))
 
         then: "only the two Corps branches are returned"
-        results.content.size() == 2
-        results.content.collect { it.name() }.sort() == [
-                "The Salvation Army - Aurora Corps Community Center",
-                "The Salvation Army - Denver Citadel Corps"
-        ]
+        verifyAll {
+            results.content.size() == 2
+            results.content.collect { it.name() }.sort() == [
+                    "The Salvation Army - Aurora Corps Community Center",
+                    "The Salvation Army - Denver Citadel Corps"
+            ]
+        }
     }
 
     def "SEARCH BY NAME | blank or empty search query should return empty page"() {
@@ -598,9 +612,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByLocation(-104.9903, 39.7392, 15000, Pageable.from(0, 10))
 
         then: "Near and Mid orgs are returned, Far is excluded, ordered by distance"
-        results.content.size() == 2
-        results.content[0].id() == orgNearId
-        results.content[1].id() == orgMidId
+        verifyAll {
+            results.content.size() == 2
+            results.content[0].id() == orgNearId
+            results.content[1].id() == orgMidId
+        }
     }
 
     def "SEARCH BY NAME | fuzzy trigram search should tolerate typos like 'Slavation Army'"() {
@@ -615,10 +631,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByName("Slavation Army", false, Pageable.from(0, 10))
 
         then: "The Salvation Army is matched via trigram similarity and ranked first"
-        !results.content.isEmpty()
-        results.content[0].id() == parentId
-        results.content[0].name() == "The Salvation Army"
-        results.content.every { it.name().contains("Salvation Army") }
+        verifyAll {
+            !results.content.isEmpty()
+            results.content[0].id() == parentId
+            results.content[0].name() == "The Salvation Army"
+            results.content.every { it.name().contains("Salvation Army") }
+        }
     }
 
     def "SEARCH BY REGION | should return organizations operating within the specified administrative region"() {
@@ -641,9 +659,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         PageResponse<Organization> results = searchByRegion(region1Id, Pageable.from(0, 10))
 
         then: "only the organization operating in Region 1 is returned"
-        results.content.size() == 1
-        results.content[0].id() == org1Id
-        results.content[0].name() == "Colorado Food Bank"
+        verifyAll {
+            results.content.size() == 1
+            results.content[0].id() == org1Id
+            results.content[0].name() == "Colorado Food Bank"
+        }
     }
 
     def "SEARCH SECURITY | should NOT return private organizations in name, location, or region search"() {
@@ -676,9 +696,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def regionResults = searchByRegion(regionId, Pageable.from(0, 10))
 
         then: "private organization is never returned in any search endpoint"
-        nameResults.content.collect { it.id() } == [publicOrgId]
-        locResults.content.collect { it.id() } == [publicOrgId]
-        regionResults.content.collect { it.id() } == [publicOrgId]
+        verifyAll {
+            nameResults.content.collect { it.id() } == [publicOrgId]
+            locResults.content.collect { it.id() } == [publicOrgId]
+            regionResults.content.collect { it.id() } == [publicOrgId]
+        }
     }
 
     def "SEARCH SECURITY | should NOT return unverified, suspended, or revoked organizations"() {
@@ -712,10 +734,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def emptyQuotesResults = searchByName('""', false, Pageable.from(0, 10))
 
         then: "all wildcard-only and empty quote queries return empty results"
-        percentResults.content.isEmpty()
-        underscoreResults.content.isEmpty()
-        multiWildcardResults.content.isEmpty()
-        emptyQuotesResults.content.isEmpty()
+        verifyAll {
+            percentResults.content.isEmpty()
+            underscoreResults.content.isEmpty()
+            multiWildcardResults.content.isEmpty()
+            emptyQuotesResults.content.isEmpty()
+        }
     }
 
     /********** EXHAUSTIVE QUERY VARIATIONS & EDGE CASES **********/
@@ -756,33 +780,39 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resExactAndQuoted = searchByName('"The Salvation Army"', true, Pageable.from(0, 10))
 
         then: "exact quote variations return strictly the single exact parent org"
-        resPaddedQuotes.content.size() == 1
-        resPaddedQuotes.content[0].id() == orgId
+        verifyAll {
+            resPaddedQuotes.content.size() == 1
+            resPaddedQuotes.content[0].id() == orgId
 
-        resSpacesInside.content.size() == 1
-        resSpacesInside.content[0].id() == orgId
+            resSpacesInside.content.size() == 1
+            resSpacesInside.content[0].id() == orgId
 
-        resExactAndQuoted.content.size() == 1
-        resExactAndQuoted.content[0].id() == orgId
+            resExactAndQuoted.content.size() == 1
+            resExactAndQuoted.content[0].id() == orgId
+        }
 
         and: "single quote characters and empty quote queries return empty pages"
-        resSingleQuoteOnly.content.isEmpty()
-        resDoubleQuoteOnly.content.isEmpty()
-        resEmptyDoubleWithSpaces.content.isEmpty()
-        resEmptySingleWithSpaces.content.isEmpty()
+        verifyAll {
+            resSingleQuoteOnly.content.isEmpty()
+            resDoubleQuoteOnly.content.isEmpty()
+            resEmptyDoubleWithSpaces.content.isEmpty()
+            resEmptySingleWithSpaces.content.isEmpty()
+        }
 
         and: "mismatched quotes gracefully fall back to ranked search and surface parent org at top"
-        !resMismatchedDoubleStart.content.isEmpty()
-        resMismatchedDoubleStart.content[0].id() == orgId
+        verifyAll {
+            !resMismatchedDoubleStart.content.isEmpty()
+            resMismatchedDoubleStart.content[0].id() == orgId
 
-        !resMismatchedDoubleEnd.content.isEmpty()
-        resMismatchedDoubleEnd.content[0].id() == orgId
+            !resMismatchedDoubleEnd.content.isEmpty()
+            resMismatchedDoubleEnd.content[0].id() == orgId
 
-        !resMismatchedSingleStart.content.isEmpty()
-        resMismatchedSingleStart.content[0].id() == orgId
+            !resMismatchedSingleStart.content.isEmpty()
+            resMismatchedSingleStart.content[0].id() == orgId
 
-        !resMismatchedSingleEnd.content.isEmpty()
-        resMismatchedSingleEnd.content[0].id() == orgId
+            !resMismatchedSingleEnd.content.isEmpty()
+            resMismatchedSingleEnd.content[0].id() == orgId
+        }
     }
 
     def "SEARCH BY NAME | exhaustive typo permutations: subtle misspellings and transposed letters"() {
@@ -801,14 +831,16 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resTypoWithArticle = searchByName("The Slavation Army", false, Pageable.from(0, 10))
 
         then: "all typo variations successfully find The Salvation Army via trigram similarity"
-        !resTransposedVt.content.isEmpty()
-        resTransposedVt.content[0].id() == parentId
+        verifyAll {
+            !resTransposedVt.content.isEmpty()
+            resTransposedVt.content[0].id() == parentId
 
-        !resTransposedMr.content.isEmpty()
-        resTransposedMr.content[0].id() == parentId
+            !resTransposedMr.content.isEmpty()
+            resTransposedMr.content[0].id() == parentId
 
-        !resTypoWithArticle.content.isEmpty()
-        resTypoWithArticle.content[0].id() == parentId
+            !resTypoWithArticle.content.isEmpty()
+            resTypoWithArticle.content[0].id() == parentId
+        }
     }
 
     def "SEARCH BY NAME | article normalization with 'An' and 'A' leading articles"() {
@@ -828,14 +860,18 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resA = searchByName("Better Tomorrow Foundation", false, Pageable.from(0, 10))
 
         then: "article normalization correctly ranks the parent entity with stripped article above the competitor"
-        resAn.content.size() == 2
-        resAn.content[0].id() == orgAnId
-        resAn.content[1].id() == compAnId
+        verifyAll {
+            resAn.content.size() == 2
+            resAn.content[0].id() == orgAnId
+            resAn.content[1].id() == compAnId
+        }
 
         and: "second article query similarly elevates the canonical parent entity"
-        resA.content.size() == 2
-        resA.content[0].id() == orgAId
-        resA.content[1].id() == compAId
+        verifyAll {
+            resA.content.size() == 2
+            resA.content[0].id() == orgAId
+            resA.content[1].id() == compAId
+        }
     }
 
     def "SEARCH BY NAME | literal SQL wildcard characters (% and _) in organization names"() {
@@ -853,12 +889,16 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resUnderscore = searchByName("Special_Ops", false, Pageable.from(0, 10))
 
         then: "literal percent matches only the organization containing '100%'"
-        resPercent.content.size() == 1
-        resPercent.content[0].id() == orgPercentId
+        verifyAll {
+            resPercent.content.size() == 1
+            resPercent.content[0].id() == orgPercentId
+        }
 
         and: "literal underscore does not expand as a single-character wildcard (SpecialXOps is not matched)"
-        resUnderscore.content.size() == 1
-        resUnderscore.content[0].id() == orgUnderscoreId
+        verifyAll {
+            resUnderscore.content.size() == 1
+            resUnderscore.content[0].id() == orgUnderscoreId
+        }
     }
 
     def "SEARCH BY NAME | exhaustive cluster branch and keyword queries"() {
@@ -906,14 +946,16 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resParent = searchByName("Salvation Army", false, Pageable.from(0, 10))
 
         then: "each specific query accurately isolates its target entity at the top of results"
-        resParent.content[0].id() == parentId
-        resDenver.content[0].id() == denverId
-        resAurora.content[0].id() == auroraId
-        resSprings.content[0].id() == springsId
-        resIntermountain.content[0].id() == intermountainId
-        resStore.content[0].id() == storeId
-        resDisaster.content[0].id() == disasterId
-        resFriends.content[0].id() == friendsId
+        verifyAll {
+            resParent.content[0].id() == parentId
+            resDenver.content[0].id() == denverId
+            resAurora.content[0].id() == auroraId
+            resSprings.content[0].id() == springsId
+            resIntermountain.content[0].id() == intermountainId
+            resStore.content[0].id() == storeId
+            resDisaster.content[0].id() == disasterId
+            resFriends.content[0].id() == friendsId
+        }
     }
 
     def "PAGINATION & SORTING | normalizePageable and getOrganizations branch coverage"() {
@@ -961,33 +1003,41 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def resRegionSorted = organizationController.searchByRegion(regionId, sortedPageable)
 
         then: "all permutations execute successfully with defaults"
-        !resGetOrgsNull.content.isEmpty()
-        !resGetOrgsUnpaged.content.isEmpty()
-        !resNameNullPageable.content.isEmpty()
-        !resNameUnpaged.content.isEmpty()
+        verifyAll {
+            !resGetOrgsNull.content.isEmpty()
+            !resGetOrgsUnpaged.content.isEmpty()
+            !resNameNullPageable.content.isEmpty()
+            !resNameUnpaged.content.isEmpty()
+        }
 
         and: "searchByName with client DESC sort strips the client sort and maintains native relevance ASC tie-breaking"
         resNameWithSort.content*.name() == ['Paging Test Org 1', 'Paging Test Org 2']
 
         and: "searchByNameExact with client sort strips sort and matches the exact target entity"
-        resExactWithSort.content.size() == 1
-        resExactWithSort.content[0].id() == org1Id
+        verifyAll {
+            resExactWithSort.content.size() == 1
+            resExactWithSort.content[0].id() == org1Id
+        }
 
         and: "searchByLocation returns matching organization across null, unpaged, and sorted pageables"
-        !resLocNull.content.isEmpty()
-        resLocNull.content[0].id() == org1Id
-        !resLocUnpaged.content.isEmpty()
-        resLocUnpaged.content[0].id() == org1Id
-        !resLocSorted.content.isEmpty()
-        resLocSorted.content[0].id() == org1Id
+        verifyAll {
+            !resLocNull.content.isEmpty()
+            resLocNull.content[0].id() == org1Id
+            !resLocUnpaged.content.isEmpty()
+            resLocUnpaged.content[0].id() == org1Id
+            !resLocSorted.content.isEmpty()
+            resLocSorted.content[0].id() == org1Id
+        }
 
         and: "searchByRegion returns matching organization across null, unpaged, and sorted pageables"
-        !resRegionNull.content.isEmpty()
-        resRegionNull.content[0].id() == org1Id
-        !resRegionUnpaged.content.isEmpty()
-        resRegionUnpaged.content[0].id() == org1Id
-        !resRegionSorted.content.isEmpty()
-        resRegionSorted.content[0].id() == org1Id
+        verifyAll {
+            !resRegionNull.content.isEmpty()
+            resRegionNull.content[0].id() == org1Id
+            !resRegionUnpaged.content.isEmpty()
+            resRegionUnpaged.content[0].id() == org1Id
+            !resRegionSorted.content.isEmpty()
+            resRegionSorted.content[0].id() == org1Id
+        }
     }
 
     /********** AUTHORIZATION & SECURITY Tests **********/
@@ -1076,15 +1126,19 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asOrgAdmin(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.LEO_LOCAL_ADMIN), Organization)
 
         then: "it succeeds"
-        response.status == HttpStatus.OK
-        response.body().name() == "Updated By Admin"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().name() == "Updated By Admin"
+        }
 
         when: "org admin deletes the organization via HTTP DELETE"
         def delResponse = client.exchange(asOrgAdmin(HttpRequest.DELETE("/organizations/${org.id()}"), TestPersonas.LEO_LOCAL_ADMIN))
 
         then: "it is removed"
-        delResponse.status == HttpStatus.OK
-        !organizationRepository.findById(org.id()).isPresent()
+        verifyAll {
+            delResponse.status == HttpStatus.OK
+            !organizationRepository.findById(org.id()).isPresent()
+        }
 
         cleanup:
         executeUpdate("DELETE FROM organization_users WHERE organization_id = ?", org.id())

@@ -369,8 +369,10 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         ), Project)
 
         then: "the response is 200 OK and project title is updated"
-        response.status == HttpStatus.OK
-        response.body().title() == "Updated Project Alpha Title"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().title() == "Updated Project Alpha Title"
+        }
     }
 
     def "HAPPY PATH | should allow User A to successfully create a shift for Project A with 200 OK"() {
@@ -384,9 +386,11 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         ), Shift)
 
         then: "the response is 200 OK and shift is persisted"
-        response.status == HttpStatus.OK
-        response.body().id() != null
-        response.body().project().id() == projectAId
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() != null
+            body().project().id() == projectAId
+        }
     }
 
     def "HAPPY PATH | should allow User A to successfully update Shift A with 200 OK"() {
@@ -400,8 +404,10 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         ), Shift)
 
         then: "the response is 200 OK"
-        response.status == HttpStatus.OK
-        response.body().id() == shiftAId
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == shiftAId
+        }
     }
 
     def "HAPPY PATH | should allow User A to successfully delete Shift A with 200 OK"() {
@@ -412,8 +418,10 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         ))
 
         then: "the response is 200 OK or 204 NO_CONTENT"
-        response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-        sql.firstRow("SELECT COUNT(*) as count FROM shifts WHERE id = ?", [shiftAId]).count == 0
+        verifyAll {
+            response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
+            sql.firstRow("SELECT COUNT(*) as count FROM shifts WHERE id = ?", [shiftAId]).count == 0
+        }
     }
 
     def "HAPPY PATH | should allow Denver Regional Director to approve Denver Project A with 200 OK"() {
@@ -424,7 +432,9 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         ), Project)
 
         then: "the response is 200 OK and project status transitions to ACTIVE"
-        response.status == HttpStatus.OK
-        response.body().status() == ProjectStatus.ACTIVE
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().status() == ProjectStatus.ACTIVE
+        }
     }
 }

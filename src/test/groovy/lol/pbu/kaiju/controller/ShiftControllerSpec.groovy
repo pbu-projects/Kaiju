@@ -94,8 +94,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
         Shift saved = response.body()
 
         then: "the response is 200 OK and shift is persisted with a generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.project().id() == project.id()
             saved.isVirtual()
@@ -130,8 +130,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
         Shift saved = response.body()
 
         then: "the response is 200 OK and shift is persisted with a generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.project().id() == project.id()
             (!saved.isVirtual())
@@ -164,8 +164,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
         Shift saved = response.body()
 
         then: "the shift is persisted with 200 OK"
-        response.status == HttpStatus.OK
-        saved.id() != null
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id() != null
+        }
 
         cleanup:
         if (saved?.id() != null) {
@@ -244,8 +246,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/shifts/${id}")), Shift)
 
         then: "the correct shift is returned with 200 OK"
-        response.status == HttpStatus.OK
-        response.body().id() == id
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == id
+        }
     }
 
     def "READ | should return 404 Not Found for a non-existent shift ID"() {
@@ -287,8 +291,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
         Shift updated = response.body()
 
         then: "the response is 200 OK and contains updated data"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.startTime() == newStart
             updated.endTime() == newEnd
@@ -296,9 +300,11 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         and: "the changes are persisted in the database"
         def dbResult = sql.firstRow("SELECT start_time, end_time FROM shifts WHERE id = ?", [id])
-        dbResult != null
-        ((Timestamp) dbResult.start_time).toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
-        ((Timestamp) dbResult.end_time).toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
+        verifyAll {
+            dbResult != null
+            ((Timestamp) dbResult.start_time).toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
+            ((Timestamp) dbResult.end_time).toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
+        }
     }
 
     def "UPDATE | should throw 403 Forbidden when standard user attempts to update unmanaged shift"() {
@@ -472,10 +478,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/shifts?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     def "LIST | should reject unauthenticated GET /shifts with 401 UNAUTHORIZED"() {

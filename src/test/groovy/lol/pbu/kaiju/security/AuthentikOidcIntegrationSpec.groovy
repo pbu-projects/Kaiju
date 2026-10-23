@@ -286,17 +286,21 @@ class AuthentikOidcIntegrationSpec extends Specification {
         Map<String, Object> config = JSONObjectUtils.parse(resp.body())
 
         then: "the response is HTTP 200 with matching issuer and signing algorithms"
-        resp.statusCode() == 200
-        config.get("issuer") == OIDC_ISSUER
-        config.get("jwks_uri") == JWKS_URL
-        (config.get("id_token_signing_alg_values_supported") as List).contains("RS256")
+        verifyAll {
+            resp.statusCode() == 200
+            config.get("issuer") == OIDC_ISSUER
+            config.get("jwks_uri") == JWKS_URL
+            (config.get("id_token_signing_alg_values_supported") as List).contains("RS256")
+        }
 
         then: "the key set contains a valid RSA signing key using RS256"
         !jwkSet.getKeys().isEmpty()
         RSAKey rsaKey = (RSAKey) jwkSet.getKeys().get(0)
-        rsaKey.getAlgorithm() == JWSAlgorithm.RS256
-        rsaKey.getKeyUse().identifier() == "sig"
-        rsaKey.toRSAPublicKey() != null
+        verifyAll(rsaKey) {
+            getAlgorithm() == JWSAlgorithm.RS256
+            getKeyUse().identifier() == "sig"
+            toRSAPublicKey() != null
+        }
     }
 
     @Unroll
@@ -314,15 +318,15 @@ class AuthentikOidcIntegrationSpec extends Specification {
         then: "the cryptographic RS256 signature validates successfully against live JWKS"
         signedJWT.verify(verifier)
 
-        and: "token claims contain expected OpenID metadata"
+        and: "token claims contain expected OpenID metadata and valid expiration"
         def claims = signedJWT.getJWTClaimsSet()
-        claims.getIssuer() == OIDC_ISSUER
-        claims.getAudience().contains(CLIENT_ID)
-        claims.getStringClaim("email") == expectedEmail
-        claims.getStringListClaim("groups").contains(expectedGroup)
-
-        and: "token expiration is in the future"
-        claims.getExpirationTime().after(new Date())
+        verifyAll(claims) {
+            getIssuer() == OIDC_ISSUER
+            getAudience().contains(CLIENT_ID)
+            getStringClaim("email") == expectedEmail
+            getStringListClaim("groups").contains(expectedGroup)
+            getExpirationTime().after(new Date())
+        }
 
         where:
         username                          | expectedEmail                     | expectedGroup
@@ -550,20 +554,25 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         then: "authentication succeeds with a new database record created"
         authResponse.isAuthenticated()
+        authResponse.getAuthentication().isPresent()
         def auth = authResponse.getAuthentication().get()
-        auth.getAttributes().get("email") == jennyEmail
 
         and: "Jenny now physically exists in PostgreSQL as a STANDARD_USER"
         Optional<User> dbUserOpt = userRepository.findByEmail(jennyEmail)
         dbUserOpt.isPresent()
         User dbUser = dbUserOpt.get()
-        dbUser.email() == jennyEmail
-        dbUser.role() == UserRole.STANDARD_USER
-        auth.getName() == dbUser.id().toString()
+        verifyAll {
+            auth.getAttributes().get("email") == jennyEmail
+            auth.getName() == dbUser.id().toString()
+            dbUser.email() == jennyEmail
+            dbUser.role() == UserRole.STANDARD_USER
+        }
 
         and: "standard volunteer discrete permissions are granted in the security context"
-        UserRole.STANDARD_USER.getPermissions().each { permission ->
-            assert auth.getRoles().contains(permission.getClaim())
+        verifyAll(auth) {
+            UserRole.STANDARD_USER.getPermissions().every { permission ->
+                roles.contains(permission.getClaim())
+            }
         }
 
         cleanup:
@@ -632,8 +641,10 @@ class AuthentikOidcIntegrationSpec extends Specification {
         createdRegionId = regionResponse.body().id()
 
         then: "region creation is granted with 200 OK verifying region:manage permission"
-        regionResponse.status == HttpStatus.OK
-        createdRegionId != null
+        verifyAll {
+            regionResponse.status == HttpStatus.OK
+            createdRegionId != null
+        }
 
         cleanup:
         if (createdRegionId != null) {
@@ -656,8 +667,10 @@ class AuthentikOidcIntegrationSpec extends Specification {
         createdRegionId = regionResponse.body().id()
 
         then: "region creation is granted with 200 OK verifying region:manage permission"
-        regionResponse.status == HttpStatus.OK
-        createdRegionId != null
+        verifyAll {
+            regionResponse.status == HttpStatus.OK
+            createdRegionId != null
+        }
 
         when: "Rachel calls GET /users to attempt system user administration"
         client.exchange(
@@ -763,8 +776,10 @@ class AuthentikOidcIntegrationSpec extends Specification {
         createdRegionId = elevatedResponse.body().id()
 
         then: "access is immediately granted with 200 OK reflecting the updated database authority"
-        elevatedResponse.status == HttpStatus.OK
-        createdRegionId != null
+        verifyAll {
+            elevatedResponse.status == HttpStatus.OK
+            createdRegionId != null
+        }
 
         when: "Victor is dynamically demoted back to STANDARD_USER in the database"
         userService.updateRole(victor.id(), UserRole.STANDARD_USER)
@@ -803,12 +818,12 @@ class AuthentikOidcIntegrationSpec extends Specification {
         )
 
         then: "access is granted with 200 OK due to JIT provisioning with mapped GLOBAL_ADMIN role"
-        response.status == HttpStatus.OK
-
-        and: "Gary now exists in the PostgreSQL database with GLOBAL_ADMIN role"
         Optional<User> provisionedUser = userRepository.findByEmail(garyEmail)
         provisionedUser.isPresent()
-        provisionedUser.get().role() == UserRole.GLOBAL_ADMIN
+        verifyAll {
+            response.status == HttpStatus.OK
+            provisionedUser.orElse(null)?.role() == UserRole.GLOBAL_ADMIN
+        }
 
         cleanup:
         if (originalGary != null) {

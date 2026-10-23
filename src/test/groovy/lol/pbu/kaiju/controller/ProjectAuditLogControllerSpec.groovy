@@ -57,8 +57,10 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         ProjectAuditLog result = response.body()
 
         then: "200 OK is returned with the correct project audit log"
-        response.status == HttpStatus.OK
-        result.id() == id
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.id() == id
+        }
     }
 
     def "READ | should return 404 for a non-existent project audit log ID"() {
@@ -86,9 +88,11 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/project-audit-logs?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+        }
     }
 
     def "LIST | should fully drain all project audit logs sequentially using cursors"() {

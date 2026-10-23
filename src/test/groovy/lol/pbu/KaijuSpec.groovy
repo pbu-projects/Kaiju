@@ -39,9 +39,11 @@ class KaijuSpec extends Specification {
         String pointWkt = postgisRs.getString(1)
 
         then:
-        userCount > 0
-        projectCount > 0
-        pointWkt != null
-        pointWkt.startsWith("POINT")
+        verifyAll {
+            userCount > 0
+            projectCount > 0
+            pointWkt != null
+            pointWkt.startsWith("POINT")
+        }
     }
 }

@@ -45,10 +45,12 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         RegionUser saved = response.body()
 
         then: "200 OK is returned and record is persisted"
-        response.status == HttpStatus.OK
-        saved.id().userId() == userId
-        saved.id().regionId() == regionId
-        saved.role() == RegionUserRole.REGION_DIRECTOR
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id().userId() == userId
+            saved.id().regionId() == regionId
+            saved.role() == RegionUserRole.REGION_DIRECTOR
+        }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [userId, regionId])
@@ -124,10 +126,12 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         RegionUser saved = response.body()
 
         then: "200 OK is returned and record is persisted"
-        response.status == HttpStatus.OK
-        saved.id().userId() == targetUserId
-        saved.id().regionId() == targetRegionId
-        saved.role() == RegionUserRole.REGION_AGENT
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id().userId() == targetUserId
+            saved.id().regionId() == targetRegionId
+            saved.role() == RegionUserRole.REGION_AGENT
+        }
 
         and: "it can be retrieved from the database"
         def result = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [targetUserId, targetRegionId])
@@ -154,10 +158,12 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         RegionUser result = response.body()
 
         then: "200 OK is returned with correct data"
-        response.status == HttpStatus.OK
-        result.id().userId() == userId
-        result.id().regionId() == regionId
-        result.role() == RegionUserRole.REGION_DIRECTOR
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.id().userId() == userId
+            result.id().regionId() == regionId
+            result.role() == RegionUserRole.REGION_DIRECTOR
+        }
 
         cleanup:
         executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", userId, regionId)
@@ -200,8 +206,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         RegionUser updated = response.body()
 
         then: "the update is reflected in the response"
-        response.status == HttpStatus.OK
-        updated.role() == RegionUserRole.REGION_DIRECTOR
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.role() == RegionUserRole.REGION_DIRECTOR
+        }
 
         and: "persisted in the database"
         def role = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [userId, regionId]).role
@@ -277,8 +285,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         RegionUser updated = response.body()
 
         then: "200 OK is returned and update is reflected in response"
-        response.status == HttpStatus.OK
-        updated.role() == RegionUserRole.REGION_DIRECTOR
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.role() == RegionUserRole.REGION_DIRECTOR
+        }
 
         and: "persisted in the database"
         def role = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [targetUserId, targetRegionId]).role
@@ -303,11 +313,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         when: "the region user is deleted via HTTP DELETE"
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/region-users/${userId}/${regionId}")))
 
-        then: "200 OK is returned"
-        response.status == HttpStatus.OK
-
-        and: "it no longer exists in repository"
-        !regionUserRepository.existsById(new RegionUserId(userId, regionId))
+        then: "200 OK is returned and it no longer exists in repository"
+        verifyAll {
+            response.status == HttpStatus.OK
+            !regionUserRepository.existsById(new RegionUserId(userId, regionId))
+        }
 
         cleanup:
         executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", userId, regionId)
@@ -367,11 +377,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         when: "the regional director deletes the region user via HTTP DELETE"
         def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${targetUserId}/${targetRegionId}"), directorId.toString()))
 
-        then: "200 OK is returned"
-        response.status == HttpStatus.OK
-
-        and: "the record is removed from the repository"
-        !regionUserRepository.existsById(new RegionUserId(targetUserId, targetRegionId))
+        then: "200 OK is returned and record is removed from the repository"
+        verifyAll {
+            response.status == HttpStatus.OK
+            !regionUserRepository.existsById(new RegionUserId(targetUserId, targetRegionId))
+        }
 
         cleanup:
         executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
@@ -386,9 +396,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/region-users?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+        }
     }
 
     def "LIST | should fully drain all region users sequentially using cursors"() {

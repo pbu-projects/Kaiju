@@ -69,8 +69,8 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         AdministrativeRegion saved = response.body()
 
         then: "the administrative region is persisted with 200 OK and generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.name() == regionName
             saved.geom() != null
@@ -128,10 +128,10 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/administrative-regions/${id}")), AdministrativeRegion)
 
         then: "200 OK is returned with the correct administrative region"
-        response.status == HttpStatus.OK
-        verifyAll {
-            response.body().id() == id
-            response.body().name() == "Test Region Read"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == id
+            body().name() == "Test Region Read"
         }
     }
 
@@ -168,8 +168,8 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         AdministrativeRegion updated = response.body()
 
         then: "the returned administrative region contains the updated data with 200 OK"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.name() == newName
         }
@@ -237,11 +237,9 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         when: "the administrative region is deleted via HTTP DELETE"
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/administrative-regions/${id}")))
 
-        then: "the response is 200 OK"
-        response.status == HttpStatus.OK
-
-        and: "the administrative region no longer exists in the repository or database"
+        then: "the response is 200 OK and region no longer exists in repository or database"
         verifyAll {
+            response.status == HttpStatus.OK
             !administrativeRegionRepository.findById(id).isPresent()
             sql.firstRow("SELECT count(*) as count FROM administrative_regions WHERE id = ?", [id]).count == 0
         }
@@ -279,10 +277,12 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/administrative-regions?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 2
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 2
+        }
     }
 
     def "LIST | should reject unauthenticated GET /administrative-regions with 401 UNAUTHORIZED"() {

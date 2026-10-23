@@ -29,25 +29,31 @@ class JtsConverterSpec extends Specification {
         PGobject pgObject = pointConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
 
         then: "it maps to a PGobject with geography type"
-        pgObject != null
-        pgObject.type == "geography"
-        pgObject.value != null
+        verifyAll(pgObject) {
+            it != null
+            type == "geography"
+            value != null
+        }
 
         when: "converting back to entity value"
         Point convertedPoint = pointConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
         then: "it reconstructs the point with matching coordinates and SRID"
-        convertedPoint != null
-        convertedPoint.x == Double.valueOf(-105.0)
-        convertedPoint.y == Double.valueOf(39.0)
-        convertedPoint.SRID == 4326
+        verifyAll(convertedPoint) {
+            it != null
+            x == Double.valueOf(-105.0)
+            y == Double.valueOf(39.0)
+            SRID == 4326
+        }
     }
 
     def "JtsPointConverter | should handle null values gracefully"() {
         expect:
-        pointConverter.convertToPersistedValue(null, ConversionContext.DEFAULT) == null
-        pointConverter.convertToEntityValue(null, ConversionContext.DEFAULT) == null
-        pointConverter.convertToEntityValue(new PGobject(), ConversionContext.DEFAULT) == null
+        verifyAll {
+            pointConverter.convertToPersistedValue(null, ConversionContext.DEFAULT) == null
+            pointConverter.convertToEntityValue(null, ConversionContext.DEFAULT) == null
+            pointConverter.convertToEntityValue(new PGobject(), ConversionContext.DEFAULT) == null
+        }
     }
 
     def "JtsPointConverter | should throw IllegalArgumentException on ParseException for invalid hex or WKB value"() {
@@ -137,23 +143,29 @@ class JtsConverterSpec extends Specification {
         Object pgObject = polygonConverter.convertToPersistedValue(polygon, ConversionContext.DEFAULT)
 
         then: "it maps to a PGobject with geography type"
-        pgObject instanceof PGobject
-        ((PGobject) pgObject).type == "geography"
-        ((PGobject) pgObject).value != null
+        verifyAll {
+            pgObject instanceof PGobject
+            ((PGobject) pgObject).type == "geography"
+            ((PGobject) pgObject).value != null
+        }
 
         when: "converting back to entity value"
         Object convertedPolygon = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
         then: "it reconstructs the polygon with matching SRID"
-        convertedPolygon instanceof Polygon
-        ((Polygon) convertedPolygon).SRID == 4326
+        verifyAll {
+            convertedPolygon instanceof Polygon
+            ((Polygon) convertedPolygon).SRID == 4326
+        }
     }
 
     def "JtsPolygonConverter | should handle null values gracefully"() {
         expect:
-        polygonConverter.convertToPersistedValue(null, ConversionContext.DEFAULT) == null
-        polygonConverter.convertToEntityValue(null, ConversionContext.DEFAULT) == null
-        polygonConverter.convertToEntityValue(new PGobject(), ConversionContext.DEFAULT) == null
+        verifyAll {
+            polygonConverter.convertToPersistedValue(null, ConversionContext.DEFAULT) == null
+            polygonConverter.convertToEntityValue(null, ConversionContext.DEFAULT) == null
+            polygonConverter.convertToEntityValue(new PGobject(), ConversionContext.DEFAULT) == null
+        }
     }
 
     def "JtsPolygonConverter | should throw IllegalArgumentException on ParseException for invalid hex or WKB value"() {
@@ -205,8 +217,10 @@ class JtsConverterSpec extends Specification {
         Object result = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
         then: "the SRID is set to 4326"
-        result instanceof Polygon
-        ((Polygon) result).SRID == 4326
+        verifyAll {
+            result instanceof Polygon
+            ((Polygon) result).SRID == 4326
+        }
     }
 
     def "JtsPolygonConverter | should preserve non-zero SRID"() {
@@ -219,8 +233,10 @@ class JtsConverterSpec extends Specification {
         Object result = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
         then: "the SRID remains 3857"
-        result instanceof Polygon
-        ((Polygon) result).SRID == 3857
+        verifyAll {
+            result instanceof Polygon
+            ((Polygon) result).SRID == 3857
+        }
     }
 
     def "JtsPolygonConverter | should successfully parse MultiPolygon without ClassCastException"() {
@@ -234,7 +250,9 @@ class JtsConverterSpec extends Specification {
         def result = polygonConverter.convertToEntityValue(pgObject, ConversionContext.DEFAULT)
 
         then: "it reconstructs a Geometry instance without ClassCastException"
-        result instanceof Geometry
-        result.SRID == 4326
+        verifyAll {
+            result instanceof Geometry
+            result.SRID == 4326
+        }
     }
 }

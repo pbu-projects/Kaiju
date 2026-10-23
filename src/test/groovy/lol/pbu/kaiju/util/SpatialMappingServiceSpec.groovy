@@ -12,9 +12,11 @@ class SpatialMappingServiceSpec extends Specification {
 
     def "toPoint returns null when coordinates are null"() {
         expect:
-        service.toPoint(null, null) == null
-        service.toPoint(10.0, null) == null
-        service.toPoint(null, 20.0) == null
+        verifyAll {
+            service.toPoint(null, null) == null
+            service.toPoint(10.0, null) == null
+            service.toPoint(null, 20.0) == null
+        }
     }
 
     def "toPoint creates JTS point with correct coordinates and srid"() {
@@ -22,10 +24,12 @@ class SpatialMappingServiceSpec extends Specification {
         def point = service.toPoint(-104.9903, 39.7392)
 
         then:
-        point != null
-        point.x == -104.9903
-        point.y == 39.7392
-        point.getSRID() == 4326
+        verifyAll(point) {
+            it != null
+            x == -104.9903
+            y == 39.7392
+            getSRID() == 4326
+        }
     }
 
     def "toPolygon throws exception when coordinates are null or fewer than 3"() {
@@ -54,13 +58,15 @@ class SpatialMappingServiceSpec extends Specification {
         def polygon = service.toPolygon(coords)
 
         then:
-        polygon != null
-        polygon.coordinates.length == 4
-        polygon.coordinates[0].x == 0.0
-        polygon.coordinates[0].y == 0.0
-        polygon.coordinates[3].x == 0.0
-        polygon.coordinates[3].y == 0.0
-        polygon.getSRID() == 4326
+        verifyAll(polygon) {
+            it != null
+            coordinates.length == 4
+            coordinates[0].x == 0.0
+            coordinates[0].y == 0.0
+            coordinates[3].x == 0.0
+            coordinates[3].y == 0.0
+            getSRID() == 4326
+        }
     }
 
     def "toPolygon does not duplicate closing coordinate if already closed"() {
@@ -76,8 +82,10 @@ class SpatialMappingServiceSpec extends Specification {
         def polygon = service.toPolygon(coords)
 
         then:
-        polygon != null
-        polygon.coordinates.length == 4
-        polygon.coordinates[0].equals2D(polygon.coordinates[3])
+        verifyAll(polygon) {
+            it != null
+            coordinates.length == 4
+            coordinates[0].equals2D(coordinates[3])
+        }
     }
 }

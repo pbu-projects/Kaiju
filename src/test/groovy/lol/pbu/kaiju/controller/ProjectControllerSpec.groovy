@@ -175,8 +175,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project saved = response.body()
 
         then: "the project is persisted with 200 OK and a generated ID"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             saved.id() != null
             saved.title() == command.title()
             saved.description() == command.description()
@@ -231,8 +231,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project saved = response.body()
 
         then: "the project is persisted with generated ID"
-        response.status == HttpStatus.OK
-        saved.id() != null
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id() != null
+        }
 
         and: "child locations and boundaries enforce mass-assignment immunity with server-managed null IDs"
         verifyAll {
@@ -340,8 +342,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project result = response.body()
 
         then: "the correct project is returned"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             result != null
             result.id() == id
             result.title() == "Test Project Read"
@@ -369,10 +371,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "the search returns a page containing the project"
-        response.status == HttpStatus.OK
         def content = response.body().content as List
-        content != null
-        content.any { it.title == targetTitle }
+        verifyAll {
+            response.status == HttpStatus.OK
+            content != null
+            content.any { it.title == targetTitle }
+        }
     }
 
     /********** UPDATE Tests **********/
@@ -393,8 +397,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "the returned project contains updated data while status remains DRAFT"
-        response.status == HttpStatus.OK
         verifyAll {
+            response.status == HttpStatus.OK
             updated.id() == id
             updated.title() == newTitle
             updated.description() == newDescription
@@ -498,8 +502,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         and: "the project in the database remains assigned to Org A"
         def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
-        projectInDb.organization_id == orgAId
-        projectInDb.title == 'Project in Org A'
+        verifyAll(projectInDb) {
+            organization_id == orgAId
+            title == 'Project in Org A'
+        }
     }
 
     def "UPDATE | should allow legitimate update by Org Manager preserving existing organization"() {
@@ -521,14 +527,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "the update succeeds"
-        response.status == HttpStatus.OK
-        updated.id() == projectId
-        updated.title() == "Legit Updated Title"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.id() == projectId
+            updated.title() == "Legit Updated Title"
+        }
 
         and: "the database reflects the updated fields while organization remains Org A"
         def projectInDb = sql.firstRow("SELECT organization_id, title, description FROM projects WHERE id = ?", [projectId])
-        projectInDb.organization_id == orgAId
-        projectInDb.title == "Legit Updated Title"
+        verifyAll(projectInDb) {
+            organization_id == orgAId
+            title == "Legit Updated Title"
+        }
     }
 
     def "UPDATE | should allow project reassignment to another organization when user is GLOBAL_ADMIN"() {
@@ -553,14 +563,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "the update succeeds"
-        response.status == HttpStatus.OK
-        updated.id() == projectId
-        updated.title() == "Admin Updated Title"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.id() == projectId
+            updated.title() == "Admin Updated Title"
+        }
 
         and: "the project is reassigned to Org B in the database"
         def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
-        projectInDb.organization_id == orgBId
-        projectInDb.title == "Admin Updated Title"
+        verifyAll(projectInDb) {
+            organization_id == orgBId
+            title == "Admin Updated Title"
+        }
     }
 
     def "UPDATE | should reject project reassignment even when user is manager of destination org"() {
@@ -664,13 +678,17 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "the project status is demoted to PENDING for regional review"
-        response.status == HttpStatus.OK
-        updated.status() == PENDING
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.status() == PENDING
+        }
 
         and: "the status in database is PENDING"
         def projectInDb = sql.firstRow("SELECT status, title FROM projects WHERE id = ?", [projectId])
-        projectInDb.status == 'PENDING'
-        projectInDb.title == "Updated Active Project"
+        verifyAll(projectInDb) {
+            status == 'PENDING'
+            title == "Updated Active Project"
+        }
     }
 
     /********** DELETE Tests **********/
@@ -686,9 +704,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/projects/${id}")))
 
         then: "the project no longer exists in the repository or database"
-        response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-        !projectRepository.findById(id).isPresent()
-        sql.firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
+        verifyAll {
+            response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
+            !projectRepository.findById(id).isPresent()
+            sql.firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
+        }
     }
 
     def "DELETE | should fail to delete a non-existent project"() {
@@ -763,15 +783,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "only active projects in range are returned sorted by closest location, with no duplicates per project"
-        response.status == HttpStatus.OK
         List items = response.body().content as List
         List testResults = items.findAll { (it.projectId as String) in [uuids.projectIdA, uuids.projectIdB, uuids.projectIdC, uuids.projectIdD, uuids.projectIdE].collect { it.toString() } }
-        testResults.size() == 4
-
-        testResults[0].projectId == uuids.projectIdA.toString()
-        testResults[1].projectId == uuids.projectIdB.toString()
-        testResults[2].projectId == uuids.projectIdE.toString()
-        testResults[3].projectId == uuids.projectIdC.toString()
+        verifyAll {
+            response.status == HttpStatus.OK
+            testResults.size() == 4
+            testResults[0].projectId == uuids.projectIdA.toString()
+            testResults[1].projectId == uuids.projectIdB.toString()
+            testResults[2].projectId == uuids.projectIdE.toString()
+            testResults[3].projectId == uuids.projectIdC.toString()
+        }
     }
 
     @Unroll
@@ -819,14 +840,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "the result matches expected order and presence based on project status and shift validity"
-        response.status == HttpStatus.OK
         List items = response.body().content as List
         List testResults = items.findAll { (it.projectId as String) in [uuids.projectIdA, uuids.projectIdB].collect { it.toString() } }
 
         List<String> expectedUUIDs = expectedOrderNames.collect { name ->
             (name == 'A' ? uuids.projectIdA : uuids.projectIdB).toString()
         }
-        testResults.collect { it.projectId as String } == expectedUUIDs
+        verifyAll {
+            response.status == HttpStatus.OK
+            testResults.collect { it.projectId as String } == expectedUUIDs
+        }
 
         where:
         status     | shiftActive | expectedOrderNames
@@ -894,9 +917,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
-        response.status == HttpStatus.OK
-        approved.id() == projId
-        approved.status() == ACTIVE
+        verifyAll {
+            response.status == HttpStatus.OK
+            approved.id() == projId
+            approved.status() == ACTIVE
+        }
 
         and: "the status is persisted in the database"
         def inDb = sql.firstRow("SELECT status FROM projects WHERE id = ?", [projId])
@@ -924,9 +949,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
-        response.status == HttpStatus.OK
-        approved.id() == projId
-        approved.status() == ACTIVE
+        verifyAll {
+            response.status == HttpStatus.OK
+            approved.id() == projId
+            approved.status() == ACTIVE
+        }
 
         cleanup:
         executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
@@ -992,8 +1019,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
-        response.status == HttpStatus.OK
-        approved.status() == ACTIVE
+        verifyAll {
+            response.status == HttpStatus.OK
+            approved.status() == ACTIVE
+        }
     }
 
     def "APPROVE | should reject approval of soft-deleted project with 404 Not Found"() {
@@ -1028,11 +1057,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
 
         then: "a project_audit_logs record is written"
-        response.status == HttpStatus.OK
         def auditRow = sql.firstRow("SELECT action, actor_id FROM project_audit_logs WHERE project_id = ?", [projId])
-        auditRow != null
-        auditRow.action == 'APPROVED'
-        auditRow.actor_id == UUID.fromString(adminId)
+        verifyAll {
+            response.status == HttpStatus.OK
+            auditRow != null
+            auditRow.action == 'APPROVED'
+            auditRow.actor_id == UUID.fromString(adminId)
+        }
     }
 
     def "APPROVE | should allow REGION_DIRECTOR to approve physical project with locations inside their region"() {
@@ -1058,9 +1089,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project approved = response.body()
 
         then: "the physical project transitions to ACTIVE"
-        response.status == HttpStatus.OK
-        approved.id() == projId
-        approved.status() == ACTIVE
+        verifyAll {
+            response.status == HttpStatus.OK
+            approved.id() == projId
+            approved.status() == ACTIVE
+        }
 
         cleanup:
         executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
@@ -1086,9 +1119,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project approved = response.body()
 
         then: "the project transitions to ACTIVE"
-        response.status == HttpStatus.OK
-        approved.id() == projId
-        approved.status() == ACTIVE
+        verifyAll {
+            response.status == HttpStatus.OK
+            approved.id() == projId
+            approved.status() == ACTIVE
+        }
 
         cleanup:
         executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
@@ -1141,8 +1176,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "a 404 Not Found is thrown"
         def e = thrown(HttpStatusException)
-        e.status == HttpStatus.NOT_FOUND
-        e.message == "User not found"
+        verifyAll(e) {
+            status == HttpStatus.NOT_FOUND
+            message == "User not found"
+        }
     }
 
     /********** MANAGING REGION Tests **********/
@@ -1221,10 +1258,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project saved = response.body()
 
         then: "project is saved and managingRegion is set"
-        response.status == HttpStatus.OK
-        saved.id() != null
-        saved.managingRegion() != null
-        saved.managingRegion().id() == regId
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.id() != null
+            saved.managingRegion() != null
+            saved.managingRegion().id() == regId
+        }
     }
 
     def "UPDATE | should throw 400 when updating project locations outside existing managingRegion"() {
@@ -1317,10 +1356,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "managingRegion is successfully unassigned"
-        response.status == HttpStatus.OK
-        updated.managingRegion() == null
         def dbRow = sql.firstRow("SELECT managing_region_id FROM projects WHERE id = ?", [saved.id()])
-        dbRow.managing_region_id == null
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.managingRegion() == null
+            dbRow.managing_region_id == null
+        }
     }
 
     def "UPDATE | should demote ACTIVE project to PENDING when reassigned to organization outside geographic bounds"() {
@@ -1357,11 +1398,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "the status is automatically demoted to PENDING for regional review"
-        response.status == HttpStatus.OK
-        updated.status() == PENDING
         def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [saved.id()])
-        row.status == 'PENDING'
-        row.organization_id == orgBId
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.status() == PENDING
+            row.status == 'PENDING'
+            row.organization_id == orgBId
+        }
     }
 
     def "UPDATE | should preserve ACTIVE status when reassigned to organization containing geographic bounds"() {
@@ -1392,11 +1435,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "status is preserved as ACTIVE"
-        response.status == HttpStatus.OK
-        updated.status() == ACTIVE
         def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [saved.id()])
-        row.status == 'ACTIVE'
-        row.organization_id == org2Id
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.status() == ACTIVE
+            row.status == 'ACTIVE'
+            row.organization_id == org2Id
+        }
     }
 
     def "UPDATE | should reject project update by unaffiliated standard user with 403 Forbidden"() {
@@ -1441,8 +1486,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${saved.id()}")))
 
         then: "the project is deleted from the database"
-        response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-        sql.firstRow("SELECT id FROM projects WHERE id = ?", [saved.id()]) == null
+        verifyAll {
+            response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
+            sql.firstRow("SELECT id FROM projects WHERE id = ?", [saved.id()]) == null
+        }
     }
 
     /********** LIST / Draining Tests **********/
@@ -1485,10 +1532,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects?size=5")), Map)
 
         then: "the response is 200 OK with content list"
-        response.status == HttpStatus.OK
         Map body = response.body()
-        body.content instanceof List
-        body.content.size() >= 5
+        verifyAll {
+            response.status == HttpStatus.OK
+            body.content instanceof List
+            body.content.size() >= 5
+        }
     }
 
     /********** Security 401 Negative Tests **********/

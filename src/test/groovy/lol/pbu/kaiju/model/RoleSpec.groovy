@@ -16,16 +16,18 @@ class RoleSpec extends Specification {
     }
 
     def "UserRole.hasPermission returns false for a permission the role does not carry"() {
-        expect: "STANDARD_USER does not have SYSTEM_ADMIN"
-        !UserRole.STANDARD_USER.hasPermission(Permission.SYSTEM_ADMIN)
-
-        and: "REGION_AGENT does not have SYSTEM_ADMIN"
-        !UserRole.REGION_AGENT.hasPermission(Permission.SYSTEM_ADMIN)
+        expect: "STANDARD_USER and REGION_AGENT do not have SYSTEM_ADMIN"
+        verifyAll {
+            !UserRole.STANDARD_USER.hasPermission(Permission.SYSTEM_ADMIN)
+            !UserRole.REGION_AGENT.hasPermission(Permission.SYSTEM_ADMIN)
+        }
     }
 
     def "ProjectUserRole enum contains PROJECT_SPONSOR"() {
         expect:
-        ProjectUserRole.values().contains(ProjectUserRole.PROJECT_SPONSOR)
-        ProjectUserRole.valueOf("PROJECT_SPONSOR") == ProjectUserRole.PROJECT_SPONSOR
+        verifyAll {
+            ProjectUserRole.values().contains(ProjectUserRole.PROJECT_SPONSOR)
+            ProjectUserRole.valueOf("PROJECT_SPONSOR") == ProjectUserRole.PROJECT_SPONSOR
+        }
     }
 }
