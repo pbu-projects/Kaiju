@@ -65,8 +65,9 @@ application {
 }
 
 java {
-    sourceCompatibility = JavaVersion.toVersion("25")
-    targetCompatibility = JavaVersion.toVersion("25")
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
 }
 
 
@@ -97,7 +98,6 @@ micronaut {
     aot {
         // Please review carefully the optimizations enabled below
         // Check https://micronaut-projects.github.io/micronaut-aot/latest/guide/ for more details
-        optimizeServiceLoading = true
         convertYamlToJava = true
         precomputeOperations = true
         cacheEnvironment = true
@@ -158,8 +158,12 @@ sonar {
     }
 }
 
-tasks.named<io.micronaut.gradle.docker.MicronautDockerfile>("dockerfile") {
+tasks.withType<io.micronaut.gradle.docker.MicronautDockerfile>().configureEach {
     baseImage = "eclipse-temurin:25-jre"
+}
+
+tasks.withType<io.micronaut.gradle.docker.NativeImageDockerfile>().configureEach {
+    jdkVersion = "25"
 }
 
 tasks.withType<JavaCompile>().configureEach {

@@ -1,0 +1,12 @@
+.git
+.gradle
+build
+bin
+.idea
+*.iml
+.agent
+.gemini
+.context
+.vscode
+adversarial-critique.md
+*.md
