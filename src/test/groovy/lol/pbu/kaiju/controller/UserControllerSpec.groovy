@@ -360,11 +360,13 @@ class UserControllerSpec extends BaseControllerSpec {
         def response = client.exchange(authenticated(HttpRequest.GET("/users/me"), user.id().toString(), ["STANDARD_USER"]), User)
 
         then: "the response status is 200 OK and matches the caller"
-        response.status == HttpStatus.OK
-        response.body() != null
-        response.body().id() == user.id()
-        response.body().email() == user.email()
-        response.body().role() == UserRole.STANDARD_USER
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body() != null
+            body().id() == user.id()
+            body().email() == user.email()
+            body().role() == UserRole.STANDARD_USER
+        }
     }
 
     def "ME | should reject unauthenticated GET /users/me with 401 UNAUTHORIZED"() {

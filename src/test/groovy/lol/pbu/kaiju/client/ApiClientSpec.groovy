@@ -59,9 +59,11 @@ class ApiClientSpec extends BaseControllerSpec {
         User user = defaultApi.getCurrentUser()
 
         then: "current user details match persona"
-        user != null
-        user.id == TestPersonas.SARAH_ADMIN.id
-        user.email == TestPersonas.SARAH_ADMIN.email
+        verifyAll(user) {
+            it != null
+            id == TestPersonas.SARAH_ADMIN.id
+            email == TestPersonas.SARAH_ADMIN.email
+        }
     }
 
     def "can list and read administrative regions"() {
@@ -72,16 +74,20 @@ class ApiClientSpec extends BaseControllerSpec {
         CursoredPageAdministrativeRegion page = defaultApi.getAdministrativeRegions(null)
 
         then: "regions list is not empty"
-        page != null
-        page.content != null
-        !page.content.isEmpty()
+        verifyAll(page) {
+            it != null
+            content != null
+            !content.isEmpty()
+        }
 
         when: "fetching a specific seeded region by id"
         AdministrativeRegion region = defaultApi.getAdministrativeRegion(TestPersonas.COLORADO_STATE_REGION_ID)
 
         then: "the specific region is returned"
-        region != null
-        region.id == TestPersonas.COLORADO_STATE_REGION_ID
+        verifyAll(region) {
+            it != null
+            id == TestPersonas.COLORADO_STATE_REGION_ID
+        }
     }
 
     def "can list and read organizations"() {
@@ -92,16 +98,20 @@ class ApiClientSpec extends BaseControllerSpec {
         CursoredPageOrganization page = defaultApi.getOrganizations(null)
 
         then: "organizations list is not empty"
-        page != null
-        page.content != null
-        !page.content.isEmpty()
+        verifyAll(page) {
+            it != null
+            content != null
+            !content.isEmpty()
+        }
 
         when: "fetching a specific seeded organization by id"
         Organization org = defaultApi.getOrganization(TestPersonas.NATIONAL_RELIEF_NETWORK_ID)
 
         then: "the specific organization is returned"
-        org != null
-        org.id == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+        verifyAll(org) {
+            it != null
+            id == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+        }
     }
 
     def "can list and read users"() {
@@ -112,24 +122,30 @@ class ApiClientSpec extends BaseControllerSpec {
         CursoredPageUser page = defaultApi.getUsers(null)
 
         then: "users list is not empty"
-        page != null
-        page.content != null
-        !page.content.isEmpty()
+        verifyAll(page) {
+            it != null
+            content != null
+            !content.isEmpty()
+        }
 
         when: "fetching a specific user by id"
         User user = defaultApi.getUser(TestPersonas.SARAH_ADMIN.id)
 
         then: "the user is returned"
-        user != null
-        user.id == TestPersonas.SARAH_ADMIN.id
+        verifyAll(user) {
+            it != null
+            id == TestPersonas.SARAH_ADMIN.id
+        }
 
         when: "updating user role"
         RoleUpdateRequest roleRequest = new RoleUpdateRequest(UserRole.REGION_AGENT)
         User updatedUser = defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, roleRequest)
 
         then: "user role is updated"
-        updatedUser != null
-        updatedUser.role == UserRole.REGION_AGENT
+        verifyAll(updatedUser) {
+            it != null
+            role == UserRole.REGION_AGENT
+        }
     }
 
     def "can create update and delete tags"() {
@@ -141,31 +157,40 @@ class ApiClientSpec extends BaseControllerSpec {
         Tag createdTag = defaultApi.addTag(createCommand)
 
         then: "the tag is created with valid id"
-        createdTag != null
-        createdTag.id != null
-        createdTag.name == "client-tag-test"
+        verifyAll(createdTag) {
+            it != null
+            id != null
+            name == "client-tag-test"
+        }
 
         when: "listing tags"
         CursoredPageTag tagsPage = defaultApi.getTags(null)
 
         then: "the created tag appears in list"
-        tagsPage != null
-        tagsPage.content.any { it.name == "client-tag-test" }
+        verifyAll(tagsPage) {
+            it != null
+            content.any { it.name == "client-tag-test" }
+        }
 
         when: "updating the tag"
         UpdateTagCommand updateCommand = new UpdateTagCommand("client-tag-updated")
         Tag updatedTag = defaultApi.updateTag(createdTag.id, updateCommand)
 
         then: "the tag name is updated"
-        updatedTag != null
-        updatedTag.name == "client-tag-updated"
+        verifyAll(updatedTag) {
+            it != null
+            name == "client-tag-updated"
+        }
 
         when: "deleting the tag"
         defaultApi.deleteTag(createdTag.id)
         CursoredPageTag tagsAfterDelete = defaultApi.getTags(null)
 
         then: "the deleted tag is gone"
-        !tagsAfterDelete.content.any { it.id == createdTag.id }
+        verifyAll(tagsAfterDelete) {
+            it != null
+            !content.any { it.id == createdTag.id }
+        }
     }
 
     def "can list projects and shifts"() {
@@ -233,9 +258,11 @@ class ApiClientSpec extends BaseControllerSpec {
         RegionUser regionUser = defaultApi.getRegionUser(TestPersonas.RACHEL_STATE_DIRECTOR.id, TestPersonas.COLORADO_STATE_REGION_ID)
 
         then: "region user details are returned"
-        regionUser != null
-        regionUser.id.userId == TestPersonas.RACHEL_STATE_DIRECTOR.id
-        regionUser.id.regionId == TestPersonas.COLORADO_STATE_REGION_ID
+        verifyAll(regionUser) {
+            it != null
+            id.userId == TestPersonas.RACHEL_STATE_DIRECTOR.id
+            id.regionId == TestPersonas.COLORADO_STATE_REGION_ID
+        }
 
         when: "fetching organization users"
         CursoredPageOrganizationUser orgUsers = defaultApi.getOrganizationUsers(null)
@@ -247,8 +274,10 @@ class ApiClientSpec extends BaseControllerSpec {
         OrganizationUser orgUser = defaultApi.getOrganizationUser(TestPersonas.NATHAN_NATIONAL_ADMIN.id, TestPersonas.NATIONAL_RELIEF_NETWORK_ID)
 
         then: "organization user details are returned"
-        orgUser != null
-        orgUser.id.userId == TestPersonas.NATHAN_NATIONAL_ADMIN.id
-        orgUser.id.organizationId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+        verifyAll(orgUser) {
+            it != null
+            id.userId == TestPersonas.NATHAN_NATIONAL_ADMIN.id
+            id.organizationId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+        }
     }
 }
