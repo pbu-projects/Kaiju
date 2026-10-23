@@ -108,9 +108,7 @@ public class LocationController {
         Location existing = locationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, LOCATION_NOT_FOUND));
         Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        String timezone = (existing.geom() != null && existing.geom().equalsExact(point) && existing.timezone() != null)
-                ? (command.timezone() != null ? command.timezone() : existing.timezone())
-                : resolveTimezone(point, command.timezone());
+        String timezone = resolveUpdatedTimezone(existing, point, command.timezone());
         Location location = new Location(
                 id,
                 command.name(),
@@ -139,6 +137,13 @@ public class LocationController {
         if (deletedCount == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, LOCATION_NOT_FOUND);
         }
+    }
+
+    private String resolveUpdatedTimezone(Location existing, Point point, String requestedTimezone) {
+        if (existing.geom() != null && existing.geom().equalsExact(point) && existing.timezone() != null) {
+            return requestedTimezone != null ? requestedTimezone : existing.timezone();
+        }
+        return resolveTimezone(point, requestedTimezone);
     }
 
     String resolveTimezone(Point point, String fallbackTimezone) {
