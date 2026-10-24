@@ -13,30 +13,46 @@ Nonprofits shouldn't have to choose between clunky legacy software and costly en
 
 <details>
 <summary><b>Hyper-Local Discovery</b>: Volunteers find initiatives right in their neighborhood without zip code guesswork.</summary>
+<dl>
+<dd>
 
-> All the math leans into two strengths: [PostGIS](https://postgis.net/)'s phenomenal spatial performance, and [Micronaut](https://micronaut.io/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/)'s crazy speed. No reinventing the wheel, just pairing two technologies that work together beautifully.
+All the math leans into two strengths: [PostGIS](https://postgis.net/)'s phenomenal spatial performance, and [Micronaut](https://micronaut.io/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/)'s crazy speed. No reinventing the wheel, just pairing two technologies that work together beautifully.
 
+</dd>
+</dl>
 </details>
 
 <details>
 <summary><b>Budget-Friendly Frugality</b>: Minimal server and memory overhead keeps hosting costs near zero.</summary>
+<dl>
+<dd>
 
-> Traditional servers eat up expensive memory just idling. By compiling ahead-of-time with [Micronaut AOT](https://micronaut-projects.github.io/micronaut-aot/latest/guide/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/), Kaiju starts instantly and runs with a tiny memory footprint. Nonprofits can host it on low-cost cloud tiers without blowing donor funds on giant hosting bills.
+Traditional servers eat up expensive memory just idling. By compiling ahead-of-time with [Micronaut AOT](https://micronaut-projects.github.io/micronaut-aot/latest/guide/) and [GraalVM](https://www.graalvm.org/latest/reference-manual/native-image/), Kaiju starts instantly and runs with a tiny memory footprint. Nonprofits can host it on low-cost cloud tiers without blowing donor funds on giant hosting bills.
 
+</dd>
+</dl>
 </details>
 
 <details>
 <summary><b>Trusted & Safe</b>: Multi-layer verification, moderation queues, and immutable audit logs keep communities safe.</summary>
+<dl>
+<dd>
 
-> Safety shouldn't require bureaucracy. Verified partner organizations get fast-tracked, while new community initiatives are routed to local coordinators who know the area before listings go live. Everything from volunteer approvals to role updates is safely logged, and separate volunteer records ensure attendee histories stay private and protected.
+Safety shouldn't require bureaucracy. Verified partner organizations get fast-tracked, while new community initiatives are routed to local coordinators who know the area before listings go live. Everything from volunteer approvals to role updates is safely logged, and separate volunteer records ensure attendee histories stay private and protected.
 
+</dd>
+</dl>
 </details>
 
 <details>
 <summary><b>Fast & Resilient</b>: Sub-millisecond response times sustain major community drives and disaster mobilizations.</summary>
+<dl>
+<dd>
 
-> When an emergency response or major holiday drive brings thousands of volunteers to the platform at once, the system won't choke. Powered by [Java 25](https://openjdk.org/projects/jdk/25/)'s ultra-low-latency [Generational ZGC](https://openjdk.org/jeps/439) and a unified [PostgreSQL](https://www.postgresql.org/) database, searches and signups stay snappy under heavy traffic without spinning wheels or crashes.
+When an emergency response or major holiday drive brings thousands of volunteers to the platform at once, the system won't choke. Powered by [Java 25](https://openjdk.org/projects/jdk/25/)'s ultra-low-latency [Generational ZGC](https://openjdk.org/jeps/439) and a unified [PostgreSQL](https://www.postgresql.org/) database, searches and signups stay snappy under heavy traffic without spinning wheels or crashes.
 
+</dd>
+</dl>
 </details>
 
 ## Code Quality & Tech Stack
