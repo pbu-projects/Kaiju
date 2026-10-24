@@ -31,7 +31,6 @@ import lol.pbu.kaiju.service.UserService
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-import spock.lang.Requires
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -55,7 +54,6 @@ import java.util.concurrent.TimeUnit
 @Property(name = "micronaut.security.token.jwt.signatures.jwks.authentik.url", value = "http://localhost:9000/application/o/kaiju/jwks/")
 @Property(name = "micronaut.security.token.jwt.signatures.secret.generator.secret", value = "pleaseChangeThisSecretForANewOne32Bits")
 @MicronautTest(transactional = false)
-@Requires({ AuthentikOidcIntegrationSpec.isAuthentikAvailable() })
 class AuthentikOidcIntegrationSpec extends Specification {
 
     private static final String AUTHENTIK_BASE_URL = "http://localhost:9000"
@@ -69,9 +67,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
     JWKSet jwkSet
 
     def setupSpec() {
-        if (isAuthentikAvailable()) {
-            jwkSet = JWKSet.load(new URI(JWKS_URL).toURL())
-        }
+        jwkSet = JWKSet.load(new URI(JWKS_URL).toURL())
     }
 
     @Inject
@@ -108,21 +104,6 @@ class AuthentikOidcIntegrationSpec extends Specification {
         ]
     }
 
-    static boolean isAuthentikAvailable() {
-        try {
-            JavaHttpClient probeClient = JavaHttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(2))
-                    .build()
-            JavaHttpRequest probeReq = JavaHttpRequest.newBuilder()
-                    .uri(URI.create("${AUTHENTIK_BASE_URL}/application/o/kaiju/.well-known/openid-configuration"))
-                    .GET()
-                    .build()
-            JavaHttpResponse<String> resp = probeClient.send(probeReq, JavaHttpResponse.BodyHandlers.ofString())
-            return resp.statusCode() == 200
-        } catch (Exception ignored) {
-            return false
-        }
-    }
 
     private static <T> T await(Publisher<T> publisher) {
         CompletableFuture<T> future = new CompletableFuture<>()
