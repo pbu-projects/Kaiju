@@ -286,7 +286,7 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing location by ID"() {
         given: "an existing location"
-        def location = locationRepository.save(new Location(null, "Test Location Read", "123 Main St", "City", "UT", "84000", "US", createPoint()))
+        def location = dataBuilder.location().withName("Test Location Read").withAddress("123 Main St", "City", "UT", "84000", "US").withGeometry(createPoint()).persist()
         UUID id = location.id()
 
         when: "the location is requested by its ID via HTTP GET"
@@ -343,7 +343,7 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing location"() {
         given: "an existing location to update"
-        def location = locationRepository.save(new Location(null, "Original Location Name", "123 Main St", "Original City", "UT", "84000", "US", createPoint()))
+        def location = dataBuilder.location().withName("Original Location Name").withAddress("123 Main St", "Original City", "UT", "84000", "US").withGeometry(createPoint()).persist()
         UUID id = location.id()
         def newName = "Updated ${faker.commerce().productName()}"
         def newCity = faker.address().city()
@@ -596,7 +596,7 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should fail to update location with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing location"
-        def location = locationRepository.save(new Location(null, "Test Update Invalid", "123 St", "City", "UT", "84000", "US", createPoint()))
+        def location = dataBuilder.location().withName("Test Update Invalid").withAddress("123 St", "City", "UT", "84000", "US").withGeometry(createPoint()).persist()
         UUID id = location.id()
 
         when: "an update with invalid data is attempted via HTTP PUT"
@@ -630,7 +630,7 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing location"() {
         given: "an existing location"
-        def location = locationRepository.save(new Location(null, "Original Location Director", "123 Main St", "Original City", "CO", "80202", "US", createPoint()))
+        def location = dataBuilder.location().withName("Original Location Director").withAddress("123 Main St", "Original City", "CO", "80202", "US").withGeometry(createPoint()).persist()
         UUID id = location.id()
         def newName = "Director Location Update ${faker.company().name()}"
         def updateCommand = new UpdateLocationCommand(newName, "456 Update Ave", "Denver", "CO", "80202", "US", -104.99, 39.74)
@@ -688,8 +688,7 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing location"() {
         given: "a new location to be deleted"
-        def tempLoc = new Location(null, "Test Delete Location", "123 Delete St", "Delete City", "UT", "00000", "US", createPoint())
-        def saved = locationRepository.save(tempLoc)
+        def saved = dataBuilder.location().withName("Test Delete Location").withAddress("123 Delete St", "Delete City", "UT", "00000", "US").withGeometry(createPoint()).persist()
         UUID id = saved.id()
         assert locationRepository.existsById(id)
 
@@ -729,8 +728,7 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing location"() {
         given: "a new location to be deleted"
-        def tempLoc = new Location(null, "Director Delete Location", "123 Delete St", "Denver", "CO", "80202", "US", createPoint())
-        def saved = locationRepository.save(tempLoc)
+        def saved = dataBuilder.location().withName("Director Delete Location").withAddress("123 Delete St", "Denver", "CO", "80202", "US").withGeometry(createPoint()).persist()
         UUID id = saved.id()
         assert locationRepository.existsById(id)
 
@@ -769,8 +767,8 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "LIST | should retrieve locations with pagination"() {
         given: "two persisted locations"
-        locationRepository.save(new Location(null, "Test Paging Loc 1", "123 St", "City", "UT", "84000", "US", createPoint()))
-        locationRepository.save(new Location(null, "Test Paging Loc 2", "456 St", "City", "UT", "84000", "US", createPoint()))
+        dataBuilder.location().withName("Test Paging Loc 1").withAddress("123 St", "City", "UT", "84000", "US").withGeometry(createPoint()).persist()
+        dataBuilder.location().withName("Test Paging Loc 2").withAddress("456 St", "City", "UT", "84000", "US").withGeometry(createPoint()).persist()
 
         when: "requesting locations via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/locations?size=5")), Map)

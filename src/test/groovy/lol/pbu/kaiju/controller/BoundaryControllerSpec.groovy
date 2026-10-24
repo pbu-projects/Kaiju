@@ -56,8 +56,15 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def setup() {
-        sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary A', ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))', 4326))")
-        sql.execute("INSERT INTO boundaries (name, geom) VALUES ('Test Boundary B', ST_GeomFromText('POLYGON((0 0, 0 2, 2 2, 2 0, 0 0))', 4326))")
+        Coordinate[] coordsB = [
+                new Coordinate(0, 0),
+                new Coordinate(0, 2),
+                new Coordinate(2, 2),
+                new Coordinate(2, 0),
+                new Coordinate(0, 0)
+        ]
+        dataBuilder.boundary().withName("Test Boundary A").persist()
+        dataBuilder.boundary().withName("Test Boundary B").withGeometry(geometryFactory.createPolygon(coordsB)).persist()
     }
 
     def cleanup() {
@@ -181,7 +188,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing boundary by ID"() {
         given: "an existing boundary"
-        def boundary = boundaryRepository.save(new Boundary(null, "Test Boundary Read", createPolygon()))
+        def boundary = dataBuilder.boundary().withName("Test Boundary Read").withGeometry(createPolygon()).persist()
         UUID id = boundary.id()
 
         when: "the boundary is requested by its ID via HTTP GET"
@@ -217,7 +224,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing boundary"() {
         given: "an existing boundary"
-        def boundary = boundaryRepository.save(new Boundary(null, "Original Boundary Name", createPolygon()))
+        def boundary = dataBuilder.boundary().withName("Original Boundary Name").withGeometry(createPolygon()).persist()
         UUID id = boundary.id()
         def newName = "Updated Boundary ${faker.address().city()}"
         def updateCommand = new UpdateBoundaryCommand(newName, createCoordinateDtos())
@@ -255,7 +262,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should fail to update boundary with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing boundary"
-        def boundary = boundaryRepository.save(new Boundary(null, "Test Update Invalid", createPolygon()))
+        def boundary = dataBuilder.boundary().withName("Test Update Invalid").withGeometry(createPolygon()).persist()
         UUID id = boundary.id()
 
         when: "an update with invalid data is attempted via HTTP PUT"
@@ -285,7 +292,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing boundary"() {
         given: "an existing boundary"
-        def boundary = boundaryRepository.save(new Boundary(null, "Test Boundary Director Update", createPolygon()))
+        def boundary = dataBuilder.boundary().withName("Test Boundary Director Update").withGeometry(createPolygon()).persist()
         UUID id = boundary.id()
         def newName = "Director Boundary Update ${faker.address().city()}"
         def updateCommand = new UpdateBoundaryCommand(newName, createCoordinateDtos())
@@ -339,8 +346,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing boundary"() {
         given: "a new boundary to be deleted"
-        def tempBoundary = new Boundary(null, "Temporary Boundary to Delete", createPolygon())
-        def saved = boundaryRepository.save(tempBoundary)
+        def saved = dataBuilder.boundary().withName("Temporary Boundary to Delete").withGeometry(createPolygon()).persist()
         UUID id = saved.id()
         assert boundaryRepository.existsById(id)
 
@@ -380,8 +386,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing boundary"() {
         given: "a new boundary to be deleted"
-        def tempBoundary = new Boundary(null, "Temporary Boundary Director Delete", createPolygon())
-        def saved = boundaryRepository.save(tempBoundary)
+        def saved = dataBuilder.boundary().withName("Temporary Boundary Director Delete").withGeometry(createPolygon()).persist()
         UUID id = saved.id()
         assert boundaryRepository.existsById(id)
 

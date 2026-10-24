@@ -11,6 +11,7 @@ import io.micronaut.security.token.generator.TokenGenerator
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.fixtures.TestPersonas
+import lol.pbu.kaiju.fixtures.builder.KaijuDataBuilder
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -29,6 +30,9 @@ abstract class BaseControllerSpec extends Specification {
 
     @Inject
     TokenGenerator tokenGenerator
+
+    @Inject
+    KaijuDataBuilder dataBuilder
 
     @Inject
     @Client("/")

@@ -121,7 +121,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve an existing administrative region by ID"() {
         given: "an existing administrative region"
         def geom = createTestPolygon()
-        def region = administrativeRegionRepository.save(new AdministrativeRegion(null, "Test Region Read", null, geom))
+        def region = dataBuilder.region().withName("Test Region Read").withGeometry(geom).persist()
         UUID id = region.id()
 
         when: "the administrative region is requested by its ID via HTTP GET"
@@ -158,7 +158,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing administrative region"() {
         given: "an existing administrative region"
         def geom = createTestPolygon()
-        def region = administrativeRegionRepository.save(new AdministrativeRegion(null, "Original Region Name", null, geom))
+        def region = dataBuilder.region().withName("Original Region Name").withGeometry(geom).persist()
         UUID id = region.id()
         def newName = "Updated Region ${faker.address().state()}"
         def updateCommand = new UpdateAdministrativeRegionCommand(newName, null, createCoordinateDtos())
@@ -196,7 +196,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should fail to update administrative region with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing administrative region"
-        def region = administrativeRegionRepository.save(new AdministrativeRegion(null, "Test Update Invalid", null, createTestPolygon()))
+        def region = dataBuilder.region().withName("Test Update Invalid").withGeometry(createTestPolygon()).persist()
         UUID id = region.id()
 
         when: "an update with invalid data is attempted via HTTP PUT"
@@ -228,9 +228,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing administrative region"() {
         given: "a new administrative region to be deleted"
-        def geom = createTestPolygon()
-        def tempRegion = new AdministrativeRegion(null, "Temporary Region to Delete", null, geom)
-        def saved = administrativeRegionRepository.save(tempRegion)
+        def saved = dataBuilder.region().withName("Temporary Region to Delete").withGeometry(createTestPolygon()).persist()
         UUID id = saved.id()
         assert administrativeRegionRepository.existsById(id)
 
@@ -270,8 +268,8 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
 
     def "LIST | should retrieve administrative regions with pagination"() {
         given: "persisted administrative regions"
-        administrativeRegionRepository.save(new AdministrativeRegion(null, "Test Region Paging 1", null, createTestPolygon()))
-        administrativeRegionRepository.save(new AdministrativeRegion(null, "Test Region Paging 2", null, createTestPolygon()))
+        dataBuilder.region().withName("Test Region Paging 1").withGeometry(createTestPolygon()).persist()
+        dataBuilder.region().withName("Test Region Paging 2").withGeometry(createTestPolygon()).persist()
 
         when: "requesting administrative regions via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/administrative-regions?size=5")), Map)

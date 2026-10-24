@@ -27,8 +27,8 @@ class TagControllerSpec extends BaseControllerSpec {
     Faker faker = new Faker()
 
     def setup() {
-        sql.execute("INSERT INTO tags (name) VALUES ('test-tag-a')")
-        sql.execute("INSERT INTO tags (name) VALUES ('test-tag-b')")
+        dataBuilder.tag().withName("test-tag-a").persist()
+        dataBuilder.tag().withName("test-tag-b").persist()
     }
 
     def cleanup() {
@@ -143,7 +143,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing tag by ID"() {
         given: "an existing tag"
-        def tag = tagRepository.save(new Tag(null, "test-tag-read-${faker.number().digits(5)}"))
+        def tag = dataBuilder.tag().withName("test-tag-read-${faker.number().digits(5)}").persist()
         UUID id = tag.id()
 
         when: "the tag is requested by its ID via HTTP GET"
@@ -179,7 +179,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing tag"() {
         given: "an existing tag"
-        def tag = tagRepository.save(new Tag(null, "original-tag-${faker.number().digits(5)}"))
+        def tag = dataBuilder.tag().withName("original-tag-${faker.number().digits(5)}").persist()
         UUID id = tag.id()
         def newName = "updated-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
         def updateCommand = new UpdateTagCommand(newName)
@@ -217,7 +217,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should fail to update tag with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing tag"
-        def tag = tagRepository.save(new Tag(null, "tag-for-invalid-update"))
+        def tag = dataBuilder.tag().withName("tag-for-invalid-update").persist()
         UUID id = tag.id()
 
         when: "an update with invalid data is attempted via HTTP PUT"
@@ -244,7 +244,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing tag"() {
         given: "an existing tag"
-        def tag = tagRepository.save(new Tag(null, "original-tag-${faker.number().digits(5)}"))
+        def tag = dataBuilder.tag().withName("original-tag-${faker.number().digits(5)}").persist()
         UUID id = tag.id()
         def newName = "director-updated-${UUID.randomUUID().toString().substring(0, 8)}"
         def updateCommand = new UpdateTagCommand(newName)
@@ -300,7 +300,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing tag"() {
         given: "a new tag to be deleted"
-        def saved = tagRepository.save(new Tag(null, "temporary-tag-to-delete"))
+        def saved = dataBuilder.tag().withName("temporary-tag-to-delete").persist()
         UUID id = saved.id()
         assert tagRepository.existsById(id)
 
@@ -340,7 +340,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing tag"() {
         given: "a new tag to be deleted"
-        def saved = tagRepository.save(new Tag(null, "director-delete-tag"))
+        def saved = dataBuilder.tag().withName("director-delete-tag").persist()
         UUID id = saved.id()
         assert tagRepository.existsById(id)
 

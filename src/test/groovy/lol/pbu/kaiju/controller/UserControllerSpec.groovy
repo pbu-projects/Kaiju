@@ -19,7 +19,6 @@ import spock.lang.Shared
 import spock.lang.Unroll
 
 import java.security.Principal
-import java.time.OffsetDateTime
 import java.util.UUID
 
 @MicronautTest(transactional = false)
@@ -47,7 +46,7 @@ class UserControllerSpec extends BaseControllerSpec {
     }
 
     private User createDbUser(String email, UserRole role) {
-        User user = userRepository.save(new User(null, email, role, OffsetDateTime.now()))
+        User user = dataBuilder.user().withEmail(email).withRole(role).persist()
         createdUserIds.add(user.id())
         return user
     }
