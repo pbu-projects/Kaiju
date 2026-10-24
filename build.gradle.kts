@@ -1,3 +1,9 @@
+import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.time.Duration
+
 plugins {
     id("groovy") 
     id("io.micronaut.application") version "5.0.2"
@@ -189,6 +195,58 @@ tasks.withType<AbstractTestTask>().configureEach {
 // Disabled because snakeyaml runtime dependency is removed for AOT convertYamlToJava optimization
 tasks.named("inspectRuntimeClasspath") {
     enabled = false
+}
+
+val verifyAuthentikAvailable by tasks.registering {
+    group = "verification"
+    description = "Checks that Authentik is running and healthy before test compilation or execution."
+    doLast {
+        val probeUrl = "http://localhost:9000/application/o/kaiju/.well-known/openid-configuration"
+        val client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(2))
+            .build()
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(probeUrl))
+            .timeout(Duration.ofSeconds(2))
+            .GET()
+            .build()
+
+        val isHealthy = try {
+            val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+            response.statusCode() == 200
+        } catch (_: Exception) {
+            false
+        }
+
+        if (!isHealthy) {
+            throw GradleException(
+                """
+                
+                ================================================================================
+                [ERROR] Authentik is not reachable at $probeUrl.
+                Authentik is required to compile test resources and run tests.
+
+                Please start the Authentik service using:
+                  docker compose -f database/compose.yml up -d authentik-server authentik-worker
+                ================================================================================
+                """.trimIndent()
+            )
+        }
+    }
+}
+
+val testCompilationAndExecutionTasks = listOf(
+    "compileTestJava",
+    "compileTestGroovy",
+    "compileTestResourcesJava",
+    "compileTestResourcesGroovy",
+    "test"
+)
+
+testCompilationAndExecutionTasks.forEach { taskName ->
+    tasks.named(taskName) {
+        dependsOn(verifyAuthentikAvailable)
+    }
 }
 
 tasks.named<Test>("test") {
