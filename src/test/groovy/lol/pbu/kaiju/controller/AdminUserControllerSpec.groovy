@@ -10,7 +10,6 @@ import lol.pbu.kaiju.model.RoleUpdateRequest
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 
-import java.time.OffsetDateTime
 import java.util.UUID
 
 @MicronautTest(transactional = false)
@@ -19,13 +18,9 @@ class AdminUserControllerSpec extends BaseControllerSpec {
     @Inject
     UserRepository userRepository
 
-    def cleanup() {
-        executeUpdate("DELETE FROM users WHERE email LIKE 'admin-test-%'")
-    }
-
     def "updateUserRole updates the role of an existing user"() {
         given: "a user saved with STANDARD_USER role"
-        User user = userRepository.save(new User(null, "admin-test-${UUID.randomUUID()}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
+        User user = dataBuilder.user().asVolunteer().persist()
 
         when: "an admin promotes them to REGION_AGENT via HTTP PUT"
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/admin/users/${user.id()}/role", new RoleUpdateRequest(UserRole.REGION_AGENT))), User)
@@ -55,7 +50,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
 
     def "updateUserRole throws 403 FORBIDDEN for standard user without SYSTEM_ADMIN_CLAIM"() {
         given: "a user saved with STANDARD_USER role"
-        User user = userRepository.save(new User(null, "admin-test-${UUID.randomUUID()}@example.com", UserRole.STANDARD_USER, OffsetDateTime.now()))
+        User user = dataBuilder.user().asVolunteer().persist()
 
         when: "a standard user attempts to update role"
         client.exchange(asVolunteer(HttpRequest.PUT("/admin/users/${user.id()}/role", new RoleUpdateRequest(UserRole.REGION_AGENT))), User)

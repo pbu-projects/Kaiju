@@ -9,6 +9,10 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.UserRole
+import lol.pbu.kaiju.repository.AdministrativeRegionRepository
+import lol.pbu.kaiju.repository.OrganizationRepository
+import lol.pbu.kaiju.repository.OrganizationUserRepository
+import lol.pbu.kaiju.repository.RegionUserRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.UserService
 import org.reactivestreams.Publisher
@@ -22,10 +26,22 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
 @MicronautTest(transactional = true)
-class CommunityPersonaAuthenticationSpec extends Specification {
+class PersonaAuthSpec extends Specification {
 
     @Inject
     UserRepository userRepository
+
+    @Inject
+    AdministrativeRegionRepository administrativeRegionRepository
+
+    @Inject
+    OrganizationRepository organizationRepository
+
+    @Inject
+    RegionUserRepository regionUserRepository
+
+    @Inject
+    OrganizationUserRepository organizationUserRepository
 
     @Inject
     UserService userService
@@ -76,11 +92,8 @@ class CommunityPersonaAuthenticationSpec extends Specification {
     def "all seeded regions in 3-tier regional hierarchy exist with correct parentage"() {
         when: "querying administrative regions from the database"
         Map<UUID, Map<String, Object>> regions = [:]
-        new Sql(dataSource).eachRow("SELECT id, name, parent_region_id FROM administrative_regions") { row ->
-            UUID id = row.id as UUID
-            String name = row.name as String
-            UUID parentId = row.parent_region_id ? (row.parent_region_id as UUID) : null
-            regions[id] = [name: name, parentId: parentId]
+        administrativeRegionRepository.findAll().each { region ->
+            regions[region.id()] = [name: region.name(), parentId: region.parentRegionId()]
         }
 
         then: "Level 1, Level 2, and Level 3 regions exist with correct parentage and total count matches"
@@ -332,13 +345,13 @@ class CommunityPersonaAuthenticationSpec extends Specification {
     def "all seeded organizations in 3-tier organizational hierarchy exist with correct attributes"() {
         when: "querying organizations from the database"
         Map<UUID, Map<String, Object>> orgs = [:]
-        new Sql(dataSource).eachRow("SELECT id, name, parent_id, is_public, verification_status FROM organizations") { row ->
-            UUID id = row.id as UUID
-            String name = row.name as String
-            UUID parentId = row.parent_id ? (row.parent_id as UUID) : null
-            boolean isPublic = row.is_public as Boolean
-            String status = row.verification_status as String
-            orgs[id] = [name: name, parentId: parentId, isPublic: isPublic, status: status]
+        organizationRepository.findAll().each { org ->
+            orgs[org.id()] = [
+                    name    : org.name(),
+                    parentId: org.parentId(),
+                    isPublic: org.isPublic(),
+                    status  : org.verificationStatus().name()
+            ]
         }
 
         then: "Level 1, Level 2, Level 3 organizations and standalone co-op exist with correct attributes"
@@ -373,17 +386,14 @@ class CommunityPersonaAuthenticationSpec extends Specification {
 
     def "region_users and organization_users bindings match expected persona assignments"() {
         when: "querying region_users bindings"
-        Set<String> regionBindings = new HashSet<>()
-        Sql sql = new Sql(dataSource)
-        sql.eachRow("SELECT user_id, region_id, role FROM region_users") { row ->
-            regionBindings.add("${row.user_id}:${row.region_id}:${row.role}".toString())
-        }
+        Set<String> regionBindings = regionUserRepository.findAll()
+                .collect { "${it.id().userId()}:${it.id().regionId()}:${it.role().name()}".toString() }
+                .toSet()
 
         and: "querying organization_users bindings"
-        Set<String> orgBindings = new HashSet<>()
-        sql.eachRow("SELECT user_id, organization_id, role FROM organization_users") { row ->
-            orgBindings.add("${row.user_id}:${row.organization_id}:${row.role}".toString())
-        }
+        Set<String> orgBindings = organizationUserRepository.findAll()
+                .collect { "${it.id().userId()}:${it.id().organizationId()}:${it.role().name()}".toString() }
+                .toSet()
 
         then: "all regional persona bindings are present"
         TestPersonas.SEEDED_PERSONAS.findAll { it.regionId != null }.each { persona ->
