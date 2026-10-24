@@ -32,6 +32,11 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@6cfc8b8e8bb586cc164bef1c478c1eea3a4d6a19
 
+      - name: Start Authentik test identity provider
+        run: |
+          docker compose -f database/compose.yml up -d authentik-server authentik-worker
+          timeout 180 bash -c 'until curl -sf http://localhost:9000/application/o/kaiju/.well-known/openid-configuration; do sleep 3; done'
+
       - name: Build and analyze
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
