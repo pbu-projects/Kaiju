@@ -92,33 +92,25 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
         orgAId = TestPersonas.DENVER_METRO_BRANCH_ID
         userA = TestPersonas.LAURA_LOCAL_MANAGER
-        locationAId = UUID.randomUUID()
         projectAId = UUID.randomUUID()
         shiftAId = UUID.randomUUID()
 
-        orgBId = UUID.randomUUID()
         userB = TestPersonas.URSULA_UTAH_ADMIN
-        locationBId = UUID.randomUUID()
         projectBId = UUID.randomUUID()
         shiftBId = UUID.randomUUID()
 
         // 1. Link Denver Metro Branch to Denver County Region if not already present
-        executeUpdate("""
-            INSERT INTO organization_regions (organization_id, region_id)
-            VALUES (?, ?)
-            ON CONFLICT DO NOTHING
-        """, orgAId, denverRegionId)
+        dataBuilder.linkOrganizationToRegion(orgAId, denverRegionId)
 
         // 2. Organization Alpha (Org A) in Denver
-        executeUpdate("""
-            INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom)
-            VALUES (?, 'Denver Location Alpha', '1600 California St', 'Denver', 'CO', '80202', ?, ST_GeogFromText(?))
-        """, locationAId, COUNTRY_CODE_US, DENVER_POINT)
+        def locA = dataBuilder.location()
+                .withName("Denver Location Alpha")
+                .withAddress("1600 California St", "Denver", "CO", "80202", COUNTRY_CODE_US)
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        locationAId = locA.id()
 
-        executeUpdate("""
-            INSERT INTO organization_locations (organization_id, location_id)
-            VALUES (?, ?)
-        """, orgAId, locationAId)
+        dataBuilder.linkOrganizationToLocation(orgAId, locationAId)
 
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
@@ -138,20 +130,20 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         """, shiftAId, projectAId, Timestamp.from(startTimeA.toInstant()), Timestamp.from(endTimeA.toInstant()))
 
         // 3. Organization Beta (Org B) in Boulder
-        executeUpdate("""
-            INSERT INTO organizations (id, name, is_public, verification_status)
-            VALUES (?, 'Organization Beta', true, ?)
-        """, orgBId, STATUS_VERIFIED)
+        def locB = dataBuilder.location()
+                .withName("Boulder Location Beta")
+                .withAddress("1000 Pearl St", "Boulder", "CO", "80302", COUNTRY_CODE_US)
+                .atPoint(-105.2705, 40.0150)
+                .persist()
+        locationBId = locB.id()
 
-        executeUpdate("""
-            INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom)
-            VALUES (?, 'Boulder Location Beta', '1000 Pearl St', 'Boulder', 'CO', '80302', ?, ST_GeogFromText(?))
-        """, locationBId, COUNTRY_CODE_US, BOULDER_POINT)
-
-        executeUpdate("""
-            INSERT INTO organization_locations (organization_id, location_id)
-            VALUES (?, ?)
-        """, orgBId, locationBId)
+        def orgB = dataBuilder.organization()
+                .withName("Organization Beta")
+                .asPublic()
+                .verified()
+                .withLocation(locB)
+                .persist()
+        orgBId = orgB.id()
 
         executeUpdate("""
             INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)

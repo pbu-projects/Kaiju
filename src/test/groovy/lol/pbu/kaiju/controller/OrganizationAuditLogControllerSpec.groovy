@@ -8,16 +8,11 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.OrganizationAuditLog
-import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.OrganizationAuditLogRepository
 
 import java.time.OffsetDateTime
 import java.util.UUID
-
-import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 @MicronautTest(transactional = false)
 class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
@@ -28,28 +23,12 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
     @Inject
     OrganizationAuditLogController organizationAuditLogController
 
-    private Organization getRandomOrganization() {
-        def orgRow = sql.firstRow("SELECT id, name FROM organizations LIMIT 1")
-        if (!orgRow) {
-            throw new IllegalStateException("No organizations found in database to link audit log to.")
-        }
-        new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, UNVERIFIED, null, [])
-    }
-
-    private User getRandomUser() {
-        def userRow = sql.firstRow("SELECT id, email, role FROM users LIMIT 1")
-        if (!userRow) {
-            throw new IllegalStateException("No users found in database to link audit log to.")
-        }
-        new User(userRow.id as UUID, userRow.email as String, UserRole.valueOf(userRow.role as String), OffsetDateTime.now())
-    }
-
     /********** READ Tests **********/
 
     def "READ | should retrieve an existing organization audit log by ID"() {
         given: "seed an organization audit log"
-        def org = getRandomOrganization()
-        def actor = getRandomUser()
+        def org = dataBuilder.organization().persist()
+        def actor = dataBuilder.user().persist()
         def log = organizationAuditLogRepository.save(new OrganizationAuditLog(null, org, actor, "UNVERIFIED", "VERIFIED", "Reason", OffsetDateTime.now()))
         UUID id = log.id()
 

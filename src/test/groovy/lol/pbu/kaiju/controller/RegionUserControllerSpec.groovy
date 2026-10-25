@@ -33,10 +33,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should successfully save a valid region user"() {
         given: "a new region user connection"
-        UUID userId = UUID.randomUUID()
-        UUID regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "regionuser@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", regionId, "Test Region for User")
+        def user = dataBuilder.user().asStandardUser().withEmail("regionuser@example.com").persist()
+        def region = dataBuilder.region().withName("Test Region for User").persist()
+        UUID userId = user.id()
+        UUID regionId = region.id()
 
         def command = new CreateRegionUserCommand(userId, regionId, RegionUserRole.REGION_DIRECTOR)
 
@@ -113,11 +113,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should allow regional director with region:manage claim to save a region user"() {
         given: "a target user, administrative region, and regional director"
-        UUID targetUserId = UUID.randomUUID()
-        UUID targetRegionId = UUID.randomUUID()
+        def targetUser = dataBuilder.user().asStandardUser().withEmail("director-create-user@example.com").persist()
+        def targetRegion = dataBuilder.region().withName("Director Test Region Create").persist()
+        UUID targetUserId = targetUser.id()
+        UUID targetRegionId = targetRegion.id()
         UUID directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "director-create-user@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", targetRegionId, "Director Test Region Create")
 
         def command = new CreateRegionUserCommand(targetUserId, targetRegionId, RegionUserRole.REGION_AGENT)
 
@@ -147,11 +147,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing region user by composite ID"() {
         given: "an existing user and region"
-        UUID userId = UUID.randomUUID()
-        UUID regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "regionuser-read@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", regionId, "Test Region for User Read")
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", userId, regionId)
+        def user = dataBuilder.user().asStandardUser().withEmail("regionuser-read@example.com").persist()
+        def region = dataBuilder.region().withName("Test Region for User Read").persist()
+        UUID userId = user.id()
+        UUID regionId = region.id()
+        dataBuilder.regionUser().asRegionDirector(userId, regionId).persist()
 
         when: "the region user is requested via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/region-users/${userId}/${regionId}")), RegionUser)
@@ -193,11 +193,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing region user role"() {
         given: "an existing region user"
-        UUID userId = UUID.randomUUID()
-        UUID regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "regionuser-update@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", regionId, "Test Region for User Update")
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", userId, regionId)
+        def user = dataBuilder.user().asStandardUser().withEmail("regionuser-update@example.com").persist()
+        def region = dataBuilder.region().withName("Test Region for User Update").persist()
+        UUID userId = user.id()
+        UUID regionId = region.id()
+        dataBuilder.regionUser().asRegionAgent(userId, regionId).persist()
 
         def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
 
@@ -271,12 +271,12 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing region user role"() {
         given: "an existing region user association and regional director"
-        UUID targetUserId = UUID.randomUUID()
-        UUID targetRegionId = UUID.randomUUID()
+        def targetUser = dataBuilder.user().asStandardUser().withEmail("director-update-user@example.com").persist()
+        def targetRegion = dataBuilder.region().withName("Director Test Region Update").persist()
+        UUID targetUserId = targetUser.id()
+        UUID targetRegionId = targetRegion.id()
         UUID directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "director-update-user@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", targetRegionId, "Director Test Region Update")
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", targetUserId, targetRegionId)
+        dataBuilder.regionUser().asRegionAgent(targetUserId, targetRegionId).persist()
 
         def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
 
@@ -304,11 +304,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing region user"() {
         given: "an existing region user"
-        UUID userId = UUID.randomUUID()
-        UUID regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", userId, "regionuser-delete@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", regionId, "Test Region for User Delete")
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", userId, regionId)
+        def user = dataBuilder.user().asStandardUser().withEmail("regionuser-delete@example.com").persist()
+        def region = dataBuilder.region().withName("Test Region for User Delete").persist()
+        UUID userId = user.id()
+        UUID regionId = region.id()
+        dataBuilder.regionUser().asRegionAgent(userId, regionId).persist()
 
         when: "the region user is deleted via HTTP DELETE"
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/region-users/${userId}/${regionId}")))
@@ -367,12 +367,12 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing region user"() {
         given: "an existing region user association and regional director"
-        UUID targetUserId = UUID.randomUUID()
-        UUID targetRegionId = UUID.randomUUID()
+        def targetUser = dataBuilder.user().asStandardUser().withEmail("director-del-user@example.com").persist()
+        def targetRegion = dataBuilder.region().withName("Director Test Region Delete").persist()
+        UUID targetUserId = targetUser.id()
+        UUID targetRegionId = targetRegion.id()
         UUID directorId = UUID.randomUUID()
-        executeUpdate("INSERT INTO users (id, email, role) VALUES (?, ?, 'STANDARD_USER')", targetUserId, "director-del-user@example.com")
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, ?, ST_GeographyFromText('POLYGON((-105.0 39.0, -104.0 39.0, -104.0 40.0, -105.0 40.0, -105.0 39.0))'))", targetRegionId, "Director Test Region Delete")
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", targetUserId, targetRegionId)
+        dataBuilder.regionUser().asRegionAgent(targetUserId, targetRegionId).persist()
 
         when: "the regional director deletes the region user via HTTP DELETE"
         def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${targetUserId}/${targetRegionId}"), directorId.toString()))
