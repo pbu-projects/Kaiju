@@ -27,16 +27,19 @@ import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.security.ProjectSecurityService
 import net.datafaker.Faker
+import org.locationtech.jts.geom.Coordinate
 import spock.lang.Shared
 import spock.lang.Unroll
 
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE
 import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING
+import static lol.pbu.kaiju.model.ProjectStatus.PENDING_UPDATE
 import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 @MicronautTest(transactional = false)
 class ProjectControllerSpec extends BaseControllerSpec {
@@ -98,13 +101,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     private Organization getRandomOrganization() {
-        def orgRow = sql.firstRow("SELECT id, name FROM organizations LIMIT 1")
-        if (orgRow) {
-            return new Organization(orgRow.id as UUID, orgRow.name as String, null, null, true, UNVERIFIED, null, [])
-        }
-        def newId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Default Test Org', true, 'VERIFIED')", newId)
-        return new Organization(newId, 'Default Test Org', null, null, true, UNVERIFIED, null, [])
+        return dataBuilder.organization().persist()
     }
 
     private List<ProjectBoundaryCommand> defaultBoundaries(String name = "Default Boundary") {
@@ -131,16 +128,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
             List<ProjectLocationCommand> locations = [],
             List<ProjectBoundaryCommand> boundaries = defaultBoundaries()
     ) {
-        new CreateProjectCommand(
-                orgId,
-                managingRegionId,
-                title,
-                description,
-                projectType,
-                status,
-                locations,
-                boundaries
-        )
+        dataBuilder.project()
+                .forOrg(orgId)
+                .inRegion(managingRegionId)
+                .withTitle(title)
+                .withDescription(description)
+                .withType(projectType)
+                .withStatus(status)
+                .withCommandLocations(locations)
+                .withCommandBoundaries(boundaries)
+                .asCommand()
     }
 
     private UpdateProjectCommand updateProjectCommand(
@@ -152,15 +149,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
             List<ProjectLocationCommand> locations = [],
             List<ProjectBoundaryCommand> boundaries = defaultBoundaries()
     ) {
-        new UpdateProjectCommand(
-                orgId,
-                managingRegionId,
-                title,
-                description,
-                projectType,
-                locations,
-                boundaries
-        )
+        dataBuilder.project()
+                .forOrg(orgId)
+                .inRegion(managingRegionId)
+                .withTitle(title)
+                .withDescription(description)
+                .withType(projectType)
+                .withCommandLocations(locations)
+                .withCommandBoundaries(boundaries)
+                .asUpdateCommand()
     }
 
     /********** CREATE Tests **********/
@@ -484,11 +481,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def orgBId = TestPersonas.UTAH_STATE_CHAPTER_ID
 
         and: "a project belonging to Org A"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Project in Org A', 'Description of project in Org A that is long enough.', 'STANDARD', 'DRAFT', NOW())
-        """, projectId, orgAId)
+        def project = dataBuilder.project()
+                .forOrg(orgAId)
+                .withTitle("Project in Org A")
+                .withDescription("Description of project in Org A that is long enough.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .persist()
+        def projectId = project.id()
 
         and: "an update command attempting to reassign the project to Org B"
         def updateCmd = updateProjectCommand(orgBId, "Hijacked Title", "Hijacked Description that is at least twenty chars long.")
@@ -513,11 +513,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def orgAId = TestPersonas.DENVER_METRO_BRANCH_ID
 
         and: "a project belonging to Org A"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Initial Title', 'Initial Description that is at least twenty chars long.', 'STANDARD', 'DRAFT', NOW())
-        """, projectId, orgAId)
+        def project = dataBuilder.project()
+                .forOrg(orgAId)
+                .withTitle("Initial Title")
+                .withDescription("Initial Description that is at least twenty chars long.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .persist()
+        def projectId = project.id()
 
         and: "an update payload preserving Org A with updated title and description"
         def updateCmd = updateProjectCommand(orgAId, "Legit Updated Title", "Legit Updated Description that is at least twenty chars long.")
@@ -543,17 +546,19 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow project reassignment to another organization when user is GLOBAL_ADMIN"() {
         given: "two organizations Org A and Org B"
-        def orgAId = UUID.randomUUID()
-        def orgBId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
+        def orgA = dataBuilder.organization().withName("Org A").asPublic().persist()
+        def orgB = dataBuilder.organization().withName("Org B").asPublic().persist()
+        def orgBId = orgB.id()
 
         and: "a project belonging to Org A"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Original Title', 'Original Description that is at least twenty chars long.', 'STANDARD', 'DRAFT', NOW())
-        """, projectId, orgAId)
+        def project = dataBuilder.project()
+                .forOrg(orgA)
+                .withTitle("Original Title")
+                .withDescription("Original Description that is at least twenty chars long.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .persist()
+        def projectId = project.id()
 
         and: "an update command reassigning the project to Org B"
         def updateCmd = updateProjectCommand(orgBId, "Admin Updated Title", "Admin Updated Description that is at least twenty chars long.")
@@ -579,21 +584,23 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject project reassignment even when user is manager of destination org"() {
         given: "two organizations Org A and Org B"
-        def orgAId = UUID.randomUUID()
-        def orgBId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org B', true)", orgBId)
+        def orgA = dataBuilder.organization().withName("Org A").asPublic().persist()
+        def orgB = dataBuilder.organization().withName("Org B").asPublic().persist()
+        def orgBId = orgB.id()
 
         and: "a user who is an ORG_MANAGER of both Org A and Org B"
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgAId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgBId)
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, orgA).persist()
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, orgB).persist()
 
         and: "a project belonging to Org A"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Dual Mgr Project', 'Dual Mgr Description that is at least twenty chars long.', 'STANDARD', 'DRAFT', NOW())
-        """, projectId, orgAId)
+        def project = dataBuilder.project()
+                .forOrg(orgA)
+                .withTitle("Dual Mgr Project")
+                .withDescription("Dual Mgr Description that is at least twenty chars long.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .persist()
+        def projectId = project.id()
 
         and: "an update command reassigning the project to Org B"
         def updateCmd = updateProjectCommand(orgBId, "Reassigned by Dual Manager", "Desc with plenty of characters to pass validation.")
@@ -607,20 +614,25 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         and: "the project remains assigned to Org A in the database"
         def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
-        projectInDb.organization_id == orgAId
+        verifyAll {
+            projectInDb.organization_id == orgA.id()
+        }
     }
 
     def "UPDATE | should throw 404 Not Found when privileged user reassigns project to non-existent organization"() {
         given: "an organization Org A"
-        def orgAId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Org A', true)", orgAId)
+        def orgA = dataBuilder.organization().withName("Org A").asPublic().persist()
+        def orgAId = orgA.id()
 
         and: "a project belonging to Org A"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Project to Reassign', 'Description of project to reassign at least 20 chars.', 'STANDARD', 'DRAFT', NOW())
-        """, projectId, orgAId)
+        def project = dataBuilder.project()
+                .forOrg(orgA)
+                .withTitle("Project to Reassign")
+                .withDescription("Description of project to reassign at least 20 chars.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .persist()
+        def projectId = project.id()
 
         and: "an update command with a non-existent destination organization"
         def nonExistentOrgId = UUID.randomUUID()
@@ -640,25 +652,34 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should demote ACTIVE project status to PENDING when location is updated outside boundary"() {
         given: "a region and an organization bounded to it"
-        def regionId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom) 
-            VALUES (?, 'City of Denver', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
-        """, regionId)
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("City of Denver")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
 
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Denver Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regionId)
+        def org = dataBuilder.organization().withName("Denver Org").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.linkOrganizationToRegion(org, region)
 
         and: "an Org Manager for the organization"
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         and: "an ACTIVE project belonging to the organization"
-        def projectId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Active Denver Project', 'Description of active Denver project at least 20 chars.', 'STANDARD', 'ACTIVE', NOW())
-        """, projectId, orgId)
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Denver Project")
+                .withDescription("Description of active Denver project at least 20 chars.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .persist()
+        def projectId = project.id()
 
         and: "an update command with a location outside the region (Boulder)"
         def outsideLoc = new ProjectLocationCommand(
@@ -727,51 +748,38 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY LOCATION | should successfully query projects by location point, returning closest locations first"() {
         given: "seed the database with test organization, projects, locations (closest to furthest), and active shifts"
-        def uuids = [:].withDefault { UUID.randomUUID() }
+        def org = dataBuilder.organization().withName("Distance Test Org").asPublic().persist()
 
-        String idName = "id, name"
-        def insertInto = { String table, String columns, String values ->
-            "INSERT INTO ${table} (${columns}) VALUES (${values})"
-        }
+        def projA = dataBuilder.project().forOrg(org).withTitle("Project A").withDescription("Description with at least twenty characters here.").withType(STANDARD).withStatus(ACTIVE).persist()
+        def projB = dataBuilder.project().forOrg(org).withTitle("Project B").withDescription("Description with at least twenty characters here.").withType(STANDARD).withStatus(ACTIVE).persist()
+        def projC = dataBuilder.project().forOrg(org).withTitle("Project C").withDescription("Description with at least twenty characters here.").withType(STANDARD).withStatus(ACTIVE).persist()
+        def projD = dataBuilder.project().forOrg(org).withTitle("Project D").withDescription("Description with at least twenty characters here.").withType(STANDARD).withStatus(ACTIVE).persist()
+        def projE = dataBuilder.project().forOrg(org).withTitle("Project E").withDescription("Description with at least twenty characters here.").withType(STANDARD).withStatus(ACTIVE).persist()
 
-        String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Distance Test Org', true")
-        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description with at least twenty characters here.', 'STANDARD', 'ACTIVE', NOW()")
-        String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
-        String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
-        String insertShiftSql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours'")
+        def locA1 = dataBuilder.location().withName('Location A1').withAddressLine('123 Closest St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 39.7572).persist()
+        def locB1 = dataBuilder.location().withName('Location B1').withAddressLine('456 Second St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 39.7842).persist()
+        def locA2 = dataBuilder.location().withName('Location A2').withAddressLine('789 Third St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 39.8292).persist()
+        def locE1 = dataBuilder.location().withName('Location E1').withAddressLine('101 Fourth St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 39.8472).persist()
+        def locC1 = dataBuilder.location().withName('Location C1').withAddressLine('202 Fifth St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 39.8742).persist()
+        def locA3 = dataBuilder.location().withName('Location A3').withAddressLine('303 Far St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 40.1892).persist()
+        def locD1 = dataBuilder.location().withName('Location D1').withAddressLine('404 Far St').withCity('Denver').withCountryCode('US').atPoint(-104.9903, 40.1892).persist()
 
-        [
-                [insertOrganizationSql, [uuids.organizationId]],
-                [insertProjectSql, [uuids.projectIdA, uuids.organizationId, 'Project A']],
-                [insertProjectSql, [uuids.projectIdB, uuids.organizationId, 'Project B']],
-                [insertProjectSql, [uuids.projectIdC, uuids.organizationId, 'Project C']],
-                [insertProjectSql, [uuids.projectIdD, uuids.organizationId, 'Project D']],
-                [insertProjectSql, [uuids.projectIdE, uuids.organizationId, 'Project E']],
+        dataBuilder.addProjectLocation(projA, locA1)
+        dataBuilder.addProjectLocation(projA, locA2)
+        dataBuilder.addProjectLocation(projA, locA3)
+        dataBuilder.addProjectLocation(projB, locB1)
+        dataBuilder.addProjectLocation(projE, locE1)
+        dataBuilder.addProjectLocation(projC, locC1)
+        dataBuilder.addProjectLocation(projD, locD1)
 
-                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']],
-                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']],
-                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],
-                [insertLocationSql, [uuids.locE1, 'Location E1', '101 Fourth St', 'Denver', 'US', 'POINT(-104.9903 39.8472)']],
-                [insertLocationSql, [uuids.locC1, 'Location C1', '202 Fifth St', 'Denver', 'US', 'POINT(-104.9903 39.8742)']],
-                [insertLocationSql, [uuids.locA3, 'Location A3', '303 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],
-                [insertLocationSql, [uuids.locD1, 'Location D1', '404 Far St', 'Denver', 'US', 'POINT(-104.9903 40.1892)']],
-
-                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA1]],
-                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA2]],
-                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA3]],
-                [insertProjectLocationSql, [uuids.projectIdB, uuids.locB1]],
-                [insertProjectLocationSql, [uuids.projectIdE, uuids.locE1]],
-                [insertProjectLocationSql, [uuids.projectIdC, uuids.locC1]],
-                [insertProjectLocationSql, [uuids.projectIdD, uuids.locD1]],
-
-                [insertShiftSql, [uuids.shiftA1, uuids.projectIdA, uuids.locA1]],
-                [insertShiftSql, [uuids.shiftA2, uuids.projectIdA, uuids.locA2]],
-                [insertShiftSql, [uuids.shiftA3, uuids.projectIdA, uuids.locA3]],
-                [insertShiftSql, [uuids.shiftB1, uuids.projectIdB, uuids.locB1]],
-                [insertShiftSql, [uuids.shiftE1, uuids.projectIdE, uuids.locE1]],
-                [insertShiftSql, [uuids.shiftC1, uuids.projectIdC, uuids.locC1]],
-                [insertShiftSql, [uuids.shiftD1, uuids.projectIdD, uuids.locD1]]
-        ].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC)
+        dataBuilder.shift().forProject(projA).atLocation(locA1).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
+        dataBuilder.shift().forProject(projA).atLocation(locA2).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
+        dataBuilder.shift().forProject(projA).atLocation(locA3).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
+        dataBuilder.shift().forProject(projB).atLocation(locB1).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
+        dataBuilder.shift().forProject(projE).atLocation(locE1).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
+        dataBuilder.shift().forProject(projC).atLocation(locC1).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
+        dataBuilder.shift().forProject(projD).atLocation(locD1).withTimes(now.plusDays(1), now.plusDays(1).plusHours(2)).persist()
 
         when: "searching projects by location via HTTP GET with 20km radius"
         def uri = UriBuilder.of("/projects/search-by-location")
@@ -784,51 +792,87 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "only active projects in range are returned sorted by closest location, with no duplicates per project"
         List items = response.body().content as List
-        List testResults = items.findAll { (it.projectId as String) in [uuids.projectIdA, uuids.projectIdB, uuids.projectIdC, uuids.projectIdD, uuids.projectIdE].collect { it.toString() } }
+        List testResults = items.findAll { (it.projectId as String) in [projA.id(), projB.id(), projC.id(), projD.id(), projE.id()].collect { it.toString() } }
         verifyAll {
             response.status == HttpStatus.OK
             testResults.size() == 4
-            testResults[0].projectId == uuids.projectIdA.toString()
-            testResults[1].projectId == uuids.projectIdB.toString()
-            testResults[2].projectId == uuids.projectIdE.toString()
-            testResults[3].projectId == uuids.projectIdC.toString()
+            testResults[0].projectId == projA.id().toString()
+            testResults[1].projectId == projB.id().toString()
+            testResults[2].projectId == projE.id().toString()
+            testResults[3].projectId == projC.id().toString()
         }
     }
 
     @Unroll
     def "SEARCH BY LOCATION | should handle project status #status and shift active state #shiftActive"() {
         given: "seed the database with test organization, project statuses, and shift time configurations"
-        def uuids = [:].withDefault { UUID.randomUUID() }
+        def org = dataBuilder.organization().withName("Status Test Org").asPublic().persist()
 
-        String idName = "id, name"
-        def insertInto = { String table, String columns, String values ->
-            "INSERT INTO ${table} (${columns}) VALUES (${values})"
-        }
+        def projA = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Project A")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ProjectStatus.valueOf(status))
+                .persist()
 
-        String insertOrganizationSql = insertInto("organizations", "${idName}, is_public", "?, 'Status Test Org', true")
-        String insertProjectSql = insertInto("projects", "id, organization_id, title, description, project_type, status, created_at", "?, ?, ?, 'Description with at least twenty characters here.', 'STANDARD', ?, NOW()")
-        String insertLocationSql = insertInto("locations", "${idName}, address_line, city, country_code, geom", "?, ?, ?, ?, ?, ST_GeographyFromText(?)")
-        String insertProjectLocationSql = insertInto("project_locations", "project_id, location_id", "?, ?")
+        def projB = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Project B")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .persist()
 
-        String startOffset = shiftActive ? "1 day" : "-1 day"
-        String endOffset = shiftActive ? "1 day 2 hours" : "-22 hours"
-        String insertShiftA1Sql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '${startOffset}', NOW() + INTERVAL '${endOffset}'")
-        String insertShiftSql = insertInto("shifts", "id, project_id, is_virtual, location_id, start_time, end_time", "?, ?, false, ?, NOW() + INTERVAL '1 day', NOW() + INTERVAL '1 day 2 hours'")
+        def locA1 = dataBuilder.location()
+                .withName('Location A1')
+                .withAddressLine('123 Closest St')
+                .withCity('Denver')
+                .withCountryCode('US')
+                .atPoint(-104.9903, 39.7572)
+                .persist()
 
-        [
-                [insertOrganizationSql, [uuids.organizationId]],
-                [insertProjectSql, [uuids.projectIdA, uuids.organizationId, 'Project A', status]],
-                [insertProjectSql, [uuids.projectIdB, uuids.organizationId, 'Project B', 'ACTIVE']],
-                [insertLocationSql, [uuids.locA1, 'Location A1', '123 Closest St', 'Denver', 'US', 'POINT(-104.9903 39.7572)']],
-                [insertLocationSql, [uuids.locB1, 'Location B1', '456 Second St', 'Denver', 'US', 'POINT(-104.9903 39.7842)']],
-                [insertLocationSql, [uuids.locA2, 'Location A2', '789 Third St', 'Denver', 'US', 'POINT(-104.9903 39.8292)']],
-                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA1]],
-                [insertProjectLocationSql, [uuids.projectIdA, uuids.locA2]],
-                [insertProjectLocationSql, [uuids.projectIdB, uuids.locB1]],
-                [insertShiftA1Sql, [uuids.shiftA1, uuids.projectIdA, uuids.locA1]],
-                [insertShiftSql, [uuids.shiftA2, uuids.projectIdA, uuids.locA2]],
-                [insertShiftSql, [uuids.shiftB1, uuids.projectIdB, uuids.locB1]]
-        ].each { List<Object> seedStatement -> executeUpdate(seedStatement[0] as String, *(seedStatement[1] as List)) }
+        def locB1 = dataBuilder.location()
+                .withName('Location B1')
+                .withAddressLine('456 Second St')
+                .withCity('Denver')
+                .withCountryCode('US')
+                .atPoint(-104.9903, 39.7842)
+                .persist()
+
+        def locA2 = dataBuilder.location()
+                .withName('Location A2')
+                .withAddressLine('789 Third St')
+                .withCity('Denver')
+                .withCountryCode('US')
+                .atPoint(-104.9903, 39.8292)
+                .persist()
+
+        dataBuilder.addProjectLocation(projA, locA1)
+        dataBuilder.addProjectLocation(projA, locA2)
+        dataBuilder.addProjectLocation(projB, locB1)
+
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC)
+        OffsetDateTime shiftA1Start = shiftActive ? now.plusDays(1) : now.minusDays(1)
+        OffsetDateTime shiftA1End = shiftActive ? now.plusDays(1).plusHours(2) : now.minusHours(22)
+
+        dataBuilder.shift()
+                .forProject(projA)
+                .atLocation(locA1)
+                .withTimes(shiftA1Start, shiftA1End)
+                .persist()
+
+        dataBuilder.shift()
+                .forProject(projA)
+                .atLocation(locA2)
+                .withTimes(now.plusDays(1), now.plusDays(1).plusHours(2))
+                .persist()
+
+        dataBuilder.shift()
+                .forProject(projB)
+                .atLocation(locB1)
+                .withTimes(now.plusDays(1), now.plusDays(1).plusHours(2))
+                .persist()
 
         when: "searching projects by location via HTTP GET"
         def uri = UriBuilder.of("/projects/search-by-location")
@@ -841,15 +885,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         then: "the result matches expected order and presence based on project status and shift validity"
         List items = response.body().content as List
-        List testResults = items.findAll { (it.projectId as String) in [uuids.projectIdA, uuids.projectIdB].collect { it.toString() } }
+        List testResults = items.findAll { (it.projectId as String) in [projA.id(), projB.id()].collect { it.toString() } }
 
         List<String> expectedUUIDs = expectedOrderNames.collect { name ->
-            (name == 'A' ? uuids.projectIdA : uuids.projectIdB).toString()
+            (name == 'A' ? projA.id() : projB.id()).toString()
         }
         verifyAll {
             response.status == HttpStatus.OK
             testResults.collect { it.projectId as String } == expectedUUIDs
         }
+
 
         where:
         status     | shiftActive | expectedOrderNames
@@ -895,22 +940,26 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET(uri)), Map)
 
         then: "an empty Page is returned"
-        response.status == HttpStatus.OK
         def content = response.body().content as List
-        content.isEmpty()
+        verifyAll {
+            response.status == HttpStatus.OK
+            content.isEmpty()
+        }
     }
 
     /********** APPROVE Tests **********/
 
     def "APPROVE | should allow GLOBAL_ADMIN to approve a virtual project"() {
         given: "an organization and a pending virtual project"
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Approve Org', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Virtual Approve Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
+        def org = dataBuilder.organization().withName("Approve Org").asPublic().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Virtual Approve Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .persist()
+        def projId = project.id()
 
         when: "the GLOBAL_ADMIN approves the project via HTTP PUT"
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
@@ -930,19 +979,32 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should allow REGION_DIRECTOR to approve a virtual project when org is in their region"() {
         given: "a region, organization in that region, and pending virtual project"
-        def regId = UUID.randomUUID()
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Approve Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Director Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Director Virtual Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.7),
+                new Coordinate(-104.7, 39.7),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.7)
+        ]
+        def region = dataBuilder.region()
+                .withName("Approve Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
+        def org = dataBuilder.organization().withName("Director Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Director Virtual Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .persist()
+        def projId = project.id()
 
         and: "a REGION_DIRECTOR of that region"
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR') ON CONFLICT DO NOTHING", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
+        dataBuilder.regionUser().asRegionDirector(TestPersonas.DANIEL_COUNTY_DIRECTOR, region).persist()
 
         when: "the REGION_DIRECTOR approves the virtual project via HTTP PUT"
         def response = client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
@@ -961,13 +1023,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should reject REGION_AGENT approval of virtual project with 403 Forbidden"() {
         given: "an organization and pending virtual project"
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Agent VOrg', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Agent VProj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
+        def org = dataBuilder.organization().withName("Agent VOrg").asPublic().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Agent VProj")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .persist()
+        def projId = project.id()
 
         when: "the REGION_AGENT attempts to approve the virtual project via HTTP PUT"
         client.exchange(asRegionAgent(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.CONNIE_COUNTY_AGENT), Project)
@@ -988,13 +1052,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should reject approval of already ACTIVE project with 400 Bad Request"() {
         given: "an already ACTIVE project"
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Active Org', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Already Active', 'Description with at least twenty characters here.', 'STANDARD', 'ACTIVE', NOW())
-        """, projId, orgId)
+        def org = dataBuilder.organization().withName("Active Org").asPublic().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Already Active")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .persist()
+        def projId = project.id()
 
         when: "attempting to approve an ACTIVE project via HTTP PUT"
         client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
@@ -1006,13 +1072,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should allow approving a PENDING_UPDATE project"() {
         given: "a project in PENDING_UPDATE status"
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'PendingUpdate Org', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Pending Update Proj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING_UPDATE', NOW())
-        """, projId, orgId)
+        def org = dataBuilder.organization().withName("PendingUpdate Org").asPublic().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Pending Update Proj")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING_UPDATE)
+                .persist()
+        def projId = project.id()
 
         when: "approving the PENDING_UPDATE project via HTTP PUT"
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
@@ -1027,13 +1095,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should reject approval of soft-deleted project with 404 Not Found"() {
         given: "a soft-deleted pending project"
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Deleted Org', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at, deleted_at)
-            VALUES (?, ?, 'Deleted Proj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW(), NOW())
-        """, projId, orgId)
+        def org = dataBuilder.organization().withName("Deleted Org").asPublic().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Deleted Proj")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .deleted()
+                .persist()
+        def projId = project.id()
 
         when: "attempting to approve a deleted project via HTTP PUT"
         client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
@@ -1045,13 +1116,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should write audit log record on approval"() {
         given: "a pending project and an admin"
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Audit Org', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Audit Proj', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
+        def org = dataBuilder.organization().withName("Audit Org").asPublic().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Audit Proj")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .persist()
+        def projId = project.id()
 
         when: "approving the project via HTTP PUT"
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
@@ -1068,21 +1141,39 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should allow REGION_DIRECTOR to approve physical project with locations inside their region"() {
         given: "a region, organization, location inside that region, and physical project"
-        def regId = UUID.randomUUID()
-        def orgId = UUID.randomUUID()
-        def locId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Phys Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Phys Org', true)", orgId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Phys Loc', 'St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", locId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Phys Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, locId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Director Phys Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
+        def org = dataBuilder.organization().withName("Phys Org").asPublic().persist()
+        def loc = dataBuilder.location()
+                .withName("Phys Loc")
+                .withAddressLine("St")
+                .withCity("Denver")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Phys Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .atLocation(loc)
+                .persist()
+        def projId = project.id()
 
         and: "a REGION_DIRECTOR assigned to that region"
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR') ON CONFLICT DO NOTHING", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
+        dataBuilder.regionUser().asRegionDirector(TestPersonas.DANIEL_COUNTY_DIRECTOR, region).persist()
 
         when: "the REGION_DIRECTOR approves the physical project via HTTP PUT"
         def response = client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
@@ -1101,18 +1192,32 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "APPROVE | should allow REGION_DIRECTOR to approve virtual project assigned via managing_region_id"() {
         given: "a region, verified organization, and virtual project explicitly assigned via managing_region_id"
-        def regId = UUID.randomUUID()
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Managing Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Managing Reg Org', true, 'VERIFIED')", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, ?, 'Virtual Assigned Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId, regId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Director Managing Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
+        def org = dataBuilder.organization().withName("Managing Reg Org").asPublic().verified().persist()
+
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .inRegion(region)
+                .withTitle("Virtual Assigned Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .persist()
+        def projId = project.id()
 
         and: "a REGION_DIRECTOR assigned to that managing region"
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR') ON CONFLICT DO NOTHING", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
+        dataBuilder.regionUser().asRegionDirector(TestPersonas.DANIEL_COUNTY_DIRECTOR, region).persist()
 
         when: "the REGION_DIRECTOR approves the virtual project via HTTP PUT"
         def response = client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
@@ -1146,15 +1251,22 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "APPROVE | should reject approval when REGION_DIRECTOR lacks geographic jurisdiction over physical locations"() {
         given: "a PENDING project with physical locations in Colorado Springs (outside Denver County)"
         def org = getRandomOrganization()
-        def csLocId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'CS Project', 'Description with at least twenty characters here.', 'STANDARD', 'PENDING', NOW())
-        """, projId, org.id())
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'CS Loc', '123 Main', 'Colo Springs', 'US', ST_GeogFromText('POINT(-104.82 38.83)'))",
-                csLocId)
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, csLocId)
+        def csLoc = dataBuilder.location()
+                .withName("CS Loc")
+                .withAddressLine("123 Main")
+                .withCity("Colo Springs")
+                .withCountryCode("US")
+                .atPoint(-104.82, 38.83)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("CS Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .atLocation(csLoc)
+                .persist()
+        def projId = project.id()
 
         when: "the Denver Region Director attempts to approve the project via HTTP PUT"
         client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${projId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
@@ -1200,8 +1312,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "SUBMIT | should throw 400 when project locations do not fall within managingRegion"() {
         given: "a managing region with a defined boundary"
-        def regId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Strict Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Strict Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
 
         and: "an organization and a location outside the managing region"
         def org = getRandomOrganization()
@@ -1227,8 +1349,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "SUBMIT | should throw 403 when submitter lacks authority to assign managingRegion"() {
         given: "a managing region"
-        def regId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Auth Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Auth Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
 
         and: "an organization"
         def org = getRandomOrganization()
@@ -1245,11 +1377,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "SUBMIT | should successfully save virtual project with valid managingRegion"() {
         given: "a valid region and organization where user has authority"
-        UUID regId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Submit Virtual Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
-        """, regId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.7),
+                new Coordinate(-104.9, 39.7),
+                new Coordinate(-104.9, 39.8),
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-105.1, 39.7)
+        ]
+        def region = dataBuilder.region()
+                .withName("Submit Virtual Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
         def org = getRandomOrganization()
         def command = createProjectCommand(org.id(), "Virtual Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
 
@@ -1268,8 +1407,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should throw 400 when updating project locations outside existing managingRegion"() {
         given: "a managing region and an active project inside it"
-        def regId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Update Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Update Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
         def org = getRandomOrganization()
 
         def inLoc = new ProjectLocationCommand("In Loc", "123 St", "Denver", null, null, "US", -104.9, 39.7)
@@ -1288,15 +1437,22 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should throw 403 when user lacks authority to assign new managingRegion on update"() {
         given: "an organization with an Org Manager and a separate foreign region"
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Update Region Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
+        def org = dataBuilder.organization().withName("Update Region Org").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
-        def foreignRegionId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Foreign Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
-        """, foreignRegionId)
+        Coordinate[] foreignCoords = [
+                new Coordinate(-105.1, 39.7),
+                new Coordinate(-104.9, 39.7),
+                new Coordinate(-104.9, 39.8),
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-105.1, 39.7)
+        ]
+        def foreignRegion = dataBuilder.region()
+                .withName("Foreign Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(foreignCoords))
+                .persist()
+        def foreignRegionId = foreignRegion.id()
 
         def createCmd = createProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
@@ -1312,15 +1468,22 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should throw 403 when unauthorized user attempts to unassign managingRegion"() {
         given: "a project with a managingRegion in Region B under an organization not bound to Region B"
-        def regBId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Region B', ST_GeogFromText('POLYGON((-104.8 39.7, -104.6 39.7, -104.6 39.8, -104.8 39.8, -104.8 39.7))'))
-        """, regBId)
+        Coordinate[] regBCoords = [
+                new Coordinate(-104.8, 39.7),
+                new Coordinate(-104.6, 39.7),
+                new Coordinate(-104.6, 39.8),
+                new Coordinate(-104.8, 39.8),
+                new Coordinate(-104.8, 39.7)
+        ]
+        def regionB = dataBuilder.region()
+                .withName("Region B")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regBCoords))
+                .persist()
+        def regBId = regionB.id()
 
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Unassign Region', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
+        def org = dataBuilder.organization().withName("Org Unassign Region").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         def createCmd = createProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, DRAFT, regBId)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
@@ -1336,16 +1499,23 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should allow authorized Org Manager to unassign managingRegion"() {
         given: "a region and an organization bounded to it with an Org Manager"
-        def regId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Region For Unassign', ST_GeogFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
-        """, regId)
+        Coordinate[] regionCoords = [
+                new Coordinate(-105.1, 39.7),
+                new Coordinate(-104.9, 39.7),
+                new Coordinate(-104.9, 39.8),
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-105.1, 39.7)
+        ]
+        def region = dataBuilder.region()
+                .withName("Region For Unassign")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
+                .persist()
+        def regId = region.id()
 
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org For Unassign', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
+        def org = dataBuilder.organization().withName("Org For Unassign").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         def createCmd = createProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
@@ -1366,25 +1536,37 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should demote ACTIVE project to PENDING when reassigned to organization outside geographic bounds"() {
         given: "two regions: Denver and Boulder"
-        def denverRegId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Denver City Reassign', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
-        """, denverRegId)
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def denverReg = dataBuilder.region()
+                .withName("Denver City Reassign")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
 
-        def boulderRegId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Boulder City Reassign', ST_GeogFromText('POLYGON((-105.35 39.95, -105.15 39.95, -105.15 40.10, -105.35 40.10, -105.35 39.95))'))
-        """, boulderRegId)
+        Coordinate[] boulderCoords = [
+                new Coordinate(-105.35, 39.95),
+                new Coordinate(-105.15, 39.95),
+                new Coordinate(-105.15, 40.10),
+                new Coordinate(-105.35, 40.10),
+                new Coordinate(-105.35, 39.95)
+        ]
+        def boulderReg = dataBuilder.region()
+                .withName("Boulder City Reassign")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(boulderCoords))
+                .persist()
 
-        def orgAId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Denver Reassign Org A', true, 'VERIFIED')", orgAId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgAId, denverRegId)
+        def orgA = dataBuilder.organization().withName("Denver Reassign Org A").asPublic().verified().persist()
+        def orgAId = orgA.id()
+        dataBuilder.linkOrganizationToRegion(orgA, denverReg)
 
-        def orgBId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Boulder Reassign Org B', true, 'VERIFIED')", orgBId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgBId, boulderRegId)
+        def orgB = dataBuilder.organization().withName("Boulder Reassign Org B").asPublic().verified().persist()
+        def orgBId = orgB.id()
+        dataBuilder.linkOrganizationToRegion(orgB, boulderReg)
 
         and: "an ACTIVE project under Denver Org with a location in Denver"
         def denverLoc = new ProjectLocationCommand("Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
@@ -1409,19 +1591,25 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should preserve ACTIVE status when reassigned to organization containing geographic bounds"() {
         given: "a shared regional boundary enclosing Denver"
-        def regionId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom)
-            VALUES (?, 'Shared Denver Region', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
-        """, regionId)
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("Shared Denver Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
 
-        def org1Id = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Alpha Shared', true, 'VERIFIED')", org1Id)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org1Id, regionId)
+        def org1 = dataBuilder.organization().withName("Org Alpha Shared").asPublic().verified().persist()
+        def org1Id = org1.id()
+        dataBuilder.linkOrganizationToRegion(org1, region)
 
-        def org2Id = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Beta Shared', true, 'VERIFIED')", org2Id)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org2Id, regionId)
+        def org2 = dataBuilder.organization().withName("Org Beta Shared").asPublic().verified().persist()
+        def org2Id = org2.id()
+        dataBuilder.linkOrganizationToRegion(org2, region)
 
         and: "an ACTIVE project in Org Alpha"
         def denverLoc = new ProjectLocationCommand("Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
@@ -1475,9 +1663,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should allow Org Manager to delete project belonging to their organization"() {
         given: "an organization with an Org Manager and a project"
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Delete Test Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", TestPersonas.LAURA_LOCAL_MANAGER.id, orgId)
+        def org = dataBuilder.organization().withName("Delete Test Org").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         def createCmd = createProjectCommand(orgId, "Project to Delete", "Description with at least twenty characters here.")
         Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()

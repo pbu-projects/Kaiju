@@ -8,6 +8,8 @@ import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.model.UserRole
+import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.security.ProjectSecurityService
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.Point
@@ -44,29 +46,32 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
     @Unroll
     def "should enforce matrix: Org[#orgStatus] + Role[#userRole] + Location[#location] -> Expect: #expectedApprovalState"() {
         given: "a real civic boundary (Denver) in the administrative_regions table"
-        def regionId = UUID.randomUUID()
-        sql.execute("""
-            INSERT INTO administrative_regions (id, name, geom) 
-            VALUES (?, 'City of Denver', ST_GeogFromText(?))
-        """, [regionId, DENVER_WKT])
+        Geometry denverGeom = new WKTReader().read(DENVER_WKT)
+        def region = dataBuilder.region()
+                .withName("City of Denver")
+                .withGeometry(denverGeom)
+                .persist()
 
         and: "the test user, organization, and roles are seeded"
-        def userId = UUID.randomUUID()
-        sql.execute("INSERT INTO users (id, email, role) VALUES (?, ?, ?)", 
-            [userId, "test-${UUID.randomUUID()}@example.com".toString(), userRole == "REGION_AGENT" ? "REGION_AGENT" : "STANDARD_USER"])
-            
-        def orgId = UUID.randomUUID()
-        sql.execute("INSERT INTO organizations (id, name, verification_status) VALUES (?, ?, ?)", 
-            [orgId, "Test Org", orgStatus == "VERIFIED" ? "VERIFIED" : "UNVERIFIED"])
+        UserRole mappedUserRole = userRole == "REGION_AGENT" ? UserRole.REGION_AGENT : UserRole.STANDARD_USER
+        def user = dataBuilder.user().withRole(mappedUserRole).persist()
+        def userId = user.id()
+
+        VerificationStatus mappedOrgStatus = orgStatus == "VERIFIED" ? VerificationStatus.VERIFIED : VerificationStatus.UNVERIFIED
+        def org = dataBuilder.organization()
+                .withName("Test Org")
+                .withVerificationStatus(mappedOrgStatus)
+                .persist()
+        def orgId = org.id()
 
         // Link the org to the region so we can test the civic boundary logic
-        sql.execute("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", [orgId, regionId])
+        dataBuilder.linkOrganizationToRegion(org, region)
 
         if (userRole == "ORG_MANAGER") {
-            sql.execute("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", [userId, orgId])
+            dataBuilder.organizationUser().asOrgManager(user, org).persist()
         }
         if (userRole == "REGION_AGENT") {
-            sql.execute("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", [userId, regionId])
+            dataBuilder.regionUser().asRegionAgent(user, region).persist()
         }
 
         and: "the target geographic point"

@@ -31,10 +31,11 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         if (projRow) {
             projectId = projRow.id as UUID
         } else {
-            def orgId = UUID.randomUUID()
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Audit Test Org', true, 'VERIFIED')", orgId)
-            projectId = UUID.randomUUID()
-            executeUpdate("INSERT INTO projects (id, organization_id, title, description, project_type, status) VALUES (?, ?, 'Audit Test Proj', 'Test project description exceeding 20 chars', 'STANDARD', 'DRAFT')", projectId, orgId)
+            def project = dataBuilder.project()
+                    .withTitle("Audit Test Proj")
+                    .withDescription("Test project description exceeding 20 chars")
+                    .persist()
+            projectId = project.id()
         }
 
         sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", [projectId, actorId])

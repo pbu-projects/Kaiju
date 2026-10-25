@@ -65,4 +65,19 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
             userRepository.findByEmail(email).isPresent()
         }
     }
+
+    def "JIT Provisioning | retrieves existing user without creating a duplicate"() {
+        given: "an existing user created with data builder"
+        def existingUser = dataBuilder.user().persist()
+
+        when: "retrieving the user by email"
+        def retrieved = userService.provisionOrGetUser(existingUser.email())
+
+        then: "the retrieved user matches the existing user"
+        verifyAll {
+            retrieved.id() == existingUser.id()
+            retrieved.email() == existingUser.email()
+            retrieved.role() == existingUser.role()
+        }
+    }
 }

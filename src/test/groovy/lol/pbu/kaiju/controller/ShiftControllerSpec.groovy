@@ -43,23 +43,33 @@ class ShiftControllerSpec extends BaseControllerSpec {
     private void ensureFixtures() {
         def locRow = sql.firstRow("SELECT id FROM locations LIMIT 1")
         if (!locRow) {
-            executeUpdate("INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom) VALUES (?, 'Default Shift Loc', '123 Main', 'Denver', 'CO', '80202', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", UUID.randomUUID())
+            dataBuilder.location()
+                    .withName("Default Shift Loc")
+                    .withAddressLine("123 Main")
+                    .withCity("Denver")
+                    .withStateProvince("CO")
+                    .withPostalCode("80202")
+                    .withCountryCode("US")
+                    .atPoint(-104.9903d, 39.7392d)
+                    .persist()
         }
         def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
         UUID projectId
         if (!projRow) {
-            def orgId = UUID.randomUUID()
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Shift Test Org', true, 'VERIFIED')", orgId)
-            projectId = UUID.randomUUID()
-            executeUpdate("INSERT INTO projects (id, organization_id, title, description, project_type, status) VALUES (?, ?, 'Shift Test Proj', 'Test project description exceeding 20 chars', 'STANDARD', 'DRAFT')", projectId, orgId)
+            def project = dataBuilder.project()
+                    .withTitle("Shift Test Proj")
+                    .withDescription("Test project description exceeding 20 chars")
+                    .persist()
+            projectId = project.id()
         } else {
             projectId = projRow.id as UUID
         }
         def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
         if (!shiftRow) {
-            def startTime = OffsetDateTime.now()
-            def endTime = startTime.plusHours(2)
-            executeUpdate("INSERT INTO shifts (id, project_id, is_virtual, start_time, end_time) VALUES (?, ?, true, ?, ?)", UUID.randomUUID(), projectId, Timestamp.from(startTime.toInstant()), Timestamp.from(endTime.toInstant()))
+            dataBuilder.shift()
+                    .forProject(projectId)
+                    .asVirtual()
+                    .persist()
         }
     }
 
@@ -155,8 +165,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should succeed when called by org manager of project organization"() {
         given: "a project belonging to Denver Metro Branch where Laura is Org Manager"
-        UUID projectId = UUID.randomUUID()
-        executeUpdate("INSERT INTO projects (id, organization_id, title, description, project_type, status) VALUES (?, ?, 'Laura Managed Proj', 'Project managed by Laura exceeding 20 chars', 'STANDARD', 'DRAFT')", projectId, TestPersonas.DENVER_METRO_BRANCH_ID)
+        def project = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Laura Managed Proj")
+                .withDescription("Project managed by Laura exceeding 20 chars")
+                .persist()
+        UUID projectId = project.id()
         def command = new CreateShiftCommand(projectId, true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "the org manager adds shift via HTTP POST"
@@ -384,11 +398,9 @@ class ShiftControllerSpec extends BaseControllerSpec {
         when: "the shift is deleted by admin via HTTP DELETE"
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/shifts/${id}")))
 
-        then: "the response is 200 OK"
-        response.status == HttpStatus.OK
-
-        and: "the shift no longer exists in the repository or database"
+        then: "the response is 200 OK and shift no longer exists"
         verifyAll {
+            response.status == HttpStatus.OK
             !shiftRepository.findById(id).isPresent()
             sql.firstRow("SELECT count(*) as count FROM shifts WHERE id = ?", [id]).count == 0
         }
@@ -441,9 +453,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
         UUID projectId = projRow.id as UUID
         while ((sql.firstRow("SELECT count(*) as count FROM shifts").count as int) < 2) {
-            def startTime = OffsetDateTime.now()
-            def endTime = startTime.plusHours(2)
-            executeUpdate("INSERT INTO shifts (id, project_id, is_virtual, start_time, end_time) VALUES (?, ?, true, ?, ?)", UUID.randomUUID(), projectId, Timestamp.from(startTime.toInstant()), Timestamp.from(endTime.toInstant()))
+            dataBuilder.shift().forProject(projectId).asVirtual().persist()
         }
         Set<Shift> allShifts = new LinkedHashSet<>()
         int pageSize = 5
@@ -469,9 +479,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
         UUID projectId = projRow.id as UUID
         while ((sql.firstRow("SELECT count(*) as count FROM shifts").count as int) < 2) {
-            def startTime = OffsetDateTime.now()
-            def endTime = startTime.plusHours(2)
-            executeUpdate("INSERT INTO shifts (id, project_id, is_virtual, start_time, end_time) VALUES (?, ?, true, ?, ?)", UUID.randomUUID(), projectId, Timestamp.from(startTime.toInstant()), Timestamp.from(endTime.toInstant()))
+            dataBuilder.shift().forProject(projectId).asVirtual().persist()
         }
 
         when: "requesting shifts via HTTP GET"
