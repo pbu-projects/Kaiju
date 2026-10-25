@@ -5,22 +5,15 @@ import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
-import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.domain.Location
-import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
+import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
-import lol.pbu.kaiju.model.VerificationStatus
-import org.locationtech.jts.geom.Coordinate
-import org.locationtech.jts.geom.GeometryFactory
-import org.locationtech.jts.geom.PrecisionModel
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.SecurityQueryRepository
-import lol.pbu.kaiju.repository.UserRepository
-import spock.lang.Shared
+import org.locationtech.jts.geom.Coordinate
 
-import java.time.OffsetDateTime
+import java.util.UUID
 
 @MicronautTest(transactional = false)
 class ProjectSecurityServiceSpec extends BaseControllerSpec {
@@ -29,62 +22,65 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     ProjectSecurityService service
 
     @Inject
-    UserRepository userRepository
-
-    @Inject
     SecurityQueryRepository queryRepository
 
-    @Shared
-    UUID orgId = UUID.randomUUID()
-
-    @Shared
-    UUID projectId = UUID.randomUUID()
+    UUID orgId
+    UUID projectId
 
     def setup() {
-        // Seed a real organization and project using raw SQL to avoid validation constraint issues
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Test Org', true)", orgId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Security Test Project', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projectId, orgId)
+        def org = dataBuilder.organization()
+                .withName("Test Org")
+                .asPublic()
+                .persist()
+        orgId = org.id()
+
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Security Test Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
+        projectId = project.id()
     }
 
     User saveUser(UserRole role) {
-        userRepository.save(new User(null, "sec-test-${UUID.randomUUID()}@example.com", role, OffsetDateTime.now()))
+        dataBuilder.user().withRole(role).persist()
     }
 
     def "canModifyProject returns true for GLOBAL_ADMIN without any org lookup"() {
         given:
         User admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def project = dataBuilder.project()
+                .withId(projectId)
+                .withoutOrg()
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         expect:
-        // A global admin on any project (even one with no org match) can modify it
-        service.canModifyProject(admin.id(), new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )) == true
+        service.canModifyProject(admin.id(), project) == true
     }
 
     def "canModifyProject returns false when user is not org manager"() {
         given:
         User user = saveUser(UserRole.STANDARD_USER)
-        UUID anotherOrg = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Other Org', true)", anotherOrg)
+        def org = dataBuilder.organization()
+                .withName("Other Org")
+                .asPublic()
+                .unverified()
+                .persist()
 
-        and: "a project belonging to anotherOrg"
-        UUID anotherProject = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Other Project', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, anotherProject, anotherOrg)
-
-        and: "user has NO org_user entry for that org"
-        def org = new Organization(anotherOrg, "Other Org", null, null, true,
-                VerificationStatus.UNVERIFIED, null, [])
-        def project = new Project(anotherProject, org, null, "Other Project", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], [])
+        and: "a project belonging to another org"
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Other Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         expect:
         service.canModifyProject(user.id(), project) == false
@@ -93,11 +89,13 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canModifyProject returns false when project has no organization"() {
         given:
         User user = saveUser(UserRole.STANDARD_USER)
-        def project = new Project(
-                UUID.randomUUID(), null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
+        def project = dataBuilder.project()
+                .withoutOrg()
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         expect:
         service.canModifyProject(user.id(), project) == false
@@ -105,11 +103,13 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "canModifyProject throws NOT_FOUND when user does not exist"() {
         given:
-        def project = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
+        def project = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         when:
         service.canModifyProject(UUID.randomUUID(), project)
@@ -154,11 +154,13 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canReassignProject returns true for GLOBAL_ADMIN without any jurisdiction check"() {
         given:
         User admin = saveUser(UserRole.GLOBAL_ADMIN)
-        def project = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
+        def project = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         expect:
         service.canReassignProject(admin.id(), project) == true
@@ -167,12 +169,14 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canReassignProject returns false for STANDARD_USER even if org manager"() {
         given: "a standard user who is an org manager"
         User user = saveUser(UserRole.STANDARD_USER)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", user.id(), orgId)
-        def project = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
+        dataBuilder.organizationUser().asOrgManager(user, orgId).persist()
+        def project = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         expect:
         service.canReassignProject(user.id(), project) == false
@@ -181,11 +185,13 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
     def "canReassignProject returns false for REGION_AGENT without jurisdiction"() {
         given: "a regional agent with no jurisdiction over the project"
         User agent = saveUser(UserRole.REGION_AGENT)
-        def project = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
+        def project = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         expect:
         service.canReassignProject(agent.id(), project) == false
@@ -193,11 +199,13 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "canReassignProject throws NOT_FOUND when user does not exist"() {
         given:
-        def project = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
+        def project = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
 
         when:
         service.canReassignProject(UUID.randomUUID(), project)
@@ -209,16 +217,21 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "areAllLocationsInOrgRegion returns false when locations is null or empty"() {
         given:
-        def projectNoLocs = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, [], []
-        )
-        def projectNullLocs = new Project(
-                projectId, null, null, "Title", "Desc",
-                ProjectType.STANDARD, ProjectStatus.PENDING,
-                OffsetDateTime.now(), null, null, null, []
-        )
+        def projectNoLocs = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
+        def projectNullLocs = dataBuilder.project()
+                .withId(projectId)
+                .withTitle("Title")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .withNullLocations()
+                .build()
 
         expect:
         verifyAll {
@@ -229,61 +242,92 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "areAllLocationsInOrgRegion evaluates geographic boundaries correctly"() {
         given: "a region and an organization mapped to it"
-        def testRegionId = UUID.randomUUID()
-        def testOrgId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO administrative_regions (id, name, geom) 
-            VALUES (?, 'Denver Area', ST_GeogFromText('POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))'))
-        """, testRegionId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Geo Org', true)", testOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, testRegionId)
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("Denver Area")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Geo Org")
+                .asPublic()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
 
         and: "locations inside and outside the region"
-        def geomFactory = new GeometryFactory(new PrecisionModel(), 4326)
-        def insidePoint = geomFactory.createPoint(new Coordinate(-104.9903, 39.7392))
-        def outsidePoint = geomFactory.createPoint(new Coordinate(-105.2705, 40.0150))
-        def insideLoc = new Location(UUID.randomUUID(), "Inside", "123 St", "Denver", "CO", "80202", "US", insidePoint)
-        def outsideLoc = new Location(UUID.randomUUID(), "Outside", "456 St", "Boulder", "CO", "80302", "US", outsidePoint)
+        def insideLoc = dataBuilder.location()
+                .withName("Inside")
+                .withAddress("123 St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .build()
+        def outsideLoc = dataBuilder.location()
+                .withName("Outside")
+                .withAddress("456 St", "Boulder", "CO", "80302", "US")
+                .atPoint(-105.2705, 40.0150)
+                .build()
 
-        def projectInside = new Project(
-                UUID.randomUUID(), null, null, "Inside", "Desc",
-                ProjectType.STANDARD, ProjectStatus.ACTIVE,
-                OffsetDateTime.now(), null, null, [insideLoc], []
-        )
-        def projectOutside = new Project(
-                UUID.randomUUID(), null, null, "Outside", "Desc",
-                ProjectType.STANDARD, ProjectStatus.ACTIVE,
-                OffsetDateTime.now(), null, null, [outsideLoc], []
-        )
+        def projectInside = dataBuilder.project()
+                .withTitle("Inside")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(insideLoc)
+                .build()
+        def projectOutside = dataBuilder.project()
+                .withTitle("Outside")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(outsideLoc)
+                .build()
 
         expect:
         verifyAll {
-            service.areAllLocationsInOrgRegion(projectInside, testOrgId) == true
-            service.areAllLocationsInOrgRegion(projectOutside, testOrgId) == false
+            service.areAllLocationsInOrgRegion(projectInside, org.id()) == true
+            service.areAllLocationsInOrgRegion(projectOutside, org.id()) == false
         }
     }
 
     def "authorizeRegionalAdminApproval allows REGION_DIRECTOR to approve virtual project when org is in their region"() {
         given: "a region and an organization mapped to it"
-        def regId = UUID.randomUUID()
-        def vOrgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Virtual Org', true, 'VERIFIED')", vOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, regId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.7),
+                new Coordinate(-104.7, 39.7),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.7)
+        ]
+        def region = dataBuilder.region()
+                .withName("Director Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Virtual Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
 
         and: "a virtual project belonging to that organization (zero locations in project_locations)"
-        def vProjId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Virtual Project', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, vProjId, vOrgId)
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Virtual Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a user who is REGION_DIRECTOR of that region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         when: "the REGION_DIRECTOR attempts to approve the virtual project"
-        service.authorizeRegionalAdminApproval(director.id(), vProjId)
+        service.authorizeRegionalAdminApproval(director.id(), project.id())
 
         then: "approval succeeds without throwing an exception"
         noExceptionThrown()
@@ -291,27 +335,42 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "authorizeRegionalAdminApproval throws FORBIDDEN when REGION_DIRECTOR attempts to approve virtual project outside their region"() {
         given: "a region and an organization mapped to a different region"
-        def directorRegId = UUID.randomUUID()
-        def otherRegId = UUID.randomUUID()
-        def vOrgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", directorRegId)
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Other Region', ST_GeogFromText('POLYGON((-105.1 39.7, -104.7 39.7, -104.7 39.6, -105.1 39.6, -105.1 39.7))'))", otherRegId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public) VALUES (?, 'Other Org', true)", vOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, otherRegId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.7),
+                new Coordinate(-104.7, 39.7),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.7)
+        ]
+        def directorRegion = dataBuilder.region()
+                .withName("Director Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def otherRegion = dataBuilder.region()
+                .withName("Other Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Other Org")
+                .asPublic()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, otherRegion)
 
         and: "a virtual project belonging to that organization"
-        def vProjId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Other Virtual Project', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, vProjId, vOrgId)
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Other Virtual Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a user who is REGION_DIRECTOR of the unrelated region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), directorRegId)
+        dataBuilder.regionUser().asRegionDirector(director, directorRegion).persist()
 
         when:
-        service.authorizeRegionalAdminApproval(director.id(), vProjId)
+        service.authorizeRegionalAdminApproval(director.id(), project.id())
 
         then:
         HttpStatusException e = thrown()
@@ -320,17 +379,19 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "authorizeRegionalAdminApproval throws FORBIDDEN when REGION_AGENT attempts to approve a virtual project"() {
         given: "a virtual project with 0 locations"
-        def vProjId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Agent Virtual Project', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, vProjId, orgId)
+        def project = dataBuilder.project()
+                .forOrg(orgId)
+                .withTitle("Agent Virtual Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a REGION_AGENT"
         def agent = saveUser(UserRole.REGION_AGENT)
 
         when:
-        service.authorizeRegionalAdminApproval(agent.id(), vProjId)
+        service.authorizeRegionalAdminApproval(agent.id(), project.id())
 
         then:
         HttpStatusException e = thrown()
@@ -342,203 +403,314 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "hasJurisdictionOverAllProjectLocations recognizes REGION_DIRECTOR in addition to REGION_AGENT"() {
         given: "a region, a project with a location inside that region, and a REGION_DIRECTOR"
-        def regId = UUID.randomUUID()
-        def locId = UUID.randomUUID()
-        def pId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Loc Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc', 'St', 'City', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", locId)
-        executeUpdate("INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at) VALUES (?, ?, 'Loc Project', 'Desc', 'STANDARD', 'PENDING', NOW())", pId, orgId)
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", pId, locId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Director Loc Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def loc = dataBuilder.location()
+                .withName("Loc")
+                .withAddress("St", "City", null, null, "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(orgId)
+                .withTitle("Loc Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .persist()
 
         and: "a REGION_DIRECTOR assigned to that region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         expect:
         verifyAll {
-            queryRepository.hasJurisdictionOverAllProjectLocations(director.id(), pId) == true
-            service.canReassignProject(director.id(), new Project(pId, null, null, "Loc Project", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])) == true
+            queryRepository.hasJurisdictionOverAllProjectLocations(director.id(), project.id()) == true
+            service.canReassignProject(director.id(), project) == true
         }
     }
 
     def "canModifyProject allows REGION_DIRECTOR to modify a virtual project in their region"() {
         given: "a region, verified organization in that region, and virtual project"
-        def regId = UUID.randomUUID()
-        def vOrgId = UUID.randomUUID()
-        def vProjId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Mod Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Mod Org', true, 'VERIFIED')", vOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, regId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Virtual Mod Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, vProjId, vOrgId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Mod Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Mod Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Virtual Mod Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a REGION_DIRECTOR of that region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
-
-        and: "domain entity representation"
-        def orgEntity = new Organization(vOrgId, "Mod Org", null, null, true, VerificationStatus.VERIFIED, null, [])
-        def projEntity = new Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         expect:
-        service.canModifyProject(director.id(), projEntity) == true
+        service.canModifyProject(director.id(), project) == true
     }
 
     def "canModifyProject denies REGION_DIRECTOR on virtual project outside their region"() {
         given: "a region, organization in a different region, and virtual project"
-        def dirRegId = UUID.randomUUID()
-        def otherRegId = UUID.randomUUID()
-        def vOrgId = UUID.randomUUID()
-        def vProjId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Dir Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", dirRegId)
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Other Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", otherRegId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Other Org', true, 'VERIFIED')", vOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", vOrgId, otherRegId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Virtual Mod Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, vProjId, vOrgId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def dirRegion = dataBuilder.region()
+                .withName("Dir Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def otherRegion = dataBuilder.region()
+                .withName("Other Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Other Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, otherRegion)
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Virtual Mod Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a REGION_DIRECTOR of Dir Reg"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), dirRegId)
-
-        def orgEntity = new Organization(vOrgId, "Other Org", null, null, true, VerificationStatus.VERIFIED, null, [])
-        def projEntity = new Project(vProjId, orgEntity, null, "Virtual Mod Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        dataBuilder.regionUser().asRegionDirector(director, dirRegion).persist()
 
         expect:
-        service.canModifyProject(director.id(), projEntity) == false
+        service.canModifyProject(director.id(), project) == false
     }
 
     def "isVirtualProjectInDirectorJurisdiction enforces managing_region_id precedence over organization_regions"() {
         given: "two regions A and B"
-        def regAId = UUID.randomUUID()
-        def regBId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Region A', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regAId)
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Region B', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regBId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def regA = dataBuilder.region()
+                .withName("Region A")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def regB = dataBuilder.region()
+                .withName("Region B")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
 
         and: "an organization with presence in both Region A and Region B"
-        def orgMultiId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Multi Org', true, 'VERIFIED')", orgMultiId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgMultiId, regAId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgMultiId, regBId)
+        def orgMulti = dataBuilder.organization()
+                .withName("Multi Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(orgMulti, regA)
+        dataBuilder.linkOrganizationToRegion(orgMulti, regB)
 
         and: "a virtual project explicitly assigned to Region A via managing_region_id"
-        def projAId = UUID.randomUUID()
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, ?, 'Project specifically in Region A', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projAId, orgMultiId, regAId)
+        def projA = dataBuilder.project()
+                .forOrg(orgMulti)
+                .inRegion(regA)
+                .withTitle("Project specifically in Region A")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "directors for Region A and Region B"
         def dirA = saveUser(UserRole.REGION_DIRECTOR)
         def dirB = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", dirA.id(), regAId)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", dirB.id(), regBId)
+        dataBuilder.regionUser().asRegionDirector(dirA, regA).persist()
+        dataBuilder.regionUser().asRegionDirector(dirB, regB).persist()
 
         expect: "Director A has jurisdiction while Director B is denied because managing_region_id takes precedence"
         verifyAll {
-            queryRepository.isVirtualProjectInDirectorJurisdiction(dirA.id(), projAId) == true
-            queryRepository.isVirtualProjectInDirectorJurisdiction(dirB.id(), projAId) == false
+            queryRepository.isVirtualProjectInDirectorJurisdiction(dirA.id(), projA.id()) == true
+            queryRepository.isVirtualProjectInDirectorJurisdiction(dirB.id(), projA.id()) == false
         }
     }
 
     def "isVirtualProjectInDirectorJurisdiction rejects unverified organizations"() {
         given: "a region and an UNVERIFIED organization in that region"
-        def regId = UUID.randomUUID()
-        def unverifiedOrgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Unverified Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Unverified Org', true, 'UNVERIFIED')", unverifiedOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", unverifiedOrgId, regId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Unverified Org Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projId, unverifiedOrgId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Unverified Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def unverifiedOrg = dataBuilder.organization()
+                .withName("Unverified Org")
+                .asPublic()
+                .unverified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(unverifiedOrg, region)
+        def project = dataBuilder.project()
+                .forOrg(unverifiedOrg)
+                .withTitle("Unverified Org Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a director of that region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         expect: "unverified organization virtual project cannot be approved by director"
-        queryRepository.isVirtualProjectInDirectorJurisdiction(director.id(), projId) == false
+        queryRepository.isVirtualProjectInDirectorJurisdiction(director.id(), project.id()) == false
     }
 
     def "canModifyProject allows REGION_DIRECTOR to modify a physical project with locations inside their region"() {
         given: "a region, verified org, location, and physical project"
-        def regId = UUID.randomUUID()
-        def orgId = UUID.randomUUID()
-        def locId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Dir Phys Mod Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Phys Mod Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc', 'St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9903 39.7392)'))", locId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Phys Mod Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, locId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Dir Phys Mod Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Phys Mod Org")
+                .asPublic()
+                .verified()
+                .persist()
+        def loc = dataBuilder.location()
+                .withName("Loc")
+                .withAddress("St", "Denver", null, null, "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Phys Mod Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .persist()
 
         and: "a REGION_DIRECTOR assigned to that region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
-
-        and: "domain entity representation"
-        def orgEntity = new Organization(orgId, "Phys Mod Org", null, null, true, VerificationStatus.VERIFIED, null, [])
-        def projEntity = new Project(projId, orgEntity, null, "Phys Mod Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         expect:
-        service.canModifyProject(director.id(), projEntity) == true
+        service.canModifyProject(director.id(), project) == true
     }
 
     def "canReassignProject allows REGION_DIRECTOR to reassign a virtual project in their region"() {
         given: "a region, verified org, and virtual project"
-        def regId = UUID.randomUUID()
-        def orgId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Dir VReassign Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'VReassign Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", orgId, regId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'VReassign Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Dir VReassign Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("VReassign Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("VReassign Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
 
         and: "a REGION_DIRECTOR of that region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
-
-        and: "a domain entity"
-        def orgEntity = new Organization(orgId, "VReassign Org", null, null, true, VerificationStatus.VERIFIED, null, [])
-        def projEntity = new Project(projId, orgEntity, null, "VReassign Proj", "Desc", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [], [])
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         expect:
-        service.canReassignProject(director.id(), projEntity) == true
+        service.canReassignProject(director.id(), project) == true
     }
 
     def "authorizeRegionalAdminApproval throws FORBIDDEN for REGION_DIRECTOR on physical project outside their region"() {
         given: "a region, an out-of-region location, and a physical project"
-        def regId = UUID.randomUUID()
-        def orgId = UUID.randomUUID()
-        def locId = UUID.randomUUID()
-        def projId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Director Reg', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Far Loc', 'St', 'Boulder', 'US', ST_GeographyFromText('POINT(-105.2705 40.0150)'))", locId)
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Far Phys Proj', 'Desc', 'STANDARD', 'PENDING', NOW())
-        """, projId, orgId)
-        executeUpdate("INSERT INTO project_locations (project_id, location_id) VALUES (?, ?)", projId, locId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Director Reg")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Org")
+                .asPublic()
+                .verified()
+                .persist()
+        def loc = dataBuilder.location()
+                .withName("Far Loc")
+                .withAddress("St", "Boulder", null, null, "US")
+                .atPoint(-105.2705, 40.0150)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Far Phys Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .persist()
 
         and: "a REGION_DIRECTOR assigned to Denver region"
         def director = saveUser(UserRole.REGION_DIRECTOR)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_DIRECTOR')", director.id(), regId)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         when: "attempting to approve out-of-region physical project"
-        service.authorizeRegionalAdminApproval(director.id(), projId)
+        service.authorizeRegionalAdminApproval(director.id(), project.id())
 
         then: "a 403 Forbidden is thrown"
         HttpStatusException e = thrown()
@@ -547,55 +719,90 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     def "areAllLocationsInOrgRegion batches multiple locations in single query"() {
         given: "an organization linked to a region"
-        def regId = UUID.randomUUID()
-        def testOrgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Batch Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Batch Org', true, 'VERIFIED')", testOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, regId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Batch Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Batch Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
 
-        and: "a GeometryFactory and multiple points within the region"
-        def gf = new GeometryFactory(new PrecisionModel(), 4326)
-        def loc1 = new Location(UUID.randomUUID(), "L1", "A1", "C1", null, null, "US", gf.createPoint(new Coordinate(-105.0, 39.7)))
-        def loc2 = new Location(UUID.randomUUID(), "L2", "A2", "C2", null, null, "US", gf.createPoint(new Coordinate(-104.9, 39.7)))
-        def loc3 = new Location(UUID.randomUUID(), "L3", "A3", "C3", null, null, "US", gf.createPoint(new Coordinate(-104.8, 39.7)))
+        and: "multiple points within the region"
+        def loc1 = dataBuilder.location().withName("L1").withAddress("A1", "C1", null, null, "US").atPoint(-105.0, 39.7).build()
+        def loc2 = dataBuilder.location().withName("L2").withAddress("A2", "C2", null, null, "US").atPoint(-104.9, 39.7).build()
+        def loc3 = dataBuilder.location().withName("L3").withAddress("A3", "C3", null, null, "US").atPoint(-104.8, 39.7).build()
 
-        def projectAllIn = new Project(UUID.randomUUID(), null, null, "P1", "D", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, loc2, loc3], [])
+        def projectAllIn = dataBuilder.project()
+                .withTitle("P1")
+                .withDescription("D")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocations([loc1, loc2, loc3])
+                .build()
 
         and: "one point outside the region"
-        def locOut = new Location(UUID.randomUUID(), "LOut", "A4", "C4", null, null, "US", gf.createPoint(new Coordinate(-106.0, 41.0)))
-        def projectWithOut = new Project(UUID.randomUUID(), null, null, "P2", "D", ProjectType.STANDARD, ProjectStatus.PENDING, OffsetDateTime.now(), null, null, [loc1, locOut], [])
+        def locOut = dataBuilder.location().withName("LOut").withAddress("A4", "C4", null, null, "US").atPoint(-106.0, 41.0).build()
+        def projectWithOut = dataBuilder.project()
+                .withTitle("P2")
+                .withDescription("D")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocations([loc1, locOut])
+                .build()
 
         expect:
         verifyAll {
-            service.areAllLocationsInOrgRegion(projectAllIn, testOrgId) == true
-            service.areAllLocationsInOrgRegion(projectWithOut, testOrgId) == false
+            service.areAllLocationsInOrgRegion(projectAllIn, org.id()) == true
+            service.areAllLocationsInOrgRegion(projectWithOut, org.id()) == false
         }
     }
 
     def "canAssignManagingRegion evaluates roles and organization presence"() {
         given: "a region and organization"
-        def regId = UUID.randomUUID()
-        def testOrgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Assign Region', ST_GeogFromText('POLYGON((-105.1 39.8, -104.7 39.8, -104.7 39.6, -105.1 39.6, -105.1 39.8))'))", regId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Assign Org', true, 'VERIFIED')", testOrgId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", testOrgId, regId)
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("Assign Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Assign Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
 
         and: "users with various roles"
         def admin = saveUser(UserRole.GLOBAL_ADMIN)
         def standardUser = saveUser(UserRole.STANDARD_USER)
 
         def orgManager = saveUser(UserRole.STANDARD_USER)
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MANAGER')", orgManager.id(), testOrgId)
+        dataBuilder.organizationUser().asOrgManager(orgManager, org).persist()
 
         def regionalAgent = saveUser(UserRole.REGION_AGENT)
-        executeUpdate("INSERT INTO region_users (user_id, region_id, role) VALUES (?, ?, 'REGION_AGENT')", regionalAgent.id(), regId)
+        dataBuilder.regionUser().asRegionAgent(regionalAgent, region).persist()
 
         expect:
         verifyAll {
-            service.canAssignManagingRegion(admin.id(), testOrgId, regId) == true
-            service.canAssignManagingRegion(orgManager.id(), testOrgId, regId) == true
-            service.canAssignManagingRegion(regionalAgent.id(), testOrgId, regId) == true
-            service.canAssignManagingRegion(standardUser.id(), testOrgId, regId) == false
+            service.canAssignManagingRegion(admin.id(), org.id(), region.id()) == true
+            service.canAssignManagingRegion(orgManager.id(), org.id(), region.id()) == true
+            service.canAssignManagingRegion(regionalAgent.id(), org.id(), region.id()) == true
+            service.canAssignManagingRegion(standardUser.id(), org.id(), region.id()) == false
         }
     }
 }
