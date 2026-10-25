@@ -51,7 +51,6 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
                 .withName("City of Denver")
                 .withGeometry(denverGeom)
                 .persist()
-        def regionId = region.id()
 
         and: "the test user, organization, and roles are seeded"
         UserRole mappedUserRole = userRole == "REGION_AGENT" ? UserRole.REGION_AGENT : UserRole.STANDARD_USER

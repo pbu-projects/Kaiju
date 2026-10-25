@@ -10,7 +10,6 @@ import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.dto.CoordinateDto
@@ -549,7 +548,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "two organizations Org A and Org B"
         def orgA = dataBuilder.organization().withName("Org A").asPublic().persist()
         def orgB = dataBuilder.organization().withName("Org B").asPublic().persist()
-        def orgAId = orgA.id()
         def orgBId = orgB.id()
 
         and: "a project belonging to Org A"
@@ -588,7 +586,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "two organizations Org A and Org B"
         def orgA = dataBuilder.organization().withName("Org A").asPublic().persist()
         def orgB = dataBuilder.organization().withName("Org B").asPublic().persist()
-        def orgAId = orgA.id()
         def orgBId = orgB.id()
 
         and: "a user who is an ORG_MANAGER of both Org A and Org B"
@@ -617,7 +614,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         and: "the project remains assigned to Org A in the database"
         def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
-        projectInDb.organization_id == orgAId
+        verifyAll {
+            projectInDb.organization_id == orgA.id()
+        }
     }
 
     def "UPDATE | should throw 404 Not Found when privileged user reassigns project to non-existent organization"() {
@@ -664,7 +663,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("City of Denver")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
                 .persist()
-        def regionId = region.id()
 
         def org = dataBuilder.organization().withName("Denver Org").asPublic().verified().persist()
         def orgId = org.id()
@@ -1549,7 +1547,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Denver City Reassign")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
                 .persist()
-        def denverRegId = denverReg.id()
 
         Coordinate[] boulderCoords = [
                 new Coordinate(-105.35, 39.95),
@@ -1562,7 +1559,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Boulder City Reassign")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(boulderCoords))
                 .persist()
-        def boulderRegId = boulderReg.id()
 
         def orgA = dataBuilder.organization().withName("Denver Reassign Org A").asPublic().verified().persist()
         def orgAId = orgA.id()
