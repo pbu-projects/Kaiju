@@ -24,15 +24,23 @@ class RegionUserBuilder {
 
     RegionUserBuilder asRegionDirector(Object user = null, Object region = null) {
         this.role = RegionUserRole.REGION_DIRECTOR
-        if (user != null) withUser(user)
-        if (region != null) withRegion(region)
+        if (user != null) {
+            withUser(user)
+        }
+        if (region != null) {
+            withRegion(region)
+        }
         return this
     }
 
     RegionUserBuilder asRegionAgent(Object user = null, Object region = null) {
         this.role = RegionUserRole.REGION_AGENT
-        if (user != null) withUser(user)
-        if (region != null) withRegion(region)
+        if (user != null) {
+            withUser(user)
+        }
+        if (region != null) {
+            withRegion(region)
+        }
         return this
     }
 
