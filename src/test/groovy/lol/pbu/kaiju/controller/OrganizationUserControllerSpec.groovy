@@ -168,7 +168,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         role == 'ORG_ADMIN'
 
         cleanup:
-        executeUpdate("UPDATE organization_users SET role = 'ORG_MEMBER' WHERE user_id = ? AND organization_id = ?", userId, orgId)
+        organizationUserRepository.update(dataBuilder.organizationUser().asOrgMember(userId, orgId).build())
     }
 
     def "UPDATE | should throw 403 Forbidden when standard user attempts to update org user"() {
@@ -218,7 +218,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         given: "an existing organization user and an org admin"
         UUID userId = TestPersonas.VALERIE_VOLUNTEER.id
         UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_MEMBER') ON CONFLICT DO NOTHING", userId, orgId)
+        dataBuilder.organizationUser().asOrgMember(userId, orgId).persist()
 
         when: "the organization user is deleted by org admin via HTTP DELETE"
         def response = client.exchange(

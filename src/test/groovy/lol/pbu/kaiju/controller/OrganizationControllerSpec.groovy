@@ -17,6 +17,7 @@ import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.OrganizationRepository
 import net.datafaker.Faker
+import org.locationtech.jts.geom.Coordinate
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -377,7 +378,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "LIST | should fully drain all organizations sequentially using cursors"() {
         setup:
         (1..3).each { i ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Drain Test Org ${i}', true, 'VERIFIED')", UUID.randomUUID())
+            dataBuilder.organization().withName("Drain Test Org ${i}").asPublic().verified().persist()
         }
         Set<Organization> allOrgs = new LinkedHashSet<>()
         int pageSize = 5
@@ -401,7 +402,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "LIST | should retrieve organizations with pagination via HTTP GET"() {
         setup:
         (1..3).each { i ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Page Test Org ${i}', true, 'VERIFIED')", UUID.randomUUID())
+            dataBuilder.organization().withName("Page Test Org ${i}").asPublic().verified().persist()
         }
 
         when: "requesting organizations via HTTP GET as global admin"
@@ -419,7 +420,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "LIST | should retrieve organizations with pagination and sorting via HTTP GET"() {
         setup:
         (1..3).each { i ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Sort Test Org ${i}', true, 'VERIFIED')", UUID.randomUUID())
+            dataBuilder.organization().withName("Sort Test Org ${i}").asPublic().verified().persist()
         }
 
         when: "requesting organizations via HTTP GET as global admin with sort"
@@ -449,7 +450,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "Friends of The Salvation Army"
         ]
         names.each { orgName ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, ?, true, 'VERIFIED')", UUID.randomUUID(), orgName)
+            dataBuilder.organization().withName(orgName).asPublic().verified().persist()
         }
 
         when: "searching with double quotes for exact parent name"
@@ -470,7 +471,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "Salvation Army Family Store"
         ]
         names.each { orgName ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, ?, true, 'VERIFIED')", UUID.randomUUID(), orgName)
+            dataBuilder.organization().withName(orgName).asPublic().verified().persist()
         }
 
         when: "searching with single quotes for exact name"
@@ -491,7 +492,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "Salvation Army Family Store"
         ]
         names.each { orgName ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, ?, true, 'VERIFIED')", UUID.randomUUID(), orgName)
+            dataBuilder.organization().withName(orgName).asPublic().verified().persist()
         }
 
         when: "searching with exact=true flag"
@@ -506,8 +507,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | case-insensitive exact search should match regardless of casing"() {
         given: "an organization with mixed case"
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", UUID.randomUUID())
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
+        dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
 
         when: "searching with lowercase quoted string"
         PageResponse<Organization> results = searchByName('"the salvation army"', false, Pageable.from(0, 10))
@@ -532,7 +533,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "Red Cross Unrelated Org"
         ]
         names.each { orgName ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, ?, true, 'VERIFIED')", UUID.randomUUID(), orgName)
+            dataBuilder.organization().withName(orgName).asPublic().verified().persist()
         }
 
         when: "performing a non-exact ranked search"
@@ -556,7 +557,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 "Salvation Army Family Store"
         ]
         names.each { orgName ->
-            executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, ?, true, 'VERIFIED')", UUID.randomUUID(), orgName)
+            dataBuilder.organization().withName(orgName).asPublic().verified().persist()
         }
 
         when: "searching for branch prefix"
@@ -590,23 +591,50 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY LOCATION | should query organizations by location coordinates, returning closest first"() {
         given: "3 organizations at varying distances from Denver center (-104.9903, 39.7392)"
-        def orgNearId = UUID.randomUUID()
-        def locNearId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Near Denver', true, 'VERIFIED')", orgNearId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Near', '123 St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9903 39.7572)'))", locNearId) // ~2 km
-        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", orgNearId, locNearId)
+        def locNear = dataBuilder.location()
+                .withName("Loc Near")
+                .withAddressLine("123 St")
+                .withCity("Denver")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7572)
+                .persist()
+        def orgNear = dataBuilder.organization()
+                .withName("Org Near Denver")
+                .asPublic()
+                .verified()
+                .withLocation(locNear)
+                .persist()
+        def orgNearId = orgNear.id()
 
-        def orgMidId = UUID.randomUUID()
-        def locMidId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Mid Distance', true, 'VERIFIED')", orgMidId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Mid', '456 St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.9903 39.8292)'))", locMidId) // ~10 km
-        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", orgMidId, locMidId)
+        def locMid = dataBuilder.location()
+                .withName("Loc Mid")
+                .withAddressLine("456 St")
+                .withCity("Denver")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.8292)
+                .persist()
+        def orgMid = dataBuilder.organization()
+                .withName("Org Mid Distance")
+                .asPublic()
+                .verified()
+                .withLocation(locMid)
+                .persist()
+        def orgMidId = orgMid.id()
 
-        def orgFarId = UUID.randomUUID()
-        def locFarId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Org Far Boulder', true, 'VERIFIED')", orgFarId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Far', '789 St', 'Boulder', 'US', ST_GeographyFromText('POINT(-105.2705 40.0150)'))", locFarId) // ~50 km
-        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", orgFarId, locFarId)
+        def locFar = dataBuilder.location()
+                .withName("Loc Far")
+                .withAddressLine("789 St")
+                .withCity("Boulder")
+                .withCountryCode("US")
+                .atPoint(-105.2705, 40.0150)
+                .persist()
+        def orgFar = dataBuilder.organization()
+                .withName("Org Far Boulder")
+                .asPublic()
+                .verified()
+                .withLocation(locFar)
+                .persist()
+        def orgFarId = orgFar.id()
 
         when: "searching within 15 km of Denver center"
         PageResponse<Organization> results = searchByLocation(-104.9903, 39.7392, 15000, Pageable.from(0, 10))
@@ -621,11 +649,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | fuzzy trigram search should tolerate typos like 'Slavation Army'"() {
         given: "a cluster of Salvation Army organizations and an unrelated org"
-        def parentId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", parentId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Family Store', true, 'VERIFIED')", UUID.randomUUID())
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Red Cross Society', true, 'VERIFIED')", UUID.randomUUID())
+        def parent = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        def parentId = parent.id()
+        dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
+        dataBuilder.organization().withName("Salvation Army Family Store").asPublic().verified().persist()
+        dataBuilder.organization().withName("Red Cross Society").asPublic().verified().persist()
 
         when: "searching with a typo: 'Slavation Army'"
         PageResponse<Organization> results = searchByName("Slavation Army", false, Pageable.from(0, 10))
@@ -641,19 +669,27 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY REGION | should return organizations operating within the specified administrative region"() {
         given: "two administrative regions"
-        def region1Id = UUID.randomUUID()
-        def region2Id = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Colorado Region', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", region1Id)
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Utah Region', ST_GeographyFromText('POLYGON((-114 37, -109 37, -109 42, -114 42, -114 37))'))", region2Id)
+        def region1 = dataBuilder.region().withName("Colorado Region").persist()
+        def region2 = dataBuilder.region().withName("Utah Region").withGeometry(
+                dataBuilder.geometryFactory.createPolygon([
+                        new Coordinate(-114, 37),
+                        new Coordinate(-109, 37),
+                        new Coordinate(-109, 42),
+                        new Coordinate(-114, 42),
+                        new Coordinate(-114, 37)
+                ] as Coordinate[])
+        ).persist()
+        def region1Id = region1.id()
+        def region2Id = region2.id()
 
         and: "organizations assigned to different regions"
-        def org1Id = UUID.randomUUID()
-        def org2Id = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Colorado Food Bank', true, 'VERIFIED')", org1Id)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Utah Food Bank', true, 'VERIFIED')", org2Id)
+        def org1 = dataBuilder.organization().withName("Colorado Food Bank").asPublic().verified().persist()
+        def org2 = dataBuilder.organization().withName("Utah Food Bank").asPublic().verified().persist()
+        def org1Id = org1.id()
+        def org2Id = org2.id()
 
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org1Id, region1Id)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org2Id, region2Id)
+        dataBuilder.linkOrganizationToRegion(org1Id, region1Id)
+        dataBuilder.linkOrganizationToRegion(org2Id, region2Id)
 
         when: "searching for organizations in Region 1"
         PageResponse<Organization> results = searchByRegion(region1Id, Pageable.from(0, 10))
@@ -668,23 +704,21 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH SECURITY | should NOT return private organizations in name, location, or region search"() {
         given: "a private organization and a public organization with similar names"
-        def publicOrgId = UUID.randomUUID()
-        def privateOrgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Confidential Shelter Public', true, 'VERIFIED')", publicOrgId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Confidential Shelter Private', false, 'VERIFIED')", privateOrgId)
+        def publicOrg = dataBuilder.organization().withName("Confidential Shelter Public").asPublic().verified().persist()
+        def privateOrg = dataBuilder.organization().withName("Confidential Shelter Private").asPrivate().verified().persist()
+        def publicOrgId = publicOrg.id()
+        def privateOrgId = privateOrg.id()
 
         and: "locations and regions assigned to both"
-        def locPublicId = UUID.randomUUID()
-        def locPrivateId = UUID.randomUUID()
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Pub', '1 St', 'City', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))", locPublicId)
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Loc Priv', '2 St', 'City', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))", locPrivateId)
-        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", publicOrgId, locPublicId)
-        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", privateOrgId, locPrivateId)
+        def locPublic = dataBuilder.location().withName("Loc Pub").withAddressLine("1 St").withCity("City").withCountryCode("US").atPoint(-104.99, 39.74).persist()
+        def locPrivate = dataBuilder.location().withName("Loc Priv").withAddressLine("2 St").withCity("City").withCountryCode("US").atPoint(-104.99, 39.74).persist()
+        dataBuilder.linkOrganizationToLocation(publicOrgId, locPublic.id())
+        dataBuilder.linkOrganizationToLocation(privateOrgId, locPrivate.id())
 
-        def regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Test Region Private', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", regionId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", publicOrgId, regionId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", privateOrgId, regionId)
+        def region = dataBuilder.region().withName("Test Region Private").persist()
+        def regionId = region.id()
+        dataBuilder.linkOrganizationToRegion(publicOrgId, regionId)
+        dataBuilder.linkOrganizationToRegion(privateOrgId, regionId)
 
         when: "searching by name"
         def nameResults = searchByName("Confidential Shelter", false, Pageable.from(0, 10))
@@ -705,15 +739,15 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH SECURITY | should NOT return unverified, suspended, or revoked organizations"() {
         given: "organizations in various verification statuses"
-        def verifiedId = UUID.randomUUID()
-        def unverifiedId = UUID.randomUUID()
-        def suspendedId = UUID.randomUUID()
-        def revokedId = UUID.randomUUID()
+        def verified = dataBuilder.organization().withName("Charity Org Verified").asPublic().verified().persist()
+        def unverified = dataBuilder.organization().withName("Charity Org Unverified").asPublic().unverified().persist()
+        def suspended = dataBuilder.organization().withName("Charity Org Suspended").asPublic().withVerificationStatus(VerificationStatus.SUSPENDED).persist()
+        def revoked = dataBuilder.organization().withName("Charity Org Revoked").asPublic().withVerificationStatus(VerificationStatus.REVOKED).persist()
 
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Verified', true, 'VERIFIED')", verifiedId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Unverified', true, 'UNVERIFIED')", unverifiedId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Suspended', true, 'SUSPENDED')", suspendedId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Charity Org Revoked', true, 'REVOKED')", revokedId)
+        def verifiedId = verified.id()
+        def unverifiedId = unverified.id()
+        def suspendedId = suspended.id()
+        def revokedId = revoked.id()
 
         when: "searching by name"
         def results = searchByName("Charity Org", false, Pageable.from(0, 10))
@@ -724,8 +758,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH SECURITY | SQL wildcard queries ('%', '_', '%%') should return empty page rather than dumping table"() {
         given: "some organizations exist in the database"
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Wildcard Test Org A', true, 'VERIFIED')", UUID.randomUUID())
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Wildcard Test Org B', true, 'VERIFIED')", UUID.randomUUID())
+        dataBuilder.organization().withName("Wildcard Test Org A").asPublic().verified().persist()
+        dataBuilder.organization().withName("Wildcard Test Org B").asPublic().verified().persist()
 
         when: "searching with wildcard characters"
         def percentResults = searchByName("%", false, Pageable.from(0, 10))
@@ -746,9 +780,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | exhaustive syntax permutations: quote variations, padding, and mismatched quotes"() {
         given: "an organization in database"
-        def orgId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", orgId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
+        def org = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
 
         when: "searching with leading/trailing spaces outside quotes: '  \"The Salvation Army\"  '"
         def resPaddedQuotes = searchByName('  "The Salvation Army"  ', false, Pageable.from(0, 10))
@@ -817,9 +851,9 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | exhaustive typo permutations: subtle misspellings and transposed letters"() {
         given: "Salvation Army parent organization"
-        def parentId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", parentId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", UUID.randomUUID())
+        def parent = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        def parentId = parent.id()
+        dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
 
         when: "searching with transposed 'v' and 't': 'Salavtion Army'"
         def resTransposedVt = searchByName("Salavtion Army", false, Pageable.from(0, 10))
@@ -845,15 +879,15 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | article normalization with 'An' and 'A' leading articles"() {
         given: "organizations with 'An' and 'A' prefixes alongside competing prefix organizations"
-        def orgAnId = UUID.randomUUID()
-        def orgAId = UUID.randomUUID()
-        def compAnId = UUID.randomUUID()
-        def compAId = UUID.randomUUID()
+        def orgAn = dataBuilder.organization().withName("An Organization Example").asPublic().verified().persist()
+        def orgA = dataBuilder.organization().withName("A Better Tomorrow Foundation").asPublic().verified().persist()
+        def compAn = dataBuilder.organization().withName("Organization Example Regional Branch").asPublic().verified().persist()
+        def compA = dataBuilder.organization().withName("Better Tomorrow Foundation Network").asPublic().verified().persist()
 
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'An Organization Example', true, 'VERIFIED')", orgAnId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'A Better Tomorrow Foundation', true, 'VERIFIED')", orgAId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Organization Example Regional Branch', true, 'VERIFIED')", compAnId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Better Tomorrow Foundation Network', true, 'VERIFIED')", compAId)
+        def orgAnId = orgAn.id()
+        def orgAId = orgA.id()
+        def compAnId = compAn.id()
+        def compAId = compA.id()
 
         when: "searching without the leading article"
         def resAn = searchByName("Organization Example", false, Pageable.from(0, 10))
@@ -876,11 +910,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | literal SQL wildcard characters (% and _) in organization names"() {
         given: "organizations with literal % and _ in their names"
-        def orgPercentId = UUID.randomUUID()
-        def orgUnderscoreId = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, '100% Volunteer Initiative', true, 'VERIFIED')", orgPercentId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Special_Ops Outreach', true, 'VERIFIED')", orgUnderscoreId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'SpecialXOps Outreach', true, 'VERIFIED')", UUID.randomUUID())
+        def orgPercent = dataBuilder.organization().withName("100% Volunteer Initiative").asPublic().verified().persist()
+        def orgUnderscore = dataBuilder.organization().withName("Special_Ops Outreach").asPublic().verified().persist()
+        dataBuilder.organization().withName("SpecialXOps Outreach").asPublic().verified().persist()
+
+        def orgPercentId = orgPercent.id()
+        def orgUnderscoreId = orgUnderscore.id()
 
         when: "searching for literal '100%'"
         def resPercent = searchByName("100%", false, Pageable.from(0, 10))
@@ -903,23 +938,23 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SEARCH BY NAME | exhaustive cluster branch and keyword queries"() {
         given: "a rich cluster of diverse Salvation Army organizations"
-        def parentId = UUID.randomUUID()
-        def denverId = UUID.randomUUID()
-        def auroraId = UUID.randomUUID()
-        def springsId = UUID.randomUUID()
-        def intermountainId = UUID.randomUUID()
-        def storeId = UUID.randomUUID()
-        def disasterId = UUID.randomUUID()
-        def friendsId = UUID.randomUUID()
+        def parent = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        def denver = dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
+        def aurora = dataBuilder.organization().withName("The Salvation Army - Aurora Corps Community Center").asPublic().verified().persist()
+        def springs = dataBuilder.organization().withName("The Salvation Army - Colorado Springs Corps").asPublic().verified().persist()
+        def intermountain = dataBuilder.organization().withName("The Salvation Army Intermountain Division").asPublic().verified().persist()
+        def store = dataBuilder.organization().withName("Salvation Army Family Store").asPublic().verified().persist()
+        def disaster = dataBuilder.organization().withName("Salvation Army Emergency Disaster Services").asPublic().verified().persist()
+        def friends = dataBuilder.organization().withName("Friends of The Salvation Army").asPublic().verified().persist()
 
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army', true, 'VERIFIED')", parentId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Denver Citadel Corps', true, 'VERIFIED')", denverId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Aurora Corps Community Center', true, 'VERIFIED')", auroraId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army - Colorado Springs Corps', true, 'VERIFIED')", springsId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'The Salvation Army Intermountain Division', true, 'VERIFIED')", intermountainId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Family Store', true, 'VERIFIED')", storeId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Salvation Army Emergency Disaster Services', true, 'VERIFIED')", disasterId)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Friends of The Salvation Army', true, 'VERIFIED')", friendsId)
+        def parentId = parent.id()
+        def denverId = denver.id()
+        def auroraId = aurora.id()
+        def springsId = springs.id()
+        def intermountainId = intermountain.id()
+        def storeId = store.id()
+        def disasterId = disaster.id()
+        def friendsId = friends.id()
 
         when: "searching for 'Denver Citadel'"
         def resDenver = searchByName("Denver Citadel", false, Pageable.from(0, 10))
@@ -960,18 +995,32 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "PAGINATION & SORTING | normalizePageable and getOrganizations branch coverage"() {
         given: "organizations, locations, and regions exist"
-        def org1Id = UUID.randomUUID()
-        def org2Id = UUID.randomUUID()
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org 1', true, 'VERIFIED')", org1Id)
-        executeUpdate("INSERT INTO organizations (id, name, is_public, verification_status) VALUES (?, 'Paging Test Org 2', true, 'VERIFIED')", org2Id)
+        def loc = dataBuilder.location()
+                .withName("Paging Test Loc")
+                .withAddressLine("100 Main St")
+                .withCity("Denver")
+                .withCountryCode("US")
+                .atPoint(-104.99, 39.74)
+                .persist()
+        def locId = loc.id()
 
-        def locId = UUID.randomUUID()
-        executeUpdate("INSERT INTO locations (id, name, address_line, city, country_code, geom) VALUES (?, 'Paging Test Loc', '100 Main St', 'Denver', 'US', ST_GeographyFromText('POINT(-104.99 39.74)'))", locId)
-        executeUpdate("INSERT INTO organization_locations (organization_id, location_id) VALUES (?, ?)", org1Id, locId)
+        def org1 = dataBuilder.organization()
+                .withName("Paging Test Org 1")
+                .asPublic()
+                .verified()
+                .withLocation(loc)
+                .persist()
+        def org2 = dataBuilder.organization()
+                .withName("Paging Test Org 2")
+                .asPublic()
+                .verified()
+                .persist()
+        def org1Id = org1.id()
+        def org2Id = org2.id()
 
-        def regionId = UUID.randomUUID()
-        executeUpdate("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Paging Region', ST_GeographyFromText('POLYGON((-109 37, -102 37, -102 41, -109 41, -109 37))'))", regionId)
-        executeUpdate("INSERT INTO organization_regions (organization_id, region_id) VALUES (?, ?)", org1Id, regionId)
+        def region = dataBuilder.region().withName("Paging Region").persist()
+        def regionId = region.id()
+        dataBuilder.linkOrganizationToRegion(org1Id, regionId)
 
         when: "calling getOrganizations with null pageable"
         def resGetOrgsNull = organizationController.getOrganizations(null)
@@ -1092,7 +1141,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority updates organization"() {
         given: "an organization and a standard unauthorized user"
-        def org = organizationRepository.save(new Organization(null, "Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
+        def org = dataBuilder.organization().withName("Auth Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
         def updated = new UpdateOrganizationCommand("Hacked Name", "https://hacked.com", null, true)
 
         when: "unauthorized user attempts to update the organization"
@@ -1105,7 +1154,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority deletes organization"() {
         given: "an organization and a standard unauthorized user"
-        def org = organizationRepository.save(new Organization(null, "Delete Auth Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
+        def org = dataBuilder.organization().withName("Delete Auth Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
 
         when: "unauthorized user attempts to delete the organization"
         client.exchange(asVolunteer(HttpRequest.DELETE("/organizations/${org.id()}"), TestPersonas.VICTOR_VOLUNTEER))
@@ -1117,8 +1166,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "AUTHORIZATION | should allow organization admin to update and delete organization"() {
         given: "an organization and an ORG_ADMIN for that organization"
-        def org = organizationRepository.save(new Organization(null, "Allowed Org ${faker.company().name()}", "https://example.com", null, true, UNVERIFIED, null, []))
-        executeUpdate("INSERT INTO organization_users (user_id, organization_id, role) VALUES (?, ?, 'ORG_ADMIN')", TestPersonas.LEO_LOCAL_ADMIN.id, org.id())
+        def org = dataBuilder.organization().withName("Allowed Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
+        dataBuilder.organizationUser().asOrgAdmin(TestPersonas.LEO_LOCAL_ADMIN.id, org.id()).persist()
 
         def updated = new UpdateOrganizationCommand("Updated By Admin", "https://example.com", null, true)
 
