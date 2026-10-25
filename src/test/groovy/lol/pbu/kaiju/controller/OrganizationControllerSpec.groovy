@@ -628,13 +628,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 .withCountryCode("US")
                 .atPoint(-105.2705, 40.0150)
                 .persist()
-        def orgFar = dataBuilder.organization()
+        dataBuilder.organization()
                 .withName("Org Far Boulder")
                 .asPublic()
                 .verified()
                 .withLocation(locFar)
                 .persist()
-        def orgFarId = orgFar.id()
 
         when: "searching within 15 km of Denver center"
         PageResponse<Organization> results = searchByLocation(-104.9903, 39.7392, 15000, Pageable.from(0, 10))
@@ -740,14 +739,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "SEARCH SECURITY | should NOT return unverified, suspended, or revoked organizations"() {
         given: "organizations in various verification statuses"
         def verified = dataBuilder.organization().withName("Charity Org Verified").asPublic().verified().persist()
-        def unverified = dataBuilder.organization().withName("Charity Org Unverified").asPublic().unverified().persist()
-        def suspended = dataBuilder.organization().withName("Charity Org Suspended").asPublic().withVerificationStatus(VerificationStatus.SUSPENDED).persist()
-        def revoked = dataBuilder.organization().withName("Charity Org Revoked").asPublic().withVerificationStatus(VerificationStatus.REVOKED).persist()
+        dataBuilder.organization().withName("Charity Org Unverified").asPublic().unverified().persist()
+        dataBuilder.organization().withName("Charity Org Suspended").asPublic().withVerificationStatus(VerificationStatus.SUSPENDED).persist()
+        dataBuilder.organization().withName("Charity Org Revoked").asPublic().withVerificationStatus(VerificationStatus.REVOKED).persist()
 
         def verifiedId = verified.id()
-        def unverifiedId = unverified.id()
-        def suspendedId = suspended.id()
-        def revokedId = revoked.id()
 
         when: "searching by name"
         def results = searchByName("Charity Org", false, Pageable.from(0, 10))
@@ -1002,7 +998,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 .withCountryCode("US")
                 .atPoint(-104.99, 39.74)
                 .persist()
-        def locId = loc.id()
 
         def org1 = dataBuilder.organization()
                 .withName("Paging Test Org 1")
@@ -1010,13 +1005,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 .verified()
                 .withLocation(loc)
                 .persist()
-        def org2 = dataBuilder.organization()
+        dataBuilder.organization()
                 .withName("Paging Test Org 2")
                 .asPublic()
                 .verified()
                 .persist()
         def org1Id = org1.id()
-        def org2Id = org2.id()
 
         def region = dataBuilder.region().withName("Paging Region").persist()
         def regionId = region.id()

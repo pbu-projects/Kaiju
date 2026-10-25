@@ -24,22 +24,34 @@ class OrganizationUserBuilder {
 
     OrganizationUserBuilder asOrgAdmin(Object user = null, Object org = null) {
         this.role = OrganizationUserRole.ORG_ADMIN
-        if (user != null) withUser(user)
-        if (org != null) withOrganization(org)
+        if (user != null) {
+            withUser(user)
+        }
+        if (org != null) {
+            withOrganization(org)
+        }
         return this
     }
 
     OrganizationUserBuilder asOrgManager(Object user = null, Object org = null) {
         this.role = OrganizationUserRole.ORG_MANAGER
-        if (user != null) withUser(user)
-        if (org != null) withOrganization(org)
+        if (user != null) {
+            withUser(user)
+        }
+        if (org != null) {
+            withOrganization(org)
+        }
         return this
     }
 
     OrganizationUserBuilder asOrgMember(Object user = null, Object org = null) {
         this.role = OrganizationUserRole.ORG_MEMBER
-        if (user != null) withUser(user)
-        if (org != null) withOrganization(org)
+        if (user != null) {
+            withUser(user)
+        }
+        if (org != null) {
+            withOrganization(org)
+        }
         return this
     }
 
