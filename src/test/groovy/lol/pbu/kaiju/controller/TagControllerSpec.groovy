@@ -31,10 +31,6 @@ class TagControllerSpec extends BaseControllerSpec {
         dataBuilder.tag().withName("test-tag-b").persist()
     }
 
-    def cleanup() {
-        sql.execute("DELETE FROM tags WHERE name LIKE 'test-tag-%' OR name LIKE 'tag-%' OR name LIKE 'updated-%' OR name LIKE 'temporary-tag-%' OR name LIKE 'director-%'")
-    }
-
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid tag"() {
@@ -44,7 +40,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
         when: "the tag is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/tags", command)), Tag)
-        Tag saved = response.body()
+        Tag saved = track(response.body())
 
         then: "the tag is persisted with 200 OK and generated ID"
         verifyAll {
@@ -54,10 +50,11 @@ class TagControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
+        def result = tagRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.name() == name
+            it != null
+            id() == saved.id()
+            name() == saved.name()
         }
     }
 
@@ -93,7 +90,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
         when: "the tag is added by a regional director via HTTP POST"
         def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Tag)
-        Tag saved = response.body()
+        Tag saved = track(response.body())
 
         then: "the tag is persisted with 200 OK and generated ID"
         verifyAll {
@@ -103,15 +100,11 @@ class TagControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM tags WHERE id = ?", [saved.id()])
+        def result = tagRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.name() == name
-        }
-
-        cleanup:
-        if (saved?.id()) {
-            sql.execute("DELETE FROM tags WHERE id = ?", [saved.id()])
+            it != null
+            id() == saved.id()
+            name() == saved.name()
         }
     }
 
@@ -196,9 +189,10 @@ class TagControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
+        def dbResult = tagRepository.findById(id).orElse(null)
         verifyAll(dbResult) {
-            name == newName
+            it != null
+            name() == newName
         }
     }
 
@@ -261,13 +255,11 @@ class TagControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT name FROM tags WHERE id = ?", [id])
+        def dbResult = tagRepository.findById(id).orElse(null)
         verifyAll(dbResult) {
-            name == newName
+            it != null
+            name() == newName
         }
-
-        cleanup:
-        sql.execute("DELETE FROM tags WHERE id = ?", [id])
     }
 
     def "UPDATE | should reject standard user attempting PUT /tags/{id} with 403 FORBIDDEN"() {
@@ -313,7 +305,7 @@ class TagControllerSpec extends BaseControllerSpec {
         and: "the tag no longer exists in the repository or database"
         verifyAll {
             !tagRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM tags WHERE id = ?", [id]).count == 0
+            !tagRepository.existsById(id)
         }
     }
 
@@ -353,7 +345,7 @@ class TagControllerSpec extends BaseControllerSpec {
         and: "the tag no longer exists in the repository or database"
         verifyAll {
             !tagRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM tags WHERE id = ?", [id]).count == 0
+            !tagRepository.existsById(id)
         }
     }
 

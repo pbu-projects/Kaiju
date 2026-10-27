@@ -59,7 +59,6 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testImplementation("org.testcontainers:testcontainers-spock")
-    testImplementation("org.apache.groovy:groovy-sql:${project.properties["groovySqlVersion"]}")
     testImplementation("net.datafaker:datafaker:${project.properties["datafakerVersion"]}")
     testImplementation("ch.qos.logback:logback-classic")
 }

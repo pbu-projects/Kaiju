@@ -146,6 +146,9 @@ class ApiClientSpec extends BaseControllerSpec {
             it != null
             role == UserRole.REGION_AGENT
         }
+
+        cleanup:
+        defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, new RoleUpdateRequest(UserRole.STANDARD_USER))
     }
 
     def "can create update and delete tags"() {

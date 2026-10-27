@@ -14,6 +14,7 @@ class LocationBuilder {
     private final LocationRepository locationRepository
     private final GeometryFactory geometryFactory
     private final Faker faker
+    private final KaijuDataBuilder dataBuilder
 
     private UUID id
     private String name
@@ -28,11 +29,13 @@ class LocationBuilder {
     LocationBuilder(
             LocationRepository locationRepository,
             GeometryFactory geometryFactory,
-            Faker faker
+            Faker faker,
+            KaijuDataBuilder dataBuilder = null
     ) {
         this.locationRepository = locationRepository
         this.geometryFactory = geometryFactory
         this.faker = faker
+        this.dataBuilder = dataBuilder
     }
 
     LocationBuilder withName(String name) {
@@ -121,6 +124,8 @@ class LocationBuilder {
 
     Location persist() {
         assert locationRepository != null : "Cannot persist location without a LocationRepository"
-        return locationRepository.save(build())
+        Location saved = locationRepository.save(build())
+        dataBuilder?.trackLocation(saved.id())
+        return saved
     }
 }

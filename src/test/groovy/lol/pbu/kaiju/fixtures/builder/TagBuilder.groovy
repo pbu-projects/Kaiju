@@ -8,12 +8,14 @@ import java.util.UUID
 class TagBuilder {
 
     private final TagRepository tagRepository
+    private final KaijuDataBuilder dataBuilder
 
     private UUID id
     private String name
 
-    TagBuilder(TagRepository tagRepository) {
+    TagBuilder(TagRepository tagRepository, KaijuDataBuilder dataBuilder = null) {
         this.tagRepository = tagRepository
+        this.dataBuilder = dataBuilder
     }
 
     TagBuilder withName(String name) {
@@ -33,6 +35,8 @@ class TagBuilder {
 
     Tag persist() {
         assert tagRepository != null : "Cannot persist tag without a TagRepository"
-        return tagRepository.save(build())
+        Tag saved = tagRepository.save(build())
+        dataBuilder?.trackTag(saved.id())
+        return saved
     }
 }

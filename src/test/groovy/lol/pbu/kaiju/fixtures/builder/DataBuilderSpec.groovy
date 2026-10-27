@@ -1,6 +1,7 @@
 package lol.pbu.kaiju.fixtures.builder
 
 import lol.pbu.kaiju.domain.AdministrativeRegion
+import lol.pbu.kaiju.domain.Boundary
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.OrganizationUser
@@ -23,6 +24,9 @@ import lol.pbu.kaiju.model.VerificationStatus
 import net.datafaker.Faker
 import spock.lang.Specification
 
+import javax.sql.DataSource
+import java.sql.Connection
+import java.sql.PreparedStatement
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -418,6 +422,198 @@ class DataBuilderSpec extends Specification {
             dataBuilder.boundary() != null
             dataBuilder.geometryFactory != null
             dataBuilder.faker != null
+        }
+    }
+
+    def "KaijuDataBuilder | should track custom entities and polymorphic objects"() {
+        given: "a data builder instance and sample entities"
+        def dataBuilder = new KaijuDataBuilder()
+        UUID userId = UUID.randomUUID()
+        UUID orgId = UUID.randomUUID()
+        UUID regionId = UUID.randomUUID()
+        UUID locId = UUID.randomUUID()
+        UUID tagId = UUID.randomUUID()
+        UUID boundaryId = UUID.randomUUID()
+        UUID projectId = UUID.randomUUID()
+        UUID shiftId = UUID.randomUUID()
+
+        when: "tracking IDs directly"
+        dataBuilder.trackUser(userId)
+        dataBuilder.trackOrganization(orgId)
+        dataBuilder.trackRegion(regionId)
+        dataBuilder.trackLocation(locId)
+        dataBuilder.trackTag(tagId)
+        dataBuilder.trackBoundary(boundaryId)
+        dataBuilder.trackProject(projectId)
+        dataBuilder.trackShift(shiftId)
+        dataBuilder.trackOrganizationUser(userId, orgId)
+        dataBuilder.trackRegionUser(userId, regionId)
+        dataBuilder.trackShiftSignup(shiftId, userId)
+        dataBuilder.trackShiftTag(shiftId, tagId)
+        dataBuilder.trackProjectLocation(projectId, locId)
+        dataBuilder.trackProjectBoundary(projectId, boundaryId)
+        dataBuilder.trackOrganizationRegion(orgId, regionId)
+        dataBuilder.trackOrganizationLocation(orgId, locId)
+
+        then: "all tracked sets contain the added IDs"
+        verifyAll {
+            dataBuilder.trackedUserIds.contains(userId)
+            dataBuilder.trackedOrganizationIds.contains(orgId)
+            dataBuilder.trackedRegionIds.contains(regionId)
+            dataBuilder.trackedLocationIds.contains(locId)
+            dataBuilder.trackedTagIds.contains(tagId)
+            dataBuilder.trackedBoundaryIds.contains(boundaryId)
+            dataBuilder.trackedProjectIds.contains(projectId)
+            dataBuilder.trackedShiftIds.contains(shiftId)
+            dataBuilder.trackedOrgUsers.contains([userId: userId, organizationId: orgId])
+            dataBuilder.trackedRegionUsers.contains([userId: userId, regionId: regionId])
+            dataBuilder.trackedShiftSignups.contains([shiftId: shiftId, userId: userId])
+            dataBuilder.trackedShiftTags.contains([shiftId: shiftId, tagId: tagId])
+            dataBuilder.trackedProjectLocations.contains([projectId: projectId, locationId: locId])
+            dataBuilder.trackedProjectBoundaries.contains([projectId: projectId, boundaryId: boundaryId])
+            dataBuilder.trackedOrgRegions.contains([organizationId: orgId, regionId: regionId])
+            dataBuilder.trackedOrgLocations.contains([organizationId: orgId, locationId: locId])
+        }
+
+        when: "tracking via polymorphic track helper"
+        UUID polyUserId = UUID.randomUUID()
+        UUID polyOrgId = UUID.randomUUID()
+        UUID polyProjId = UUID.randomUUID()
+        User polyUser = new User(polyUserId, "test@kaiju.local", UserRole.STANDARD_USER, OffsetDateTime.now())
+        Organization polyOrg = new Organization(polyOrgId, "Test Org", "https://test.local", null, true, VerificationStatus.VERIFIED, null, [])
+        Project polyProj = new Project(polyProjId, polyOrg, null, "Test Proj", "Desc", ProjectType.STANDARD, ProjectStatus.ACTIVE, OffsetDateTime.now(), null, null, [], [])
+
+        dataBuilder.track(polyUser)
+        dataBuilder.track(polyOrg)
+        dataBuilder.track(polyProj)
+
+        then: "polymorphic tracking adds IDs to appropriate sets"
+        verifyAll {
+            dataBuilder.trackedUserIds.contains(polyUserId)
+            dataBuilder.trackedOrganizationIds.contains(polyOrgId)
+            dataBuilder.trackedProjectIds.contains(polyProjId)
+        }
+    }
+
+    def "KaijuDataBuilder | should ignore seeded personas, seeded orgs, and global admin"() {
+        given: "a data builder instance"
+        def dataBuilder = new KaijuDataBuilder()
+
+        when: "attempting to track seeded entities or null values"
+        dataBuilder.trackUser(TestPersonas.SARAH_ADMIN.id)
+        dataBuilder.trackUser(TestPersonas.GLOBAL_ADMIN_ID)
+        dataBuilder.trackUser(null)
+        dataBuilder.trackOrganization(TestPersonas.NATIONAL_RELIEF_NETWORK_ID)
+        dataBuilder.trackOrganization(null)
+        dataBuilder.trackRegion(TestPersonas.COLORADO_STATE_REGION_ID)
+        dataBuilder.trackRegion(null)
+        dataBuilder.track(null)
+
+        then: "none of the seeded or null entries are tracked"
+        verifyAll {
+            dataBuilder.trackedUserIds.isEmpty()
+            dataBuilder.trackedOrganizationIds.isEmpty()
+            dataBuilder.trackedRegionIds.isEmpty()
+        }
+    }
+
+    def "KaijuDataBuilder | should clear tracked sets without deleting when requested"() {
+        given: "a data builder with tracked IDs"
+        def dataBuilder = new KaijuDataBuilder()
+        dataBuilder.trackUser(UUID.randomUUID())
+        dataBuilder.trackOrganization(UUID.randomUUID())
+        dataBuilder.trackProject(UUID.randomUUID())
+
+        when: "clearing tracked entities"
+        dataBuilder.clearTrackedEntities()
+
+        then: "all tracked sets are empty"
+        verifyAll {
+            dataBuilder.trackedUserIds.isEmpty()
+            dataBuilder.trackedOrganizationIds.isEmpty()
+            dataBuilder.trackedProjectIds.isEmpty()
+        }
+    }
+
+    def "KaijuDataBuilder | should execute teardown in reverse foreign key order"() {
+        given: "mocked database connection capturing executed SQL statements"
+        List<String> executedQueries = []
+        PreparedStatement mockStmt = Mock(PreparedStatement) {
+            addBatch() >> {}
+            executeBatch() >> new int[0]
+        }
+        Connection mockConn = Mock(Connection) {
+            prepareStatement(_ as String) >> { String sql ->
+                executedQueries.add(sql.replaceAll(/\s+/, " ").trim())
+                return mockStmt
+            }
+        }
+        DataSource mockDataSource = Mock(DataSource) {
+            getConnection() >> mockConn
+        }
+
+        KaijuDataBuilder dataBuilder = new KaijuDataBuilder(
+                null, null, null, null, null, null, null, null, null, null,
+                mockDataSource
+        )
+
+        UUID shiftId = UUID.randomUUID()
+        UUID userId = UUID.randomUUID()
+        UUID tagId = UUID.randomUUID()
+        UUID projId = UUID.randomUUID()
+        UUID locId = UUID.randomUUID()
+        UUID boundaryId = UUID.randomUUID()
+        UUID orgId = UUID.randomUUID()
+        UUID regionId = UUID.randomUUID()
+
+        dataBuilder.trackShiftSignup(shiftId, userId)
+        dataBuilder.trackShiftTag(shiftId, tagId)
+        dataBuilder.trackShift(shiftId)
+        dataBuilder.trackProjectLocation(projId, locId)
+        dataBuilder.trackProjectBoundary(projId, boundaryId)
+        dataBuilder.trackProject(projId)
+        dataBuilder.trackOrganizationRegion(orgId, regionId)
+        dataBuilder.trackOrganizationLocation(orgId, locId)
+        dataBuilder.trackRegionUser(userId, regionId)
+        dataBuilder.trackOrganizationUser(userId, orgId)
+        dataBuilder.trackOrganization(orgId)
+        dataBuilder.trackLocation(locId)
+        dataBuilder.trackBoundary(boundaryId)
+        dataBuilder.trackRegion(regionId)
+        dataBuilder.trackTag(tagId)
+        dataBuilder.trackUser(userId)
+
+        when: "cleaning up tracked entities"
+        dataBuilder.cleanupTrackedEntities()
+
+        then: "teardown statements are executed in reverse foreign key order"
+        verifyAll {
+            executedQueries.size() >= 19
+            executedQueries[0] == "DELETE FROM shift_signups WHERE shift_id = ? AND user_id = ?"
+            executedQueries[1] == "DELETE FROM shift_tags WHERE shift_id = ? AND tag_id = ?"
+            executedQueries[2] == "DELETE FROM shifts WHERE id = ?"
+            executedQueries[3] == "DELETE FROM project_audit_logs WHERE project_id = ?"
+            executedQueries[4] == "DELETE FROM project_locations WHERE project_id = ? AND location_id = ?"
+            executedQueries[5] == "DELETE FROM project_boundaries WHERE project_id = ? AND boundary_id = ?"
+            executedQueries[6] == "DELETE FROM project_users WHERE project_id = ?"
+            executedQueries[7] == "DELETE FROM projects WHERE id = ?"
+            executedQueries[8] == "DELETE FROM organization_audit_logs WHERE organization_id = ?"
+            executedQueries[9] == "DELETE FROM organization_regions WHERE organization_id = ? AND region_id = ?"
+            executedQueries[10] == "DELETE FROM organization_locations WHERE organization_id = ? AND location_id = ?"
+            executedQueries[11] == "DELETE FROM region_users WHERE user_id = ? AND region_id = ?"
+            executedQueries[12] == "DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?"
+            executedQueries.contains("DELETE FROM organizations WHERE id = ?")
+            executedQueries.contains("DELETE FROM locations WHERE id = ?")
+            executedQueries.contains("DELETE FROM boundaries WHERE id = ?" )
+            executedQueries.contains("DELETE FROM administrative_regions WHERE id = ?")
+            executedQueries.contains("DELETE FROM tags WHERE id = ?")
+            executedQueries.contains("DELETE FROM project_audit_logs WHERE actor_id = ?")
+            executedQueries.contains("DELETE FROM organization_audit_logs WHERE actor_id = ?")
+            executedQueries.contains("DELETE FROM users WHERE id = ?")
+            dataBuilder.trackedUserIds.isEmpty()
+            dataBuilder.trackedOrganizationIds.isEmpty()
+            dataBuilder.trackedProjectIds.isEmpty()
+            dataBuilder.trackedShiftIds.isEmpty()
         }
     }
 }

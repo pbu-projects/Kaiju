@@ -67,10 +67,6 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         dataBuilder.boundary().withName("Test Boundary B").withGeometry(geometryFactory.createPolygon(coordsB)).persist()
     }
 
-    def cleanup() {
-        sql.execute("DELETE FROM boundaries WHERE name LIKE 'Test Boundary %' OR name LIKE 'Updated Boundary %' OR name LIKE 'Temporary Boundary %' OR name LIKE 'Director Boundary %'")
-    }
-
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid boundary"() {
@@ -80,7 +76,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
         when: "the boundary is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/boundaries", command)), Boundary)
-        Boundary saved = response.body()
+        Boundary saved = track(response.body())
 
         then: "the boundary is persisted with 200 OK and generated ID"
         verifyAll {
@@ -91,10 +87,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM boundaries WHERE id = ?", [saved.id()])
+        def result = boundaryRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.name() == result.name
+            it != null
+            it.id() == saved.id()
+            it.name() == name
         }
     }
 
@@ -105,7 +102,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
 
         when: "the boundary is added by a regional director via HTTP POST"
         def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Boundary)
-        Boundary saved = response.body()
+        Boundary saved = track(response.body())
 
         then: "the boundary is persisted with 200 OK and generated ID"
         verifyAll {
@@ -116,15 +113,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM boundaries WHERE id = ?", [saved.id()])
+        def result = boundaryRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.name() == result.name
-        }
-
-        cleanup:
-        if (saved?.id()) {
-            sql.execute("DELETE FROM boundaries WHERE id = ?", [saved.id()])
+            it != null
+            it.id() == saved.id()
+            it.name() == name
         }
     }
 
@@ -241,9 +234,10 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT name FROM boundaries WHERE id = ?", [id])
+        def dbResult = boundaryRepository.findById(id).orElse(null)
         verifyAll(dbResult) {
-            name == newName
+            dbResult != null
+            name() == newName
         }
     }
 
@@ -309,11 +303,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT name FROM boundaries WHERE id = ?", [id])
-        dbResult.name == newName
-
-        cleanup:
-        sql.execute("DELETE FROM boundaries WHERE id = ?", [id])
+        def dbResult = boundaryRepository.findById(id).orElse(null)
+        verifyAll(dbResult) {
+            dbResult != null
+            name() == newName
+        }
     }
 
     def "UPDATE | should reject standard user attempting PUT /boundaries/{id} with 403 FORBIDDEN"() {
@@ -359,7 +353,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         and: "the boundary no longer exists in the repository or database"
         verifyAll {
             !boundaryRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM boundaries WHERE id = ?", [id]).count == 0
+            !boundaryRepository.existsById(id)
         }
     }
 
@@ -399,7 +393,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         and: "the boundary no longer exists in the repository or database"
         verifyAll {
             !boundaryRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM boundaries WHERE id = ?", [id]).count == 0
+            !boundaryRepository.existsById(id)
         }
     }
 

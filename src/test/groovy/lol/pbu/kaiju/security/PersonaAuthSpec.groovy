@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.security
 
-import groovy.sql.Sql
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
@@ -22,6 +21,9 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.sql.DataSource
+import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.ResultSet
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -215,11 +217,8 @@ class PersonaAuthSpec extends Specification {
     }
 
     def "seeded county boundaries accurately contain internal landmarks and exclude adjacent municipalities"() {
-        given: "a connection to the test database"
-        Sql sql = new Sql(dataSource)
-
         when: "evaluating spatial containment for real-world locations against Denver County and El Paso County"
-        def spatialResults = sql.firstRow("""
+        String sql = """
             SELECT
                 ST_Covers(
                     (SELECT geom FROM administrative_regions WHERE id = ?),
@@ -277,7 +276,8 @@ class PersonaAuthSpec extends Specification {
                     (SELECT geom FROM administrative_regions WHERE id = ?),
                     ST_GeographyFromText('SRID=4326;POINT(-104.8214 38.8339)')
                 ) AS cos_downtown_covers_cos_hall
-        """, [
+        """
+        List<UUID> params = [
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
@@ -292,7 +292,34 @@ class PersonaAuthSpec extends Specification {
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_DOWNTOWN_REGION_ID,
                 TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID
-        ])
+        ]
+
+        Map<String, Boolean> spatialResults = [:]
+        dataSource.connection.withCloseable { conn ->
+            conn.prepareStatement(sql).withCloseable { stmt ->
+                params.eachWithIndex { param, idx ->
+                    stmt.setObject(idx + 1, param)
+                }
+                stmt.executeQuery().withCloseable { rs ->
+                    if (rs.next()) {
+                        spatialResults.denver_city_hall_inside = rs.getBoolean("denver_city_hall_inside")
+                        spatialResults.dia_inside = rs.getBoolean("dia_inside")
+                        spatialResults.lakewood_inside = rs.getBoolean("lakewood_inside")
+                        spatialResults.aurora_inside = rs.getBoolean("aurora_inside")
+                        spatialResults.cos_city_hall_inside = rs.getBoolean("cos_city_hall_inside")
+                        spatialResults.pueblo_inside = rs.getBoolean("pueblo_inside")
+                        spatialResults.cos_hall_inside_cos_city = rs.getBoolean("cos_hall_inside_cos_city")
+                        spatialResults.fountain_hall_inside_fountain = rs.getBoolean("fountain_hall_inside_fountain")
+                        spatialResults.fountain_hall_inside_cos_city = rs.getBoolean("fountain_hall_inside_cos_city")
+                        spatialResults.arapahoe_covers_aurora_hall = rs.getBoolean("arapahoe_covers_aurora_hall")
+                        spatialResults.aurora_covers_aurora_hall = rs.getBoolean("aurora_covers_aurora_hall")
+                        spatialResults.denver_covers_aurora_hall = rs.getBoolean("denver_covers_aurora_hall")
+                        spatialResults.denver_downtown_covers_16th_st_mall = rs.getBoolean("denver_downtown_covers_16th_st_mall")
+                        spatialResults.cos_downtown_covers_cos_hall = rs.getBoolean("cos_downtown_covers_cos_hall")
+                    }
+                }
+            }
+        }
 
         then: "landmarks, municipal boundaries, and downtown cores match expected containment"
         verifyAll(spatialResults) {
@@ -314,12 +341,9 @@ class PersonaAuthSpec extends Specification {
     }
 
     def "all seeded administrative regions are mathematically non-rectangular and topologically valid"() {
-        given: "a connection to the test database"
-        Sql sql = new Sql(dataSource)
-
         when: "evaluating geometric validity and checking against bounding boxes"
         String regionIds = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(',')
-        def rows = sql.rows("""
+        String query = """
             SELECT
                 id,
                 name,
@@ -330,7 +354,25 @@ class PersonaAuthSpec extends Specification {
             FROM administrative_regions
             WHERE id IN (${regionIds})
             ORDER BY name
-        """.toString())
+        """.toString()
+
+        List<Map<String, Object>> rows = []
+        dataSource.connection.withCloseable { conn ->
+            conn.prepareStatement(query).withCloseable { stmt ->
+                stmt.executeQuery().withCloseable { rs ->
+                    while (rs.next()) {
+                        rows.add([
+                                id                 : rs.getObject("id", UUID),
+                                name               : rs.getString("name"),
+                                is_valid           : rs.getBoolean("is_valid"),
+                                is_axis_aligned_box: rs.getBoolean("is_axis_aligned_box"),
+                                is_oriented_box    : rs.getBoolean("is_oriented_box"),
+                                point_count        : rs.getInt("point_count")
+                        ])
+                    }
+                }
+            }
+        }
 
         then: "all 28 seeded regions are retrieved and meet geometric validity constraints"
         verifyAll {

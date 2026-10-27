@@ -13,13 +13,15 @@ import java.util.UUID
 class RegionUserBuilder {
 
     private final RegionUserRepository regionUserRepository
+    private final KaijuDataBuilder dataBuilder
 
     private UUID userId
     private UUID regionId
     private RegionUserRole role = RegionUserRole.REGION_AGENT
 
-    RegionUserBuilder(RegionUserRepository regionUserRepository) {
+    RegionUserBuilder(RegionUserRepository regionUserRepository, KaijuDataBuilder dataBuilder = null) {
         this.regionUserRepository = regionUserRepository
+        this.dataBuilder = dataBuilder
     }
 
     RegionUserBuilder asRegionDirector(Object user = null, Object region = null) {
@@ -106,6 +108,8 @@ class RegionUserBuilder {
 
     RegionUser persist() {
         assert regionUserRepository != null : "Cannot persist region user without a RegionUserRepository"
-        return regionUserRepository.save(build())
+        RegionUser saved = regionUserRepository.save(build())
+        dataBuilder?.trackRegionUser(saved.id().userId(), saved.id().regionId())
+        return saved
     }
 }

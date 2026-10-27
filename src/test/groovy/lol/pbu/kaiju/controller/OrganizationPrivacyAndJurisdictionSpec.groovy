@@ -4,6 +4,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.dto.CoordinateDto
@@ -15,13 +16,16 @@ import lol.pbu.kaiju.dto.UpdateShiftCommand
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
+import lol.pbu.kaiju.repository.ShiftRepository
 
-import java.sql.Timestamp
 import java.time.OffsetDateTime
 import java.util.UUID
 
 @MicronautTest(transactional = false)
 class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
+
+    @Inject
+    ShiftRepository shiftRepository
 
     static final String STATUS_VERIFIED = "VERIFIED"
     static final String STATUS_PENDING = "PENDING"
@@ -54,50 +58,14 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         provisionTenantFixtures()
     }
 
-    def cleanup() {
-        if (projectAId != null) {
-            executeUpdate("DELETE FROM shifts WHERE project_id = ?", projectAId)
-            executeUpdate("DELETE FROM project_locations WHERE project_id = ?", projectAId)
-            executeUpdate("DELETE FROM projects WHERE id = ?", projectAId)
-        }
-        if (projectBId != null) {
-            executeUpdate("DELETE FROM shifts WHERE project_id = ?", projectBId)
-            executeUpdate("DELETE FROM project_locations WHERE project_id = ?", projectBId)
-            executeUpdate("DELETE FROM projects WHERE id = ?", projectBId)
-        }
-        if (shiftAId != null) {
-            executeUpdate("DELETE FROM shifts WHERE id = ?", shiftAId)
-        }
-        if (shiftBId != null) {
-            executeUpdate("DELETE FROM shifts WHERE id = ?", shiftBId)
-        }
-        if (locationAId != null) {
-            executeUpdate("DELETE FROM organization_locations WHERE location_id = ?", locationAId)
-            executeUpdate("DELETE FROM locations WHERE id = ?", locationAId)
-        }
-        if (locationBId != null) {
-            executeUpdate("DELETE FROM organization_locations WHERE location_id = ?", locationBId)
-            executeUpdate("DELETE FROM locations WHERE id = ?", locationBId)
-        }
-        if (orgBId != null && orgBId != TestPersonas.DENVER_METRO_BRANCH_ID) {
-            executeUpdate("DELETE FROM organization_users WHERE organization_id = ?", orgBId)
-            executeUpdate("DELETE FROM organization_regions WHERE organization_id = ?", orgBId)
-            executeUpdate("DELETE FROM organizations WHERE id = ?", orgBId)
-        }
-    }
-
     private void provisionTenantFixtures() {
         denverRegionId = TestPersonas.DENVER_COUNTY_REGION_ID
         denverDirector = TestPersonas.DANIEL_COUNTY_DIRECTOR
 
         orgAId = TestPersonas.DENVER_METRO_BRANCH_ID
         userA = TestPersonas.LAURA_LOCAL_MANAGER
-        projectAId = UUID.randomUUID()
-        shiftAId = UUID.randomUUID()
 
         userB = TestPersonas.URSULA_UTAH_ADMIN
-        projectBId = UUID.randomUUID()
-        shiftBId = UUID.randomUUID()
 
         // 1. Link Denver Metro Branch to Denver County Region if not already present
         dataBuilder.linkOrganizationToRegion(orgAId, denverRegionId)
@@ -112,22 +80,24 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
         dataBuilder.linkOrganizationToLocation(orgAId, locationAId)
 
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Project Alpha Denver', 'Description for Project Alpha Denver with at least twenty characters.', 'STANDARD', ?, NOW())
-        """, projectAId, orgAId, STATUS_PENDING)
-
-        executeUpdate("""
-            INSERT INTO project_locations (project_id, location_id)
-            VALUES (?, ?)
-        """, projectAId, locationAId)
+        def projectA = dataBuilder.project()
+                .forOrg(orgAId)
+                .withTitle("Project Alpha Denver")
+                .withDescription("Description for Project Alpha Denver with at least twenty characters.")
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(locA)
+                .persist()
+        projectAId = projectA.id()
 
         def startTimeA = OffsetDateTime.now().plusDays(1)
         def endTimeA = startTimeA.plusHours(2)
-        executeUpdate("""
-            INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time)
-            VALUES (?, ?, true, NULL, ?, ?)
-        """, shiftAId, projectAId, Timestamp.from(startTimeA.toInstant()), Timestamp.from(endTimeA.toInstant()))
+        def shiftA = dataBuilder.shift()
+                .forProject(projectA)
+                .asVirtual()
+                .withStartTime(startTimeA)
+                .withEndTime(endTimeA)
+                .persist()
+        shiftAId = shiftA.id()
 
         // 3. Organization Beta (Org B) in Boulder
         def locB = dataBuilder.location()
@@ -145,22 +115,24 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
                 .persist()
         orgBId = orgB.id()
 
-        executeUpdate("""
-            INSERT INTO projects (id, organization_id, title, description, project_type, status, created_at)
-            VALUES (?, ?, 'Project Beta Boulder', 'Description for Project Beta Boulder with at least twenty characters.', 'STANDARD', ?, NOW())
-        """, projectBId, orgBId, STATUS_PENDING)
-
-        executeUpdate("""
-            INSERT INTO project_locations (project_id, location_id)
-            VALUES (?, ?)
-        """, projectBId, locationBId)
+        def projectB = dataBuilder.project()
+                .forOrg(orgBId)
+                .withTitle("Project Beta Boulder")
+                .withDescription("Description for Project Beta Boulder with at least twenty characters.")
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(locB)
+                .persist()
+        projectBId = projectB.id()
 
         def startTimeB = OffsetDateTime.now().plusDays(2)
         def endTimeB = startTimeB.plusHours(2)
-        executeUpdate("""
-            INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time)
-            VALUES (?, ?, true, NULL, ?, ?)
-        """, shiftBId, projectBId, Timestamp.from(startTimeB.toInstant()), Timestamp.from(endTimeB.toInstant()))
+        def shiftB = dataBuilder.shift()
+                .forProject(projectB)
+                .asVirtual()
+                .withStartTime(startTimeB)
+                .withEndTime(endTimeB)
+                .persist()
+        shiftBId = shiftB.id()
     }
 
     private UpdateProjectCommand createUpdateProjectCommand(UUID orgId, String title, String description) {
@@ -376,6 +348,7 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
                 HttpRequest.POST(SHIFTS_PATH, command),
                 userA
         ), Shift)
+        track(response.body())
 
         then: "the response is 200 OK and shift is persisted"
         verifyAll(response) {
@@ -412,7 +385,8 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         then: "the response is 200 OK or 204 NO_CONTENT"
         verifyAll {
             response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-            sql.firstRow("SELECT COUNT(*) as count FROM shifts WHERE id = ?", [shiftAId]).count == 0
+            !shiftRepository.findById(shiftAId).isPresent()
+            !shiftRepository.existsById(shiftAId)
         }
     }
 

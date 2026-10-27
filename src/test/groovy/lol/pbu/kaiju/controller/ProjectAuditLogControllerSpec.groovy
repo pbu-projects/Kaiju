@@ -10,8 +10,10 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.ProjectAuditLog
 import lol.pbu.kaiju.fixtures.TestPersonas
+import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 
+import java.time.OffsetDateTime
 import java.util.UUID
 
 @MicronautTest(transactional = false)
@@ -23,35 +25,24 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
     @Inject
     ProjectAuditLogController projectAuditLogController
 
+    private UUID createdLogId
+
     def setup() {
-        UUID actorId = TestPersonas.SARAH_ADMIN.id
-
-        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
-        UUID projectId
-        if (projRow) {
-            projectId = projRow.id as UUID
-        } else {
-            def project = dataBuilder.project()
-                    .withTitle("Audit Test Proj")
-                    .withDescription("Test project description exceeding 20 chars")
-                    .persist()
-            projectId = project.id()
-        }
-
-        sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'CREATED')", [projectId, actorId])
-        sql.execute("INSERT INTO project_audit_logs (project_id, actor_id, action) VALUES (?, ?, 'EDITED')", [projectId, actorId])
-    }
-
-    def cleanup() {
-        sql.execute("DELETE FROM project_audit_logs WHERE action IN ('CREATED', 'EDITED')")
+        def project = dataBuilder.project()
+                .withTitle("Audit Test Proj")
+                .withDescription("Test project description exceeding 20 chars")
+                .persist()
+        def user = dataBuilder.user().asAdmin().persist()
+        def log1 = projectAuditLogRepository.save(new ProjectAuditLog(null, project, user, AuditAction.CREATED, OffsetDateTime.now()))
+        projectAuditLogRepository.save(new ProjectAuditLog(null, project, user, AuditAction.EDITED, OffsetDateTime.now()))
+        createdLogId = log1.id()
     }
 
     /********** READ Tests **********/
 
     def "READ | should retrieve an existing project audit log by ID"() {
         given: "an existing project audit log"
-        def logRow = sql.firstRow("SELECT id FROM project_audit_logs LIMIT 1")
-        UUID id = logRow.id as UUID
+        UUID id = createdLogId
 
         when: "the project audit log is requested by its ID via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/project-audit-logs/${id}")), ProjectAuditLog)
@@ -110,7 +101,7 @@ class ProjectAuditLogControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected set contains all project audit logs from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM project_audit_logs").count
+        def totalCount = projectAuditLogRepository.count()
         verifyAll {
             allLogs.size() == totalCount
             allLogs.size() >= 2
