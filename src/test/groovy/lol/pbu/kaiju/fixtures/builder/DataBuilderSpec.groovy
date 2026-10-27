@@ -1,7 +1,6 @@
 package lol.pbu.kaiju.fixtures.builder
 
 import lol.pbu.kaiju.domain.AdministrativeRegion
-import lol.pbu.kaiju.domain.Boundary
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.OrganizationUser

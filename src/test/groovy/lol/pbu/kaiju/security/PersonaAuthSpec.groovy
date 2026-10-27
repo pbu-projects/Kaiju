@@ -54,7 +54,7 @@ class PersonaAuthSpec extends Specification {
     @Inject
     DataSource dataSource
 
-    private static <T> T await(Publisher<T> publisher) {
+    static <T> T await(Publisher<T> publisher) {
         CompletableFuture<T> future = new CompletableFuture<>()
         publisher.subscribe(new Subscriber<T>() {
             @Override
@@ -77,6 +77,31 @@ class PersonaAuthSpec extends Specification {
             }
         })
         return future.get(5, TimeUnit.SECONDS)
+    }
+
+    List<Map<String, Object>> executeQuery(String sql, List<Object> params = []) {
+        List<Map<String, Object>> results = []
+        try (Connection conn = dataSource.connection;
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            params.eachWithIndex { param, idx ->
+                stmt.setObject(idx + 1, param)
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                int colCount = rs.metaData.columnCount
+                while (rs.next()) {
+                    results.add(readRow(rs, colCount))
+                }
+            }
+        }
+        return results
+    }
+
+    static Map<String, Object> readRow(ResultSet rs, int colCount) {
+        Map<String, Object> row = [:]
+        for (int i = 1; i <= colCount; i++) {
+            row[rs.metaData.getColumnLabel(i)] = rs.getObject(i)
+        }
+        return row
     }
 
     def "all 26 seeded personas exist in database with correct role"() {
@@ -294,32 +319,7 @@ class PersonaAuthSpec extends Specification {
                 TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID
         ]
 
-        Map<String, Boolean> spatialResults = [:]
-        dataSource.connection.withCloseable { conn ->
-            conn.prepareStatement(sql).withCloseable { stmt ->
-                params.eachWithIndex { param, idx ->
-                    stmt.setObject(idx + 1, param)
-                }
-                stmt.executeQuery().withCloseable { rs ->
-                    if (rs.next()) {
-                        spatialResults.denver_city_hall_inside = rs.getBoolean("denver_city_hall_inside")
-                        spatialResults.dia_inside = rs.getBoolean("dia_inside")
-                        spatialResults.lakewood_inside = rs.getBoolean("lakewood_inside")
-                        spatialResults.aurora_inside = rs.getBoolean("aurora_inside")
-                        spatialResults.cos_city_hall_inside = rs.getBoolean("cos_city_hall_inside")
-                        spatialResults.pueblo_inside = rs.getBoolean("pueblo_inside")
-                        spatialResults.cos_hall_inside_cos_city = rs.getBoolean("cos_hall_inside_cos_city")
-                        spatialResults.fountain_hall_inside_fountain = rs.getBoolean("fountain_hall_inside_fountain")
-                        spatialResults.fountain_hall_inside_cos_city = rs.getBoolean("fountain_hall_inside_cos_city")
-                        spatialResults.arapahoe_covers_aurora_hall = rs.getBoolean("arapahoe_covers_aurora_hall")
-                        spatialResults.aurora_covers_aurora_hall = rs.getBoolean("aurora_covers_aurora_hall")
-                        spatialResults.denver_covers_aurora_hall = rs.getBoolean("denver_covers_aurora_hall")
-                        spatialResults.denver_downtown_covers_16th_st_mall = rs.getBoolean("denver_downtown_covers_16th_st_mall")
-                        spatialResults.cos_downtown_covers_cos_hall = rs.getBoolean("cos_downtown_covers_cos_hall")
-                    }
-                }
-            }
-        }
+        Map<String, Object> spatialResults = executeQuery(sql, params as List<Object>).first()
 
         then: "landmarks, municipal boundaries, and downtown cores match expected containment"
         verifyAll(spatialResults) {
@@ -356,23 +356,7 @@ class PersonaAuthSpec extends Specification {
             ORDER BY name
         """.toString()
 
-        List<Map<String, Object>> rows = []
-        dataSource.connection.withCloseable { conn ->
-            conn.prepareStatement(query).withCloseable { stmt ->
-                stmt.executeQuery().withCloseable { rs ->
-                    while (rs.next()) {
-                        rows.add([
-                                id                 : rs.getObject("id", UUID),
-                                name               : rs.getString("name"),
-                                is_valid           : rs.getBoolean("is_valid"),
-                                is_axis_aligned_box: rs.getBoolean("is_axis_aligned_box"),
-                                is_oriented_box    : rs.getBoolean("is_oriented_box"),
-                                point_count        : rs.getInt("point_count")
-                        ])
-                    }
-                }
-            }
-        }
+        List<Map<String, Object>> rows = executeQuery(query)
 
         then: "all 28 seeded regions are retrieved and meet geometric validity constraints"
         verifyAll {

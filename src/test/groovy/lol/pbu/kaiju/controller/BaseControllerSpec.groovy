@@ -19,7 +19,6 @@ import java.security.Principal
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.util.Arrays
 import java.util.UUID
 
 @Property(name = "micronaut.security.enabled", value = "true")

@@ -9,7 +9,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.ProjectAuditLog
-import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 

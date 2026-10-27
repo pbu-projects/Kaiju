@@ -9,7 +9,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Location
-import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.dto.CreateShiftCommand
@@ -24,9 +23,6 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 import static java.time.temporal.ChronoUnit.SECONDS
-import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
-import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 @MicronautTest(transactional = false)
 class ShiftControllerSpec extends BaseControllerSpec {

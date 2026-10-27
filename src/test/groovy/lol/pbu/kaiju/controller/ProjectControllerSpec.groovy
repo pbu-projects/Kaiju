@@ -971,7 +971,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Approve Region")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
                 .persist()
-        def regId = region.id()
         def org = dataBuilder.organization().withName("Director Org").asPublic().verified().persist()
         dataBuilder.linkOrganizationToRegion(org, region)
 
@@ -1131,7 +1130,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Director Phys Region")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
                 .persist()
-        def regId = region.id()
         def org = dataBuilder.organization().withName("Phys Org").asPublic().persist()
         def loc = dataBuilder.location()
                 .withName("Phys Loc")
@@ -1179,7 +1177,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Director Managing Reg")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
                 .persist()
-        def regId = region.id()
         def org = dataBuilder.organization().withName("Managing Reg Org").asPublic().verified().persist()
 
         def project = dataBuilder.project()

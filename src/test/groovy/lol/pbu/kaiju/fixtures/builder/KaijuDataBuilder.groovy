@@ -474,7 +474,7 @@ class KaijuDataBuilder {
         }
     }
 
-    private DataSource getRawDataSource() {
+    DataSource getRawDataSource() {
         return DelegatingDataSource.unwrapDataSource(dataSource)
     }
 
