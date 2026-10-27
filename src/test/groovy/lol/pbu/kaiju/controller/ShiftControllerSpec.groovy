@@ -9,29 +9,32 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Location
-import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.UpdateShiftCommand
 import lol.pbu.kaiju.fixtures.TestPersonas
+import lol.pbu.kaiju.repository.LocationRepository
+import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.ShiftRepository
 import spock.lang.Unroll
 
-import java.sql.Timestamp
 import java.time.OffsetDateTime
 import java.util.UUID
 
 import static java.time.temporal.ChronoUnit.SECONDS
-import static lol.pbu.kaiju.model.ProjectStatus.DRAFT
-import static lol.pbu.kaiju.model.ProjectType.STANDARD
-import static lol.pbu.kaiju.model.VerificationStatus.UNVERIFIED
 
 @MicronautTest(transactional = false)
 class ShiftControllerSpec extends BaseControllerSpec {
 
     @Inject
     ShiftRepository shiftRepository
+
+    @Inject
+    ProjectRepository projectRepository
+
+    @Inject
+    LocationRepository locationRepository
 
     @Inject
     ShiftController shiftController
@@ -41,8 +44,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     private void ensureFixtures() {
-        def locRow = sql.firstRow("SELECT id FROM locations LIMIT 1")
-        if (!locRow) {
+        if (locationRepository.count() == 0) {
             dataBuilder.location()
                     .withName("Default Shift Loc")
                     .withAddressLine("123 Main")
@@ -53,19 +55,17 @@ class ShiftControllerSpec extends BaseControllerSpec {
                     .atPoint(-104.9903d, 39.7392d)
                     .persist()
         }
-        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
         UUID projectId
-        if (!projRow) {
+        if (projectRepository.count() == 0) {
             def project = dataBuilder.project()
                     .withTitle("Shift Test Proj")
                     .withDescription("Test project description exceeding 20 chars")
                     .persist()
             projectId = project.id()
         } else {
-            projectId = projRow.id as UUID
+            projectId = projectRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content.first().id()
         }
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        if (!shiftRow) {
+        if (shiftRepository.count() == 0) {
             dataBuilder.shift()
                     .forProject(projectId)
                     .asVirtual()
@@ -74,20 +74,42 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     private Project getRandomProject() {
-        def projectRow = sql.firstRow("SELECT id, title FROM projects LIMIT 1")
-        if (!projectRow) {
-            throw new IllegalStateException("No projects found in database to link shift to.")
+        def projects = projectRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content
+        if (projects.isEmpty()) {
+            return dataBuilder.project()
+                    .withTitle("Shift Test Proj")
+                    .withDescription("Test project description exceeding 20 chars")
+                    .persist()
         }
-        def org = new Organization(UUID.randomUUID(), "Dummy Org", null, null, true, UNVERIFIED, null, [])
-        new Project(projectRow.id as UUID, org, null, projectRow.title as String, "Desc", STANDARD, DRAFT, OffsetDateTime.now(), null, null, [], [])
+        return projects.first()
     }
 
     private Location getRandomLocation() {
-        def locationRow = sql.firstRow("SELECT id, name FROM locations LIMIT 1")
-        if (!locationRow) {
-            throw new IllegalStateException("No locations found in database to link shift to.")
+        def locs = locationRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content
+        if (locs.isEmpty()) {
+            return dataBuilder.location()
+                    .withName("Default Shift Loc")
+                    .withAddressLine("123 Main")
+                    .withCity("Denver")
+                    .withStateProvince("CO")
+                    .withPostalCode("80202")
+                    .withCountryCode("US")
+                    .atPoint(-104.9903d, 39.7392d)
+                    .persist()
         }
-        new Location(locationRow.id as UUID, locationRow.name as String, "123 St", "City", null, null, "US", null)
+        return locs.first()
+    }
+
+    private UUID getAnyShiftId() {
+        def shifts = shiftRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content
+        if (shifts.isEmpty()) {
+            def shift = dataBuilder.shift()
+                    .forProject(getRandomProject())
+                    .asVirtual()
+                    .persist()
+            return shift.id()
+        }
+        return shifts.first().id()
     }
 
     /********** CREATE Tests **********/
@@ -101,7 +123,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "the shift is added by admin via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
-        Shift saved = response.body()
+        Shift saved = track(response.body())
 
         then: "the response is 200 OK and shift is persisted with a generated ID"
         verifyAll {
@@ -113,17 +135,13 @@ class ShiftControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM shifts WHERE id = ?", [saved.id()])
+        def result = shiftRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.project().id() == project_id
-            is_virtual == true
-            location_id == null
-        }
-
-        cleanup:
-        if (saved?.id() != null) {
-            executeUpdate("DELETE FROM shifts WHERE id = ?", saved.id())
+            it != null
+            it.id() == saved.id()
+            it.project().id() == project.id()
+            it.isVirtual() == true
+            it.location() == null
         }
     }
 
@@ -137,7 +155,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "the shift is added by admin via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
-        Shift saved = response.body()
+        Shift saved = track(response.body())
 
         then: "the response is 200 OK and shift is persisted with a generated ID"
         verifyAll {
@@ -149,17 +167,13 @@ class ShiftControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM shifts WHERE id = ?", [saved.id()])
+        def result = shiftRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.project().id() == project_id
-            is_virtual == false
-            saved.location().id() == location_id
-        }
-
-        cleanup:
-        if (saved?.id() != null) {
-            executeUpdate("DELETE FROM shifts WHERE id = ?", saved.id())
+            it != null
+            it.id() == saved.id()
+            it.project().id() == project.id()
+            it.isVirtual() == false
+            it.location().id() == location.id()
         }
     }
 
@@ -175,19 +189,13 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "the org manager adds shift via HTTP POST"
         def response = client.exchange(asOrgManager(HttpRequest.POST("/shifts", command), TestPersonas.LAURA_LOCAL_MANAGER), Shift)
-        Shift saved = response.body()
+        Shift saved = track(response.body())
 
         then: "the shift is persisted with 200 OK"
         verifyAll {
             response.status == HttpStatus.OK
             saved.id() != null
         }
-
-        cleanup:
-        if (saved?.id() != null) {
-            executeUpdate("DELETE FROM shifts WHERE id = ?", saved.id())
-        }
-        executeUpdate("DELETE FROM projects WHERE id = ?", projectId)
     }
 
     def "CREATE | should throw 403 Forbidden when standard user attempts to add shift for unmanaged project"() {
@@ -252,9 +260,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "READ | should retrieve an existing shift by ID"() {
         given: "an existing shift ID from the database"
-        def firstRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert firstRow != null
-        UUID id = firstRow.id as UUID
+        UUID id = getAnyShiftId()
 
         when: "the shift is requested by its ID via HTTP GET"
         def response = client.exchange(asGlobalAdmin(HttpRequest.GET("/shifts/${id}")), Shift)
@@ -277,9 +283,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "READ | should reject unauthenticated GET /shifts/{id} with 401 UNAUTHORIZED"() {
         given: "an existing shift ID"
-        def firstRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert firstRow != null
-        UUID id = firstRow.id as UUID
+        UUID id = getAnyShiftId()
 
         when: "an unauthenticated caller requests a shift"
         client.exchange(HttpRequest.GET("/shifts/${id}"), Shift)
@@ -293,9 +297,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should successfully update an existing shift when called by admin"() {
         given: "an existing shift's details"
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert shiftRow != null
-        UUID id = shiftRow.id as UUID
+        UUID id = getAnyShiftId()
         def newStart = OffsetDateTime.now().plusDays(1)
         def newEnd = newStart.plusHours(4)
         def updateCommand = new UpdateShiftCommand(true, null, newStart, newEnd, null)
@@ -313,19 +315,17 @@ class ShiftControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT start_time, end_time FROM shifts WHERE id = ?", [id])
+        def dbResult = shiftRepository.findById(id).orElse(null)
         verifyAll {
             dbResult != null
-            ((Timestamp) dbResult.start_time).toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
-            ((Timestamp) dbResult.end_time).toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
+            dbResult.startTime().toInstant().truncatedTo(SECONDS) == newStart.toInstant().truncatedTo(SECONDS)
+            dbResult.endTime().toInstant().truncatedTo(SECONDS) == newEnd.toInstant().truncatedTo(SECONDS)
         }
     }
 
     def "UPDATE | should throw 403 Forbidden when standard user attempts to update unmanaged shift"() {
         given: "an existing shift and an unauthorized user"
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert shiftRow != null
-        UUID id = shiftRow.id as UUID
+        UUID id = getAnyShiftId()
         def updateCommand = new UpdateShiftCommand(true, null, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
 
         when: "unauthorized user attempts to update shift via HTTP PUT"
@@ -338,9 +338,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject unauthenticated PUT /shifts/{id} with 401 UNAUTHORIZED"() {
         given: "an existing shift ID and update command"
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert shiftRow != null
-        UUID id = shiftRow.id as UUID
+        UUID id = getAnyShiftId()
         def updateCommand = new UpdateShiftCommand(true, null, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
 
         when: "an unauthenticated caller attempts to update a shift"
@@ -367,9 +365,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
     @Unroll
     def "UPDATE | should throw 400 Bad Request on invalid location logic: #testCase"(String testCase, boolean isVirtual, UUID locationId) {
         given: "an existing shift and an update command with invalid location logic"
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert shiftRow != null
-        UUID id = shiftRow.id as UUID
+        UUID id = getAnyShiftId()
         def updateCommand = new UpdateShiftCommand(isVirtual, locationId, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
 
         when: "attempting to update shift via HTTP PUT"
@@ -392,7 +388,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def project = getRandomProject()
         def command = new CreateShiftCommand(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
         def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
-        UUID id = createResponse.body().id()
+        UUID id = track(createResponse.body()).id()
         assert shiftRepository.existsById(id)
 
         when: "the shift is deleted by admin via HTTP DELETE"
@@ -402,15 +398,13 @@ class ShiftControllerSpec extends BaseControllerSpec {
         verifyAll {
             response.status == HttpStatus.OK
             !shiftRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM shifts WHERE id = ?", [id]).count == 0
+            !shiftRepository.existsById(id)
         }
     }
 
     def "DELETE | should throw 403 Forbidden when standard user attempts to delete unmanaged shift"() {
         given: "an existing shift and an unauthorized user"
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert shiftRow != null
-        UUID id = shiftRow.id as UUID
+        UUID id = getAnyShiftId()
 
         when: "unauthorized user attempts to delete shift via HTTP DELETE"
         client.exchange(asVolunteer(HttpRequest.DELETE("/shifts/${id}"), TestPersonas.VICTOR_VOLUNTEER))
@@ -422,9 +416,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should reject unauthenticated DELETE /shifts/{id} with 401 UNAUTHORIZED"() {
         given: "an existing shift ID"
-        def shiftRow = sql.firstRow("SELECT id FROM shifts LIMIT 1")
-        assert shiftRow != null
-        UUID id = shiftRow.id as UUID
+        UUID id = getAnyShiftId()
 
         when: "an unauthenticated caller attempts to delete a shift"
         client.exchange(HttpRequest.DELETE("/shifts/${id}"))
@@ -450,9 +442,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "LIST | should fully drain all shifts sequentially using cursors"() {
         setup:
-        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
-        UUID projectId = projRow.id as UUID
-        while ((sql.firstRow("SELECT count(*) as count FROM shifts").count as int) < 2) {
+        UUID projectId = getRandomProject().id()
+        while (shiftRepository.count() < 2) {
             dataBuilder.shift().forProject(projectId).asVirtual().persist()
         }
         Set<Shift> allShifts = new LinkedHashSet<>()
@@ -467,7 +458,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected set contains all shifts from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM shifts").count
+        def totalCount = shiftRepository.count()
         verifyAll {
             allShifts.size() == totalCount
             allShifts.size() >= 2
@@ -476,9 +467,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "LIST | should retrieve shifts with pagination via HTTP GET"() {
         setup:
-        def projRow = sql.firstRow("SELECT id FROM projects LIMIT 1")
-        UUID projectId = projRow.id as UUID
-        while ((sql.firstRow("SELECT count(*) as count FROM shifts").count as int) < 2) {
+        UUID projectId = getRandomProject().id()
+        while (shiftRepository.count() < 2) {
             dataBuilder.shift().forProject(projectId).asVirtual().persist()
         }
 

@@ -18,6 +18,9 @@ import java.io.SequenceInputStream
 import java.net.http.HttpClient as JavaHttpClient
 import java.net.http.HttpRequest as JavaHttpRequest
 import java.net.http.HttpResponse as JavaHttpResponse
+import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.ResultSet
 import java.util.Collections
 import java.util.UUID
 
@@ -51,17 +54,19 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     def setup() {
         stubHttpClientInstance.reset()
         testRegionId = UUID.randomUUID()
-        executeUpdate("""
+        trackRegion(testRegionId)
+        String insertSql = """
             INSERT INTO administrative_regions (id, name, geom)
             VALUES (?, 'Ingestion Test Region', ST_GeographyFromText('POLYGON((-105.1 39.7, -104.9 39.7, -104.9 39.8, -105.1 39.8, -105.1 39.7))'))
-        """, testRegionId)
+        """
+        try (Connection conn = rawDataSource.connection; PreparedStatement stmt = conn.prepareStatement(insertSql)) {
+            stmt.setObject(1, testRegionId)
+            stmt.executeUpdate()
+        }
     }
 
     def cleanup() {
         stubHttpClientInstance.reset()
-        if (testRegionId) {
-            executeUpdate("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
-        }
     }
 
     def "SUCCESS | should successfully ingest, simplify, and validate boundary from authoritative TIGERweb API"() {
@@ -89,9 +94,20 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         }
 
         and: "the updated geometry in PostGIS is valid and simplified"
-        def dbRow = sql.firstRow("SELECT ST_IsValid(geom::geometry) AS is_valid, ST_NPoints(geom::geometry) AS pts FROM administrative_regions WHERE id = ?", [testRegionId])
-        verifyAll(dbRow) {
-            is_valid == true
+        boolean isValid = false
+        int pts = 0
+        String checkSql = "SELECT ST_IsValid(geom::geometry) AS is_valid, ST_NPoints(geom::geometry) AS pts FROM administrative_regions WHERE id = ?"
+        try (Connection conn = rawDataSource.connection; PreparedStatement stmt = conn.prepareStatement(checkSql)) {
+            stmt.setObject(1, testRegionId)
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    isValid = rs.getBoolean("is_valid")
+                    pts = rs.getInt("pts")
+                }
+            }
+        }
+        verifyAll {
+            isValid == true
             pts == body.simplifiedPoints()
         }
 

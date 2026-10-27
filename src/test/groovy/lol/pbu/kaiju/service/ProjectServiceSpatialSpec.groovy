@@ -6,7 +6,6 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.AdministrativeRegion
-import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
@@ -37,23 +36,6 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
 
     @Inject
     UserRepository userRepository
-
-    def cleanup() {
-        String SEEDED_ORGS = TestPersonas.SEEDED_ORGANIZATION_IDS.collect { "'${it}'" }.join(", ")
-        String SEEDED_REGIONS = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(", ")
-
-        executeUpdate("DELETE FROM shifts")
-        executeUpdate("DELETE FROM project_audit_logs")
-        executeUpdate("DELETE FROM project_locations")
-        executeUpdate("DELETE FROM projects")
-        executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORGS}) OR region_id NOT IN (${SEEDED_REGIONS})")
-        executeUpdate("DELETE FROM region_users WHERE region_id NOT IN (${SEEDED_REGIONS})")
-        executeUpdate("DELETE FROM organization_users WHERE organization_id NOT IN (${SEEDED_ORGS})")
-        executeUpdate("DELETE FROM organizations WHERE id NOT IN (${SEEDED_ORGS})")
-        executeUpdate("DELETE FROM locations")
-        executeUpdate("DELETE FROM administrative_regions WHERE id NOT IN (${SEEDED_REGIONS})")
-        executeUpdate("DELETE FROM users WHERE email LIKE '%@example.com'")
-    }
 
     def "ManagingRegion | rejects creation when managing region does not exist"() {
         given: "an organization and creator user"

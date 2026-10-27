@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.controller
 
-import groovy.sql.Sql
 import io.micronaut.context.annotation.Property
 import io.micronaut.data.connection.jdbc.advice.DelegatingDataSource
 import io.micronaut.http.MutableHttpRequest
@@ -17,6 +16,10 @@ import spock.lang.Specification
 
 import javax.sql.DataSource
 import java.security.Principal
+import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.ResultSet
+import java.util.UUID
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.oauth2.enabled", value = "false")
@@ -46,16 +49,15 @@ abstract class BaseControllerSpec extends Specification {
     @Shared
     DataSource dataSource
 
-    Sql getSql() {
-        new Sql(DelegatingDataSource.unwrapDataSource(dataSource))
-    }
-
-    protected void executeUpdate(String sqlString, Object... parameters) {
-        sql.execute(sqlString, parameters as List)
+    protected DataSource getRawDataSource() {
+        DelegatingDataSource.unwrapDataSource(dataSource)
     }
 
     protected void ensureGlobalAdmin() {
-        executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'global-admin@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
+        String sql = "INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'global-admin@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING"
+        try (Connection conn = rawDataSource.connection; PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.executeUpdate()
+        }
     }
 
     def setup() {
@@ -63,34 +65,57 @@ abstract class BaseControllerSpec extends Specification {
     }
 
     protected void cleanupDatabase() {
-        String SEEDED_USERS = TestPersonas.SEEDED_PERSONAS.collect { "'${it.id}'" }.join(", ")
-        String SEEDED_ORGS = TestPersonas.SEEDED_ORGANIZATION_IDS.collect { "'${it}'" }.join(", ")
-        String SEEDED_REGIONS = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(", ")
-
-        executeUpdate("DELETE FROM shift_signups")
-        executeUpdate("DELETE FROM shift_tags")
-        executeUpdate("DELETE FROM shifts")
-        executeUpdate("DELETE FROM project_audit_logs")
-        executeUpdate("DELETE FROM project_locations")
-        executeUpdate("DELETE FROM project_boundaries")
-        executeUpdate("DELETE FROM project_users")
-        executeUpdate("DELETE FROM projects")
-        executeUpdate("DELETE FROM organization_audit_logs")
-        executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORGS}) OR region_id NOT IN (${SEEDED_REGIONS})")
-        executeUpdate("DELETE FROM organization_locations")
-        executeUpdate("DELETE FROM region_users WHERE region_id NOT IN (${SEEDED_REGIONS})")
-        executeUpdate("DELETE FROM organization_users WHERE organization_id NOT IN (${SEEDED_ORGS})")
-        executeUpdate("DELETE FROM organizations WHERE id NOT IN (${SEEDED_ORGS})")
-        executeUpdate("DELETE FROM locations")
-        executeUpdate("DELETE FROM boundaries")
-        executeUpdate("DELETE FROM administrative_regions WHERE id NOT IN (${SEEDED_REGIONS})")
-        executeUpdate("DELETE FROM tags")
-        executeUpdate("DELETE FROM users WHERE id NOT IN (${SEEDED_USERS}) AND email != 'global-admin@example.com'")
+        dataBuilder.cleanupTrackedEntities()
         ensureGlobalAdmin()
     }
 
     def cleanup() {
-        cleanupDatabase()
+        dataBuilder.cleanupTrackedEntities()
+    }
+
+    protected <T> T track(T entity) {
+        dataBuilder.track(entity)
+        return entity
+    }
+
+    protected void trackProject(UUID id) {
+        dataBuilder.trackProject(id)
+    }
+
+    protected void trackShift(UUID id) {
+        dataBuilder.trackShift(id)
+    }
+
+    protected void trackOrganization(UUID id) {
+        dataBuilder.trackOrganization(id)
+    }
+
+    protected void trackUser(UUID id) {
+        dataBuilder.trackUser(id)
+    }
+
+    protected void trackLocation(UUID id) {
+        dataBuilder.trackLocation(id)
+    }
+
+    protected void trackRegion(UUID id) {
+        dataBuilder.trackRegion(id)
+    }
+
+    protected void trackTag(UUID id) {
+        dataBuilder.trackTag(id)
+    }
+
+    protected void trackBoundary(UUID id) {
+        dataBuilder.trackBoundary(id)
+    }
+
+    protected void trackOrganizationUser(UUID userId, UUID orgId) {
+        dataBuilder.trackOrganizationUser(userId, orgId)
+    }
+
+    protected void trackRegionUser(UUID userId, UUID regionId) {
+        dataBuilder.trackRegionUser(userId, regionId)
     }
 
     protected <T> MutableHttpRequest<T> asPersona(MutableHttpRequest<T> request, TestPersonas.Persona persona) {
@@ -114,10 +139,13 @@ abstract class BaseControllerSpec extends Specification {
 
     protected <T> MutableHttpRequest<T> authenticated(MutableHttpRequest<T> request, String userId, List<String> roles) {
         String email = null
-        try {
-            def row = sql.firstRow("SELECT email FROM users WHERE id = ?::uuid", [userId])
-            if (row != null && row.email != null) {
-                email = row.email as String
+        try (Connection conn = rawDataSource.connection;
+             PreparedStatement stmt = conn.prepareStatement("SELECT email FROM users WHERE id = ?::uuid")) {
+            stmt.setObject(1, userId)
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    email = rs.getString("email")
+                }
             }
         } catch (Exception ignored) {
         }
@@ -128,8 +156,16 @@ abstract class BaseControllerSpec extends Specification {
             } else {
                 email = "user-${userId}@kaiju.local"
                 String roleToSet = roles ? roles.find { ["GLOBAL_ADMIN", "REGION_DIRECTOR", "REGION_AGENT", "ORG_ADMIN", "ORG_MANAGER", "ORG_MEMBER", "STANDARD_USER"].contains(it) } ?: "STANDARD_USER" : "STANDARD_USER"
+                try (Connection conn = rawDataSource.connection;
+                     PreparedStatement stmt = conn.prepareStatement("INSERT INTO users (id, email, role) VALUES (?::uuid, ?, ?) ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role")) {
+                    stmt.setObject(1, userId)
+                    stmt.setString(2, email)
+                    stmt.setString(3, roleToSet)
+                    stmt.executeUpdate()
+                } catch (Exception ignored) {
+                }
                 try {
-                    executeUpdate("INSERT INTO users (id, email, role) VALUES (?::uuid, ?, ?) ON CONFLICT (id) DO UPDATE SET role = EXCLUDED.role", userId, email, roleToSet)
+                    trackUser(UUID.fromString(userId))
                 } catch (Exception ignored) {
                 }
             }

@@ -53,10 +53,6 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         ]
     }
 
-    def cleanup() {
-        sql.execute("DELETE FROM administrative_regions WHERE name LIKE 'Region %' OR name LIKE 'Test Region %' OR name LIKE 'Original Region %' OR name LIKE 'Updated Region %' OR name LIKE 'Temporary Region %'")
-    }
-
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid administrative region"() {
@@ -66,7 +62,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
 
         when: "the administrative region is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions", command)), AdministrativeRegion)
-        AdministrativeRegion saved = response.body()
+        AdministrativeRegion saved = track(response.body())
 
         then: "the administrative region is persisted with 200 OK and generated ID"
         verifyAll {
@@ -77,10 +73,11 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM administrative_regions WHERE id = ?", [saved.id()])
+        def result = administrativeRegionRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.name() == name
+            result != null
+            id() == saved.id()
+            name() == saved.name()
         }
     }
 
@@ -175,9 +172,10 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT name FROM administrative_regions WHERE id = ?", [id])
+        def dbResult = administrativeRegionRepository.findById(id).orElse(null)
         verifyAll(dbResult) {
-            name == newName
+            dbResult != null
+            name() == newName
         }
     }
 
@@ -239,7 +237,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         verifyAll {
             response.status == HttpStatus.OK
             !administrativeRegionRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM administrative_regions WHERE id = ?", [id]).count == 0
+            !administrativeRegionRepository.existsById(id)
         }
     }
 

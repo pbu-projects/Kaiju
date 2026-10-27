@@ -12,14 +12,16 @@ class BoundaryBuilder {
 
     private final BoundaryRepository boundaryRepository
     private final GeometryFactory geometryFactory
+    private final KaijuDataBuilder dataBuilder
 
     private UUID id
     private String name
     private Geometry geom
 
-    BoundaryBuilder(BoundaryRepository boundaryRepository, GeometryFactory geometryFactory) {
+    BoundaryBuilder(BoundaryRepository boundaryRepository, GeometryFactory geometryFactory, KaijuDataBuilder dataBuilder = null) {
         this.boundaryRepository = boundaryRepository
         this.geometryFactory = geometryFactory
+        this.dataBuilder = dataBuilder
     }
 
     BoundaryBuilder withName(String name) {
@@ -48,7 +50,9 @@ class BoundaryBuilder {
 
     Boundary persist() {
         assert boundaryRepository != null : "Cannot persist boundary without a BoundaryRepository"
-        return boundaryRepository.save(build())
+        Boundary saved = boundaryRepository.save(build())
+        dataBuilder?.trackBoundary(saved.id())
+        return saved
     }
 
     private Geometry defaultPolygon() {

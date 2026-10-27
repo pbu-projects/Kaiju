@@ -37,57 +37,6 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     @Shared
     Faker faker = new Faker()
 
-    @Shared
-    List<UUID> createdUserIds = []
-
-    def cleanup() {
-        executeUpdate("DELETE FROM organization_locations")
-        executeUpdate("DELETE FROM organization_regions")
-        createdUserIds.each { id ->
-            try {
-                executeUpdate("DELETE FROM organization_users WHERE user_id = ?", id)
-                executeUpdate("DELETE FROM users WHERE id = ?", id)
-            } catch (Exception ignored) {
-            }
-        }
-        createdUserIds.clear()
-        sql.execute("""
-            DELETE FROM organizations 
-            WHERE name LIKE '%Salvation Army%' 
-               OR name LIKE '%Shelter%' 
-               OR name LIKE '%Charity Org%' 
-               OR name LIKE '%Wildcard%' 
-               OR name LIKE '%Volunteer Initiative%' 
-               OR name LIKE 'Special%' 
-               OR name LIKE 'Org Near%' 
-               OR name LIKE 'Org Mid%' 
-               OR name LIKE 'Org Far%' 
-               OR name LIKE '%Food Bank%' 
-               OR name LIKE 'Paging Test Org%' 
-               OR name LIKE '%Organization Example%' 
-               OR name LIKE '%Better Tomorrow%' 
-               OR name LIKE 'Test Org%' 
-               OR name LIKE 'Original%' 
-               OR name LIKE 'Updated%' 
-               OR name LIKE 'Temporary%' 
-               OR name LIKE 'Auth Org%' 
-               OR name LIKE 'Delete Auth Org%' 
-               OR name LIKE 'Allowed Org%' 
-               OR name LIKE 'Std Org%' 
-               OR name LIKE 'Std Del Org%' 
-               OR name LIKE 'Hacked%' 
-               OR name LIKE 'Valid Org%' 
-               OR name LIKE 'Valid Name%' 
-               OR name LIKE 'Red Cross%'
-        """ as String)
-        sql.execute("DELETE FROM locations WHERE name IN ('Loc Near', 'Loc Mid', 'Loc Far', 'Loc Pub', 'Loc Priv', 'Paging Test Loc')" as String)
-        sql.execute("DELETE FROM administrative_regions WHERE name IN ('Colorado Region', 'Utah Region', 'Test Region Private', 'Paging Region')" as String)
-    }
-
-    def setup() {
-        cleanup()
-    }
-
     static class PageResponse<T> {
         List<T> content = []
         int totalSize
@@ -185,7 +134,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
         when: "the organization is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
-        Organization saved = response.body()
+        Organization saved = track(response.body())
 
         then: "the organization is persisted with a generated ID"
         verifyAll {
@@ -196,11 +145,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM organizations WHERE id = ?", [saved.id()])
+        def result = organizationRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.name() == name
-            saved.websiteUrl() == website_url
+            result != null
+            id() == saved.id()
+            name() == command.name()
+            websiteUrl() == command.websiteUrl()
         }
     }
 
@@ -272,10 +222,11 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT name, website_url FROM organizations WHERE id = ?", [id])
+        def dbResult = organizationRepository.findById(id).orElse(null)
         verifyAll(dbResult) {
-            name == newName
-            website_url == newUrl
+            dbResult != null
+            name() == newName
+            websiteUrl() == newUrl
         }
     }
 
@@ -357,7 +308,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         verifyAll {
             response.status == HttpStatus.OK
             !organizationRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM organizations WHERE id = ?", [id]).count == 0
+            !organizationRepository.existsById(id)
         }
     }
 
@@ -392,7 +343,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected set contains all organizations from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM organizations").count
+        def totalCount = organizationRepository.count()
         verifyAll {
             allOrgs.size() == totalCount
             allOrgs.size() >= 2
@@ -1182,9 +1133,5 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             delResponse.status == HttpStatus.OK
             !organizationRepository.findById(org.id()).isPresent()
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM organization_users WHERE organization_id = ?", org.id())
-        executeUpdate("DELETE FROM organizations WHERE id = ?", org.id())
     }
 }

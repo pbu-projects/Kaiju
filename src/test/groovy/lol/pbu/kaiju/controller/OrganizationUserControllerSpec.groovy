@@ -42,7 +42,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
                 asOrgAdmin(HttpRequest.POST("/organization-users", command), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
-        OrganizationUser saved = response.body()
+        OrganizationUser saved = track(response.body())
 
         then: "200 OK is returned and record is persisted"
         verifyAll {
@@ -53,11 +53,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT role FROM organization_users WHERE user_id = ? AND organization_id = ?", [userId, orgId])
-        result.role == 'ORG_ADMIN'
-
-        cleanup:
-        executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", userId, orgId)
+        def result = organizationUserRepository.findById(saved.id()).orElse(null)
+        verifyAll(result) {
+            result != null
+            role() == OrganizationUserRole.ORG_ADMIN
+        }
     }
 
     def "CREATE | should throw 403 Forbidden when standard user attempts to add org user"() {
@@ -164,8 +164,8 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         }
 
         and: "persisted in the database"
-        def role = sql.firstRow("SELECT role FROM organization_users WHERE user_id = ? AND organization_id = ?", [userId, orgId]).role
-        role == 'ORG_ADMIN'
+        def role = organizationUserRepository.findById(new OrganizationUserId(userId, orgId)).orElse(null)?.role()
+        role == OrganizationUserRole.ORG_ADMIN
 
         cleanup:
         organizationUserRepository.update(dataBuilder.organizationUser().asOrgMember(userId, orgId).build())
@@ -230,9 +230,6 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
             response.status == HttpStatus.OK
             !organizationUserRepository.findById(new OrganizationUserId(userId, orgId)).isPresent()
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM organization_users WHERE user_id = ? AND organization_id = ?", userId, orgId)
     }
 
     def "DELETE | should throw 403 Forbidden when standard user attempts to delete org user"() {
@@ -300,7 +297,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected size matches the DB count"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM organization_users").count
+        def totalCount = organizationUserRepository.count()
         allOrgUsers.size() == totalCount
     }
 }

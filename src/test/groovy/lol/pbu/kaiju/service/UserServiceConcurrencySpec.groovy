@@ -19,17 +19,13 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
     @Inject
     UserRepository userRepository
 
-    def cleanup() {
-        executeUpdate("DELETE FROM users WHERE email LIKE 'concurrent-%@example.com' OR email LIKE 'canonical-%@example.com'")
-    }
-
     def "JIT Provisioning | canonicalizes mixed-case and untrimmed email"() {
         given: "a mixed-case and untrimmed email"
         def rawEmail = "   Canonical-${UUID.randomUUID()}@EXAMPLE.COM   "
         def canonicalEmail = rawEmail.toLowerCase(Locale.ROOT).trim()
 
         when: "provisioning with untrimmed mixed-case email"
-        def user1 = userService.provisionOrGetUser(rawEmail)
+        def user1 = track(userService.provisionOrGetUser(rawEmail))
 
         and: "retrieving with canonical lowercase email"
         def user2 = userService.provisionOrGetUser(canonicalEmail)
@@ -55,6 +51,7 @@ class UserServiceConcurrencySpec extends BaseControllerSpec {
         }
         List<Future<User>> futures = executor.invokeAll(tasks)
         List<User> results = futures.collect { it.get() }
+        track(results[0])
 
         then: "all tasks succeed and return the exact same user ID"
         def firstUserId = results[0].id()

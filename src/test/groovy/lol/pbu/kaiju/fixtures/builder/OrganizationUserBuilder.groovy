@@ -13,13 +13,15 @@ import java.util.UUID
 class OrganizationUserBuilder {
 
     private final OrganizationUserRepository organizationUserRepository
+    private final KaijuDataBuilder dataBuilder
 
     private UUID userId
     private UUID organizationId
     private OrganizationUserRole role = OrganizationUserRole.ORG_MEMBER
 
-    OrganizationUserBuilder(OrganizationUserRepository organizationUserRepository) {
+    OrganizationUserBuilder(OrganizationUserRepository organizationUserRepository, KaijuDataBuilder dataBuilder = null) {
         this.organizationUserRepository = organizationUserRepository
+        this.dataBuilder = dataBuilder
     }
 
     OrganizationUserBuilder asOrgAdmin(Object user = null, Object org = null) {
@@ -117,6 +119,8 @@ class OrganizationUserBuilder {
 
     OrganizationUser persist() {
         assert organizationUserRepository != null : "Cannot persist organization user without an OrganizationUserRepository"
-        return organizationUserRepository.save(build())
+        OrganizationUser saved = organizationUserRepository.save(build())
+        dataBuilder?.trackOrganizationUser(saved.id().userId(), saved.id().organizationId())
+        return saved
     }
 }

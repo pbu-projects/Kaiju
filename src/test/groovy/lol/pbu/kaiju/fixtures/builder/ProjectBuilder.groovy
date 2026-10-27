@@ -221,6 +221,7 @@ class ProjectBuilder {
                 []
         )
         Project saved = projectRepository.save(toSave)
+        dataBuilder?.trackProject(saved.id())
 
         if (!locations.isEmpty()) {
             assert dataBuilder != null : "Cannot persist project locations without a KaijuDataBuilder instance"

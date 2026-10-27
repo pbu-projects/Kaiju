@@ -135,6 +135,7 @@ class OrganizationBuilder {
                 []
         )
         Organization saved = organizationRepository.save(orgToSave)
+        dataBuilder?.trackOrganization(saved.id())
         if (!locations.isEmpty()) {
             assert dataBuilder != null : "Cannot persist organization locations without a KaijuDataBuilder instance"
             locations.each { loc ->

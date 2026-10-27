@@ -14,6 +14,7 @@ class RegionBuilder {
     private final AdministrativeRegionRepository regionRepository
     private final GeometryFactory geometryFactory
     private final Faker faker
+    private final KaijuDataBuilder dataBuilder
 
     private UUID id
     private String name
@@ -23,11 +24,13 @@ class RegionBuilder {
     RegionBuilder(
             AdministrativeRegionRepository regionRepository,
             GeometryFactory geometryFactory,
-            Faker faker
+            Faker faker,
+            KaijuDataBuilder dataBuilder = null
     ) {
         this.regionRepository = regionRepository
         this.geometryFactory = geometryFactory
         this.faker = faker
+        this.dataBuilder = dataBuilder
     }
 
     RegionBuilder withName(String name) {
@@ -66,7 +69,9 @@ class RegionBuilder {
 
     AdministrativeRegion persist() {
         assert regionRepository != null : "Cannot persist region without an AdministrativeRegionRepository"
-        return regionRepository.save(build())
+        AdministrativeRegion saved = regionRepository.save(build())
+        dataBuilder?.trackRegion(saved.id())
+        return saved
     }
 
     private Geometry defaultPolygon() {

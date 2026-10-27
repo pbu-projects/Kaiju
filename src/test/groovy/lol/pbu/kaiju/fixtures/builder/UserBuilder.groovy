@@ -12,15 +12,17 @@ class UserBuilder {
 
     private final UserRepository userRepository
     private final Faker faker
+    private final KaijuDataBuilder dataBuilder
 
     private UUID id
     private String email
     private UserRole role = UserRole.STANDARD_USER
     private OffsetDateTime createdAt
 
-    UserBuilder(UserRepository userRepository, Faker faker) {
+    UserBuilder(UserRepository userRepository, Faker faker, KaijuDataBuilder dataBuilder = null) {
         this.userRepository = userRepository
         this.faker = faker
+        this.dataBuilder = dataBuilder
     }
 
     UserBuilder asAdmin() {
@@ -79,7 +81,9 @@ class UserBuilder {
 
     User persist() {
         assert userRepository != null : "Cannot persist user without a UserRepository"
-        return userRepository.save(build())
+        User saved = userRepository.save(build())
+        dataBuilder?.trackUser(saved.id())
+        return saved
     }
 
     private String generateEmail() {

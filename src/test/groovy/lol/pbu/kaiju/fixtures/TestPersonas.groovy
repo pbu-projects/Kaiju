@@ -393,7 +393,11 @@ class TestPersonas {
             JENNY_NEW
     )
 
+    static final UUID GLOBAL_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000000")
+
     static final List<Persona> SEEDED_PERSONAS = ALL_PERSONAS.findAll { it.isSeededInDb }
+
+    static final List<UUID> SEEDED_PERSONA_IDS = SEEDED_PERSONAS.collect { it.id }.asImmutable()
 
     static Persona findByEmail(String email) {
         ALL_PERSONAS.find { it.email.equalsIgnoreCase(email) }

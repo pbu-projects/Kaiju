@@ -165,6 +165,7 @@ class ShiftBuilder {
                 []
         )
         Shift saved = shiftRepository.save(toSave)
+        dataBuilder?.trackShift(saved.id())
 
         if (capacity != null && dataBuilder != null) {
             dataBuilder.updateShiftCapacity(saved.id(), capacity)

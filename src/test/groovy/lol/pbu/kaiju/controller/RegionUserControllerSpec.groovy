@@ -42,7 +42,7 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
         when: "the region user is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/region-users", command)), RegionUser)
-        RegionUser saved = response.body()
+        RegionUser saved = track(response.body())
 
         then: "200 OK is returned and record is persisted"
         verifyAll {
@@ -53,13 +53,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [userId, regionId])
-        result.role == 'REGION_DIRECTOR'
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", userId, regionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", regionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", userId)
+        def result = regionUserRepository.findById(saved.id()).orElse(null)
+        verifyAll(result) {
+            result != null
+            role() == RegionUserRole.REGION_DIRECTOR
+        }
     }
 
     @Unroll
@@ -123,7 +121,7 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
         when: "the regional director creates the region user via HTTP POST"
         def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command), directorId.toString()), RegionUser)
-        RegionUser saved = response.body()
+        RegionUser saved = track(response.body())
 
         then: "200 OK is returned and record is persisted"
         verifyAll {
@@ -134,13 +132,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [targetUserId, targetRegionId])
-        result.role == 'REGION_AGENT'
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", targetRegionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", targetUserId)
+        def result = regionUserRepository.findById(saved.id()).orElse(null)
+        verifyAll(result) {
+            result != null
+            role() == RegionUserRole.REGION_AGENT
+        }
     }
 
     /********** READ Tests **********/
@@ -164,11 +160,6 @@ class RegionUserControllerSpec extends BaseControllerSpec {
             result.id().regionId() == regionId
             result.role() == RegionUserRole.REGION_DIRECTOR
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", userId, regionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", regionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", userId)
     }
 
     def "READ | should return 404 for a non-existent composite ID"() {
@@ -212,13 +203,8 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
 
         and: "persisted in the database"
-        def role = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [userId, regionId]).role
-        role == 'REGION_DIRECTOR'
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", userId, regionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", regionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", userId)
+        def role = regionUserRepository.findById(new RegionUserId(userId, regionId)).orElse(null)?.role()
+        role == RegionUserRole.REGION_DIRECTOR
     }
 
     def "UPDATE | should fail to update a non-existent region user"() {
@@ -291,13 +277,8 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
 
         and: "persisted in the database"
-        def role = sql.firstRow("SELECT role FROM region_users WHERE user_id = ? AND region_id = ?", [targetUserId, targetRegionId]).role
-        role == 'REGION_DIRECTOR'
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", targetRegionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", targetUserId)
+        def role = regionUserRepository.findById(new RegionUserId(targetUserId, targetRegionId)).orElse(null)?.role()
+        role == RegionUserRole.REGION_DIRECTOR
     }
 
     /********** DELETE Tests **********/
@@ -318,11 +299,6 @@ class RegionUserControllerSpec extends BaseControllerSpec {
             response.status == HttpStatus.OK
             !regionUserRepository.existsById(new RegionUserId(userId, regionId))
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", userId, regionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", regionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", userId)
     }
 
     def "DELETE | should fail to delete a non-existent region user"() {
@@ -382,11 +358,6 @@ class RegionUserControllerSpec extends BaseControllerSpec {
             response.status == HttpStatus.OK
             !regionUserRepository.existsById(new RegionUserId(targetUserId, targetRegionId))
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", targetUserId, targetRegionId)
-        executeUpdate("DELETE FROM administrative_regions WHERE id = ?", targetRegionId)
-        executeUpdate("DELETE FROM users WHERE id = ?", targetUserId)
     }
 
     /********** LIST Tests **********/
@@ -417,7 +388,7 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected size matches the DB count"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM region_users").count
+        def totalCount = regionUserRepository.count()
         allRegionUsers.size() == totalCount
     }
 }

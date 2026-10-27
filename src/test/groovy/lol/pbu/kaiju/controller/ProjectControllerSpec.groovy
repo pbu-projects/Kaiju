@@ -18,6 +18,7 @@ import lol.pbu.kaiju.dto.ProjectBoundaryCommand
 import lol.pbu.kaiju.dto.ProjectLocationCommand
 import lol.pbu.kaiju.dto.UpdateProjectCommand
 import lol.pbu.kaiju.fixtures.TestPersonas
+import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
@@ -70,35 +71,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     @Shared
     String adminId = TestPersonas.SARAH_ADMIN.id.toString()
-
-    def setupSpec() {
-        executeUpdate("INSERT INTO users (id, email, role) VALUES ('00000000-0000-0000-0000-000000000000', 'test-principal@example.com', 'GLOBAL_ADMIN') ON CONFLICT DO NOTHING")
-    }
-
-    private static final String SEEDED_REGION_IDS = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(', ')
-    private static final String SEEDED_ORG_IDS = TestPersonas.SEEDED_ORGANIZATION_IDS.collect { "'${it}'" }.join(', ')
-    private static final String SEEDED_USER_IDS = TestPersonas.SEEDED_PERSONAS.collect { "'${it.id}'" }.join(', ')
-
-    def cleanup() {
-        executeUpdate("DELETE FROM shift_tags")
-        executeUpdate("DELETE FROM shifts")
-        executeUpdate("DELETE FROM project_audit_logs")
-        executeUpdate("DELETE FROM project_locations")
-        executeUpdate("DELETE FROM project_boundaries")
-        executeUpdate("DELETE FROM project_users")
-        executeUpdate("DELETE FROM projects")
-        executeUpdate("DELETE FROM organization_regions WHERE organization_id NOT IN (${SEEDED_ORG_IDS})")
-        executeUpdate("DELETE FROM organization_users WHERE user_id NOT IN (${SEEDED_USER_IDS}) OR organization_id NOT IN (${SEEDED_ORG_IDS})")
-        executeUpdate("DELETE FROM region_users WHERE user_id NOT IN (${SEEDED_USER_IDS}) OR region_id NOT IN (${SEEDED_REGION_IDS})")
-        executeUpdate("DELETE FROM locations WHERE name LIKE '%Loc%' OR name LIKE '%St%' OR address_line LIKE '%St%' OR city = 'Denver' OR city = 'Boulder' OR city = 'Toronto' OR city = 'Colo Springs'")
-        executeUpdate("DELETE FROM administrative_regions WHERE id NOT IN (${SEEDED_REGION_IDS})")
-        executeUpdate("DELETE FROM organizations WHERE (name LIKE '%Org%' OR name LIKE '%Denver%' OR name LIKE '%Boulder%' OR name LIKE '%Default%' OR name LIKE '%Test%') AND id NOT IN (${SEEDED_ORG_IDS})")
-        executeUpdate("DELETE FROM users WHERE email LIKE '%@example.com' AND id != '00000000-0000-0000-0000-000000000000' AND id NOT IN (${SEEDED_USER_IDS})")
-    }
-
-    def setup() {
-        cleanup()
-    }
 
     private Organization getRandomOrganization() {
         return dataBuilder.organization().persist()
@@ -169,7 +141,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         when: "the project is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
-        Project saved = response.body()
+        Project saved = track(response.body())
 
         then: "the project is persisted with 200 OK and a generated ID"
         verifyAll {
@@ -182,11 +154,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM projects WHERE id = ?", [saved.id()])
+        def result = projectRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.title() == title
-            saved.description() == description
+            result != null
+            id() == saved.id()
+            title() == command.title()
+            description() == command.description()
         }
     }
 
@@ -225,7 +198,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         when: "submitting the project via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
-        Project saved = response.body()
+        Project saved = track(response.body())
 
         then: "the project is persisted with generated ID"
         verifyAll {
@@ -331,7 +304,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project created via HTTP"
         def org = getRandomOrganization()
         def command = createProjectCommand(org.id(), "Test Project Read")
-        Project created = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
+        Project created = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
         UUID id = created.id()
 
         when: "the project is requested by its ID via HTTP GET"
@@ -361,7 +334,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def org = getRandomOrganization()
         def targetTitle = "Searchable Title ${faker.number().digits(5)}"
         def command = createProjectCommand(org.id(), targetTitle)
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
 
         when: "projects are searched by this title via HTTP GET"
         def uri = UriBuilder.of("/projects").queryParam("title", targetTitle).build().toString()
@@ -382,7 +355,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project"
         def org = getRandomOrganization()
         def createCmd = createProjectCommand(org.id(), "Original Project Title", "Original Description with plenty of words to exceed 20 characters.", STANDARD, DRAFT)
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
         UUID id = saved.id()
 
         def newTitle = "Updated ${faker.book().title()}"
@@ -403,11 +376,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         and: "the changes are persisted in the database"
-        def dbResult = sql.firstRow("SELECT title, description, status FROM projects WHERE id = ?", [id])
+        def dbResult = projectRepository.findById(id).orElse(null)
         verifyAll(dbResult) {
-            title == newTitle
-            description == newDescription
-            status == 'DRAFT'
+            dbResult != null
+            title() == newTitle
+            description() == newDescription
+            status() == DRAFT
         }
     }
 
@@ -429,7 +403,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project"
         def org = getRandomOrganization()
         def createCmd = createProjectCommand(org.id(), "Project Before Empty Boundary Update")
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         and: "an update command with empty boundaries"
         def updateCmd = new UpdateProjectCommand(
@@ -454,7 +428,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project"
         def org = getRandomOrganization()
         def createCmd = createProjectCommand(org.id(), "Project Before Short Desc Update")
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         and: "an update command with description under 20 characters"
         def updateCmd = new UpdateProjectCommand(
@@ -501,10 +475,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
 
         and: "the project in the database remains assigned to Org A"
-        def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
+        def projectInDb = projectRepository.findById(projectId).orElse(null)
         verifyAll(projectInDb) {
-            organization_id == orgAId
-            title == 'Project in Org A'
+            projectInDb != null
+            organization().id() == orgAId
+            title() == 'Project in Org A'
         }
     }
 
@@ -537,10 +512,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         and: "the database reflects the updated fields while organization remains Org A"
-        def projectInDb = sql.firstRow("SELECT organization_id, title, description FROM projects WHERE id = ?", [projectId])
-        verifyAll(projectInDb) {
-            organization_id == orgAId
-            title == "Legit Updated Title"
+        def projectInDb2 = projectRepository.findById(projectId).orElse(null)
+        verifyAll(projectInDb2) {
+            projectInDb2 != null
+            organization().id() == orgAId
+            title() == "Legit Updated Title"
         }
     }
 
@@ -575,10 +551,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         and: "the project is reassigned to Org B in the database"
-        def projectInDb = sql.firstRow("SELECT organization_id, title FROM projects WHERE id = ?", [projectId])
-        verifyAll(projectInDb) {
-            organization_id == orgBId
-            title == "Admin Updated Title"
+        def projectInDb3 = projectRepository.findById(projectId).orElse(null)
+        verifyAll(projectInDb3) {
+            projectInDb3 != null
+            organization().id() == orgBId
+            title() == "Admin Updated Title"
         }
     }
 
@@ -613,9 +590,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
 
         and: "the project remains assigned to Org A in the database"
-        def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
-        verifyAll {
-            projectInDb.organization_id == orgA.id()
+        def projectInDb4 = projectRepository.findById(projectId).orElse(null)
+        verifyAll(projectInDb4) {
+            projectInDb4 != null
+            organization().id() == orgA.id()
         }
     }
 
@@ -646,8 +624,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
 
         and: "the project in DB remains assigned to Org A"
-        def projectInDb = sql.firstRow("SELECT organization_id FROM projects WHERE id = ?", [projectId])
-        projectInDb.organization_id == orgAId
+        def projectInDb5 = projectRepository.findById(projectId).orElse(null)
+        verifyAll(projectInDb5) {
+            projectInDb5 != null
+            organization().id() == orgAId
+        }
     }
 
     def "UPDATE | should demote ACTIVE project status to PENDING when location is updated outside boundary"() {
@@ -705,10 +686,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         and: "the status in database is PENDING"
-        def projectInDb = sql.firstRow("SELECT status, title FROM projects WHERE id = ?", [projectId])
-        verifyAll(projectInDb) {
-            status == 'PENDING'
-            title == "Updated Active Project"
+        def projectInDb6 = projectRepository.findById(projectId).orElse(null)
+        verifyAll(projectInDb6) {
+            projectInDb6 != null
+            status() == PENDING
+            title() == "Updated Active Project"
         }
     }
 
@@ -718,7 +700,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a new project created via HTTP"
         def org = getRandomOrganization()
         def command = createProjectCommand(org.id(), "Temporary Project to Delete")
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
         UUID id = saved.id()
 
         when: "the project is deleted via HTTP DELETE"
@@ -728,7 +710,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         verifyAll {
             response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
             !projectRepository.findById(id).isPresent()
-            sql.firstRow("SELECT count(*) as count FROM projects WHERE id = ?", [id]).count == 0
+            !projectRepository.existsById(id)
         }
     }
 
@@ -973,8 +955,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         and: "the status is persisted in the database"
-        def inDb = sql.firstRow("SELECT status FROM projects WHERE id = ?", [projId])
-        inDb.status == 'ACTIVE'
+        projectRepository.findById(projId).orElse(null)?.status() == ACTIVE
     }
 
     def "APPROVE | should allow REGION_DIRECTOR to approve a virtual project when org is in their region"() {
@@ -990,7 +971,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Approve Region")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
                 .persist()
-        def regId = region.id()
         def org = dataBuilder.organization().withName("Director Org").asPublic().verified().persist()
         dataBuilder.linkOrganizationToRegion(org, region)
 
@@ -1016,9 +996,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
             approved.id() == projId
             approved.status() == ACTIVE
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
     }
 
     def "APPROVE | should reject REGION_AGENT approval of virtual project with 403 Forbidden"() {
@@ -1130,12 +1107,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projId}/status", "")), Project)
 
         then: "a project_audit_logs record is written"
-        def auditRow = sql.firstRow("SELECT action, actor_id FROM project_audit_logs WHERE project_id = ?", [projId])
+        def auditLog = projectAuditLogRepository.findAll(CursoredPageable.from(100, Sort.of(Sort.Order.asc("id")))).content.find { it.project().id() == projId }
+        AuditAction auditAction = auditLog?.action()
+        UUID auditActorId = auditLog?.actor()?.id()
         verifyAll {
             response.status == HttpStatus.OK
-            auditRow != null
-            auditRow.action == 'APPROVED'
-            auditRow.actor_id == UUID.fromString(adminId)
+            auditAction == AuditAction.APPROVED
+            auditActorId == UUID.fromString(adminId)
         }
     }
 
@@ -1152,7 +1130,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Director Phys Region")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
                 .persist()
-        def regId = region.id()
         def org = dataBuilder.organization().withName("Phys Org").asPublic().persist()
         def loc = dataBuilder.location()
                 .withName("Phys Loc")
@@ -1185,9 +1162,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
             approved.id() == projId
             approved.status() == ACTIVE
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
     }
 
     def "APPROVE | should allow REGION_DIRECTOR to approve virtual project assigned via managing_region_id"() {
@@ -1203,7 +1177,6 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withName("Director Managing Reg")
                 .withGeometry(dataBuilder.geometryFactory.createPolygon(regionCoords))
                 .persist()
-        def regId = region.id()
         def org = dataBuilder.organization().withName("Managing Reg Org").asPublic().verified().persist()
 
         def project = dataBuilder.project()
@@ -1229,16 +1202,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
             approved.id() == projId
             approved.status() == ACTIVE
         }
-
-        cleanup:
-        executeUpdate("DELETE FROM region_users WHERE user_id = ? AND region_id = ?", TestPersonas.DANIEL_COUNTY_DIRECTOR.id, regId)
     }
 
     def "APPROVE | should reject approval of DRAFT project with 400 Bad Request"() {
         given: "a project in DRAFT status"
         def org = getRandomOrganization()
         def command = createProjectCommand(org.id(), "Draft Approval Project", "Description with at least twenty characters here.", STANDARD, DRAFT)
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
 
         when: "attempting to approve the draft project via HTTP PUT"
         client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}/status", "")), Project)
@@ -1280,7 +1250,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "a PENDING project"
         def org = getRandomOrganization()
         def command = createProjectCommand(org.id(), "Actor 404 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
 
         when: "calling approveProject directly with a principal UUID that is not in the users table"
         def nonExistentUserId = UUID.randomUUID()
@@ -1394,7 +1364,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         when: "submitting virtual project with global admin via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
-        Project saved = response.body()
+        Project saved = track(response.body())
 
         then: "project is saved and managingRegion is set"
         verifyAll {
@@ -1423,7 +1393,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         def inLoc = new ProjectLocationCommand("In Loc", "123 St", "Denver", null, null, "US", -104.9, 39.7)
         def createCmd = createProjectCommand(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [inLoc])
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "updating the project with locations outside the managing region without modifying managingRegion"
         def outLoc = new ProjectLocationCommand("Out Loc", "123 St", "Boulder", null, null, "US", -106.0, 41.0)
@@ -1455,7 +1425,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def foreignRegionId = foreignRegion.id()
 
         def createCmd = createProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT)
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "the Org Manager attempts to assign a foreign region not linked to their organization via HTTP PUT"
         def updateCmd = updateProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, foreignRegionId)
@@ -1486,7 +1456,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         def createCmd = createProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, DRAFT, regBId)
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "the Org Manager attempts to unassign the managingRegion via HTTP PUT"
         def updateCmd = updateProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, null)
@@ -1518,7 +1488,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         def createCmd = createProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "the Org Manager updates the project setting managingRegion to null via HTTP PUT"
         def updateCmd = updateProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, null)
@@ -1526,11 +1496,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "managingRegion is successfully unassigned"
-        def dbRow = sql.firstRow("SELECT managing_region_id FROM projects WHERE id = ?", [saved.id()])
+        def dbRow = projectRepository.findById(saved.id()).orElse(null)
         verifyAll {
             response.status == HttpStatus.OK
             updated.managingRegion() == null
-            dbRow.managing_region_id == null
+            dbRow != null
+            dbRow.managingRegion() == null
         }
     }
 
@@ -1571,8 +1542,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         and: "an ACTIVE project under Denver Org with a location in Denver"
         def denverLoc = new ProjectLocationCommand("Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
         def createCmd = createProjectCommand(orgAId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
-        executeUpdate("UPDATE projects SET status = 'ACTIVE' WHERE id = ?", saved.id())
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        dataBuilder.updateProjectStatus(saved.id(), ACTIVE)
 
         when: "a Global Admin reassigns the active Denver project to Boulder Org via HTTP PUT"
         def updateCmd = updateProjectCommand(orgBId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
@@ -1580,12 +1551,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "the status is automatically demoted to PENDING for regional review"
-        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [saved.id()])
+        def row = projectRepository.findById(saved.id()).orElse(null)
         verifyAll {
             response.status == HttpStatus.OK
             updated.status() == PENDING
-            row.status == 'PENDING'
-            row.organization_id == orgBId
+            row != null
+            row.status() == PENDING
+            row.organization().id() == orgBId
         }
     }
 
@@ -1614,8 +1586,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         and: "an ACTIVE project in Org Alpha"
         def denverLoc = new ProjectLocationCommand("Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
         def createCmd = createProjectCommand(org1Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
-        executeUpdate("UPDATE projects SET status = 'ACTIVE' WHERE id = ?", saved.id())
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        dataBuilder.updateProjectStatus(saved.id(), ACTIVE)
 
         when: "reassigning to Org Beta which also encloses the location via HTTP PUT"
         def updateCmd = updateProjectCommand(org2Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
@@ -1623,12 +1595,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         Project updated = response.body()
 
         then: "status is preserved as ACTIVE"
-        def row = sql.firstRow("SELECT status, organization_id FROM projects WHERE id = ?", [saved.id()])
+        def row = projectRepository.findById(saved.id()).orElse(null)
         verifyAll {
             response.status == HttpStatus.OK
             updated.status() == ACTIVE
-            row.status == 'ACTIVE'
-            row.organization_id == org2Id
+            row != null
+            row.status() == ACTIVE
+            row.organization().id() == org2Id
         }
     }
 
@@ -1636,7 +1609,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project and an unaffiliated standard user"
         def org = getRandomOrganization()
         def createCmd = createProjectCommand(org.id(), "Protected Project", "Description with at least twenty characters here.")
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "unaffiliated user attempts to update the project via HTTP PUT"
         def updateCmd = updateProjectCommand(org.id(), "Tampered Title", "Description with at least twenty characters here.")
@@ -1651,7 +1624,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project and an unaffiliated standard user"
         def org = getRandomOrganization()
         def createCmd = createProjectCommand(org.id(), "Protected Delete Proj", "Description with at least twenty characters here.")
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "unaffiliated user attempts to delete the project via HTTP DELETE"
         client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${saved.id()}")))
@@ -1668,7 +1641,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
         def createCmd = createProjectCommand(orgId, "Project to Delete", "Description with at least twenty characters here.")
-        Project saved = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body()
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
 
         when: "the Org Manager deletes the project via HTTP DELETE"
         def response = client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${saved.id()}")))
@@ -1676,7 +1649,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         then: "the project is deleted from the database"
         verifyAll {
             response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-            sql.firstRow("SELECT id FROM projects WHERE id = ?", [saved.id()]) == null
+            !projectRepository.findById(saved.id()).isPresent()
+            !projectRepository.existsById(saved.id())
         }
     }
 
@@ -1687,7 +1661,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def org = getRandomOrganization()
         (1..12).each { i ->
             def cmd = createProjectCommand(org.id(), "Cursor Drain Project ${String.format('%02d', i)}")
-            client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project)
+            track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project).body())
         }
         Set<Project> allProjects = new LinkedHashSet<>()
         int pageSize = 5
@@ -1701,7 +1675,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected set contains all projects from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM projects").count
+        def totalCount = projectRepository.count()
         verifyAll {
             allProjects.size() == totalCount
             allProjects.size() >= 12
@@ -1713,7 +1687,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def org = getRandomOrganization()
         (1..5).each { i ->
             def cmd = createProjectCommand(org.id(), "Http Paging Project ${i}")
-            client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project)
+            track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project).body())
         }
 
         when: "querying projects via HTTP GET"

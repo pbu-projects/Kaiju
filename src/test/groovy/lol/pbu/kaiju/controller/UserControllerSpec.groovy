@@ -33,22 +33,8 @@ class UserControllerSpec extends BaseControllerSpec {
     @Shared
     Faker faker = new Faker()
 
-    List<UUID> createdUserIds = []
-
-    def cleanup() {
-        createdUserIds.each { id ->
-            try {
-                executeUpdate("DELETE FROM users WHERE id = ?", id)
-            } catch (Exception ignored) {
-            }
-        }
-        createdUserIds.clear()
-    }
-
     private User createDbUser(String email, UserRole role) {
-        User user = dataBuilder.user().withEmail(email).withRole(role).persist()
-        createdUserIds.add(user.id())
-        return user
+        return dataBuilder.user().withEmail(email).withRole(role).persist()
     }
 
     /********** CREATE Tests **********/
@@ -60,10 +46,7 @@ class UserControllerSpec extends BaseControllerSpec {
 
         when: "the user is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", command)), User)
-        User saved = response.body()
-        if (saved?.id() != null) {
-            createdUserIds.add(saved.id())
-        }
+        User saved = track(response.body())
 
         then: "the user is persisted with 200 OK and default STANDARD_USER role"
         verifyAll {
@@ -74,11 +57,12 @@ class UserControllerSpec extends BaseControllerSpec {
         }
 
         and: "it can be retrieved from the database"
-        def result = sql.firstRow("SELECT * FROM users WHERE id = ?", [saved.id()])
+        def result = userRepository.findById(saved.id()).orElse(null)
         verifyAll(result) {
-            saved.id() == id
-            saved.email() == email
-            saved.role().name() == role
+            it != null
+            it.id() == saved.id()
+            it.email() == saved.email()
+            it.role() == saved.role()
         }
     }
 
@@ -130,10 +114,7 @@ class UserControllerSpec extends BaseControllerSpec {
 
         when: "the admin creates an elevated user"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", command), adminCaller.id().toString()), User)
-        User saved = response.body()
-        if (saved?.id() != null) {
-            createdUserIds.add(saved.id())
-        }
+        User saved = track(response.body())
 
         then: "the user is saved with the elevated role"
         verifyAll {
@@ -221,10 +202,11 @@ class UserControllerSpec extends BaseControllerSpec {
         }
 
         and: "the database reflects the update"
-        def result = sql.firstRow("SELECT email, role FROM users WHERE id = ?", [user.id()])
+        def result = userRepository.findById(user.id()).orElse(null)
         verifyAll(result) {
-            email == newEmail
-            role == 'STANDARD_USER'
+            it != null
+            email() == newEmail
+            role() == UserRole.STANDARD_USER
         }
     }
 
@@ -268,7 +250,8 @@ class UserControllerSpec extends BaseControllerSpec {
         then: "the response is 200 OK and user is removed from the database"
         verifyAll {
             response.status == HttpStatus.OK
-            sql.firstRow("SELECT count(*) as count FROM users WHERE id = ?", [user.id()]).count == 0
+            !userRepository.findById(user.id()).isPresent()
+            !userRepository.existsById(user.id())
         }
     }
 
@@ -342,7 +325,7 @@ class UserControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected set contains all users from the database"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM users").count
+        def totalCount = userRepository.count()
         verifyAll {
             allUsers.size() == totalCount
             allUsers.size() >= 2

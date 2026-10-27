@@ -43,7 +43,7 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
         }
 
         cleanup:
-        executeUpdate("DELETE FROM organization_audit_logs WHERE id = ?", id)
+        organizationAuditLogRepository.removeById(id)
     }
 
     def "READ | should return 404 for a non-existent organization audit log ID"() {
@@ -92,7 +92,7 @@ class OrganizationAuditLogControllerSpec extends BaseControllerSpec {
         }
 
         then: "the collected size matches the DB count"
-        def totalCount = sql.firstRow("SELECT count(*) as count FROM organization_audit_logs").count
+        def totalCount = organizationAuditLogRepository.count()
         allLogs.size() == totalCount
     }
 }

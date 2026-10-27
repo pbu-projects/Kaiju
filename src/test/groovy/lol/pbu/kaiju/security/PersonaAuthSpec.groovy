@@ -1,6 +1,5 @@
 package lol.pbu.kaiju.security
 
-import groovy.sql.Sql
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
 import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
@@ -22,6 +21,9 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import javax.sql.DataSource
+import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.ResultSet
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
@@ -52,7 +54,7 @@ class PersonaAuthSpec extends Specification {
     @Inject
     DataSource dataSource
 
-    private static <T> T await(Publisher<T> publisher) {
+    static <T> T await(Publisher<T> publisher) {
         CompletableFuture<T> future = new CompletableFuture<>()
         publisher.subscribe(new Subscriber<T>() {
             @Override
@@ -75,6 +77,31 @@ class PersonaAuthSpec extends Specification {
             }
         })
         return future.get(5, TimeUnit.SECONDS)
+    }
+
+    List<Map<String, Object>> executeQuery(String sql, List<Object> params = []) {
+        List<Map<String, Object>> results = []
+        try (Connection conn = dataSource.connection;
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            params.eachWithIndex { param, idx ->
+                stmt.setObject(idx + 1, param)
+            }
+            try (ResultSet rs = stmt.executeQuery()) {
+                int colCount = rs.metaData.columnCount
+                while (rs.next()) {
+                    results.add(readRow(rs, colCount))
+                }
+            }
+        }
+        return results
+    }
+
+    static Map<String, Object> readRow(ResultSet rs, int colCount) {
+        Map<String, Object> row = [:]
+        for (int i = 1; i <= colCount; i++) {
+            row[rs.metaData.getColumnLabel(i)] = rs.getObject(i)
+        }
+        return row
     }
 
     def "all 26 seeded personas exist in database with correct role"() {
@@ -215,11 +242,8 @@ class PersonaAuthSpec extends Specification {
     }
 
     def "seeded county boundaries accurately contain internal landmarks and exclude adjacent municipalities"() {
-        given: "a connection to the test database"
-        Sql sql = new Sql(dataSource)
-
         when: "evaluating spatial containment for real-world locations against Denver County and El Paso County"
-        def spatialResults = sql.firstRow("""
+        String sql = """
             SELECT
                 ST_Covers(
                     (SELECT geom FROM administrative_regions WHERE id = ?),
@@ -277,7 +301,8 @@ class PersonaAuthSpec extends Specification {
                     (SELECT geom FROM administrative_regions WHERE id = ?),
                     ST_GeographyFromText('SRID=4326;POINT(-104.8214 38.8339)')
                 ) AS cos_downtown_covers_cos_hall
-        """, [
+        """
+        List<UUID> params = [
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_COUNTY_REGION_ID,
@@ -292,7 +317,9 @@ class PersonaAuthSpec extends Specification {
                 TestPersonas.DENVER_COUNTY_REGION_ID,
                 TestPersonas.DENVER_DOWNTOWN_REGION_ID,
                 TestPersonas.COLORADO_SPRINGS_DOWNTOWN_REGION_ID
-        ])
+        ]
+
+        Map<String, Object> spatialResults = executeQuery(sql, params as List<Object>).first()
 
         then: "landmarks, municipal boundaries, and downtown cores match expected containment"
         verifyAll(spatialResults) {
@@ -314,12 +341,9 @@ class PersonaAuthSpec extends Specification {
     }
 
     def "all seeded administrative regions are mathematically non-rectangular and topologically valid"() {
-        given: "a connection to the test database"
-        Sql sql = new Sql(dataSource)
-
         when: "evaluating geometric validity and checking against bounding boxes"
         String regionIds = TestPersonas.SEEDED_REGION_IDS.collect { "'${it}'" }.join(',')
-        def rows = sql.rows("""
+        String query = """
             SELECT
                 id,
                 name,
@@ -330,7 +354,9 @@ class PersonaAuthSpec extends Specification {
             FROM administrative_regions
             WHERE id IN (${regionIds})
             ORDER BY name
-        """.toString())
+        """.toString()
+
+        List<Map<String, Object>> rows = executeQuery(query)
 
         then: "all 28 seeded regions are retrieved and meet geometric validity constraints"
         verifyAll {
