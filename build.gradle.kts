@@ -61,6 +61,8 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-spock")
     testImplementation("net.datafaker:datafaker:${project.properties["datafakerVersion"]}")
     testImplementation("ch.qos.logback:logback-classic")
+    testRuntimeOnly("ch.qos.logback:logback-classic")
+    testResourcesService("ch.qos.logback:logback-classic")
 }
 
 
