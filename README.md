@@ -71,11 +71,19 @@ When an emergency response or major holiday drive brings thousands of volunteers
 - **Want to Help?** See [Contributing](./CONTRIBUTING.md).
 
 <details>
-<summary><b>Live Test Execution</b>: Watch Spock and Testcontainers boot PostGIS and verify spatial security rules in real time.</summary>
+<summary><b>Live Test Execution</b>: Watch Spock and Testcontainers boot PostGIS, run migrations, and test security in under 30 seconds.</summary>
 <dl>
 <dd>
 
 ![Live terminal recording of Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
+
+#### Why This Matters
+
+* **Zero Flaky Mocks**: We test against real infrastructure. A single Gradle command spins up a genuine [PostgreSQL](https://www.postgresql.org/) container with [PostGIS](https://postgis.net/) spatial extensions via [Testcontainers](https://testcontainers.com/).
+* **Instant Database Setup**: [Flyway](https://documentation.red-gate.com/fd) applies 10 complete schema migrations on the fly, setting up tables, geographic indexes, seed personas, and timezone boundaries automatically.
+* **Super Thorough Testing**: The suite executes deep security checks across regional jurisdictions, organization roles, and physical boundary coordinates.
+* **Cold Start to Teardown in Under a Minute**: While the animation playback is slightly sped up for quick viewing, the real Gradle timer in the terminal shows the entire sequence finishes in about 28 seconds: spinning up Docker, applying 10 database migrations, running integration tests, and tearing down clean.
+* **One Simple Command**: No manual database configuration, no port conflicts, and no leftover test junk.
 
 </dd>
 </dl>

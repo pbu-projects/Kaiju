@@ -134,6 +134,8 @@ docker compose -f database/compose.yml up -d authentik-server authentik-worker
 
 ### Run a Single Test Method
 
+You can run individual test methods with a single command:
+
 ```bash
 ./gradlew test --tests "*ProjectSecurityMatrixSpec*should enforce matrix*"
 ```
@@ -141,7 +143,9 @@ docker compose -f database/compose.yml up -d authentik-server authentik-worker
 ![Live terminal recording of Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
 
 > [!TIP]
-> Terminal animations can be recorded and updated using [VHS](https://github.com/charmbracelet/vhs) from [`testing-call.tape`](./testing-call.tape).
+> **Super Thorough Testing in Under 30 Seconds**: While this animation playback is slightly sped up for quick viewing, look at the Gradle timer in the terminal output: the entire real-world lifecycle finishes in about 28 seconds. With one simple command, Testcontainers boots a live PostgreSQL + PostGIS container, Flyway runs 10 database schema migrations from scratch, Spock executes deep security and spatial boundary checks, and the container is cleanly torn down.
+>
+> You can re-record this animation at any time using [VHS](https://github.com/charmbracelet/vhs) from [`testing-call.tape`](./testing-call.tape).
 
 ### View Test Reports
 
