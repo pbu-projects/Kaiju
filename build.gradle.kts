@@ -258,9 +258,9 @@ tasks.named<Test>("test") {
     }
 }
 
-tasks.register("lighthouse") {
+tasks.register("validateMarkdown") {
     group = "verification"
-    description = "Lighthouse Markdown audit: validates syntax, block rendering, and link integrity."
+    description = "Validates Markdown syntax, block rendering, and link integrity."
     doLast {
         val rootDir = projectDir
         val ignoreDirs = setOf(".git", ".gradle", "build", "node_modules", ".idea", ".vscode", ".agent", ".gemini", ".context")
@@ -270,7 +270,7 @@ tasks.register("lighthouse") {
             .toList()
             .sortedBy { it.relativeTo(rootDir).path }
 
-        println("🗼 Running Lighthouse Markdown Audit across ${mdFiles.size} files...")
+        println("🔍 Running Markdown & Link Audit across ${mdFiles.size} files...")
 
         val linkPattern = Regex("""(!?)\[([^\]]*)\]\(([^)]+)\)""")
         val headingPattern = Regex("""^(#{1,6})\s+(.+)$""")
@@ -404,7 +404,7 @@ tasks.register("lighthouse") {
         val overallScore = (syntaxScore + linkScore + refScore) / 3
 
         println("\n" + "=".repeat(64))
-        println("  🗼 LIGHTHOUSE MARKDOWN & LINK INTEGRITY REPORT")
+        println("  MARKDOWN & LINK INTEGRITY REPORT")
         println("=".repeat(64))
         println("  Files Scanned:        %3d".format(mdFiles.size))
         println("  Internal Links:       %3d".format(totalLinks))
@@ -426,13 +426,25 @@ tasks.register("lighthouse") {
         }
 
         if (errors.isNotEmpty()) {
-            throw GradleException("Lighthouse Markdown audit failed with ${errors.size} error(s).")
+            throw GradleException("Markdown audit failed with ${errors.size} error(s).")
         }
     }
 }
 
+tasks.register("validateMarkdownLinks") {
+    group = "verification"
+    description = "Validates Markdown syntax, block rendering, and link integrity (alias for validateMarkdown)."
+    dependsOn("validateMarkdown")
+}
+
+tasks.register("lighthouse") {
+    group = "verification"
+    description = "Legacy alias for validateMarkdown."
+    dependsOn("validateMarkdown")
+}
+
 tasks.named("check") {
-    dependsOn("lighthouse")
+    dependsOn("validateMarkdown")
     dependsOn("generateOpenApiSpec")
 }
 

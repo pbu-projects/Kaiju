@@ -24,12 +24,14 @@ Kaiju uses [Spock Framework](https://spockframework.org/) and [Testcontainers](h
 Rather than maintaining fragile static SQL scripts or scattering raw `INSERT` queries across test files, Kaiju uses a fluent, type-safe builder suite rooted in `KaijuDataBuilder`.
 
 ### Key Benefits
+
 * **Refactoring Safety**: Builders use real domain models and repositories. When a model field changes, compile-time checks catch test mismatches instantly.
 * **Collision-Free Personas**: Builders use [DataFaker](https://www.datafaker.net/) with Star Wars and Zelda character names and unique email suffixes. Tests never collide with each other or with pre-seeded database rows.
 * **Tracked Entity Cleanup**: The builder tracks every entity ID created during a test. In `BaseControllerSpec.cleanup()`, all tracked entities are deleted in reverse order (child records before parent records). This provides clean isolation across multi-threaded HTTP test runs without needing database transaction rollbacks.
 * **Command DTO Helpers**: Builders provide `.asCommand()` methods (such as `ProjectBuilder.asCommand()`) to generate valid request payloads for testing HTTP endpoints directly.
 
 ### Available Builders
+
 * `UserBuilder`: Creates users with specific system roles (`GLOBAL_ADMIN`, `STANDARD_USER`) and unique contact details.
 * `RegionBuilder`: Creates geographic administrative regions.
 * `BoundaryBuilder`: Creates geographic boundary polygons linked to administrative regions.
@@ -58,16 +60,19 @@ Location-based volunteer discovery is a core capability of Kaiju. Spatial tests 
 Security, regional approvals, and moderation rely on clear, three-tier hierarchies.
 
 ### Geographic Regional Hierarchy
+
 1. **Level 1 (State)**: Colorado State Region encloses the entire state.
 2. **Level 2 (County / District)**: Denver County Region and El Paso County Region (both children of Colorado State).
 3. **Level 3 (City / Local Area)**: Denver Downtown Core and Colorado Springs Downtown.
 
 ### Organizational Hierarchy
+
 1. **Level 1 (National Network)**: National Relief Network (broad umbrella organization).
 2. **Level 2 (State Chapter)**: Colorado State Chapter and Utah State Chapter (children of National Relief Network).
 3. **Level 3 (Local Branch)**: Denver Metro Branch and Colorado Springs Branch.
 
 ### Paired Administrator Personas
+
 To prevent single points of failure in test data and enable realistic multi-user tests, each tier pairs a primary (`1`) and secondary (`2`) persona.
 
 System roles (`UserRole`) are distinct from scoped roles (`OrganizationUserRole` / `RegionUserRole`). All organization leads have a base system role of `STANDARD_USER` and hold scoped permissions through their organization memberships:
@@ -110,29 +115,36 @@ Tests verify authorization across groups and regional boundaries:
 ## 6. Running Tests Locally
 
 ### Prerequisites
+
 1. Make sure Docker is running on your machine.
 2. Start the local Authentik identity provider:
+
 ```bash
 docker compose -f database/compose.yml up -d authentik-server authentik-worker
 ```
 
 ### Run All Tests
+
 ```bash
 ./gradlew test
 ```
 
 ### Run a Specific Specification
+
 ```bash
 ./gradlew test --tests "*ProjectSecurityMatrixSpec*"
 ```
 
 ### Run a Single Test Method
+
 ```bash
 ./gradlew test --tests "*ProjectSecurityMatrixSpec*should enforce matrix*"
 ```
 
 ### View Test Reports
+
 After running tests, open the generated HTML report in your browser:
+
 ```text
 build/reports/tests/test/index.html
 ```
