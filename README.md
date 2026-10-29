@@ -69,3 +69,14 @@ When an emergency response or major holiday drive brings thousands of volunteers
 - **Serialization & Validation**: Java 25 Records via [Micronaut Serialization](https://micronaut-projects.github.io/micronaut-serialization/latest/guide/) (compile-time, reflection-free) and [Jakarta Validation](https://micronaut-projects.github.io/micronaut-validation/latest/guide/).
 - **Build & Optimization**: Gradle with [Micronaut AOT](https://micronaut-projects.github.io/micronaut-aot/latest/guide/) and [GraalVM](https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html).
 - **Want to Help?** See [Contributing](./CONTRIBUTING.md).
+
+<details>
+<summary><b>Live Test Execution</b>: Watch Spock and Testcontainers boot PostGIS and verify spatial security rules in real time.</summary>
+<dl>
+<dd>
+
+![Live terminal recording of Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
+
+</dd>
+</dl>
+</details>

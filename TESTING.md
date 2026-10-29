@@ -138,6 +138,11 @@ docker compose -f database/compose.yml up -d authentik-server authentik-worker
 ./gradlew test --tests "*ProjectSecurityMatrixSpec*should enforce matrix*"
 ```
 
+![Live terminal recording of Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
+
+> [!TIP]
+> Terminal animations can be recorded and updated using [VHS](https://github.com/charmbracelet/vhs) from [`testing-call.tape`](./testing-call.tape).
+
 ### View Test Reports
 
 After running tests, open the generated HTML report in your browser:
