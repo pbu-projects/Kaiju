@@ -9,7 +9,7 @@ Guidelines for contributing to the Kaiju backend service.
 Do not rewrite or reinvent established patterns. Follow the canonical documentation:
 
 * **Architecture & DTO Standards:** Refer to the internal Field Guide specification for guidelines on Java 25 records, reflection-free AOT compilation, and DTO boundaries.
-* **Testing Guidelines:** Refer to the internal Field Guide specification for Spock, Testcontainers, and PostGIS boundary test rules.
+* **Testing Guidelines:** See [Testing Guidelines](TESTING.md) and refer to the internal Field Guide specification for Spock, Testcontainers, and PostGIS boundary test rules.
 * **Security & Access Controls:** Refer to the [Security Test Plan](test-plan.md) and the internal Field Guide security matrix.
 * **Personas & User Journeys:** Refer to the internal Field Guide specification for canonical Personas and Key User Journeys.
 
@@ -36,11 +36,16 @@ We follow the [Google Java Style Guide](https://google.github.io/styleguide/java
 All tests run against live PostgreSQL + PostGIS containers managed by Testcontainers.
 
 ```bash
+# Start local Authentik identity provider
+docker compose -f database/compose.yml up -d authentik-server authentik-worker
+
+# Run the test suite
 ./gradlew test
 ```
 
 * All tests must pass locally before opening or updating a Pull Request.
 * Avoid mocking when real database/service containers can be used.
+* See [TESTING.md](TESTING.md) for full details on test fixtures, personas, and boundary checks.
 
 ---
 

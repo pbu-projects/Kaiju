@@ -63,7 +63,7 @@ When an emergency response or major holiday drive brings thousands of volunteers
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=PeanutButter-Unicorn_kaiju&metric=coverage)](https://sonarcloud.io/summary/new_code?id=PeanutButter-Unicorn_kaiju)
 
 - **Framework**: [Micronaut 5](https://micronaut.io/) (Java 25)
-- **Testing**: [Spock](https://spockframework.org/) and [Testcontainers](https://testcontainers.com/) with live PostgreSQL/PostGIS containers.
+- **Testing**: [Spock](https://spockframework.org/) and [Testcontainers](https://testcontainers.com/) with live PostgreSQL/PostGIS containers. See [Testing Guidelines](./TESTING.md).
 - **Database**: PostgreSQL + PostGIS via [Flyway](https://documentation.red-gate.com/fd) and [HikariCP](https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html#jdbc). See [Database Schema](./database/DB.md).
 - **Security**: [Micronaut Security](https://micronaut-projects.github.io/micronaut-security/latest/guide/index.html) JWT authentication via [authentik](https://goauthentik.io/).
 - **Serialization & Validation**: Java 25 Records via [Micronaut Serialization](https://micronaut-projects.github.io/micronaut-serialization/latest/guide/) (compile-time, reflection-free) and [Jakarta Validation](https://micronaut-projects.github.io/micronaut-validation/latest/guide/).
