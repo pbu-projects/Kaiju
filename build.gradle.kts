@@ -3,6 +3,10 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     id("groovy") 
@@ -255,11 +259,21 @@ testCompilationAndExecutionTasks.forEach { taskName ->
 tasks.named<Test>("test") {
     testLogging {
         events("failed", "standardError", "standardOut")
-        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        exceptionFormat = TestExceptionFormat.FULL
         showExceptions = true
         showCauses = true
         showStackTraces = true
     }
+
+    addTestListener(object : TestListener {
+        override fun afterSuite(desc: TestDescriptor, result: TestResult) {
+            if (desc.parent == null) {
+                val summary = "Test Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} passed, ${result.failedTestCount} failed, ${result.skippedTestCount} skipped)"
+                val border = "=".repeat(summary.length)
+                logger.lifecycle("\n$border\n$summary\n$border\n")
+            }
+        }
+    })
 }
 
 tasks.register("validateMarkdown") {

@@ -111,8 +111,6 @@ Tests make sure that sensitive volunteer records and organizational workspaces s
 
 ## 6. Running Tests Locally
 
-### Prerequisites
-
 1. Make sure Docker is running on your machine.
 2. Start the local Authentik identity provider:
 
@@ -120,37 +118,17 @@ Tests make sure that sensitive volunteer records and organizational workspaces s
 docker compose -f database/compose.yml up -d authentik-server authentik-worker
 ```
 
-### Run All Tests
+Run the whole test suite:
 
 ```bash
 ./gradlew test
 ```
 
-### Run a Specific Specification
+Or you can run specific tests:
 
 ```bash
-./gradlew test --tests "*ProjectSecurityMatrixSpec*"
+./gradlew test --tests "*createAuth*"
 ```
 
-### Run a Single Test Method
+![Spock and Testcontainers running createAuthSpec](./testing-call.gif)
 
-You can run individual test methods with a single command:
-
-```bash
-./gradlew test --tests "*ProjectSecurityMatrixSpec*should enforce matrix*"
-```
-
-![Live terminal recording of Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
-
-> [!TIP]
-> **Super Thorough Testing in About a Minute**: While this animation playback is slightly sped up for quick viewing, look at the Gradle timer in the terminal output: the entire real-world lifecycle finishes in about a minute. With one simple command, Testcontainers boots a live PostgreSQL + PostGIS container, Flyway runs 10 database schema migrations from scratch, Spock executes deep security and spatial boundary checks, and the container is cleanly torn down.
->
-> You can re-record this animation at any time using [VHS](https://github.com/charmbracelet/vhs) from [`testing-call.tape`](./testing-call.tape).
-
-### View Test Reports
-
-After running tests, open the generated HTML report in your browser:
-
-```text
-build/reports/tests/test/index.html
-```

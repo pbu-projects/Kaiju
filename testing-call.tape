@@ -63,5 +63,5 @@ Set Shell "bash"
 Set FontSize 32
 Set Width 2400
 Set Height 1200
-Type './gradlew test --tests "*ProjectSecurityMatrixSpec*should enforce matrix*"' Sleep 500 ms Enter
+Type './gradlew test --tests "*createAuth*"' Sleep 500 ms Enter
 Sleep 85s
