@@ -63,9 +63,28 @@ When an emergency response or major holiday drive brings thousands of volunteers
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=PeanutButter-Unicorn_kaiju&metric=coverage)](https://sonarcloud.io/summary/new_code?id=PeanutButter-Unicorn_kaiju)
 
 - **Framework**: [Micronaut 5](https://micronaut.io/) (Java 25)
-- **Testing**: [Spock](https://spockframework.org/) and [Testcontainers](https://testcontainers.com/) with live PostgreSQL/PostGIS containers.
+- **Testing**: [Spock](https://spockframework.org/) and [Testcontainers](https://testcontainers.com/) with live PostgreSQL/PostGIS containers. See [Testing Guidelines](./TESTING.md).
 - **Database**: PostgreSQL + PostGIS via [Flyway](https://documentation.red-gate.com/fd) and [HikariCP](https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html#jdbc). See [Database Schema](./database/DB.md).
 - **Security**: [Micronaut Security](https://micronaut-projects.github.io/micronaut-security/latest/guide/index.html) JWT authentication via [authentik](https://goauthentik.io/).
 - **Serialization & Validation**: Java 25 Records via [Micronaut Serialization](https://micronaut-projects.github.io/micronaut-serialization/latest/guide/) (compile-time, reflection-free) and [Jakarta Validation](https://micronaut-projects.github.io/micronaut-validation/latest/guide/).
 - **Build & Optimization**: Gradle with [Micronaut AOT](https://micronaut-projects.github.io/micronaut-aot/latest/guide/) and [GraalVM](https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html).
 - **Want to Help?** See [Contributing](./CONTRIBUTING.md).
+
+<details>
+<summary><b>Live Test Execution</b>: Watch Spock and Testcontainers boot PostGIS, run migrations, and test security in about a minute.</summary>
+<dl>
+<dd>
+
+![Live terminal recording of Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
+
+#### Why This Matters
+
+* **Zero Flaky Mocks**: We test against real infrastructure. A single Gradle command spins up a genuine [PostgreSQL](https://www.postgresql.org/) container with [PostGIS](https://postgis.net/) spatial extensions via [Testcontainers](https://testcontainers.com/).
+* **Instant Database Setup**: [Flyway](https://documentation.red-gate.com/fd) applies 10 complete schema migrations on the fly, setting up tables, geographic indexes, seed personas, and timezone boundaries automatically.
+* **Super Thorough Testing**: The suite executes deep security checks across regional jurisdictions, organization roles, and physical boundary coordinates.
+* **Cold Start to Teardown in About a Minute**: While the animation playback is slightly sped up for quick viewing, the real Gradle timer in the terminal shows the entire sequence finishes in about a minute: spinning up Docker, applying 10 database migrations, running integration tests, and tearing down clean.
+* **One Simple Command**: No manual database configuration, no port conflicts, and no leftover test junk.
+
+</dd>
+</dl>
+</details>

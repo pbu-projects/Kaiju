@@ -3,6 +3,10 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
     id("groovy") 
@@ -31,6 +35,8 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
+    annotationProcessor("org.slf4j:slf4j-nop")
+    testAnnotationProcessor("org.slf4j:slf4j-nop")
 
     compileOnly("io.micronaut:micronaut-http-client")
     compileOnly("io.swagger.core.v3:swagger-annotations")
@@ -61,6 +67,8 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-spock")
     testImplementation("net.datafaker:datafaker:${project.properties["datafakerVersion"]}")
     testImplementation("ch.qos.logback:logback-classic")
+    testRuntimeOnly("ch.qos.logback:logback-classic")
+    testResourcesService("ch.qos.logback:logback-classic")
 }
 
 
@@ -251,16 +259,26 @@ testCompilationAndExecutionTasks.forEach { taskName ->
 tasks.named<Test>("test") {
     testLogging {
         events("failed", "standardError", "standardOut")
-        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        exceptionFormat = TestExceptionFormat.FULL
         showExceptions = true
         showCauses = true
         showStackTraces = true
     }
+
+    addTestListener(object : TestListener {
+        override fun afterSuite(desc: TestDescriptor, result: TestResult) {
+            if (desc.parent == null) {
+                val summary = "Test Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} passed, ${result.failedTestCount} failed, ${result.skippedTestCount} skipped)"
+                val border = "=".repeat(summary.length)
+                logger.lifecycle("\n$border\n$summary\n$border\n")
+            }
+        }
+    })
 }
 
-tasks.register("lighthouse") {
+tasks.register("validateMarkdown") {
     group = "verification"
-    description = "Lighthouse Markdown audit: validates syntax, block rendering, and link integrity."
+    description = "Validates Markdown syntax, block rendering, and link integrity."
     doLast {
         val rootDir = projectDir
         val ignoreDirs = setOf(".git", ".gradle", "build", "node_modules", ".idea", ".vscode", ".agent", ".gemini", ".context")
@@ -270,7 +288,7 @@ tasks.register("lighthouse") {
             .toList()
             .sortedBy { it.relativeTo(rootDir).path }
 
-        println("🗼 Running Lighthouse Markdown Audit across ${mdFiles.size} files...")
+        println("🔍 Running Markdown & Link Audit across ${mdFiles.size} files...")
 
         val linkPattern = Regex("""(!?)\[([^\]]*)\]\(([^)]+)\)""")
         val headingPattern = Regex("""^(#{1,6})\s+(.+)$""")
@@ -404,7 +422,7 @@ tasks.register("lighthouse") {
         val overallScore = (syntaxScore + linkScore + refScore) / 3
 
         println("\n" + "=".repeat(64))
-        println("  🗼 LIGHTHOUSE MARKDOWN & LINK INTEGRITY REPORT")
+        println("  MARKDOWN & LINK INTEGRITY REPORT")
         println("=".repeat(64))
         println("  Files Scanned:        %3d".format(mdFiles.size))
         println("  Internal Links:       %3d".format(totalLinks))
@@ -426,13 +444,25 @@ tasks.register("lighthouse") {
         }
 
         if (errors.isNotEmpty()) {
-            throw GradleException("Lighthouse Markdown audit failed with ${errors.size} error(s).")
+            throw GradleException("Markdown audit failed with ${errors.size} error(s).")
         }
     }
 }
 
+tasks.register("validateMarkdownLinks") {
+    group = "verification"
+    description = "Validates Markdown syntax, block rendering, and link integrity (alias for validateMarkdown)."
+    dependsOn("validateMarkdown")
+}
+
+tasks.register("lighthouse") {
+    group = "verification"
+    description = "Legacy alias for validateMarkdown."
+    dependsOn("validateMarkdown")
+}
+
 tasks.named("check") {
-    dependsOn("lighthouse")
+    dependsOn("validateMarkdown")
     dependsOn("generateOpenApiSpec")
 }
 
