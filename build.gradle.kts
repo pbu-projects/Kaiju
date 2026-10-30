@@ -35,8 +35,8 @@ dependencies {
     annotationProcessor("io.micronaut.security:micronaut-security-processor")
     annotationProcessor("io.micronaut.serde:micronaut-serde-processor")
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
-    annotationProcessor("org.slf4j:slf4j-nop:2.0.17")
-    testAnnotationProcessor("org.slf4j:slf4j-nop:2.0.17")
+    annotationProcessor("org.slf4j:slf4j-nop")
+    testAnnotationProcessor("org.slf4j:slf4j-nop")
 
     compileOnly("io.micronaut:micronaut-http-client")
     compileOnly("io.swagger.core.v3:swagger-annotations")
