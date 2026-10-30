@@ -17,9 +17,7 @@ import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.security.authentication.AuthenticationResponse
-import io.micronaut.security.oauth2.endpoint.token.response.OpenIdClaims
-import io.micronaut.security.oauth2.endpoint.token.response.OpenIdTokenResponse
+import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.AdministrativeRegion
@@ -28,9 +26,6 @@ import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.UserService
-import org.reactivestreams.Publisher
-import org.reactivestreams.Subscriber
-import org.reactivestreams.Subscription
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -46,13 +41,14 @@ import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
 import java.security.interfaces.RSAPrivateKey
 import java.time.Duration
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.TimeUnit
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.token.jwt.enabled", value = "true")
-@Property(name = "micronaut.security.token.jwt.signatures.jwks.authentik.url", value = "http://localhost:9000/application/o/kaiju/jwks/")
 @Property(name = "micronaut.security.token.jwt.signatures.secret.generator.secret", value = "pleaseChangeThisSecretForANewOne32Bits")
+@Property(name = "micronaut.security.oauth2.enabled", value = "true")
+@Property(name = "micronaut.security.oauth2.clients.authentik.openid.issuer", value = "http://localhost:9000/application/o/kaiju/")
+@Property(name = "micronaut.security.oauth2.clients.authentik.client-id", value = "kaiju-client")
+@Property(name = "micronaut.security.oauth2.clients.authentik.client-secret", value = "kaiju-secret")
 @MicronautTest(transactional = false)
 class AuthentikOidcIntegrationSpec extends Specification {
 
@@ -80,7 +76,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
     AdministrativeRegionRepository administrativeRegionRepository
 
     @Inject
-    AuthentikAuthenticationMapper mapper
+    EmbeddedServer embeddedServer
 
     @Inject
     @Client("/")
@@ -104,40 +100,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
         ]
     }
 
-
-    private static <T> T await(Publisher<T> publisher) {
-        CompletableFuture<T> future = new CompletableFuture<>()
-        publisher.subscribe(new Subscriber<T>() {
-            @Override
-            void onSubscribe(Subscription s) {
-                s.request(1)
-            }
-            @Override
-            void onNext(T t) {
-                future.complete(t)
-            }
-            @Override
-            void onError(Throwable t) {
-                future.completeExceptionally(t)
-            }
-            @Override
-            void onComplete() {
-                if (!future.isDone()) {
-                    future.complete(null)
-                }
-            }
-        })
-        return future.get(5, TimeUnit.SECONDS)
-    }
-
-    /**
-     * Executes the authentic live OIDC authorization flow against Authentik
-     * to obtain genuine RS256 signed ID and access tokens for a given persona.
-     */
-    private Map<String, String> obtainLiveTokens(String username, String password = "KaijuCommunity2026!") {
-        Map<String, String> cookies = [:]
-
-        CookieHandler handler = new CookieHandler() {
+    private static CookieHandler createCookieJar(Map<String, String> cookies = [:]) {
+        return new CookieHandler() {
             @Override
             Map<String, List<String>> get(URI uri, Map<String, List<String>> requestHeaders) {
                 Map<String, List<String>> map = [:]
@@ -150,19 +114,32 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
             @Override
             void put(URI uri, Map<String, List<String>> responseHeaders) {
-                List<String> sc = responseHeaders.get("Set-Cookie")
+                List<String> sc = responseHeaders.find { k, v -> "Set-Cookie".equalsIgnoreCase(k) }?.value
                 if (sc != null) {
                     sc.each { header ->
-                        String[] p = header.split(";")[0].split("=", 2)
-                        if (p.length == 2) {
-                            cookies[p[0].trim()] = p[1].trim()
+                        String[] parts = header.split(";")
+                        String[] nameValue = parts[0].split("=", 2)
+                        if (nameValue.length == 2) {
+                            String name = nameValue[0].trim()
+                            String value = nameValue[1].trim()
+                            boolean isExpired = parts.any { part ->
+                                String trimmed = part.trim().toLowerCase(Locale.ROOT)
+                                trimmed == "max-age=0" || trimmed.startsWith("max-age=-")
+                            }
+                            if (isExpired || value.isEmpty() || value == "\"\"") {
+                                cookies.remove(name)
+                            } else {
+                                cookies[name] = value
+                            }
                         }
                     }
                 }
             }
         }
+    }
 
-        JavaHttpClient flowClient = JavaHttpClient.newBuilder()
+    private void loginUserToAuthentik(CookieHandler handler, String username, String password = "KaijuCommunity2026!") {
+        JavaHttpClient client = JavaHttpClient.newBuilder()
                 .version(JavaHttpClient.Version.HTTP_1_1)
                 .followRedirects(JavaHttpClient.Redirect.NORMAL)
                 .cookieHandler(handler)
@@ -174,16 +151,16 @@ class AuthentikOidcIntegrationSpec extends Specification {
                 .uri(URI.create("${AUTHENTIK_BASE_URL}/api/v3/flows/executor/default-authentication-flow/?query="))
                 .GET()
                 .build()
-        flowClient.send(initReq, JavaHttpResponse.BodyHandlers.ofString())
+        client.send(initReq, JavaHttpResponse.BodyHandlers.ofString())
 
-        // 2. Submit username / email
+        // 2. Submit username or email
         String idPayload = """{"component": "ak-stage-identification", "uid_field": "${username}"}"""
         JavaHttpRequest idReq = JavaHttpRequest.newBuilder()
                 .uri(URI.create("${AUTHENTIK_BASE_URL}/api/v3/flows/executor/default-authentication-flow/?query="))
                 .header("Content-Type", "application/json")
                 .POST(JavaHttpRequest.BodyPublishers.ofString(idPayload))
                 .build()
-        flowClient.send(idReq, JavaHttpResponse.BodyHandlers.ofString())
+        client.send(idReq, JavaHttpResponse.BodyHandlers.ofString())
 
         // 3. Submit password
         String passPayload = """{"component": "ak-stage-password", "password": "${password}"}"""
@@ -192,7 +169,18 @@ class AuthentikOidcIntegrationSpec extends Specification {
                 .header("Content-Type", "application/json")
                 .POST(JavaHttpRequest.BodyPublishers.ofString(passPayload))
                 .build()
-        flowClient.send(passReq, JavaHttpResponse.BodyHandlers.ofString())
+        client.send(passReq, JavaHttpResponse.BodyHandlers.ofString())
+    }
+
+    /**
+     * Executes the authentic live OIDC authorization flow against Authentik
+     * to obtain genuine RS256 signed ID and access tokens for a given persona.
+     */
+    private Map<String, String> obtainLiveTokens(String username, String password = "KaijuCommunity2026!") {
+        Map<String, String> cookies = [:]
+        CookieHandler handler = createCookieJar(cookies)
+
+        loginUserToAuthentik(handler, username, password)
 
         // 4. Request authorization code for Kaiju client with Redirect.NEVER to capture the 302 callback
         JavaHttpClient authClient = JavaHttpClient.newBuilder()
@@ -519,41 +507,86 @@ class AuthentikOidcIntegrationSpec extends Specification {
         String jennyEmail = "jenny.new@kaiju.local"
         assert !userRepository.findByEmail(jennyEmail).isPresent(): "Jenny should not exist in database before test"
 
-        when: "Jenny logs in via Authentik and obtains a genuine signed token"
-        Map<String, String> tokens = obtainLiveTokens(jennyEmail)
-        SignedJWT signedJWT = SignedJWT.parse(tokens.idToken)
-        def claims = signedJWT.getJWTClaimsSet()
+        and: "a test browser client maintaining cookies without following redirects"
+        Map<String, String> cookies = [:]
+        CookieHandler handler = createCookieJar(cookies)
+        JavaHttpClient browser = JavaHttpClient.newBuilder()
+                .version(JavaHttpClient.Version.HTTP_1_1)
+                .followRedirects(JavaHttpClient.Redirect.NEVER)
+                .cookieHandler(handler)
+                .connectTimeout(Duration.ofSeconds(5))
+                .build()
 
-        and: "the token claims are processed by AuthentikAuthenticationMapper"
-        OpenIdClaims openIdClaims = [
-                getEmail: { -> claims.getStringClaim("email") },
-                get: { String key -> key == "email_verified" ? true : claims.getClaim(key) }
-        ] as OpenIdClaims
-        OpenIdTokenResponse tokenResponse = new OpenIdTokenResponse()
-        def publisher = mapper.createAuthenticationResponse("authentik", tokenResponse, openIdClaims, null)
-        AuthenticationResponse authResponse = await(publisher)
+        when: "Jenny logs into Authentik"
+        loginUserToAuthentik(handler, jennyEmail)
 
-        then: "authentication succeeds with a new database record created"
-        authResponse.isAuthenticated()
-        authResponse.getAuthentication().isPresent()
-        def auth = authResponse.getAuthentication().get()
+        and: "she calls the Kaiju OAuth login route"
+        JavaHttpRequest loginReq = JavaHttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:${embeddedServer.port}/oauth/login/authentik"))
+                .GET()
+                .build()
+        JavaHttpResponse<String> loginResp = browser.send(loginReq, JavaHttpResponse.BodyHandlers.ofString())
+
+        then: "Kaiju redirects to Authentik and sets state, PKCE, and nonce cookies"
+        String authorizeUrl = loginResp.headers().firstValue("Location").orElse(null)
+        verifyAll {
+            loginResp.statusCode() == 302
+            authorizeUrl != null
+            authorizeUrl.contains(AUTHENTIK_BASE_URL)
+            cookies.containsKey("OAUTH2_STATE")
+            cookies.containsKey("OAUTH2_PKCE")
+            cookies.containsKey("OPENID_NONCE")
+        }
+
+        when: "the browser sends authorize request to Authentik with session cookie"
+        JavaHttpRequest authReq = JavaHttpRequest.newBuilder()
+                .uri(URI.create(authorizeUrl))
+                .GET()
+                .build()
+        JavaHttpResponse<String> authResp = browser.send(authReq, JavaHttpResponse.BodyHandlers.ofString())
+
+        then: "Authentik returns redirect to Kaiju callback with authorization code and state"
+        String callbackUrl = authResp.headers().firstValue("Location").orElse(null)
+        verifyAll {
+            authResp.statusCode() == 302
+            callbackUrl != null
+            callbackUrl.contains("/oauth/callback/authentik")
+            callbackUrl.contains("code=")
+            callbackUrl.contains("state=")
+        }
+
+        when: "the browser follows callback URL to Kaiju with state cookies"
+        JavaHttpRequest callbackReq = JavaHttpRequest.newBuilder()
+                .uri(URI.create(callbackUrl))
+                .GET()
+                .build()
+        JavaHttpResponse<String> callbackResp = browser.send(callbackReq, JavaHttpResponse.BodyHandlers.ofString())
+
+        then: "callback completes with redirect and sets JWT session cookie"
+        verifyAll(callbackResp) {
+            statusCode() == 303 || statusCode() == 302
+            cookies.containsKey("JWT")
+            cookies.get("JWT") != null && !cookies.get("JWT").isBlank()
+        }
 
         and: "Jenny now physically exists in PostgreSQL as a STANDARD_USER"
         Optional<User> dbUserOpt = userRepository.findByEmail(jennyEmail)
-        dbUserOpt.isPresent()
-        User dbUser = dbUserOpt.get()
         verifyAll {
-            auth.getAttributes().get("email") == jennyEmail
-            auth.getName() == dbUser.id().toString()
-            dbUser.email() == jennyEmail
-            dbUser.role() == UserRole.STANDARD_USER
+            dbUserOpt.isPresent()
+            dbUserOpt.get().email() == jennyEmail
+            dbUserOpt.get().role() == UserRole.STANDARD_USER
         }
 
-        and: "standard volunteer discrete permissions are granted in the security context"
-        verifyAll(auth) {
-            UserRole.STANDARD_USER.getPermissions().every { permission ->
-                roles.contains(permission.getClaim())
-            }
+        when: "the browser accesses secured endpoint presenting the JWT session cookie"
+        JavaHttpRequest projectsReq = JavaHttpRequest.newBuilder()
+                .uri(URI.create("http://localhost:${embeddedServer.port}/projects"))
+                .GET()
+                .build()
+        JavaHttpResponse<String> projectsResp = browser.send(projectsReq, JavaHttpResponse.BodyHandlers.ofString())
+
+        then: "access is granted with 200 OK"
+        verifyAll(projectsResp) {
+            statusCode() == 200
         }
 
         cleanup:

@@ -18,6 +18,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -67,10 +68,17 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
                 .map(Permission::getClaim)
                 .forEach(roles::add);
 
+        Map<String, Object> attributes = new LinkedHashMap<>();
+        attributes.put("email", user.email());
+        attributes.put("email_verified", true);
+        if (tokenResponse.getIdToken() != null && !tokenResponse.getIdToken().isBlank()) {
+            attributes.put(OPENID_TOKEN_KEY, tokenResponse.getIdToken());
+        }
+
         AuthenticationResponse response = AuthenticationResponse.success(
                 user.id().toString(),
                 roles,
-                Map.of("email", user.email())
+                Map.copyOf(attributes)
         );
 
         return Publishers.just(response);
