@@ -71,8 +71,9 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
         Map<String, Object> attributes = new LinkedHashMap<>();
         attributes.put("email", user.email());
         attributes.put("email_verified", true);
-        if (tokenResponse.getIdToken() != null && !tokenResponse.getIdToken().isBlank()) {
-            attributes.put(OPENID_TOKEN_KEY, tokenResponse.getIdToken());
+        String idToken = tokenResponse.getIdToken();
+        if (idToken != null && !idToken.isBlank()) {
+            attributes.put(OPENID_TOKEN_KEY, idToken);
         }
 
         AuthenticationResponse response = AuthenticationResponse.success(

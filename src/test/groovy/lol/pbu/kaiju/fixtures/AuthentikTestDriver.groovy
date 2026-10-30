@@ -77,27 +77,33 @@ class AuthentikTestDriver {
 
             @Override
             void put(URI uri, Map<String, List<String>> responseHeaders) {
-                List<String> sc = responseHeaders.find { k, v -> "Set-Cookie".equalsIgnoreCase(k) }?.value
-                if (sc != null) {
-                    sc.each { header ->
-                        String[] parts = header.split(";")
-                        String[] nameValue = parts[0].split("=", 2)
-                        if (nameValue.length == 2) {
-                            String name = nameValue[0].trim()
-                            String value = nameValue[1].trim()
-                            boolean isExpired = parts.any { part ->
-                                String trimmed = part.trim().toLowerCase(Locale.ROOT)
-                                trimmed == "max-age=0" || trimmed.startsWith("max-age=-")
-                            }
-                            if (isExpired || value.isEmpty() || value == "\"\"") {
-                                cookies.remove(name)
-                            } else {
-                                cookies[name] = value
-                            }
-                        }
-                    }
+                List<String> setCookieHeaders = responseHeaders.find { k, v -> "Set-Cookie".equalsIgnoreCase(k) }?.value
+                if (setCookieHeaders == null) {
+                    return
+                }
+                setCookieHeaders.each { header ->
+                    parseCookieHeader(header, cookies)
                 }
             }
+        }
+    }
+
+    private static void parseCookieHeader(String header, Map<String, String> cookies) {
+        String[] parts = header.split(";")
+        String[] nameValue = parts[0].split("=", 2)
+        if (nameValue.length != 2) {
+            return
+        }
+        String name = nameValue[0].trim()
+        String value = nameValue[1].trim()
+        boolean isExpired = parts.any { part ->
+            String trimmed = part.trim().toLowerCase(Locale.ROOT)
+            trimmed == "max-age=0" || trimmed.startsWith("max-age=-")
+        }
+        if (isExpired || value.isEmpty() || value == "\"\"") {
+            cookies.remove(name)
+        } else {
+            cookies[name] = value
         }
     }
 
