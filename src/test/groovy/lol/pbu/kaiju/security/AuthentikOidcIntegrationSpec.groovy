@@ -22,6 +22,8 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.fixtures.AuthentikTestDriver
+import lol.pbu.kaiju.fixtures.builder.KaijuDataBuilder
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.UserRepository
@@ -30,17 +32,13 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import java.net.CookieHandler
 import java.net.URI
-import java.net.URLDecoder
-import java.net.URLEncoder
 import java.net.http.HttpClient as JavaHttpClient
 import java.net.http.HttpRequest as JavaHttpRequest
 import java.net.http.HttpResponse as JavaHttpResponse
 import java.nio.charset.StandardCharsets
 import java.security.KeyPairGenerator
 import java.security.interfaces.RSAPrivateKey
-import java.time.Duration
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.token.jwt.enabled", value = "true")
@@ -52,18 +50,14 @@ import java.time.Duration
 @MicronautTest(transactional = false)
 class AuthentikOidcIntegrationSpec extends Specification {
 
-    private static final String AUTHENTIK_BASE_URL = "http://localhost:9000"
-    private static final String OIDC_ISSUER = "http://localhost:9000/application/o/kaiju/"
-    private static final String JWKS_URL = "http://localhost:9000/application/o/kaiju/jwks/"
-    private static final String CLIENT_ID = "kaiju-client"
-    private static final String CLIENT_SECRET = "kaiju-secret"
-    private static final String REDIRECT_URI = "http://localhost:8080/oauth/callback/authentik"
+    @Shared
+    AuthentikTestDriver authentikDriver = new AuthentikTestDriver()
 
     @Shared
     JWKSet jwkSet
 
     def setupSpec() {
-        jwkSet = JWKSet.load(new URI(JWKS_URL).toURL())
+        jwkSet = JWKSet.load(new URI(authentikDriver.jwksUrl).toURL())
     }
 
     @Inject
@@ -76,6 +70,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
     AdministrativeRegionRepository administrativeRegionRepository
 
     @Inject
+    KaijuDataBuilder dataBuilder
+
+    @Inject
     EmbeddedServer embeddedServer
 
     @Inject
@@ -86,167 +83,15 @@ class AuthentikOidcIntegrationSpec extends Specification {
         httpClient.toBlocking()
     }
 
-    private static Map<String, Object> createTestRegionPayload(String name) {
-        return [
-                name: name,
-                parentRegionId: null,
-                coordinates: [
-                        [longitude: -105.0, latitude: 40.0],
-                        [longitude: -105.0, latitude: 41.0],
-                        [longitude: -104.0, latitude: 41.0],
-                        [longitude: -104.0, latitude: 40.0],
-                        [longitude: -105.0, latitude: 40.0]
-                ]
-        ]
-    }
-
-    private static CookieHandler createCookieJar(Map<String, String> cookies = [:]) {
-        return new CookieHandler() {
-            @Override
-            Map<String, List<String>> get(URI uri, Map<String, List<String>> requestHeaders) {
-                Map<String, List<String>> map = [:]
-                if (!cookies.isEmpty()) {
-                    String cookieStr = cookies.collect { k, v -> "${k}=${v}" }.join("; ")
-                    map.put("Cookie", [cookieStr])
-                }
-                return map
-            }
-
-            @Override
-            void put(URI uri, Map<String, List<String>> responseHeaders) {
-                List<String> sc = responseHeaders.find { k, v -> "Set-Cookie".equalsIgnoreCase(k) }?.value
-                if (sc != null) {
-                    sc.each { header ->
-                        String[] parts = header.split(";")
-                        String[] nameValue = parts[0].split("=", 2)
-                        if (nameValue.length == 2) {
-                            String name = nameValue[0].trim()
-                            String value = nameValue[1].trim()
-                            boolean isExpired = parts.any { part ->
-                                String trimmed = part.trim().toLowerCase(Locale.ROOT)
-                                trimmed == "max-age=0" || trimmed.startsWith("max-age=-")
-                            }
-                            if (isExpired || value.isEmpty() || value == "\"\"") {
-                                cookies.remove(name)
-                            } else {
-                                cookies[name] = value
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void loginUserToAuthentik(CookieHandler handler, String username, String password = "KaijuCommunity2026!") {
-        JavaHttpClient client = JavaHttpClient.newBuilder()
-                .version(JavaHttpClient.Version.HTTP_1_1)
-                .followRedirects(JavaHttpClient.Redirect.NORMAL)
-                .cookieHandler(handler)
-                .connectTimeout(Duration.ofSeconds(5))
-                .build()
-
-        // 1. Initialize authentication flow
-        JavaHttpRequest initReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create("${AUTHENTIK_BASE_URL}/api/v3/flows/executor/default-authentication-flow/?query="))
-                .GET()
-                .build()
-        client.send(initReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        // 2. Submit username or email
-        String idPayload = """{"component": "ak-stage-identification", "uid_field": "${username}"}"""
-        JavaHttpRequest idReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create("${AUTHENTIK_BASE_URL}/api/v3/flows/executor/default-authentication-flow/?query="))
-                .header("Content-Type", "application/json")
-                .POST(JavaHttpRequest.BodyPublishers.ofString(idPayload))
-                .build()
-        client.send(idReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        // 3. Submit password
-        String passPayload = """{"component": "ak-stage-password", "password": "${password}"}"""
-        JavaHttpRequest passReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create("${AUTHENTIK_BASE_URL}/api/v3/flows/executor/default-authentication-flow/?query="))
-                .header("Content-Type", "application/json")
-                .POST(JavaHttpRequest.BodyPublishers.ofString(passPayload))
-                .build()
-        client.send(passReq, JavaHttpResponse.BodyHandlers.ofString())
-    }
-
-    /**
-     * Executes the authentic live OIDC authorization flow against Authentik
-     * to obtain genuine RS256 signed ID and access tokens for a given persona.
-     */
-    private Map<String, String> obtainLiveTokens(String username, String password = "KaijuCommunity2026!") {
-        Map<String, String> cookies = [:]
-        CookieHandler handler = createCookieJar(cookies)
-
-        loginUserToAuthentik(handler, username, password)
-
-        // 4. Request authorization code for Kaiju client with Redirect.NEVER to capture the 302 callback
-        JavaHttpClient authClient = JavaHttpClient.newBuilder()
-                .version(JavaHttpClient.Version.HTTP_1_1)
-                .followRedirects(JavaHttpClient.Redirect.NEVER)
-                .cookieHandler(handler)
-                .connectTimeout(Duration.ofSeconds(5))
-                .build()
-
-        String authUrl = "${AUTHENTIK_BASE_URL}/application/o/authorize/?" +
-                "client_id=${URLEncoder.encode(CLIENT_ID, StandardCharsets.UTF_8)}&" +
-                "response_type=code&" +
-                "redirect_uri=${URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8)}&" +
-                "scope=openid%20email%20profile"
-        JavaHttpRequest authReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create(authUrl))
-                .GET()
-                .build()
-        JavaHttpResponse<String> authResp = authClient.send(authReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        String redirectLocation = authResp.headers().firstValue("Location").orElse(null)
-        if (redirectLocation == null) {
-            throw new IllegalStateException("Failed to obtain redirect from Authentik authorization endpoint. Status: ${authResp.statusCode()}, Body: ${authResp.body()}")
-        }
-
-        URI redirectUri = URI.create(redirectLocation)
-        String query = redirectUri.getQuery()
-        String code = null
-        if (query != null) {
-            for (String param : query.split("&")) {
-                String[] pair = param.split("=")
-                if (pair.length == 2 && pair[0] == "code") {
-                    code = URLDecoder.decode(pair[1], StandardCharsets.UTF_8)
-                    break
-                }
-            }
-        }
-        if (code == null) {
-            throw new IllegalStateException("Authorization code not found in redirect URL: ${redirectLocation}")
-        }
-
-        // 5. Exchange code for tokens
-        String tokenBody = "grant_type=authorization_code&" +
-                "client_id=${URLEncoder.encode(CLIENT_ID, StandardCharsets.UTF_8)}&" +
-                "client_secret=${URLEncoder.encode(CLIENT_SECRET, StandardCharsets.UTF_8)}&" +
-                "redirect_uri=${URLEncoder.encode(REDIRECT_URI, StandardCharsets.UTF_8)}&" +
-                "code=${URLEncoder.encode(code, StandardCharsets.UTF_8)}"
-        JavaHttpRequest tokenReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create("${AUTHENTIK_BASE_URL}/application/o/token/"))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(JavaHttpRequest.BodyPublishers.ofString(tokenBody))
-                .build()
-        JavaHttpResponse<String> tokenResp = authClient.send(tokenReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        Map<String, Object> tokenJson = JSONObjectUtils.parse(tokenResp.body())
-        return [
-                idToken: tokenJson.get("id_token") as String,
-                accessToken: tokenJson.get("access_token") as String
-        ]
+    KaijuDataBuilder getData() {
+        dataBuilder
     }
 
     def "live Authentik endpoint publishes valid OpenID configuration and JWKS with RS256 key"() {
         given: "a query to Authentik's OpenID configuration discovery endpoint"
         JavaHttpClient client = JavaHttpClient.newHttpClient()
         JavaHttpRequest req = JavaHttpRequest.newBuilder()
-                .uri(URI.create("${AUTHENTIK_BASE_URL}/application/o/kaiju/.well-known/openid-configuration"))
+                .uri(URI.create("${authentikDriver.baseUrl}/application/o/kaiju/.well-known/openid-configuration"))
                 .GET()
                 .build()
 
@@ -257,8 +102,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
         then: "the response is HTTP 200 with matching issuer and signing algorithms"
         verifyAll {
             resp.statusCode() == 200
-            config.get("issuer") == OIDC_ISSUER
-            config.get("jwks_uri") == JWKS_URL
+            config.get("issuer") == authentikDriver.issuer
+            config.get("jwks_uri") == authentikDriver.jwksUrl
             (config.get("id_token_signing_alg_values_supported") as List).contains("RS256")
         }
 
@@ -275,7 +120,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
     @Unroll
     def "genuine Authentik ID token for persona '#username' has valid RS256 signature and matching claims"() {
         given: "a live OIDC token pair obtained from Authentik"
-        Map<String, String> tokens = obtainLiveTokens(username)
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens(username)
         String idTokenString = tokens.idToken
         assert idTokenString != null: "Failed to obtain ID token from Authentik"
 
@@ -290,8 +135,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
         and: "token claims contain expected OpenID metadata and valid expiration"
         def claims = signedJWT.getJWTClaimsSet()
         verifyAll(claims) {
-            getIssuer() == OIDC_ISSUER
-            getAudience().contains(CLIENT_ID)
+            getIssuer() == authentikDriver.issuer
+            getAudience().contains(authentikDriver.clientId)
             getStringClaim("email") == expectedEmail
             getStringListClaim("groups").contains(expectedGroup)
             getExpirationTime().after(new Date())
@@ -307,7 +152,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "tampered token signature fails cryptographic verification"() {
         given: "a genuine ID token from Authentik"
-        Map<String, String> tokens = obtainLiveTokens("sarah.admin1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("sarah.admin1@kaiju.local")
         String idTokenString = tokens.idToken
 
         and: "a tamperer who modifies a single character in the signature block"
@@ -327,7 +172,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "tampered token payload claims fail cryptographic verification"() {
         given: "a genuine ID token from Authentik"
-        Map<String, String> tokens = obtainLiveTokens("victor.volunteer1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("victor.volunteer1@kaiju.local")
         String idTokenString = tokens.idToken
 
         and: "an attacker who modifies payload claims to grant themselves global admin"
@@ -349,7 +194,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "expired token fails temporal validity assertion"() {
         given: "a genuine ID token"
-        Map<String, String> tokens = obtainLiveTokens("sarah.admin1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("sarah.admin1@kaiju.local")
         SignedJWT signedJWT = SignedJWT.parse(tokens.idToken)
         Date expiration = signedJWT.getJWTClaimsSet().getExpirationTime()
 
@@ -368,8 +213,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
         def keyPair = gen.generateKeyPair()
         RSASSASigner signer = new RSASSASigner((RSAPrivateKey) keyPair.private)
         JWTClaimsSet expiredClaims = new JWTClaimsSet.Builder()
-                .issuer(OIDC_ISSUER)
-                .audience(CLIENT_ID)
+                .issuer(authentikDriver.issuer)
+                .audience(authentikDriver.clientId)
                 .subject("sarah.admin1@kaiju.local")
                 .expirationTime(new Date(System.currentTimeMillis() - 60000))
                 .issueTime(new Date(System.currentTimeMillis() - 120000))
@@ -395,7 +240,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         def signer = new MACSigner(secretBytes)
         JWTClaimsSet untrustedClaims = new JWTClaimsSet.Builder()
                 .issuer("http://untrusted-idp.example.com/application/o/evil/")
-                .audience(CLIENT_ID)
+                .audience(authentikDriver.clientId)
                 .subject("sarah.admin1@kaiju.local")
                 .claim("email", "sarah.admin1@kaiju.local")
                 .claim("email_verified", true)
@@ -417,8 +262,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         when: "calling the same secured endpoint with a token signed with the identical HMAC key but a trusted issuer"
         JWTClaimsSet validClaims = new JWTClaimsSet.Builder()
-                .issuer(OIDC_ISSUER)
-                .audience(CLIENT_ID)
+                .issuer(authentikDriver.issuer)
+                .audience(authentikDriver.clientId)
                 .subject("sarah.admin1@kaiju.local")
                 .claim("email", "sarah.admin1@kaiju.local")
                 .claim("email_verified", true)
@@ -442,7 +287,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         byte[] secretBytes = "pleaseChangeThisSecretForANewOne32Bits".getBytes(StandardCharsets.UTF_8)
         def signer = new MACSigner(secretBytes)
         JWTClaimsSet untrustedAudienceClaims = new JWTClaimsSet.Builder()
-                .issuer(OIDC_ISSUER)
+                .issuer(authentikDriver.issuer)
                 .audience("untrusted-audience-client")
                 .subject("sarah.admin1@kaiju.local")
                 .claim("email", "sarah.admin1@kaiju.local")
@@ -466,7 +311,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "HTTP requests with tampered token signature return 401 Unauthorized"() {
         given: "a genuine token from Authentik with altered signature"
-        Map<String, String> tokens = obtainLiveTokens("sarah.admin1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("sarah.admin1@kaiju.local")
         String[] parts = tokens.idToken.split("\\.")
         String tamperedSignature = parts[2].substring(0, parts[2].length() - 2) + "XX"
         String tamperedToken = "${parts[0]}.${parts[1]}.${tamperedSignature}"
@@ -484,7 +329,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "HTTP requests with tampered token payload claims return 401 Unauthorized"() {
         given: "a genuine token from Authentik with forged role in payload"
-        Map<String, String> tokens = obtainLiveTokens("victor.volunteer1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("victor.volunteer1@kaiju.local")
         String[] parts = tokens.idToken.split("\\.")
         String payloadJson = new String(Base64.urlDecoder.decode(parts[1]), StandardCharsets.UTF_8)
         String forgedPayloadJson = payloadJson.replace("Kaiju Standard Users", "Kaiju Global Admins")
@@ -507,66 +352,28 @@ class AuthentikOidcIntegrationSpec extends Specification {
         String jennyEmail = "jenny.new@kaiju.local"
         assert !userRepository.findByEmail(jennyEmail).isPresent(): "Jenny should not exist in database before test"
 
-        and: "a test browser client maintaining cookies without following redirects"
-        Map<String, String> cookies = [:]
-        CookieHandler handler = createCookieJar(cookies)
-        JavaHttpClient browser = JavaHttpClient.newBuilder()
-                .version(JavaHttpClient.Version.HTTP_1_1)
-                .followRedirects(JavaHttpClient.Redirect.NEVER)
-                .cookieHandler(handler)
-                .connectTimeout(Duration.ofSeconds(5))
-                .build()
+        when: "Jenny logs into Authentik and completes browser OAuth login flow to Kaiju"
+        def loginResult = authentikDriver.executeBrowserOAuthLogin(embeddedServer.port, jennyEmail)
 
-        when: "Jenny logs into Authentik"
-        loginUserToAuthentik(handler, jennyEmail)
-
-        and: "she calls the Kaiju OAuth login route"
-        JavaHttpRequest loginReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create("http://localhost:${embeddedServer.port}/oauth/login/authentik"))
-                .GET()
-                .build()
-        JavaHttpResponse<String> loginResp = browser.send(loginReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        then: "Kaiju redirects to Authentik and sets state, PKCE, and nonce cookies"
-        String authorizeUrl = loginResp.headers().firstValue("Location").orElse(null)
-        verifyAll {
-            loginResp.statusCode() == 302
-            authorizeUrl != null
-            authorizeUrl.contains(AUTHENTIK_BASE_URL)
-            cookies.containsKey("OAUTH2_STATE")
-            cookies.containsKey("OAUTH2_PKCE")
-            cookies.containsKey("OPENID_NONCE")
+        then: "Kaiju initiates OAuth redirect with state, PKCE, and nonce cookies"
+        verifyAll(loginResult) {
+            loginStatus == 302
+            authorizeUrl.contains(authentikDriver.baseUrl)
+            hasSecurityCookies()
         }
 
-        when: "the browser sends authorize request to Authentik with session cookie"
-        JavaHttpRequest authReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create(authorizeUrl))
-                .GET()
-                .build()
-        JavaHttpResponse<String> authResp = browser.send(authReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        then: "Authentik returns redirect to Kaiju callback with authorization code and state"
-        String callbackUrl = authResp.headers().firstValue("Location").orElse(null)
-        verifyAll {
-            authResp.statusCode() == 302
-            callbackUrl != null
+        and: "Authentik approves and redirects back to Kaiju callback with authorization code"
+        verifyAll(loginResult) {
+            authStatus == 302
             callbackUrl.contains("/oauth/callback/authentik")
             callbackUrl.contains("code=")
             callbackUrl.contains("state=")
         }
 
-        when: "the browser follows callback URL to Kaiju with state cookies"
-        JavaHttpRequest callbackReq = JavaHttpRequest.newBuilder()
-                .uri(URI.create(callbackUrl))
-                .GET()
-                .build()
-        JavaHttpResponse<String> callbackResp = browser.send(callbackReq, JavaHttpResponse.BodyHandlers.ofString())
-
-        then: "callback completes with redirect and sets JWT session cookie"
-        verifyAll(callbackResp) {
-            statusCode() == 303 || statusCode() == 302
-            cookies.containsKey("JWT")
-            cookies.get("JWT") != null && !cookies.get("JWT").isBlank()
+        and: "callback completes with redirect and sets JWT session cookie"
+        verifyAll(loginResult) {
+            isRedirected()
+            hasJwtCookie()
         }
 
         and: "Jenny now physically exists in PostgreSQL as a STANDARD_USER"
@@ -582,7 +389,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
                 .uri(URI.create("http://localhost:${embeddedServer.port}/projects"))
                 .GET()
                 .build()
-        JavaHttpResponse<String> projectsResp = browser.send(projectsReq, JavaHttpResponse.BodyHandlers.ofString())
+        JavaHttpResponse<String> projectsResp = loginResult.authenticatedClient().send(projectsReq, JavaHttpResponse.BodyHandlers.ofString())
 
         then: "access is granted with 200 OK"
         verifyAll(projectsResp) {
@@ -598,7 +405,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         String aliceEmail = "alice.smith@kaiju.local"
 
         when: "Alice logs in via Authentik and obtains a genuine signed token"
-        Map<String, String> tokens = obtainLiveTokens(aliceEmail)
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens(aliceEmail)
 
         and: "she calls GET /projects presenting the token in the Authorization header"
         def response = client.exchange(
@@ -633,7 +440,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "Sarah Admin (GLOBAL_ADMIN) has full administrative access via live Authentik token"() {
         given: "a live Authentik token for Sarah Admin"
-        Map<String, String> tokens = obtainLiveTokens("sarah.admin1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("sarah.admin1@kaiju.local")
         UUID createdRegionId = null
 
         when: "Sarah calls GET /users to manage system users"
@@ -646,9 +453,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         usersResponse.status == HttpStatus.OK
 
         when: "Sarah calls POST /administrative-regions to create an administrative boundary"
-        def regionPayload = createTestRegionPayload("Sarah Admin Region " + UUID.randomUUID())
+        def regionCommand = data.region().withName("Sarah Admin Region " + UUID.randomUUID()).asCommand()
         def regionResponse = client.exchange(
-                HttpRequest.POST("/administrative-regions", regionPayload)
+                HttpRequest.POST("/administrative-regions", regionCommand)
                         .header("Authorization", "Bearer ${tokens.idToken}"),
                 AdministrativeRegion
         )
@@ -668,13 +475,13 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "Rachel State Director (REGION_DIRECTOR) can manage regions but is denied system user management"() {
         given: "a live Authentik token for Rachel State Director"
-        Map<String, String> tokens = obtainLiveTokens("rachel.state.director1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("rachel.state.director1@kaiju.local")
         UUID createdRegionId = null
 
         when: "Rachel calls POST /administrative-regions to create an administrative boundary"
-        def regionPayload = createTestRegionPayload("Rachel Director Region " + UUID.randomUUID())
+        def regionCommand = data.region().withName("Rachel Director Region " + UUID.randomUUID()).asCommand()
         def regionResponse = client.exchange(
-                HttpRequest.POST("/administrative-regions", regionPayload)
+                HttpRequest.POST("/administrative-regions", regionCommand)
                         .header("Authorization", "Bearer ${tokens.idToken}"),
                 AdministrativeRegion
         )
@@ -704,7 +511,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "Nathan National Admin (ORG_ADMIN / system STANDARD_USER) can access projects but is denied regional and system administration"() {
         given: "a live Authentik token for Nathan National Admin"
-        Map<String, String> tokens = obtainLiveTokens("nathan.national.admin1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("nathan.national.admin1@kaiju.local")
 
         when: "Nathan calls GET /projects"
         def projectsResponse = client.exchange(
@@ -716,8 +523,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         projectsResponse.status == HttpStatus.OK
 
         when: "Nathan attempts to create an administrative region via POST /administrative-regions"
+        def regionCommand = data.region().withName("Nathan Region Attempt").asCommand()
         client.exchange(
-                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Nathan Region Attempt"))
+                HttpRequest.POST("/administrative-regions", regionCommand)
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
@@ -738,7 +546,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "Victor Volunteer (STANDARD_USER) can access projects but is denied administrative region operations"() {
         given: "a live Authentik token for Victor Volunteer"
-        Map<String, String> tokens = obtainLiveTokens("victor.volunteer1@kaiju.local")
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens("victor.volunteer1@kaiju.local")
 
         when: "Victor calls GET /projects"
         def projectsResponse = client.exchange(
@@ -750,8 +558,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         projectsResponse.status == HttpStatus.OK
 
         when: "Victor attempts to create an administrative region via POST /administrative-regions"
+        def regionCommand = data.region().withName("Victor Region Attempt").asCommand()
         client.exchange(
-                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Region Attempt"))
+                HttpRequest.POST("/administrative-regions", regionCommand)
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
@@ -763,14 +572,15 @@ class AuthentikOidcIntegrationSpec extends Specification {
     def "dynamic RBAC reflects immediate permission elevation and revocation with the same live Authentik token"() {
         given: "Victor Volunteer with standard user role and a valid live Authentik token"
         String victorEmail = "victor.volunteer1@kaiju.local"
-        Map<String, String> tokens = obtainLiveTokens(victorEmail)
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens(victorEmail)
         User victor = userRepository.findByEmail(victorEmail).get()
         assert victor.role() == UserRole.STANDARD_USER
         UUID createdRegionId = null
 
         when: "Victor calls POST /administrative-regions with his initial STANDARD_USER role"
+        def preRegion = data.region().withName("Victor Pre-Promotion Region").asCommand()
         client.exchange(
-                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Pre-Promotion Region"))
+                HttpRequest.POST("/administrative-regions", preRegion)
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
@@ -782,8 +592,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         userService.updateRole(victor.id(), UserRole.REGION_DIRECTOR)
 
         and: "Victor presents the exact same live Authentik token to POST /administrative-regions"
+        def promotedRegion = data.region().withName("Victor Promoted Region").asCommand()
         def elevatedResponse = client.exchange(
-                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Promoted Region"))
+                HttpRequest.POST("/administrative-regions", promotedRegion)
                         .header("Authorization", "Bearer ${tokens.idToken}"),
                 AdministrativeRegion
         )
@@ -799,8 +610,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         userService.updateRole(victor.id(), UserRole.STANDARD_USER)
 
         and: "Victor presents the exact same live Authentik token once again"
+        def demotedRegion = data.region().withName("Victor Demoted Region").asCommand()
         client.exchange(
-                HttpRequest.POST("/administrative-regions", createTestRegionPayload("Victor Demoted Region"))
+                HttpRequest.POST("/administrative-regions", demotedRegion)
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
@@ -825,7 +637,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         assert !userRepository.findByEmail(garyEmail).isPresent(): "Gary must not exist in database before first presentation"
 
         when: "Gary logs in via Authentik and calls GET /users presenting his live token"
-        Map<String, String> tokens = obtainLiveTokens(garyEmail)
+        Map<String, String> tokens = authentikDriver.obtainLiveTokens(garyEmail)
         def response = client.exchange(
                 HttpRequest.GET("/users")
                         .header("Authorization", "Bearer ${tokens.idToken}")
