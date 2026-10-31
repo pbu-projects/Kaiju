@@ -26,6 +26,8 @@ import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 @Singleton
 public class ProjectSecurityService {
 
+    private static final String USER_NOT_FOUND = "User not found";
+
     private final SecurityQueryRepository queryRepository;
     private final UserRepository userRepository;
     private final GeometryFactory geometryFactory;
@@ -141,7 +143,7 @@ public class ProjectSecurityService {
      */
     public boolean canAssignManagingRegion(@NonNull UUID userId, @NonNull UUID organizationId, @NonNull UUID regionId) {
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, USER_NOT_FOUND));
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
@@ -158,7 +160,7 @@ public class ProjectSecurityService {
      */
     public boolean canModifyProject(@NonNull UUID userId, @NonNull Project project) {
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, USER_NOT_FOUND));
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
@@ -202,7 +204,7 @@ public class ProjectSecurityService {
      */
     public boolean canReassignProject(@NonNull UUID userId, @NonNull Project project) {
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, USER_NOT_FOUND));
         if (!user.role().hasPermission(Permission.PROJECT_REASSIGN)) {
             return false;
         }
@@ -219,7 +221,7 @@ public class ProjectSecurityService {
      */
     public void authorizeRegionalAdminApproval(@NonNull UUID regionalAdminId, @NonNull UUID projectId) {
         var user = userRepository.findById(regionalAdminId)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, USER_NOT_FOUND));
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return;
         }

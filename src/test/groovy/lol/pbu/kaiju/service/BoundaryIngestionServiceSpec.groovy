@@ -12,17 +12,6 @@ import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLParameters
-import javax.net.ssl.SSLSession
-import java.net.Authenticator
-import java.net.CookieHandler
-import java.net.ProxySelector
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpHeaders
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.io.IOException
@@ -37,11 +26,7 @@ import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.LinearRing
 import org.locationtech.jts.geom.Polygon
-import java.time.Duration
-import java.util.Optional
 import java.util.UUID
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.Executor
 
 @MicronautTest(transactional = false)
 class BoundaryIngestionServiceSpec extends Specification {
