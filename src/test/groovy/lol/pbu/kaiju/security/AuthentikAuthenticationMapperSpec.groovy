@@ -294,28 +294,46 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         }
     }
 
-    def "should include openIdToken and email_verified in authentication attributes when id token is present"() {
-        given: "an incoming token with id token and verified email"
-        String email = "token-${UUID.randomUUID()}@example.com"
-        String rawIdToken = "header.payload.signature"
+    @Unroll
+    def "should correctly process openIdToken '#rawIdToken' with email_verified '#verifiedClaim' (extra fields: #hasExtraFields)"() {
+        given: "an incoming token response and claims"
+        String email = "comb-${UUID.randomUUID()}@example.com"
         OpenIdClaims claims = [
                 getEmail: { -> email },
-                get: { String k -> k == "email_verified" ? true : null }
+                get: { String k -> k == "email_verified" ? verifiedClaim : null }
         ] as OpenIdClaims
+
         OpenIdTokenResponse token = new OpenIdTokenResponse()
         token.setIdToken(rawIdToken)
+        if (hasExtraFields) {
+            token.setAccessToken("test-access-token")
+            token.setTokenType("Bearer")
+            token.setExpiresIn(3600)
+            token.setRefreshToken("test-refresh-token")
+        }
 
         when: "the mapper processes the login"
         def publisher = mapper.createAuthenticationResponse("authentik", token, claims, null)
         AuthenticationResponse response = await(publisher)
 
-        then: "attributes include email, email_verified, and openIdToken"
+        then: "authentication succeeds and attributes reflect expected presence"
         verifyAll(response) {
             isAuthenticated()
             getAuthentication().isPresent()
             getAuthentication().get().getAttributes().get("email") == email
             getAuthentication().get().getAttributes().get("email_verified") == true
-            getAuthentication().get().getAttributes().get(OpenIdAuthenticationMapper.OPENID_TOKEN_KEY) == rawIdToken
+            if (rawIdToken != null && !rawIdToken.isBlank()) {
+                getAuthentication().get().getAttributes().get(OpenIdAuthenticationMapper.OPENID_TOKEN_KEY) == rawIdToken
+            } else {
+                !getAuthentication().get().getAttributes().containsKey(OpenIdAuthenticationMapper.OPENID_TOKEN_KEY)
+            }
         }
+
+        where:
+        [rawIdToken, verifiedClaim, hasExtraFields] << [
+                ["header.payload.signature", null, "", "   "],
+                [true, "true", "TRUE", " true "],
+                [true, false]
+        ].combinations()
     }
 }
