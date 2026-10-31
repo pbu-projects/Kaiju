@@ -1,4 +1,4 @@
-= OAuth2 Login and Callback Testing Guide
+= OAuth Login and Callback Testing Guide
 :toc:
 :toc-levels: 3
 :icons: font
@@ -81,7 +81,7 @@ Kaiju sets a secure `JWT` session cookie in Jenny's browser and redirects her to
 
 == 3. How the Automated Tests Work
 
-All live login tests live in link:../../test/groovy/lol/pbu/kaiju/security/AuthentikOidcIntegrationSpec.groovy[`AuthentikOidcIntegrationSpec`] and run with https://spockframework.org/[Spock Framework]:
+All live login tests live in link:../../../test/groovy/lol/pbu/kaiju/security/AuthentikOidcIntegrationSpec.groovy[`AuthentikOidcIntegrationSpec`] and run with https://spockframework.org/[Spock Framework]:
 
 * **Realistic Cookie Jar**: The test client tracks cookies across domains, handling multiple `Set-Cookie` headers and deleting expired cookies when `Max-Age=0` is sent.
 * **Testing HTTP Status Codes**: The test does not let the HTTP client follow redirects automatically. Instead, it inspects each `302 Found` and `303 See Other` response directly to verify redirect targets and query parameters.

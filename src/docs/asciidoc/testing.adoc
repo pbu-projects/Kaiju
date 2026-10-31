@@ -1,0 +1,15 @@
+= Kaiju Testing Guide
+:doctype: book
+:title-page:
+:toc: left
+:toclevels: 3
+:icons: font
+:sectnums:
+:sectnumlevels: 2
+
+This booklet brings together our automated testing guides and architecture specifications for Kaiju.
+It covers how we verify access control, roles, permissions, and live identity provider logins so community data stays protected.
+
+include::testing/security-rbac.adoc[leveloffset=+1]
+
+include::testing/oauth-testing.adoc[leveloffset=+1]
