@@ -159,6 +159,8 @@ For this reason, controller integration tests must use `@MicronautTest(transacti
 
 Because controller tests cannot use automatic transaction rollback, Kaiju uses `KaijuDataBuilder` to record every persisted ID and clean them up when the test finishes.
 
+<<<<
+  
 === Writing Controller Integration Tests
 
 When writing controller or endpoint tests, extend `BaseControllerSpec`:
