@@ -6,6 +6,8 @@
 :icons: font
 :sectnums:
 :sectnumlevels: 2
+:imagesdir: images
+:source-highlighter: coderay
 
 This booklet brings together our automated testing guides and architecture specifications for Kaiju.
 It covers how we verify access control, roles, permissions, and live identity provider logins so community data stays protected.

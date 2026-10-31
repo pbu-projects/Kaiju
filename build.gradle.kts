@@ -23,6 +23,8 @@ plugins {
 version = project.properties["kaijuVersion"]!!
 group = "lol.pbu"
 
+apply(from = "gradle/diagrams.gradle.kts")
+
 
 
 repositories {
@@ -477,10 +479,20 @@ tasks.test {
 }
 
 tasks.asciidoctorPdf {
+    dependsOn("generateDiagrams")
     baseDirFollowsSourceDir()
     setSourceDir(file("src/docs/asciidoc"))
     setOutputDir(layout.buildDirectory.dir("docs/asciidoctor-pdf").get().asFile)
     sources {
         include("testing.adoc")
+    }
+    asciidoctorj {
+        requires(file("gradle/asciidoctor/load-rouge.rb"))
+        attributes(
+            mapOf(
+                "source-highlighter" to "rouge",
+                "rouge-style" to "github"
+            )
+        )
     }
 }
