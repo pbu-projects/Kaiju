@@ -1,0 +1,209 @@
+= Test Fixtures, Personas, and Data Builders
+:toc:
+:toc-levels: 3
+:icons: font
+
+A practical guide explaining how Kaiju creates, manages, and cleans up test data using standardized personas and fluent data builders.
+
+== Why We Standardize Test Data
+
+Testing complex web applications requires rich data: users with specific permissions, geographic jurisdictions, parent organizations, and scheduled shifts.
+
+If every test creates its own ad-hoc data by inserting raw database rows or hardcoding arbitrary IDs, tests suffer from three common issues:
+
+1. **Brittle Test Failures**: Slight differences in setup data cause unexpected test failures that are hard to debug.
+2. **Database Pollution**: Entities left behind from a failed test run can bleed into other tests, causing cascading failures.
+3. **Hard-to-Read Setup Code**: Long blocks of manual database inserts obscure the actual behavior the test is trying to verify.
+
+To keep tests clean, fast, and repeatable, Kaiju uses two complementary tools:
+
+* **Pre-Seeded Test Personas (`TestPersonas`)**: A consistent cast of users and regions with known roles across regional and organizational hierarchies.
+* **Fluent Test Builders (`KaijuDataBuilder`)**: A builder toolkit that generates valid domain entities with sensible defaults, while automatically tracking and cleaning up created rows after each test.
+
+<<<
+
+== Pre-Seeded Test Personas (`TestPersonas`)
+
+Kaiju's authorization model depends on user roles, geographical jurisdictions (regions), and organization memberships. The `TestPersonas` class defines standard people and places with deterministic UUIDs.
+
+=== Real-World Personas
+
+Our tests simulate real people performing realistic tasks across system, regional, organizational, and volunteer scopes:
+
+[cols="30%,25%,45%",options="header"]
+|===
+| Persona | System Role | Context & Purpose
+
+| `SARAH_ADMIN`
+| `GLOBAL_ADMIN`
+| Platform administrator with unrestricted access across the entire system.
+
+| `RACHEL_STATE_DIRECTOR`
+| `REGION_DIRECTOR`
+| State director for the Colorado region. Manages state-level projects and approves regional activities.
+
+| `DANIEL_COUNTY_DIRECTOR`
+| `REGION_DIRECTOR`
+| County director for Denver County. Oversees projects located within Denver County boundaries.
+
+| `CONNIE_COUNTY_AGENT`
+| `REGION_AGENT`
+| Operational staff member in Denver County who creates shifts and coordinates volunteers.
+
+| `ETHAN_SIBLING_DIRECTOR`
+| `REGION_DIRECTOR`
+| County director for El Paso County (Colorado Springs). Used in cross-jurisdiction security tests.
+
+| `NATHAN_NATIONAL_ADMIN`
+| `STANDARD_USER`
+| Organization admin for the National Relief Network (`ORG_ADMIN`). Tests multi-tenant hierarchy rules.
+
+| `LEO_LOCAL_ADMIN`
+| `STANDARD_USER`
+| Organization admin for the Denver Metro Branch (`ORG_ADMIN`). Tests branch-level operational boundaries.
+
+| `VICTOR_VOLUNTEER`
+| `STANDARD_USER`
+| Active volunteer in Denver participating in projects and signing up for open shifts.
+
+| `JENNY_NEW`
+| `STANDARD_USER`
+| Dynamic persona who exists in the identity provider but not in the database. Tests automatic signup (JIT provisioning).
+|===
+
+<<<
+
+=== Seeded vs. Dynamic Personas: Fast to Write vs. Test Isolation
+
+Kaiju uses two distinct persona patterns to balance developer speed with strict test safety:
+
+* **Seeded Personas (Fast to Write)**:
+  Personas like `SARAH_ADMIN`, `RACHEL_STATE_DIRECTOR`, and `VICTOR_VOLUNTEER` are pre-populated into PostgreSQL during database migration. They exist to maximize developer velocity: developers can write queries, security checks, and read-only tests immediately without spending development time creating dummy regions, organizations, and permissions. They make tests fast to write.
+
+* **Dynamic Personas (Guaranteed Test Isolation)**:
+  Personas like `JENNY_NEW` have `isSeededInDb = false` and exist only in identity provider fixtures until a test creates them. Dynamic personas are required to achieve true https://mrslavchev.com/2018/08/03/hindsight-lessons-about-automation-test-isolation-principle/[Test Isolation].
+  When a test mutates state (such as registering a brand-new volunteer, updating emails, or testing Just-In-Time account creation), mutating a shared seeded persona would alter database state for other tests running later or in parallel. Using dynamic personas ensures that modifying actions run in clean isolation, preventing https://martinfowler.com/articles/nonDeterminism.html[non-deterministic (flaky) test failures].
+
+== Fluent Data Creation (`KaijuDataBuilder`)
+
+When a test needs specific records (such as an organization with three locations, or an urgent project with two shifts), manual construction can be tedious. `KaijuDataBuilder` provides a fluent, chainable API.
+
+=== Key Builders
+
+The builder provides dedicated sub-builders for each core entity:
+
+* `user()`: Builds `User` accounts with custom roles and emails.
+* `organization()`: Builds `Organization` hierarchies with parent-child links, websites, and verification statuses.
+* `organizationUser()`: Builds `OrganizationUser` memberships linking users to organizations with specific roles.
+* `region()`: Builds `AdministrativeRegion` entries across state, county, and city levels.
+* `regionUser()`: Builds `RegionUser` assignments linking users to administrative regions with specific roles.
+* `project()`: Builds `Project` entries with project types, statuses, locations, and boundaries.
+* `shift()`: Builds volunteer `Shift` schedules with start and end times, attendee caps, and skills tags.
+* `tag()`: Builds `Tag` entities for volunteer skills and project categories.
+* `location()` and `boundary()`: Builds physical addresses and spatial geometries (JTS Geometry instances).
+
+Each builder offers two terminal methods:
+
+* `.build()`: Creates an in-memory entity without database persistence.
+* `.persist()`: Saves the entity to the database via its repository and registers the generated ID with `KaijuDataBuilder` for automatic cleanup.
+
+=== Example: Building a Project with Shifts
+
+This example uses `ProjectStatus` (`lol.pbu.kaiju.model.ProjectStatus`) and `OffsetDateTime` (`java.time.OffsetDateTime`):
+
+[source,groovy]
+----
+// Create a parent organization and a local project
+def org = dataBuilder.organization()
+        .withName("Rocky Mountain Relief")
+        .persist()
+
+def project = dataBuilder.project()
+        .withTitle("Downtown Food Drive")
+        .forOrg(org)
+        .withStatus(ProjectStatus.ACTIVE)
+        .persist()
+
+// Add a volunteer shift to the project
+def shift = dataBuilder.shift()
+        .forProject(project)
+        .withTimes(OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(4))
+        .withCapacity(10)
+        .persist()
+----
+
+Sensible defaults are filled automatically using DataFaker for any field not explicitly set, keeping test setups short and readable.
+
+<<<
+
+== Automated Test Isolation and Cleanup
+
+In tests that touch the database, leaving test data behind causes future tests to fail with duplicate key errors or unexpected counts.
+
+=== When `@MicronautTest` Handles Cleanup (and When It Cannot)
+
+A common question is: **Why does Kaiju track and delete records manually if Micronaut already has test transaction support?**
+
+Micronaut Framework provides built-in test rollback using https://micronaut-projects.github.io/micronaut-test/latest/guide/[@MicronautTest(transactional = true)]. We use this whenever possible to avoid reinventing the wheel:
+
+* **When Built-in Rollback Works (`transactional = true`)**:
+  In direct unit and service tests (such as `AuthentikAuthenticationMapperSpec` or `PersonaAuthSpec`), test logic runs directly on the test thread. Micronaut opens a database transaction at the start of the test and automatically rolls it back at the end. No records are permanently saved to PostgreSQL, and no manual cleanup is needed.
+
+* **When Built-in Rollback Cannot Work (`transactional = false`)**:
+  In controller integration tests, the test client sends real HTTP network requests using `client.exchange(...)` against the embedded Netty web server. The web server processes requests on separate worker threads with their own database connections from the Hikari pool.
+  Because the server runs on a different thread:
+  1. Any uncommitted transaction on the test thread would be invisible to the server thread due to https://www.postgresql.org/docs/current/transaction-iso.html[PostgreSQL Read Committed isolation].
+  2. The test thread cannot roll back database transactions committed by the server thread.
+
+For this reason, controller integration tests must use `@MicronautTest(transactional = false)`. Every record saved by the test or by the server is committed for real.
+
+Because controller tests cannot use automatic transaction rollback, Kaiju uses `KaijuDataBuilder` to record every persisted ID and clean them up when the test finishes.
+
+=== Writing Controller Integration Tests
+
+When writing controller or endpoint tests, extend `BaseControllerSpec`:
+
+[source,groovy]
+----
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
+import lol.pbu.kaiju.controller.BaseControllerSpec
+import lol.pbu.kaiju.fixtures.TestPersonas
+
+class ProjectControllerSpec extends BaseControllerSpec {
+
+    def "should return project details for active volunteer"() {
+        given: "a persisted project"
+        def project = dataBuilder.project().persist()
+
+        when: "fetching the project by ID as an authenticated volunteer"
+        def request = authenticated(
+                HttpRequest.GET("/projects/${project.id()}"),
+                TestPersonas.VICTOR_VOLUNTEER
+        )
+        def response = client.exchange(request)
+
+        then: "the project is returned"
+        response.status() == HttpStatus.OK
+    }
+}
+----
+
+IMPORTANT: `BaseControllerSpec` automatically injects `dataBuilder` and calls `dataBuilder.cleanupTrackedEntities()` in its Spock `cleanup()` block. You do not need to wire cleanup logic manually in your test classes.
+
+When `cleanupTrackedEntities()` runs:
+
+1. It deletes child records first (shift signups, project locations, organization links) to respect foreign key constraints.
+2. It deletes main entities (shifts, projects, organizations, users).
+3. It resets its internal tracking sets so the next test begins with a clean slate.
+
+== Running Data Builder Tests
+
+To verify that all builders, entity relationships, and defaults work properly against the domain model, run the dedicated builder test suite:
+
+[source,bash]
+----
+./gradlew test --tests "lol.pbu.kaiju.fixtures.builder.DataBuilderSpec"
+----
+
+Expected result: All unit tests in `DataBuilderSpec` pass in under 5 seconds.
