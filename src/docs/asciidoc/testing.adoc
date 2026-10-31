@@ -9,7 +9,51 @@
 :imagesdir: images
 :source-highlighter: coderay
 
-This booklet brings together testing guides and quality assurance methodologies for Kaiju.
-It covers how we verify logins, data-driven test matrices, and live identity provider flows so community data stays protected.
+[preface]
+== Preface: Core Testing Principles
+
+This booklet brings together the quality assurance standards and testing guides for the Kaiju platform. Every test written in Kaiju serves five overarching principles that every chapter in this guide builds upon:
+
+=== 1. Tests Protect the End User
+Software defects in community tools are not abstract errors: they affect real people like volunteers, community leaders, and donors. Our test suite is our primary defense against security bugs, permission leaks, and data loss, keeping our community safe.
+
+=== 2. Test Integrity: Real Systems Over Fake Mocks
+We avoid fake mocks whenever possible. Mocks only test our own assumptions. Mocks often pass with flying colors while production code breaks because real HTTP headers are dropped, database constraints fail, or token signatures do not match.
+
+This philosophy is baked directly into the https://micronaut-projects.github.io/micronaut-test/latest/guide/#introduction[Micronaut Testing Framework], which was designed specifically to eliminate the traditional divide between unit and integration tests. Because Micronaut uses reflection-free, ahead-of-time compilation, spinning up a real embedded Netty server and a real HTTP client takes only milliseconds. We do not need to fake our network or server layers. Even in simple cases, tests execute against the actual underlying technology stack:
+
+* Real embedded HTTP servers running actual Netty pipelines and security filter chains.
+* Real HTTP client requests parsing live headers, status codes, and cookies.
+* Real https://postgis.net/[PostGIS] databases in Docker verifying spatial constraints and SQL transactions.
+* Real https://goauthentik.io/[Authentik] identity providers generating cryptographically signed tokens.
+
+As the Micronaut documentation emphasizes, these tools do not mock the framework: running a test within `@MicronautTest` runs your real application. Testing the actual technology gives us confidence that code verified in our test suite behaves identically in production.
+
+=== 3. Strict Test Isolation
+Tests must never depend on the execution order of other tests or leave leftover records in the database. When tests share mutable state, a single failure cascades into dozens of misleading "flaky" errors. We enforce https://mrslavchev.com/2018/08/03/hindsight-lessons-about-automation-test-isolation-principle/[Test Isolation] through three techniques:
+
+* Automatic rollback using `@MicronautTest(transactional = true)` for service tests.
+* Deterministic tracking and teardown using `KaijuDataBuilder.cleanupTrackedEntities()` for controller tests running across threads.
+* Dynamic test personas (`isSeededInDb = false`) so modifying actions run against fresh, unpolluted accounts.
+
+=== 4. Test Speed and Feedback Loops
+A test suite that takes hours to run slows down development and discourages frequent verification. We demand fast feedback loops without sacrificing coverage. We achieve high speed through:
+
+* **Pre-Seeded Personas**: Pre-populating reference hierarchies so tests are fast to author and do not waste seconds inserting dummy records.
+* **Combinatorial Testing**: Using Groovy `.combinations()` and Pairwise (PICT) strategies to verify multiple inputs efficiently without combinatorial explosion.
+* **Layered Execution**: Separating fast token mapping tests from slower live browser loop tests.
+
+=== 5. Clear Failure Reports and Maintainability
+When a test fails at 2 AM on a continuous integration server, developers need immediate answers without guessing. We use Spock Framework's `verifyAll` blocks and visual Power Assertions so every failing property is displayed in a single run with exact runtime values.
+
+<<<
+
+include::testing/conventions.adoc[leveloffset=+1]
+
+<<<
+
+include::testing/fixtures-and-personas.adoc[leveloffset=+1]
+
+<<<
 
 include::testing/oauth-testing.adoc[leveloffset=+1]

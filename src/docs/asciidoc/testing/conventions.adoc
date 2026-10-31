@@ -1,0 +1,188 @@
+= General Testing Conventions and Design Patterns
+:toc:
+:toc-levels: 3
+:icons: font
+
+A practical guide for QA engineers and developers explaining our core testing design patterns, Spock conventions, and test execution strategies across Kaiju.
+
+== Test Design: Data-Driven Testing (DDT)
+
+Both developers and QA teams need tests that are thorough without being messy or repetitive. We use https://spockframework.org/[Spock Framework] Data-Driven Testing (DDT) with `@Unroll` and `where:` blocks.
+
+Data-driven testing separates the test logic from the test inputs. 
+
+=== The Visual Table: High Readability for Simple Scenarios
+
+For simple tests with a few distinct cases, a visual table in the `where:` block is easy to read at a glance:
+
+[source,groovy]
+----
+@Unroll
+def "should validate email presence: '#rawEmail'"() {
+    when: "mapper processes incoming claims"
+    def response = processClaims([email: rawEmail])
+
+    then: "it accepts valid emails and rejects blanks"
+    response.isAuthenticated() == expectedValid
+
+    where:
+    rawEmail          | expectedValid
+    "user@kaiju.org"  | true
+    "   "             | false
+    null              | false
+}
+----
+
+Anyone reading this test can immediately see the three scenarios and their expected outcomes side by side.
+
+<<<
+
+=== The Maintenance Challenge: Large Tables
+
+Visual tables work well when scenarios are few. But what happens when you need to test permutations across multiple dimensions?
+
+Consider a security mapper that tests:
+
+* 4 variations of identity tokens (valid token, null, empty string, whitespace)
+* 4 variations of email verification claims (`true`, `"true"`, `"TRUE"`, `" true "`)
+* 2 variations of extra token fields (with or without access and refresh tokens)
+
+Writing this as a visual table requires **32 handwritten rows**:
+
+[source,groovy]
+----
+where:
+rawIdToken                 | verifiedClaim | hasExtraFields
+"header.payload.signature" | true          | true
+"header.payload.signature" | true          | false
+"header.payload.signature" | "true"        | true
+"header.payload.signature" | "true"        | false
+// ... 28 more repetitive rows ...
+----
+
+Handwritten tables of this size create real problems:
+
+1. **High Maintenance Overhead**: If you add a new edge case (such as tab-padded whitespace `"\t"`), you must manually calculate, write, and maintain 8 to 16 new rows.
+2. **Hidden Copy-Paste Errors**: In a 32-row table, an accidental typo in row 27 is easy to miss during code review.
+3. **Cluttered Test Files**: The data table becomes larger than the actual test logic.
+
+=== Using `combinations()` for High Maintainability
+
+To solve this maintenance problem, Kaiju uses Groovy's `.combinations()` method:
+
+[source,groovy]
+----
+where:
+[rawIdToken, verifiedClaim, hasExtraFields] << [
+    ["header.payload.signature", null, "", "   "], // 4 token variants
+    [true, "true", "TRUE", " true "],              // 4 boolean formats
+    [true, false]                                  // 2 extra field states
+].combinations()
+----
+
+This concise 7-line block automatically calculates every possible combination across each list (the Cartesian product: `4 * 4 * 2 = 32` permutations) without writing out 32 separate rows.
+
+<<<
+
+=== Finding the Balance: Readability vs Maintainability
+
+Choosing between a table and `.combinations()` comes down to balancing authoring ease against developer readability:
+
+* **Maintainability in the Code**: With Groovy's `.combinations()`, each variable is defined exactly once in a simple list. Adding a new variant takes a single entry in a list rather than modifying dozens of table rows.
+* **Fast Test Execution with High Coverage**: Combinatorial testing allows us to have adequate test coverage across multi-variable interactions without making our test suite slower than it needs to be.
+* **Readability in Test Reports**: You do not sacrifice readability. Spock's `@Unroll` feature still executes and names each permutation individually in the test report (for example: `should process token: '   ', email_verified: 'true', hasExtra: false`). Developers and QA see the exact inputs for every single test case in Gradle or IDE results.
+
+**Guideline for Test Authors:**
+
+* **Use Visual Tables** when testing a small set of distinct, non-combinatorial business rules (such as 3 to 5 clear boundary cases). Learn more in the https://spockframework.org/spock/docs/2.5/data_driven_testing.html[Spock Data-Driven Testing Guide].
+* **Use `.combinations()`** when verifying cross-cutting variations across multiple independent inputs. Examples in Kaiju include `AuthentikAuthenticationMapperSpec` (32 token parsing permutations) and `ProjectSecurityMatrixSpec` (12 organization and location permission permutations).
+
+== Test Variation Strategies: Combinatorial vs Pairwise (PICT)
+
+When testing multiple input variables, a key question arises: **How many combinations should we test?**
+
+=== The Problem: Combinatorial Explosion
+
+Imagine an endpoint or service that takes 5 parameters, each with 4 possible values. 
+
+If you test every possible combination across each list, you get:
+
+`4 * 4 * 4 * 4 * 4 = 1,024 test cases`
+
+If each test takes 2 seconds to start a web request and check a database, running that single test takes over 34 minutes! This is called the **combinatorial explosion**, and it makes test suites too slow for continuous integration.
+
+=== When We Use Full Combinatorial Testing (`.combinations()`)
+
+In specifications like `AuthentikAuthenticationMapperSpec` and `ProjectSecurityMatrixSpec`, total permutations are kept modest (between 12 and 32 cases). Even with database checks in PostGIS, running a dozen scenarios takes only a couple of seconds once the container starts, giving us thorough coverage with fast test execution.
+
+=== When to Consider Pairwise Testing (PICT)
+
+If a test matrix ever grows beyond 100 permutations, running every combination becomes impractical. In those scenarios, QA teams apply **Pairwise Testing**, also known as **All-Pairs** or https://github.com/microsoft/pict[PICT (Pairwise Independent Combinatorial Testing)].
+
+**The Science Behind Pairwise Testing:**
+
+Extensive software research by the https://csrc.nist.gov/projects/automated-combinatorial-testing-for-software[National Institute of Standards and Technology (NIST)] shows that:
+
+* **Over 70% of software defects** are triggered by a single parameter having an unexpected value.
+* **Over 90% of software defects** are triggered by the interaction of at most two parameters working together.
+* Very few defects require three or more parameters to interact in a specific way.
+
+Pairwise testing uses mathematical algorithms to generate a compact test table where **every pair of input variables is tested together at least once**.
+
+[cols="30%,35%,35%",options="header"]
+|===
+| Strategy | Strengths | Best Used For
+
+| **Full Combinatorial (`.combinations()`)**
+| Tests 100% of all possible variable interactions. Leaves zero edge cases untested.
+| Matrices with under 50 total permutations (such as `AuthentikAuthenticationMapperSpec` and `ProjectSecurityMatrixSpec`).
+
+| **Pairwise / PICT**
+| Cuts hundreds of test cases down to a dozen while still catching over 90% of potential bugs.
+| Very large multi-variable matrices where full combinations would exceed 100 cases.
+
+| **Targeted Persona Journeys**
+| Simulates real humans (like `Jenny New` or `Victor Volunteer`) through complete browser workflows.
+| End-to-end integration tests running against live Docker containers and external systems.
+|===
+
+<<<
+
+== Reading Spock Failure Messages
+
+When tests fail, finding the root cause quickly is critical. Standard test assertions stop on the first failure, hiding whether other properties also failed. In Kaiju, we group checks inside Spock's `verifyAll` block so every condition is tested and reported together.
+
+IMPORTANT: Always wrap multiple property assertions in a `verifyAll` block. Never write consecutive loose assertions without `verifyAll`.
+
+Spock also prints a visual diagram called a **Power Assertion**, showing the exact runtime value under each variable and method call:
+
+[source,text]
+----
+org.spockframework.runtime.SpockMultipleFailuresError: Multiple Failures (2 failures)
+
+-- Failure 1 --
+Condition not satisfied:
+
+getAuthentication().get().getRoles().contains("STANDARD_USER")
+|                   |     |          |
+|                   |     []         false
+|                   Optional[Authentication(name=jenny.new, ...)]
+AuthenticationResponse[authenticated=true]
+
+-- Failure 2 --
+Condition not satisfied:
+
+getAuthentication().get().getAttributes().get("openIdToken") != null
+|                   |     |              |                   |
+|                   |     [email:...]    null                false
+|                   Optional[Authentication(name=jenny.new, ...)]
+AuthenticationResponse[authenticated=true]
+----
+
+=== How to Read the Failure Report
+
+1. **All Failures in One Run**: Notice that Spock reported both failures together rather than stopping after Failure 1. This prevents slow "fix one bug, re-run tests, hit the next bug" loops.
+2. **Follow the Lines to Values**: Each vertical line (`|`) connects a method or property call directly to its value:
+   * Under `getRoles()`, the value is an empty list `[]`. This immediately shows that authentication succeeded, but role mapping did not attach the volunteer role.
+   * Under `get("openIdToken")`, the value is `null`. This shows that the identity token claim was omitted or not preserved by the mapper.
+3. **Pinpoint the Root Cause**: Intermediate values show right away whether a failure came from a missing claim, unexpected database record, or business rule.
