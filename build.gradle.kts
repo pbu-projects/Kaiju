@@ -485,12 +485,13 @@ tasks.asciidoctorPdf {
     setSourceDir(file("src/docs/asciidoc"))
     setOutputDir(layout.buildDirectory.dir("docs/asciidoctor-pdf").get().asFile)
     sources {
-        include("testing.adoc")
+        include("*.adoc")
     }
     asciidoctorj {
         attributes(
             mapOf(
-                "source-highlighter" to "coderay"
+                "source-highlighter" to "coderay",
+                "imagesdir" to "images"
             )
         )
     }
