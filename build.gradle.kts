@@ -94,6 +94,7 @@ graalvmNative {
     binaries {
         all {
             buildArgs.add("-H:+SharedArenaSupport")
+            buildArgs.add("--color=always")
         }
     }
 }
@@ -123,7 +124,7 @@ micronaut {
         replaceLogbackXml = true
     }
     openapi {
-        client(file("docs/openapi.yaml")) {
+        client(file("src/docs/openapi.yaml")) {
             clientId.set("/")
             apiPackageName.set("lol.pbu.kaiju.client.api")
             modelPackageName.set("lol.pbu.kaiju.client.model")
@@ -153,7 +154,7 @@ tasks.named("generateClientOpenApiModels") {
 
 tasks.register<Copy>("generateApiClient") {
     group = "openapi"
-    description = "Generates and updates test HTTP client files from docs/openapi.yaml into src/test/java."
+    description = "Generates and updates test HTTP client files from src/docs/openapi.yaml into src/test/java."
     dependsOn("generateClientOpenApiApis", "generateClientOpenApiModels")
     from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiApis/src/main/java"))
     from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiModels/src/main/java"))
@@ -189,13 +190,13 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.register<Copy>("generateOpenApiSpec") {
     group = "documentation"
-    description = "Exports the compile-time generated OpenAPI specification to docs/openapi.yaml."
+    description = "Exports the compile-time generated OpenAPI specification to src/docs/openapi.yaml."
     dependsOn("compileJava")
     from(layout.buildDirectory.dir("classes/java/main/META-INF/swagger")) {
         include("kaiju-*.yml")
         rename { "openapi.yaml" }
     }
-    into(layout.projectDirectory.dir("docs"))
+    into(layout.projectDirectory.dir("src/docs"))
 }
 // https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
 tasks.withType<AbstractTestTask>().configureEach {
@@ -489,8 +490,7 @@ tasks.asciidoctorPdf {
     asciidoctorj {
         attributes(
             mapOf(
-                "source-highlighter" to "rouge",
-                "rouge-style" to "github"
+                "source-highlighter" to "coderay"
             )
         )
     }
