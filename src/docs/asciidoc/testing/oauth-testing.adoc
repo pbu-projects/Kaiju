@@ -1,85 +1,170 @@
-= OAuth Login and Callback Testing Guide
+= OAuth and Authentication Testing Guide
 :toc:
 :toc-levels: 3
 :icons: font
 
-Guidelines for testing live browser-style login, token exchange, and newcomer account setup in Kaiju.
+A practical guide for QA engineers and developers explaining how Kaiju tests login flows, token parsing, and data-driven test matrices.
 
-[NOTE]
-====
-This guide explains how Kaiju tests real community logins from start to finish. It covers how we test the https://oauth.net/2/[OAuth 2.0] flow, session cookies, and first-time account setup against a real identity provider without using fake mocks.
-====
+== 1. Why We Test Logins This Way
 
-== 1. Why We Test Live Logins
+Logging into an application sounds simple, but real-world authentication touches several moving parts: browser redirects, cookies, digital signatures, and database accounts.
 
-When volunteers and coordinators log into Kaiju, they do not type passwords into Kaiju directly. Instead, they sign in through our identity service, https://goauthentik.io/[Authentik]. 
+In Kaiju, we avoid using fake mocks for login tests. Instead, we test against a live https://goauthentik.io/[Authentik] identity provider running in https://www.docker.com/[Docker]:
 
-In early tests, newcomer account setup was tested by passing mock data directly to internal helper classes in computer memory. While that confirmed our data mapping rules worked, it completely skipped the web server front door.
+* **Real Redirect Chains**: When users log in, their browser bounces between Kaiju and Authentik with HTTP `302 Found` redirects. Real tests ensure redirect query parameters match what identity servers expect.
+* **Real Security Cookies**: Browsers rely on cookies to remember who is logged in and to protect against login tampering. Testing against real HTTP endpoints ensures cookies are set with secure flags and cleared properly.
+* **Real Digital Signatures**: Authentik signs user identity tokens using asymmetric keys (RS256). Testing against a live service proves that key downloading (JWKS) and signature checks succeed before code reaches production.
+* **Fast Separation of Concerns**: We separate tests into two layers: fast in-memory unit tests for parsing logic, and end-to-end integration tests for network communication.
 
-Testing real HTTP web requests protects our community from real-world surprises:
+== 2. What Is Being Tested
 
-* **Real Browser Steps**: When people log in on a phone or laptop, their browser follows redirects back and forth between Kaiju and Authentik. Our tests send real HTTP calls to ensure every redirect points to the right address.
-* **Cookie Security**: Browsers rely on https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies[HTTP Cookies] to track login state and remember who is signed in. Real HTTP tests ensure temporary login cookies are created safely and removed as soon as login finishes.
-* **Zero Fake Mocks**: We test against a live Authentik service running in https://www.docker.com/[Docker]. If Authentik changes how it formats tokens or signs keys, our tests catch it immediately before any real user is affected.
+Our test suite verifies authentication across two complementary test specifications:
 
-== 2. The Login Journey: Jenny New
+=== Layer 1: Live OIDC Integration (`AuthentikOidcIntegrationSpec`)
 
-To understand how login testing works, consider the journey of a brand-new volunteer, Jenny New (`jenny.new@kaiju.local`). 
+This integration test runs a complete browser login flow against a live Authentik container and a real https://www.postgresql.org/[PostgreSQL] database:
 
-Jenny exists in our identity service, but she has never visited Kaiju before. She does not have a row in our https://www.postgresql.org/[PostgreSQL] database.
+1. **Login Initiation (`GET /oauth/login/authentik`)**: The client calls the login start point and verifies that Kaiju returns a `302 Found` redirect to Authentik. It checks that three temporary security cookies are created:
+   * `OAUTH2_STATE`: Protects against cross-site request forgery (CSRF).
+   * `OAUTH2_PKCE`: Stores the code verifier for https://datatracker.ietf.org/doc/html/rfc7636[Proof Key for Code Exchange (PKCE)].
+   * `OPENID_NONCE`: Protects token signatures against replay attacks.
+2. **Authorization Code Callback (`GET /oauth/callback/authentik`)**: The test simulates the browser returning from Authentik with an authorization code and passes back the security cookies.
+3. **Backchannel Token Exchange**: Kaiju calls Authentik over HTTP to exchange the code for signed tokens. The test verifies that Authentik accepts the code and verifier.
+4. **Just-In-Time (JIT) Provisioning**: The test uses a brand-new volunteer persona, `Jenny New` (`jenny.new@kaiju.local`). Jenny exists in Authentik but has no row in PostgreSQL. The test verifies that Kaiju automatically creates her volunteer record with the standard role (`STANDARD_USER`).
+5. **Session Cookie Issuance**: The test verifies that Kaiju responds with a `303 See Other` redirect and sets a secure `JWT` session cookie while clearing temporary login cookies (`Max-Age=0`).
+6. **Downstream API Access**: The test sends a follow-up request to a protected endpoint (`/projects`) using the `JWT` session cookie to prove that https://micronaut-projects.github.io/micronaut-security/latest/guide/[Micronaut Security] recognizes the session without needing bearer tokens.
+7. **Automatic Cleanup**: When the test finishes, Jenny's newly created account is removed from PostgreSQL so future test runs start clean.
 
-image::oauth-login-flow.svg[align="center",width=100%]
+=== Layer 2: Token and Claim Mapping Unit Tests (`AuthentikAuthenticationMapperSpec`)
 
-=== Step 1: Proving Identity in Authentik
+This fast unit test verifies how raw token responses and claim dictionaries convert into Micronaut authentication objects:
 
-Jenny signs in to Authentik with her email and password. Authentik gives her browser an authenticated session cookie.
+* **Token Preservation**: Verifies that the signed ID token string is stored in authentication attributes under the `openIdToken` key so that cookie serializers can create the session cookie.
+* **Email Verification**: Verifies that `email_verified` is mapped to a true boolean, preventing unverified email addresses from gaining access.
+* **Claim Extraction**: Verifies that user email, roles, and names are correctly pulled from token claims.
 
-=== Step 2: Starting the Login at Kaiju
+== 3. Test Design: Data-Driven Testing (DDT)
 
-Jenny's browser visits `/oauth/login/authentik` on the Kaiju web server. Kaiju responds with a `302 Found` redirect sending her to Authentik's authorization screen. Along with this redirect, Kaiju attaches three temporary security cookies:
+Both developers and QA teams need tests that are thorough without being messy or repetitive. We use https://spockframework.org/[Spock Framework] Data-Driven Testing (DDT) with `@Unroll` and `where:` blocks.
 
-* `OAUTH2_STATE`: Protects against cross-site request attacks.
-* `OAUTH2_PKCE`: Stores the code verifier for https://datatracker.ietf.org/doc/html/rfc7636[Proof Key for Code Exchange (PKCE)].
-* `OPENID_NONCE`: Protects https://openid.net/developers/how-connect-works/[OpenID Connect] tokens against replay attacks.
+Data-driven testing separates the test logic from the test inputs:
 
-=== Step 3: Getting the Authorization Code
+[source,groovy]
+----
+@Unroll
+def "should process openIdToken '#rawIdToken' with email_verified '#verifiedClaim'"() {
+    given: "incoming token response and claims"
+    ...
+    when: "mapper processes the login"
+    ...
+    then: "authentication succeeds as expected"
+    ...
+    where:
+    rawIdToken                  | verifiedClaim | expectedValid
+    "header.payload.signature"  | true          | true
+    ""                          | true          | true
+    null                        | false         | false
+}
+----
 
-Jenny's browser follows the redirect to Authentik. Authentik sees her session cookie and immediately approves the request. It redirects her back to Kaiju at `/oauth/callback/authentik` with a one-time authorization code.
+When this test runs, Spock executes the test once for each row in the table, giving each run a distinct name in test reports.
 
-=== Step 4 & 5: Kaiju Exchanges the Code for Tokens
+== 4. Test Variation Strategies: Combinatorial vs Pairwise (PICT)
 
-Jenny's browser sends the code back to Kaiju along with her security cookies. Behind the scenes, the Kaiju server talks directly to Authentik to trade the authorization code and PKCE verifier for a signed https://jwt.io/introduction[JSON Web Token (JWT)].
+When testing multiple input variables, a key question arises: **How many combinations should we test?**
 
-=== Step 6: Creating the Account in the Database
+=== The Problem: The Combinatorial Explosion
 
-Because Jenny is logging in for the first time, Kaiju reads her verified email address from the token. Kaiju creates a new volunteer record for her in PostgreSQL with the standard volunteer role (`STANDARD_USER`).
+Imagine an endpoint or service that takes 5 parameters, each with 4 possible values. 
 
-=== Step 7: Welcome Home
+If you test every possible combination (called the Cartesian product), you get:
 
-Kaiju sets a secure `JWT` session cookie in Jenny's browser and redirects her to the home page (`303 See Other`). Her browser can now use this session cookie to look at volunteer projects, sign up for shifts, and view her profile.
+`4 * 4 * 4 * 4 * 4 = 1,024 test cases`
 
-== 3. How the Automated Tests Work
+If each test takes 2 seconds to start a web request and check a database, running that single test takes over 34 minutes! This is called the **combinatorial explosion**, and it makes test suites too slow for continuous integration.
 
-All live login tests live in link:../../../test/groovy/lol/pbu/kaiju/security/AuthentikOidcIntegrationSpec.groovy[`AuthentikOidcIntegrationSpec`] and run with https://spockframework.org/[Spock Framework]:
+=== When We Use Full Combinatorial Testing (`.combinations()`)
 
-* **Realistic Cookie Jar**: The test client tracks cookies across domains, handling multiple `Set-Cookie` headers and deleting expired cookies when `Max-Age=0` is sent.
-* **Testing HTTP Status Codes**: The test does not let the HTTP client follow redirects automatically. Instead, it inspects each `302 Found` and `303 See Other` response directly to verify redirect targets and query parameters.
-* **Database Verification**: After the callback succeeds, the test queries PostgreSQL directly using `UserRepository` to prove that Jenny's record was created with the correct email, role, and permissions.
-* **Session Cookie Check**: The test uses the received `JWT` cookie to call protected endpoints (like `/projects`). This proves that https://micronaut-projects.github.io/micronaut-security/latest/guide/[Micronaut Security] accepts the cookie without needing any special test headers or bearer tokens.
-* **Automatic Cleanup**: When the test finishes, Jenny's newly created account is removed from PostgreSQL so future test runs start with a clean slate.
+In `AuthentikAuthenticationMapperSpec`, we use Groovy's `.combinations()` method to test all combinations across three variables:
 
-== 4. Running the Tests Locally
+* **ID Token Strings** (4 variations): valid token string, null, empty string `""`, blank whitespace `"   "`
+* **Email Verified Claims** (4 variations): boolean `true`, string `"true"`, uppercase `"TRUE"`, padded string `" true "`
+* **Extra Token Fields** (2 variations): with access and refresh tokens, without extra tokens
 
-To run the OAuth2 integration test suite against the local Docker containers:
+`4 * 4 * 2 = 32 test cases`
+
+**Why full combinations make sense here:**
+
+1. **In-Memory Speed**: This is a unit test. All 32 test cases run in memory in less than 50 milliseconds.
+2. **High Security Sensitivity**: Token parsing is a core security gate. An unexpected null or whitespace string could cause a null pointer exception or bypass a security check.
+3. **No Network Overhead**: Running 32 in-memory checks has zero impact on build time.
+
+=== When We Use Pairwise Testing (PICT)
+
+For broader system tests, such as `ProjectSecurityMatrixSpec`, testing every combination is impractical. In those areas, we use **Pairwise Testing**, also known as **All-Pairs** or https://github.com/microsoft/pict[PICT (Pairwise Independent Combinatorial Testing)].
+
+**The Science Behind Pairwise Testing:**
+
+Extensive software research (such as studies by the National Institute of Standards and Technology) shows that:
+* **Over 70% of software defects** are triggered by a single parameter having an unexpected value.
+* **Over 90% of software defects** are triggered by the interaction of at most two parameters working together.
+* Very few defects require three or more parameters to interact in a specific way.
+
+Pairwise testing uses mathematical algorithms to generate a compact test table where **every pair of input variables is tested together at least once**.
+
+[cols="30%,35%,35%",options="header"]
+|===
+| Strategy | Strengths | Best Used For
+
+| **Full Combinatorial (`.combinations()`)**
+| Tests 100% of all possible variable interactions. Leaves zero edge cases untested.
+| Fast in-memory unit tests with a small set of inputs (under 50 cases).
+
+| **Pairwise / PICT**
+| Cuts hundreds of test cases down to a dozen while still catching over 90% of potential bugs.
+| Complex business rules and multi-variable matrices (roles, jurisdictions, and project states).
+
+| **Targeted Persona Journeys**
+| Simulates real humans (like `Jenny New` or `Victor Volunteer`) through complete browser workflows.
+| Slow integration tests running against live Docker containers and databases.
+|===
+
+== 5. QA Verification Playbook
+
+=== Running the Fast Unit Tests
+
+To run the in-memory token and claim mapping matrix:
+
+[source,bash]
+----
+./gradlew test --tests "lol.pbu.kaiju.security.AuthentikAuthenticationMapperSpec"
+----
+
+Expected result: 55 fast unit test specifications pass in under 5 seconds.
+
+=== Running the Live Integration Tests
+
+To run the full browser redirect and database provisioning test against live Docker containers:
 
 [source,bash]
 ----
 ./gradlew test --tests "lol.pbu.kaiju.security.AuthentikOidcIntegrationSpec"
 ----
 
-To run the fast mapper unit tests:
+Expected result: The test automatically spins up PostGIS in Docker, contacts the live Authentik instance, executes the login redirect loop, verifies Jenny's row in PostgreSQL, and cleans up.
 
-[source,bash]
+=== Reading Spock Failure Messages
+
+If an assertion fails inside a data-driven test, Spock's `verifyAll` reports all failed conditions at once:
+
+[source,text]
 ----
-./gradlew test --tests "lol.pbu.kaiju.security.AuthentikAuthenticationMapperSpec"
+Condition not satisfied:
+
+response.getAuthentication().get().getAttributes().get("email_verified") == true
+|        |                   |   |              |   |                |  |
+|        |                   |   |              |   "false"          |  true
+|        |                   |   |              |                    false
 ----
+
+The report shows the exact intermediate values, making it straightforward to pinpoint whether a failure was caused by a malformed claim, a missing token attribute, or an unexpected database value.

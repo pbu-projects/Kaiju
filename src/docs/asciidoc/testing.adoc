@@ -9,9 +9,7 @@
 :imagesdir: images
 :source-highlighter: coderay
 
-This booklet brings together our automated testing guides and architecture specifications for Kaiju.
-It covers how we verify access control, roles, permissions, and live identity provider logins so community data stays protected.
-
-include::testing/security-rbac.adoc[leveloffset=+1]
+This booklet brings together testing guides and quality assurance methodologies for Kaiju.
+It covers how we verify logins, data-driven test matrices, and live identity provider flows so community data stays protected.
 
 include::testing/oauth-testing.adoc[leveloffset=+1]

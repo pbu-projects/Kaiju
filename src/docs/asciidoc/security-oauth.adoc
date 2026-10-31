@@ -1,0 +1,52 @@
+= OAuth 2.0 and OpenID Connect Architecture
+:toc:
+:toc-levels: 3
+:icons: font
+
+Guidelines explaining how authentication, token exchange, and newcomer account setup work in Kaiju.
+
+== 1. Why We Use an Identity Service
+
+When volunteers and coordinators log into Kaiju, they do not type passwords into Kaiju directly. Instead, they sign in through our identity service, https://goauthentik.io/[Authentik].
+
+Using a dedicated identity provider protects our community in several ways:
+
+* **Separation of Duties**: Kaiju manages volunteer shifts and projects. Authentik securely stores passwords, handles two-factor authentication, and manages user accounts.
+* **Standard Protocols**: We use https://oauth.net/2/[OAuth 2.0] and https://openid.net/developers/how-connect-works/[OpenID Connect (OIDC)]. This lets us securely identify who is signing in without handling raw user passwords.
+* **Cookie Security**: Browsers rely on https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies[HTTP Cookies] to track login state and remember who is signed in. The system creates temporary security cookies during login and replaces them with a secure session cookie once identity is confirmed.
+
+== 2. The Login Journey: Jenny New
+
+To understand how login works, consider the journey of a brand-new volunteer, Jenny New (`jenny.new@kaiju.local`). 
+
+Jenny exists in our identity service, but she has never visited Kaiju before. She does not have an account record in our https://www.postgresql.org/[PostgreSQL] database.
+
+image::oauth-login-flow.svg[align="center",width=100%]
+
+=== Step 1: Proving Identity in Authentik
+
+Jenny signs in to Authentik with her email and password. Authentik confirms her identity and sets an authenticated session cookie in her browser.
+
+=== Step 2: Starting the Login at Kaiju
+
+Jenny's browser visits `/oauth/login/authentik` on the Kaiju web server. Kaiju responds with a `302 Found` redirect sending her to Authentik's authorization screen. Along with this redirect, Kaiju attaches three temporary security cookies:
+
+* `OAUTH2_STATE`: A random string that protects against cross-site request attacks.
+* `OAUTH2_PKCE`: Stores the code verifier for https://datatracker.ietf.org/doc/html/rfc7636[Proof Key for Code Exchange (PKCE)].
+* `OPENID_NONCE`: Protects token signatures against replay attacks.
+
+=== Step 3: Getting the Authorization Code
+
+Jenny's browser follows the redirect to Authentik. Authentik sees her session cookie and immediately approves the request. It redirects her back to Kaiju at `/oauth/callback/authentik` with a one-time authorization code.
+
+=== Step 4 & 5: Kaiju Exchanges the Code for Tokens
+
+Jenny's browser sends the authorization code back to Kaiju along with her temporary security cookies. Behind the scenes, the Kaiju server makes a direct HTTP call to Authentik to trade the authorization code and PKCE verifier for a signed https://jwt.io/introduction[JSON Web Token (JWT)].
+
+=== Step 6: Creating the Account in the Database
+
+Because Jenny is logging in for the first time, Kaiju reads her verified email address from the token. Kaiju automatically creates a new volunteer record for her in PostgreSQL with the standard volunteer role (`STANDARD_USER`). This pattern is called Just-In-Time (JIT) provisioning.
+
+=== Step 7: Welcome Home
+
+Kaiju sets a secure `JWT` session cookie in Jenny's browser and redirects her to the home page (`303 See Other`). Her browser can now use this session cookie to look at volunteer projects, sign up for shifts, and view her profile.
