@@ -17,10 +17,13 @@ plugins {
     id("io.micronaut.test-resources") version "5.0.2"
     id("org.sonarqube") version "7.5.0.8588"
     id("jacoco")
+    id("org.asciidoctor.jvm.pdf") version "4.0.2"
 }
 
 version = project.properties["kaijuVersion"]!!
 group = "lol.pbu"
+
+apply(from = "gradle/diagrams.gradle.kts")
 
 
 
@@ -473,4 +476,23 @@ tasks.jacocoTestReport {
 }
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.asciidoctorPdf {
+    dependsOn("generateDiagrams")
+    baseDirFollowsSourceDir()
+    setSourceDir(file("src/docs/asciidoc"))
+    setOutputDir(layout.buildDirectory.dir("docs/asciidoctor-pdf").get().asFile)
+    sources {
+        include("testing.adoc")
+    }
+    asciidoctorj {
+        requires(file("gradle/asciidoctor/load-rouge.rb"))
+        attributes(
+            mapOf(
+                "source-highlighter" to "rouge",
+                "rouge-style" to "github"
+            )
+        )
+    }
 }

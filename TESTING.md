@@ -16,6 +16,7 @@ Testing in Kaiju is designed around one goal: making sure community volunteers, 
 * **Testing Multiple Situations at Once**: We use data-driven test tables (`@Unroll` and `where:`) to verify many real-world inputs, edge cases, and unexpected mistakes within a single test.
 * **Catching All Errors at Once**: We group property checks inside Spock `verifyAll` blocks. If an update has multiple mistakes, the test reports all of them together rather than stopping at the first failure.
 * **Testing the Front Door**: Controller tests extend `BaseControllerSpec` and send real HTTP requests to the running application. This verifies that security checks, data formatting, and error messages work properly for mobile apps and web browsers.
+* **Live Identity Provider Logins**: We test real browser login and callback flows against a live [Authentik](https://goauthentik.io/) service. For a step-by-step walkthrough of how we test logins, redirects, and first-time account setup, see [OAuth Testing Guide](src/docs/asciidoc/testing/oauth-testing.adoc) in our [Testing Guide Booklet](src/docs/asciidoc/testing.adoc).
 
 ---
 

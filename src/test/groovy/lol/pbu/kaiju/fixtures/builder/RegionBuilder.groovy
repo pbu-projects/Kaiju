@@ -1,11 +1,14 @@
 package lol.pbu.kaiju.fixtures.builder
 
 import lol.pbu.kaiju.domain.AdministrativeRegion
+import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
+import org.locationtech.jts.geom.PrecisionModel
 
 import java.util.UUID
 
@@ -22,14 +25,14 @@ class RegionBuilder {
     private Geometry geom
 
     RegionBuilder(
-            AdministrativeRegionRepository regionRepository,
-            GeometryFactory geometryFactory,
-            Faker faker,
+            AdministrativeRegionRepository regionRepository = null,
+            GeometryFactory geometryFactory = null,
+            Faker faker = null,
             KaijuDataBuilder dataBuilder = null
     ) {
         this.regionRepository = regionRepository
-        this.geometryFactory = geometryFactory
-        this.faker = faker
+        this.geometryFactory = geometryFactory ?: new GeometryFactory(new PrecisionModel(), 4326)
+        this.faker = faker ?: new Faker()
         this.dataBuilder = dataBuilder
     }
 
@@ -72,6 +75,15 @@ class RegionBuilder {
         AdministrativeRegion saved = regionRepository.save(build())
         dataBuilder?.trackRegion(saved.id())
         return saved
+    }
+
+    CreateAdministrativeRegionCommand asCommand() {
+        AdministrativeRegion region = build()
+        Coordinate[] coordinates = region.geom().getCoordinates()
+        List<CoordinateDto> dtos = coordinates.collect { c ->
+            new CoordinateDto(c.getX(), c.getY())
+        }
+        return new CreateAdministrativeRegionCommand(region.name(), region.parentRegionId(), dtos)
     }
 
     private Geometry defaultPolygon() {

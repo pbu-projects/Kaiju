@@ -16,7 +16,7 @@ micronaut:
   metrics:
     enabled: true
   security:
-    authentication: cookie
+    authentication: idtoken
     endpoints:
       logout:
         get-allowed: true
@@ -28,17 +28,13 @@ micronaut:
         claims-validators:
           issuer: ${OAUTH_ISSUER:`http://localhost:9000/application/o/kaiju/`}
           audience: ${OAUTH_CLIENT_ID:kaiju-client}
-        signatures:
-          jwks:
-            authentik:
-              url: ${OAUTH_JWKS_URL:http://localhost:9000/application/o/kaiju/jwks/}
     oauth2:
       clients:
         authentik:
           client-id: ${OAUTH_CLIENT_ID:kaiju-client}
           client-secret: ${OAUTH_CLIENT_SECRET:kaiju-secret}
           openid:
-            issuer: ${OAUTH_ISSUER:http://localhost:9000/application/o/kaiju/}
+            issuer: ${OAUTH_ISSUER:`http://localhost:9000/application/o/kaiju/`}
 datasources:
   default:
     url: jdbc:postgresql://localhost:5432/volunteer_monster

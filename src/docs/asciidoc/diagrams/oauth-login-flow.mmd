@@ -1,0 +1,19 @@
+sequenceDiagram
+    participant Jenny as Jenny's Web Browser
+    participant Kaiju as Kaiju Web Server
+    participant Authentik as Live Authentik Service
+    participant DB as PostgreSQL Database
+
+    Jenny->>Authentik: 1. Jenny enters username and password
+    Authentik-->>Jenny: Confirms identity and creates Authentik session
+    Jenny->>Kaiju: 2. Visits /oauth/login/authentik
+    Kaiju-->>Jenny: Returns 302 redirect to Authentik with state, PKCE, and nonce cookies
+    Jenny->>Authentik: 3. Follows redirect to /application/o/authorize/
+    Authentik-->>Jenny: Returns 302 redirect to Kaiju callback with authorization code
+    Jenny->>Kaiju: 4. Sends code and cookies to /oauth/callback/authentik
+    Kaiju->>Authentik: 5. Exchanges code for signed ID token
+    Authentik-->>Kaiju: Returns RS256 signed ID token
+    Kaiju->>DB: 6. Creates new volunteer record for Jenny (STANDARD_USER)
+    Kaiju-->>Jenny: Returns 303 redirect and sets secure JWT session cookie
+    Jenny->>Kaiju: 7. Calls /projects with JWT session cookie
+    Kaiju-->>Jenny: Returns 200 OK with volunteer project list
