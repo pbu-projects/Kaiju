@@ -17,6 +17,7 @@ plugins {
     id("io.micronaut.test-resources") version "5.0.2"
     id("org.sonarqube") version "7.5.0.8588"
     id("jacoco")
+    id("org.asciidoctor.jvm.pdf") version "4.0.2"
 }
 
 version = project.properties["kaijuVersion"]!!
@@ -473,4 +474,13 @@ tasks.jacocoTestReport {
 }
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.asciidoctorPdf {
+    baseDirFollowsSourceDir()
+    setSourceDir(file("src/docs/asciidoc"))
+    setOutputDir(layout.buildDirectory.dir("docs/asciidoctor-pdf").get().asFile)
+    sources {
+        include("testing.adoc")
+    }
 }
