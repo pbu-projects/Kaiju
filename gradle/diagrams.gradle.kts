@@ -17,7 +17,10 @@ fun sanitizeSvgForPdf(rawSvg: String): String {
     // 3. Give participant boxes Mermaid theme lavender background and purple border
     svg = svg.replace("fill=\"#eaeaea\" stroke=\"#666\"", "fill=\"#ECECFF\" stroke=\"#9370DB\" stroke-width=\"1.5px\"")
 
-    // 4. Strip root container prefix from CSS selectors so class selectors match in PDF renderer
+    // 4. Fix marker orientation so left-pointing return arrows rotate properly in prawn-svg
+    svg = svg.replace("orient=\"auto-start-reverse\"", "orient=\"auto\"")
+
+    // 5. Strip root container prefix from CSS selectors so class selectors match in PDF renderer
     svg = svg.replace(Regex("<style>(.*?)</style>", RegexOption.DOT_MATCHES_ALL)) { match ->
         val style = match.groupValues[1].replace(Regex("#container\\s+"), "")
         "<style>$style</style>"
