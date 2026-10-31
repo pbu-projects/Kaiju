@@ -487,7 +487,6 @@ tasks.asciidoctorPdf {
         include("testing.adoc")
     }
     asciidoctorj {
-        requires(file("gradle/asciidoctor/load-rouge.rb"))
         attributes(
             mapOf(
                 "source-highlighter" to "rouge",
