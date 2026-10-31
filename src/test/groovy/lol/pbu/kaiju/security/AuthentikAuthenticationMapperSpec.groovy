@@ -35,7 +35,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
     @Inject
     AuthentikAuthenticationMapper mapper
 
-    private static <T> T await(Publisher<T> publisher) {
+    static <T> T await(Publisher<T> publisher) {
         CompletableFuture<T> future = new CompletableFuture<>()
         publisher.subscribe(new Subscriber<T>() {
             @Override
@@ -232,8 +232,12 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         OpenIdClaims claims = [
                 getEmail: { -> email },
                 get: { String k ->
-                    if (k == "email_verified") return true
-                    if (k == "groups") return groupClaim
+                    if (k == "email_verified") {
+                        return true
+                    }
+                    if (k == "groups") {
+                        return groupClaim
+                    }
                     return null
                 }
         ] as OpenIdClaims
@@ -269,14 +273,18 @@ class AuthentikAuthenticationMapperSpec extends Specification {
     def "should maintain database role as authoritative when existing user logs in with different IdP group"() {
         given: "an existing user with REGION_DIRECTOR role in database"
         String email = "existing-director-${UUID.randomUUID()}@example.com"
-        User existingUser = userRepository.save(new User(null, email, UserRole.REGION_DIRECTOR, OffsetDateTime.now()))
+        userRepository.save(new User(null, email, UserRole.REGION_DIRECTOR, OffsetDateTime.now()))
 
         and: "an incoming token with different IdP group"
         OpenIdClaims claims = [
                 getEmail: { -> email },
                 get: { String k ->
-                    if (k == "email_verified") return true
-                    if (k == "groups") return ["Kaiju Global Admins"]
+                    if (k == "email_verified") {
+                        return true
+                    }
+                    if (k == "groups") {
+                        return ["Kaiju Global Admins"]
+                    }
                     return null
                 }
         ] as OpenIdClaims
