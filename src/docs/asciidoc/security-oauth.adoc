@@ -5,7 +5,7 @@
 
 Guidelines explaining how authentication, token exchange, and newcomer account setup work in Kaiju.
 
-== 1. Why We Use an Identity Service
+== Why We Use an Identity Service
 
 When volunteers and coordinators log into Kaiju, they do not type passwords into Kaiju directly. Instead, they sign in through our identity service, https://goauthentik.io/[Authentik].
 
@@ -15,7 +15,7 @@ Using a dedicated identity provider protects our community in several ways:
 * **Standard Protocols**: We use https://oauth.net/2/[OAuth 2.0] and https://openid.net/developers/how-connect-works/[OpenID Connect (OIDC)]. This lets us securely identify who is signing in without handling raw user passwords.
 * **Cookie Security**: Browsers rely on https://developer.mozilla.org/en-US/docs/Web/HTTP/Cookies[HTTP Cookies] to track login state and remember who is signed in. The system creates temporary security cookies during login and replaces them with a secure session cookie once identity is confirmed.
 
-== 2. The Login Journey: Jenny New
+== The Login Journey: Jenny New
 
 To understand how login works, consider the journey of a brand-new volunteer, Jenny New (`jenny.new@kaiju.local`). 
 
