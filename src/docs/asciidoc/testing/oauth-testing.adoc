@@ -129,6 +129,8 @@ Pairwise testing uses mathematical algorithms to generate a compact test table w
 | Slow integration tests running against live Docker containers and databases.
 |===
 
+<<<
+
 == 5. QA Verification Playbook
 
 === Running the Fast Unit Tests
@@ -153,18 +155,43 @@ To run the full browser redirect and database provisioning test against live Doc
 
 Expected result: The test automatically spins up PostGIS in Docker, contacts the live Authentik instance, executes the login redirect loop, verifies Jenny's row in PostgreSQL, and cleans up.
 
+<<<
+
 === Reading Spock Failure Messages
 
-If an assertion fails inside a data-driven test, Spock's `verifyAll` reports all failed conditions at once:
+When tests fail, finding the root cause quickly is critical. Standard test assertions stop on the very first failure, hiding whether other properties were also broken. 
+
+In Kaiju, we always use Spock's `verifyAll` block. When multiple checks are grouped inside `verifyAll`, Spock tests every condition and reports all failures together.
+
+In addition, Spock prints a visual diagram called a **Power Assertion**. This diagram traces each step in an expression and prints the exact runtime value under each variable and method call:
 
 [source,text]
 ----
+org.spockframework.runtime.SpockMultipleFailuresError: Multiple Failures (2 failures)
+
+-- Failure 1 --
 Condition not satisfied:
 
-response.getAuthentication().get().getAttributes().get("email_verified") == true
-|        |                   |   |              |   |                |  |
-|        |                   |   |              |   "false"          |  true
-|        |                   |   |              |                    false
+getAuthentication().get().getRoles().contains("STANDARD_USER")
+|                   |     |          |
+|                   |     []         false
+|                   Optional[Authentication(name=jenny.new, ...)]
+AuthenticationResponse[authenticated=true]
+
+-- Failure 2 --
+Condition not satisfied:
+
+getAuthentication().get().getAttributes().get("openIdToken") != null
+|                   |     |              |                   |
+|                   |     [email:...]    null                false
+|                   Optional[Authentication(name=jenny.new, ...)]
+AuthenticationResponse[authenticated=true]
 ----
 
-The report shows the exact intermediate values, making it straightforward to pinpoint whether a failure was caused by a malformed claim, a missing token attribute, or an unexpected database value.
+==== How to Read the Failure Report
+
+1. **All Failures in One Run**: Notice that Spock reported both failures together rather than stopping after Failure 1. This prevents slow "fix one bug, re-run tests, hit the next bug" loops.
+2. **Follow the Lines to Values**: Each vertical line (`|`) connects a method or property call directly to its value:
+   * Under `getRoles()`, the value is an empty list `[]`. This immediately shows that authentication succeeded, but role mapping did not attach the volunteer role.
+   * Under `get("openIdToken")`, the value is `null`. This shows that the identity token claim was omitted or not preserved by the mapper.
+3. **Pinpoint the Root Cause**: With the intermediate values printed on screen, QA and developers can tell right away whether a failure came from a missing claim, an unexpected database value, or an incorrect business rule.
