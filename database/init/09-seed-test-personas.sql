@@ -340,3 +340,100 @@ INSERT INTO organization_users (user_id, organization_id, role) VALUES
 ('c0000000-0000-0000-0000-000000000022', 'b0000000-0000-0000-0000-000000000004', 'ORG_ADMIN'),
 ('c0000000-0000-0000-0000-000000000023', 'b0000000-0000-0000-0000-000000000004', 'ORG_MANAGER'),
 ('c0000000-0000-0000-0000-000000000024', 'b0000000-0000-0000-0000-000000000004', 'ORG_MEMBER');
+
+-- 7. Real Colorado Locations (POC Landmarks Across Hierarchical Boundaries)
+-- Note: Migration 10 (10-timezone-boundaries.sql) adds the timezone column and populates 'America/Denver' for these points.
+INSERT INTO locations (id, name, address_line, city, state_province, postal_code, country_code, geom) VALUES
+('d0000000-0000-0000-0000-000000000001', 'Denver 16th Street Mall Hub', '1001 16th St Mall', 'Denver', 'CO', '80265', 'US', ST_GeographyFromText('POINT(-104.9942 39.7465)')),
+('d0000000-0000-0000-0000-000000000002', 'Denver Civic Center Outreach', '1437 Bannock St', 'Denver', 'CO', '80202', 'US', ST_GeographyFromText('POINT(-104.9928 39.7392)')),
+('d0000000-0000-0000-0000-000000000003', 'Denver Airport Welcome Desk', '8500 Pena Blvd', 'Denver', 'CO', '80249', 'US', ST_GeographyFromText('POINT(-104.6737 39.8561)')),
+('d0000000-0000-0000-0000-000000000004', 'Glendale Community Pantry', '950 S Birch St', 'Glendale', 'CO', '80246', 'US', ST_GeographyFromText('POINT(-104.9336 39.7029)')),
+('d0000000-0000-0000-0000-000000000005', 'Aurora Municipal Relief Center', '15151 E Alameda Pkwy', 'Aurora', 'CO', '80012', 'US', ST_GeographyFromText('POINT(-104.8093 39.7088)')),
+('d0000000-0000-0000-0000-000000000006', 'Boulder Pearl Street Station', '1300 Pearl St', 'Boulder', 'CO', '80302', 'US', ST_GeographyFromText('POINT(-105.2705 40.0150)')),
+('d0000000-0000-0000-0000-000000000007', 'Colorado Springs Civic Hub', '107 N Nevada Ave', 'Colorado Springs', 'CO', '80903', 'US', ST_GeographyFromText('POINT(-104.8214 38.8339)')),
+('d0000000-0000-0000-0000-000000000008', 'Fountain Valley Food Bank', '116 S Main St', 'Fountain', 'CO', '80817', 'US', ST_GeographyFromText('POINT(-104.7008 38.6822)'));
+
+-- 8. Sample Colorado POC Projects
+INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status, created_at, deleted_at, deleted_by) VALUES
+(
+    'e0000000-0000-0000-0000-000000000001',
+    'b0000000-0000-0000-0000-000000000004',
+    'a0000000-0000-0000-0000-000000000004',
+    'Downtown Denver Mall & Civic Clean-Up',
+    'Volunteers help welcome visitors, clean walkways, and restock outreach kits along the 16th Street Mall and Civic Center.',
+    'STANDARD',
+    'ACTIVE',
+    '2026-06-01T00:00:00+00:00',
+    NULL,
+    NULL
+),
+(
+    'e0000000-0000-0000-0000-000000000002',
+    'b0000000-0000-0000-0000-000000000004',
+    'a0000000-0000-0000-0000-000000000002',
+    'DIA Traveler Assistance & Corridor Outreach',
+    'Stationed at the Denver International Airport welcome desk to help stranded travelers and families connect with local transit and shelter.',
+    'OPEN_DOOR',
+    'ACTIVE',
+    '2026-06-01T00:00:00+00:00',
+    NULL,
+    NULL
+),
+(
+    'e0000000-0000-0000-0000-000000000003',
+    'b0000000-0000-0000-0000-000000000002',
+    'a0000000-0000-0000-0000-000000000010',
+    'Arapahoe County Food & Relief Drive',
+    'Sorting fresh produce and packing family meal boxes at the Glendale enclave pantry and the Aurora municipal relief center.',
+    'STANDARD',
+    'ACTIVE',
+    '2026-06-01T00:00:00+00:00',
+    NULL,
+    NULL
+),
+(
+    'e0000000-0000-0000-0000-000000000004',
+    'b0000000-0000-0000-0000-000000000002',
+    'a0000000-0000-0000-0000-000000000001',
+    'Front Range Foothills Trail & Creek Stewardship',
+    'Statewide chapter initiative based at Boulder Pearl Street Station to clear winter debris from local creek paths.',
+    'STANDARD',
+    'ACTIVE',
+    '2026-06-01T00:00:00+00:00',
+    NULL,
+    NULL
+),
+(
+    'e0000000-0000-0000-0000-000000000005',
+    'b0000000-0000-0000-0000-000000000005',
+    'a0000000-0000-0000-0000-000000000003',
+    'Pikes Peak & Fountain Valley Pantry Distribution',
+    'Coordinating weekend food distribution across downtown Colorado Springs and the Fountain Valley Food Bank.',
+    'STANDARD',
+    'ACTIVE',
+    '2026-06-01T00:00:00+00:00',
+    NULL,
+    NULL
+);
+
+-- 9. Link project_locations for POC Projects
+INSERT INTO project_locations (project_id, location_id) VALUES
+('e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001'),
+('e0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000002'),
+('e0000000-0000-0000-0000-000000000002', 'd0000000-0000-0000-0000-000000000003'),
+('e0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000004'),
+('e0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000005'),
+('e0000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000006'),
+('e0000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000007'),
+('e0000000-0000-0000-0000-000000000005', 'd0000000-0000-0000-0000-000000000008');
+
+-- 10. Sample Colorado POC Shifts
+INSERT INTO shifts (id, project_id, is_virtual, location_id, start_time, end_time, capacity) VALUES
+('f0000000-0000-0000-0000-000000000001', 'e0000000-0000-0000-0000-000000000001', FALSE, 'd0000000-0000-0000-0000-000000000001', '2026-12-05T16:00:00+00:00', '2026-12-05T20:00:00+00:00', 20),
+('f0000000-0000-0000-0000-000000000002', 'e0000000-0000-0000-0000-000000000001', FALSE, 'd0000000-0000-0000-0000-000000000002', '2026-12-06T16:00:00+00:00', '2026-12-06T20:00:00+00:00', 25),
+('f0000000-0000-0000-0000-000000000003', 'e0000000-0000-0000-0000-000000000002', FALSE, 'd0000000-0000-0000-0000-000000000003', '2026-12-07T15:00:00+00:00', '2026-12-07T19:00:00+00:00', 15),
+('f0000000-0000-0000-0000-000000000004', 'e0000000-0000-0000-0000-000000000003', FALSE, 'd0000000-0000-0000-0000-000000000004', '2026-12-08T17:00:00+00:00', '2026-12-08T21:00:00+00:00', 30),
+('f0000000-0000-0000-0000-000000000005', 'e0000000-0000-0000-0000-000000000003', FALSE, 'd0000000-0000-0000-0000-000000000005', '2026-12-09T17:00:00+00:00', '2026-12-09T21:00:00+00:00', 35),
+('f0000000-0000-0000-0000-000000000006', 'e0000000-0000-0000-0000-000000000004', FALSE, 'd0000000-0000-0000-0000-000000000006', '2026-12-10T16:00:00+00:00', '2026-12-10T20:00:00+00:00', 20),
+('f0000000-0000-0000-0000-000000000007', 'e0000000-0000-0000-0000-000000000005', FALSE, 'd0000000-0000-0000-0000-000000000007', '2026-12-11T16:00:00+00:00', '2026-12-11T20:00:00+00:00', 25),
+('f0000000-0000-0000-0000-000000000008', 'e0000000-0000-0000-0000-000000000005', FALSE, 'd0000000-0000-0000-0000-000000000008', '2026-12-12T16:00:00+00:00', '2026-12-12T20:00:00+00:00', 30);
