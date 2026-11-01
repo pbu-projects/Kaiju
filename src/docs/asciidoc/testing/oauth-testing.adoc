@@ -22,8 +22,6 @@ Our test suite verifies authentication across two complementary test specificati
 
 === Live OIDC Integration (`AuthentikOidcIntegrationSpec`)
 
-image::oauth-login-flow.svg[align="center",width=100%]
-
 This integration test runs a complete browser login flow against a live Authentik container and a real https://www.postgresql.org/[PostgreSQL] database:
 
 1. **Login Initiation (`GET /oauth/login/authentik`)**: The client calls the login start point and verifies that Kaiju returns a `302 Found` redirect to Authentik. It checks that three temporary security cookies are created:
