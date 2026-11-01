@@ -6,7 +6,7 @@
 :icons: font
 :sectnums:
 :sectnumlevels: 2
-:imagesdir: testing/images
+:imagesdir: images
 :source-highlighter: coderay
 
 [preface]
@@ -23,7 +23,7 @@ Kaiju connects volunteers like Victor Volunteer with projects right in their own
 We never store raw user passwords inside Kaiju. People sign in through a dedicated login service, https://goauthentik.io/[Authentik]. Kaiju checks user permissions on every action, making sure leaders only manage their own teams and volunteers only see what they need to see.
 
 === 3. Saving Money for Charities
-Community non-profits run on tight budgets. We avoid commercial map tools and cloud services that charge per click or send unexpected monthly bills. By using open map data, simplified community border shapes, and our https://www.postgresql.org/[PostgreSQL] database with https://postgis.net/[PostGIS], Kaiju runs at near-zero hosting cost.
+Community non-profits run on tight budgets. By using open map data, simplified community border shapes, and our https://www.postgresql.org/[PostgreSQL] database with https://postgis.net/[PostGIS], Kaiju runs at near-zero hosting cost.
 
 === 4. Fast and Reliable for Everyone
 When volunteers search for projects on their phones, results must load in a fraction of a second. Once a location or volunteer account is saved in our database, all radius searches, shift signups, and project approvals run locally inside PostgreSQL. We do not make slow web calls to outside servers in the middle of everyday actions.
