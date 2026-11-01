@@ -1,9 +1,9 @@
-= OAuth 2.0 and OpenID Connect Architecture
+= Signing In and Volunteer Accounts
 :toc:
 :toc-levels: 3
 :icons: font
 
-Guidelines explaining how authentication, token exchange, and newcomer account setup work in Kaiju.
+A guide explaining how logging in, security tokens, and first-time volunteer account setup work in Kaiju.
 
 == Why We Use an Identity Service
 
