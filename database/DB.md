@@ -88,6 +88,14 @@ controls over project submissions.
   find data somewhere if it's eventually needed
 - Reading: [Event Sourcing & Audit Logs]
 
+### `administrative_region_audit_logs` Table
+
+Provides an immutable historical record of all administrative region changes. Whenever a region is created, updated, deleted, or receives imported boundaries, this ledger records who made the change, the action taken, and detailed metadata.
+
+- Tracks `region_id`, `actor_id` (referencing `users`), `action` (`CREATE`, `UPDATE`, `DELETE`, `BOUNDARY_INGEST`), `metadata` (JSONB), and `created_at`.
+- Preserves audit history even if a region is deleted by avoiding a cascading foreign key constraint on `region_id`.
+- Reading: [Event Sourcing & Audit Logs]
+
 ## Dual-Track Geospatial Strategy: Points vs. Regional Polygons
 
 Our spatial architecture separates geographic data into two distinct tracks to preserve database query speed, avoid misleading user interfaces, and enforce strict legal jurisdictions:

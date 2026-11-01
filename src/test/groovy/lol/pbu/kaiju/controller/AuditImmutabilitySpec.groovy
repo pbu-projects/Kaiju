@@ -38,5 +38,8 @@ class AuditImmutabilitySpec extends BaseControllerSpec {
         "PUT"    | HttpMethod.PUT    | "/organization-audit-logs/${UUID.randomUUID()}"
         "DELETE" | HttpMethod.DELETE | "/organization-audit-logs/${UUID.randomUUID()}"
         "POST"   | HttpMethod.POST   | "/organization-audit-logs"
+        "PUT"    | HttpMethod.PUT    | "/administrative-region-audit-logs/${UUID.randomUUID()}"
+        "DELETE" | HttpMethod.DELETE | "/administrative-region-audit-logs/${UUID.randomUUID()}"
+        "POST"   | HttpMethod.POST   | "/administrative-region-audit-logs"
     }
 }

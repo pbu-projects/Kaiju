@@ -412,11 +412,13 @@ class KaijuDataBuilder {
                 deleteSingle(conn, "DELETE FROM organizations WHERE id = ?", trackedOrganizationIds)
                 deleteSingle(conn, "DELETE FROM locations WHERE id = ?", trackedLocationIds)
                 deleteSingle(conn, "DELETE FROM boundaries WHERE id = ?", trackedBoundaryIds)
+                deleteSingle(conn, "DELETE FROM administrative_region_audit_logs WHERE region_id = ?", trackedRegionIds)
                 executeSingle(conn, "UPDATE administrative_regions SET parent_region_id = NULL WHERE id = ?", trackedRegionIds)
                 deleteSingle(conn, "DELETE FROM administrative_regions WHERE id = ?", trackedRegionIds)
                 deleteSingle(conn, "DELETE FROM tags WHERE id = ?", trackedTagIds)
                 deleteSingle(conn, "DELETE FROM project_audit_logs WHERE actor_id = ?", trackedUserIds)
                 deleteSingle(conn, "DELETE FROM organization_audit_logs WHERE actor_id = ?", trackedUserIds)
+                deleteSingle(conn, "DELETE FROM administrative_region_audit_logs WHERE actor_id = ?", trackedUserIds)
                 deleteSingle(conn, "DELETE FROM users WHERE id = ?", trackedUserIds)
             }
         } finally {

@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * Child location command embedded inside Project commands. CRITICAL: Contains NO 'id' field, eliminating child entity mass assignment (Issue #26).
+ * ProjectLocationCommand
  */
 @JsonPropertyOrder({
     ProjectLocationCommand.JSON_PROPERTY_NAME,
