@@ -251,7 +251,7 @@ INSERT INTO organization_regions (organization_id, region_id) VALUES
 ('b0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000004');
 
 -- 4. Users (System, Region, Org, Independent)
--- Note: jenny.new@kaiju.local is intentionally omitted from the database to test Just-In-Time (JIT) provisioning.
+-- Note: jenny.niu@kaiju.local is intentionally omitted from the database to test Just-In-Time (JIT) provisioning.
 INSERT INTO users (id, email, role, created_at) VALUES
 -- Global System Admins
 ('c0000000-0000-0000-0000-000000000001', 'sarah.admin1@kaiju.local', 'GLOBAL_ADMIN', '2026-06-01T00:00:00+00:00'),

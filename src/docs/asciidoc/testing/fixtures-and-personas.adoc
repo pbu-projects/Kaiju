@@ -66,7 +66,7 @@ Our tests simulate real people performing realistic tasks across system, regiona
 | `STANDARD_USER`
 | Active volunteer in Denver participating in projects and signing up for open shifts.
 
-| `JENNY_NEW`
+| `JENNY_NIU`
 | `STANDARD_USER`
 | Dynamic persona who exists in the identity provider but not in the database. Tests automatic signup (JIT provisioning).
 |===
@@ -81,7 +81,7 @@ Kaiju uses two distinct persona patterns to balance developer speed with strict 
   Personas like `SARAH_ADMIN`, `RACHEL_STATE_DIRECTOR`, and `VICTOR_VOLUNTEER` are pre-populated into PostgreSQL during database migration. They exist to maximize developer velocity: developers can write queries, security checks, and read-only tests immediately without spending development time creating dummy regions, organizations, and permissions. They make tests fast to write.
 
 * **Dynamic Personas (Guaranteed Test Isolation)**:
-  Personas like `JENNY_NEW` have `isSeededInDb = false` and exist only in identity provider fixtures until a test creates them. Dynamic personas are required to achieve true https://mrslavchev.com/2018/08/03/hindsight-lessons-about-automation-test-isolation-principle/[Test Isolation].
+  Personas like `JENNY_NIU` have `isSeededInDb = false` and exist only in identity provider fixtures until a test creates them. Dynamic personas are required to achieve true https://mrslavchev.com/2018/08/03/hindsight-lessons-about-automation-test-isolation-principle/[Test Isolation].
   When a test mutates state (such as registering a brand-new volunteer, updating emails, or testing Just-In-Time account creation), mutating a shared seeded persona would alter database state for other tests running later or in parallel. Using dynamic personas ensures that modifying actions run in clean isolation, preventing https://martinfowler.com/articles/nonDeterminism.html[non-deterministic (flaky) test failures].
 
 == Fluent Data Creation (`KaijuDataBuilder`)

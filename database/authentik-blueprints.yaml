@@ -365,10 +365,10 @@ entries:
   - model: authentik_core.user
     state: present
     identifiers:
-      username: jenny.new@kaiju.local
+      username: jenny.niu@kaiju.local
     attrs:
-      email: jenny.new@kaiju.local
-      name: Jenny New
+      email: jenny.niu@kaiju.local
+      name: Jenny Niu
       is_active: true
       password: "KaijuCommunity2026!"
       groups:

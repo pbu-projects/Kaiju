@@ -96,7 +96,7 @@ This test plan outlines the scenarios required to validate the migration to the 
   - **Expected:** `401 Unauthorized`.
 - [x] **Deterministic Claim to Permission Mapping:** Authenticated personas from different administrative tiers (Global Admins, Regional Directors/Agents, Org Admins/Managers, and Volunteers) receive exact discrete permissions corresponding to their system and regional assignments.
   - **Expected:** Personas can access endpoints permitted by their discrete role permissions, while unauthorized endpoints reject them with `403 Forbidden`.
-- [x] **Just-In-Time (JIT) Newcomer Provisioning:** An unseeded community volunteer (`jenny.new@kaiju.local`) signs in for the first time through the identity provider without an existing database record.
+- [x] **Just-In-Time (JIT) Newcomer Provisioning:** An unseeded community volunteer (`jenny.niu@kaiju.local`) signs in for the first time through the identity provider without an existing database record.
   - **Expected:** A new database record is automatically provisioned with the `STANDARD_USER` role, allowing immediate participation.
 - [ ] **Cross-Tenant Regional & Organizational Hierarchy Containment:** Validated tokens for regional and organizational personas are checked against live controller endpoints to confirm vertical authority delegation and horizontal boundary isolation across the 3-tier structure.
   - **Expected:** Access granted within assigned jurisdiction or hierarchy; access denied (`403 Forbidden`) outside jurisdiction.

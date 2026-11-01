@@ -93,7 +93,7 @@ In real life, coordinators work in teams and hand off tasks. Every administrativ
 | **Local Operations Manager** | Laura Local Manager | `STANDARD_USER` | `ORG_MANAGER` | Manage day-to-day shifts and volunteer rosters locally |
 | **Local Branch Member** | Luke Local Member | `STANDARD_USER` | `ORG_MEMBER` | Assist with event check-in and local branch tasks |
 | **Community Volunteers** | Victor Volunteer 1, Valerie Volunteer 2 | `STANDARD_USER` | None | Discover nearby projects and sign up for weekend shifts |
-| **First-Time Volunteer (JIT)** | Jenny New | `STANDARD_USER` | None | Log in for the very first time; test automatic account setup |
+| **First-Time Volunteer (JIT)** | Jenny Niu | `STANDARD_USER` | None | Log in for the very first time; test automatic account setup |
 
 ---
 
@@ -106,7 +106,7 @@ Tests make sure that sensitive volunteer records and organizational workspaces s
 * **Fast and Repeatable Controller Tests**: Controller integration tests create secure session tokens directly using `BaseControllerSpec.asPersona()`. This makes tests run quickly and reliably without sending slow external web requests to log in for every check.
 * **End-to-End Login Verification**: In `AuthentikOidcIntegrationSpec`, we test the entire login journey against a live [Authentik](https://goauthentik.io/) server. This proves that real browser redirects, code exchanges, and token signatures work seamlessly.
 * **Turning Away Unauthorized Requests**: Tests send expired, tampered, or untrusted login tokens directly to the API, verifying that [Micronaut Security](https://micronaut-projects.github.io/micronaut-security/latest/guide/) turns them away immediately with HTTP `401 Unauthorized` or HTTP `403 Forbidden`.
-* **Welcoming First-Time Volunteers (Jenny New)**: When a new volunteer logs into Kaiju for the very first time, the platform automatically creates a standard volunteer profile in PostgreSQL. Tests verify that newcomers can start browsing and signing up for projects right away without hitting registration roadblocks.
+* **Welcoming First-Time Volunteers (Jenny Niu)**: When a new volunteer logs into Kaiju for the very first time, the platform automatically creates a standard volunteer profile in PostgreSQL. Tests verify that newcomers can start browsing and signing up for projects right away without hitting registration roadblocks.
 
 ---
 

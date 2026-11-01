@@ -142,7 +142,7 @@ Pairwise testing uses mathematical algorithms to generate a compact test table w
 | Very large multi-variable matrices where full combinations would exceed 100 cases.
 
 | **Targeted Persona Journeys**
-| Simulates real humans (like `Jenny New` or `Victor Volunteer`) through complete browser workflows.
+| Simulates real humans (like `Jenny Niu` or `Victor Volunteer`) through complete browser workflows.
 | End-to-end integration tests running against live Docker containers and external systems.
 |===
 
@@ -166,7 +166,7 @@ Condition not satisfied:
 getAuthentication().get().getRoles().contains("STANDARD_USER")
 |                   |     |          |
 |                   |     []         false
-|                   Optional[Authentication(name=jenny.new, ...)]
+|                   Optional[Authentication(name=jenny.niu, ...)]
 AuthenticationResponse[authenticated=true]
 
 -- Failure 2 --
@@ -175,7 +175,7 @@ Condition not satisfied:
 getAuthentication().get().getAttributes().get("openIdToken") != null
 |                   |     |              |                   |
 |                   |     [email:...]    null                false
-|                   Optional[Authentication(name=jenny.new, ...)]
+|                   Optional[Authentication(name=jenny.niu, ...)]
 AuthenticationResponse[authenticated=true]
 ----
 
