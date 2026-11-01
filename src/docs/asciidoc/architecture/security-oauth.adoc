@@ -1,9 +1,9 @@
-= OAuth 2.0 and OpenID Connect Architecture
+= Signing In and Volunteer Accounts
 :toc:
 :toc-levels: 3
 :icons: font
 
-Guidelines explaining how authentication, token exchange, and newcomer account setup work in Kaiju.
+A guide explaining how logging in, security tokens, and first-time volunteer account setup work in Kaiju.
 
 == Why We Use an Identity Service
 
@@ -20,8 +20,6 @@ Using a dedicated identity provider protects our community in several ways:
 To understand how login works, consider the journey of a brand-new volunteer, Jenny New (`jenny.new@kaiju.local`). 
 
 Jenny exists in our identity service, but she has never visited Kaiju before. She does not have an account record in our https://www.postgresql.org/[PostgreSQL] database.
-
-image::oauth-login-flow.svg[align="center",width=100%]
 
 === Step 1: Proving Identity in Authentik
 
@@ -50,3 +48,5 @@ Because Jenny is logging in for the first time, Kaiju reads her verified email a
 === Step 7: Welcome Home
 
 Kaiju sets a secure `JWT` session cookie in Jenny's browser and redirects her to the home page (`303 See Other`). Her browser can now use this session cookie to look at volunteer projects, sign up for shifts, and view her profile.
+
+image::oauth-login-flow.svg[align="center",width=100%]

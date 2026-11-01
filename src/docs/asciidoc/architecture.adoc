@@ -1,0 +1,41 @@
+= Kaiju Architecture Guide
+:doctype: book
+:title-page:
+:toc: left
+:toclevels: 3
+:icons: font
+:sectnums:
+:sectnumlevels: 2
+:imagesdir: images
+:source-highlighter: coderay
+
+[preface]
+== Preface: How We Build Kaiju
+
+This guide explains how Kaiju is built, how it keeps volunteer information safe, and why we make certain technology choices.
+
+Kaiju is designed around four simple goals:
+
+=== 1. Helping Real People in Real Communities
+Kaiju connects volunteers like Victor Volunteer with projects right in their own neighborhoods. Every design choice serves practical community goals: helping volunteers find open shifts close to home, and helping county leaders like Daniel County Director manage projects strictly inside their own communities.
+
+=== 2. Keeping Accounts and Private Data Safe
+We never store raw user passwords inside Kaiju. People sign in through a dedicated login service, https://goauthentik.io/[Authentik]. Kaiju checks user permissions on every action, making sure leaders only manage their own teams and volunteers only see what they need to see.
+
+=== 3. Saving Money for Charities
+Community non-profits run on tight budgets. By using open map data, simplified community border shapes, and our https://www.postgresql.org/[PostgreSQL] database with https://postgis.net/[PostGIS], Kaiju runs at near-zero hosting cost.
+
+=== 4. Fast and Reliable for Everyone
+When volunteers search for projects on their phones, results must load in a fraction of a second. Once a location or volunteer account is saved in our database, all radius searches, shift signups, and project approvals run locally inside PostgreSQL. We do not make slow web calls to outside servers in the middle of everyday actions.
+
+<<<
+
+include::architecture/security-oauth.adoc[leveloffset=+1]
+
+<<<
+
+include::architecture/security-rbac.adoc[leveloffset=+1]
+
+<<<
+
+include::architecture/location-and-boundaries.adoc[leveloffset=+1]
