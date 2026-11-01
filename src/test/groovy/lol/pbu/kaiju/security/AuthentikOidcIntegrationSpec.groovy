@@ -347,9 +347,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         ex.status == HttpStatus.UNAUTHORIZED
     }
 
-    def "live Authentik token for Jenny New triggers JIT provisioning into PostgreSQL as STANDARD_USER"() {
-        given: "unseeded persona Jenny New who exists only in Authentik"
-        String jennyEmail = "jenny.new@kaiju.local"
+    def "live Authentik token for Jenny Niu triggers JIT provisioning into PostgreSQL as STANDARD_USER"() {
+        given: "unseeded persona Jenny Niu who exists only in Authentik"
+        String jennyEmail = "jenny.niu@kaiju.local"
         assert !userRepository.findByEmail(jennyEmail).isPresent(): "Jenny should not exist in database before test"
 
         when: "Jenny logs into Authentik and completes browser OAuth login flow to Kaiju"
