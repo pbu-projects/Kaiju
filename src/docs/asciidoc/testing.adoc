@@ -6,7 +6,7 @@
 :icons: font
 :sectnums:
 :sectnumlevels: 2
-:imagesdir: images
+:imagesdir: testing/images
 :source-highlighter: coderay
 
 [preface]

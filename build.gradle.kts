@@ -491,7 +491,7 @@ tasks.asciidoctorPdf {
         attributes(
             mapOf(
                 "source-highlighter" to "coderay",
-                "imagesdir" to "images"
+                "imagesdir" to "testing/images"
             )
         )
     }

@@ -1,0 +1,41 @@
+= Kaiju Platform Architecture Guide
+:doctype: book
+:title-page:
+:toc: left
+:toclevels: 3
+:icons: font
+:sectnums:
+:sectnumlevels: 2
+:imagesdir: testing/images
+:source-highlighter: coderay
+
+[preface]
+== Preface: Architectural Principles
+
+This booklet brings together the core architectural blueprints for the Kaiju platform. It explains how identity, authorization, and geography work together to support community volunteers and coordinators while keeping data safe and operations reliable.
+
+Every chapter in this guide is designed around four simple principles:
+
+=== 1. Real-World Community Value
+Kaiju exists to connect volunteers with local projects. System design decisions, such as separating exact work sites from regional geofences, directly serve practical goals: fast radius searches for volunteers and strict jurisdictional boundaries for regional directors.
+
+=== 2. Security and Separation of Concerns
+We do not store or handle raw passwords inside Kaiju. Authentication is delegated to an external identity provider using modern open standards. Application security focuses on fine-grained permissions and spatial containment rather than basic role labels.
+
+=== 3. Zero-Cost Infrastructure for Nonprofits
+We avoid commercial map APIs that charge per lookup or restrict how coordinates are stored. By using open data, topological simplification, and PostgreSQL spatial indexes, Kaiju runs at near-zero hosting cost while scaling seamlessly from local pilots to global deployments.
+
+=== 4. Resilient Local Execution
+External services (like geocoders or identity servers) are only involved when strictly necessary. Once a user or location record is saved, all searches, approvals, and shift signups run locally inside PostgreSQL without network latency or external dependencies.
+
+<<<
+
+include::architecture/security-oauth.adoc[leveloffset=+1]
+
+<<<
+
+include::architecture/security-rbac.adoc[leveloffset=+1]
+
+<<<
+
+include::architecture/location-and-boundaries.adoc[leveloffset=+1]

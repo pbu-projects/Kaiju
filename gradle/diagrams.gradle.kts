@@ -33,8 +33,8 @@ tasks.register("generateDiagrams") {
     group = "documentation"
     description = "Generates SVG images from diagram source files using the Kroki API."
 
-    val inputDir = layout.projectDirectory.dir("src/docs/asciidoc/diagrams").asFile
-    val outputDir = layout.projectDirectory.dir("src/docs/asciidoc/images").asFile
+    val inputDir = layout.projectDirectory.dir("src/docs/asciidoc/testing/diagrams").asFile
+    val outputDir = layout.projectDirectory.dir("src/docs/asciidoc/testing/images").asFile
 
     inputs.dir(inputDir)
     outputs.dir(outputDir)
