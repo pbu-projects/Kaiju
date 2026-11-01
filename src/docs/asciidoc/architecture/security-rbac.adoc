@@ -9,6 +9,7 @@ Kaiju helps people find community projects and volunteer their time.
 We want everyone to have an easy time helping out, but we also need to keep information safe. 
 
 Different people have different jobs in the system:
+
 * A volunteer who signs up to clean a park only needs to see projects and join shifts.
 * A regional leader needs to approve local projects and set city boundaries.
 * A platform administrator needs to fix system settings and help users with their accounts.
