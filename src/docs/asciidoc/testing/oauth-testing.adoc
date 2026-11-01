@@ -30,7 +30,7 @@ This integration test runs a complete browser login flow against a live Authenti
    * `OPENID_NONCE`: Protects token signatures against replay attacks.
 2. **Authorization Code Callback (`GET /oauth/callback/authentik`)**: The test simulates the browser returning from Authentik with an authorization code and passes back the security cookies.
 3. **Backchannel Token Exchange**: Kaiju calls Authentik over HTTP to exchange the code for signed tokens. The test verifies that Authentik accepts the code and verifier.
-4. **Just-In-Time (JIT) Provisioning**: The test uses a brand-new volunteer persona, `Jenny New` (`jenny.new@kaiju.local`). Jenny exists in Authentik but has no row in PostgreSQL. The test verifies that Kaiju automatically creates her volunteer record with the standard role (`STANDARD_USER`).
+4. **Just-In-Time (JIT) Provisioning**: The test uses a brand-new volunteer persona, `Jenny Niu` (`jenny.niu@kaiju.local`). Jenny exists in Authentik but has no row in PostgreSQL. The test verifies that Kaiju automatically creates her volunteer record with the standard role (`STANDARD_USER`).
 5. **Session Cookie Issuance**: The test verifies that Kaiju responds with a `303 See Other` redirect and sets a secure `JWT` session cookie while clearing temporary login cookies (`Max-Age=0`).
 6. **Downstream API Access**: The test sends a follow-up request to a protected endpoint (`/projects`) using the `JWT` session cookie to prove that https://micronaut-projects.github.io/micronaut-security/latest/guide/[Micronaut Security] recognizes the session without needing bearer tokens.
 7. **Automatic Cleanup**: When the test finishes, Jenny's newly created account is removed from PostgreSQL so future test runs start clean.

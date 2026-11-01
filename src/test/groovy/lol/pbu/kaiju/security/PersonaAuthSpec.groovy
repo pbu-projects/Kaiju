@@ -465,9 +465,9 @@ class PersonaAuthSpec extends Specification {
         persona << TestPersonas.SEEDED_PERSONAS
     }
 
-    def "JIT provisioning successfully creates jenny.new@kaiju.local in PostgreSQL as STANDARD_USER"() {
-        given: "an unseeded persona Jenny New who exists only in Authentik"
-        def jenny = TestPersonas.JENNY_NEW
+    def "JIT provisioning successfully creates jenny.niu@kaiju.local in PostgreSQL as STANDARD_USER"() {
+        given: "an unseeded persona Jenny Niu who exists only in Authentik"
+        def jenny = TestPersonas.JENNY_NIU
         assert !userRepository.findByEmail(jenny.email).isPresent(): "Jenny should not initially exist in DB"
 
         and: "an incoming token for Jenny"

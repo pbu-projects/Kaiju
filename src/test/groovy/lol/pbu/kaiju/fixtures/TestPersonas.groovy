@@ -367,10 +367,10 @@ class TestPersonas {
     )
 
     // Just-In-Time Provisioning Candidate (Not seeded in DB)
-    static final Persona JENNY_NEW = new Persona(
+    static final Persona JENNY_NIU = new Persona(
             UUID.fromString("c0000000-0000-0000-0000-000000000099"),
-            "jenny.new@kaiju.local",
-            "Jenny New",
+            "jenny.niu@kaiju.local",
+            "Jenny Niu",
             UserRole.STANDARD_USER,
             null,
             null,
@@ -390,7 +390,7 @@ class TestPersonas {
             URSULA_UTAH_ADMIN, ULYSSES_UTAH_ADMIN,
             LEO_LOCAL_ADMIN, LISA_LOCAL_ADMIN, LAURA_LOCAL_MANAGER, LUKE_LOCAL_MEMBER,
             VICTOR_VOLUNTEER, VALERIE_VOLUNTEER,
-            JENNY_NEW
+            JENNY_NIU
     )
 
     static final UUID GLOBAL_ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-000000000000")
