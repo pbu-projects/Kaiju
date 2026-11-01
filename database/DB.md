@@ -130,7 +130,7 @@ When volunteers search for opportunities, the platform resolves results through 
    * Used for virtual, phone, or at-home volunteer opportunities.
    * Query: `WHERE shifts.location_id IS NULL`
 
-For the architectural decision record behind this strategy, see ADR 0003: Dual-Track Geospatial Strategy.
+For the architectural decision record behind this strategy, see ADR 0003: Dual-Track Geospatial Strategy and the [Locations, Regional Boundaries, and Geocoding Guide](../src/docs/asciidoc/location-and-boundaries.adoc).
 
 [4326]: https://epsg.io/4326
 

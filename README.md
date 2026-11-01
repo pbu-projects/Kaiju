@@ -64,7 +64,7 @@ When an emergency response or major holiday drive brings thousands of volunteers
 
 - **Framework**: [Micronaut 5](https://micronaut.io/) (Java 25)
 - **Testing**: [Spock](https://spockframework.org/) and [Testcontainers](https://testcontainers.com/) with live PostgreSQL/PostGIS containers. See [Testing Guidelines](./TESTING.md).
-- **Database**: PostgreSQL + PostGIS via [Flyway](https://documentation.red-gate.com/fd) and [HikariCP](https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html#jdbc). See [Database Schema](./database/DB.md).
+- **Database**: PostgreSQL + PostGIS via [Flyway](https://documentation.red-gate.com/fd) and [HikariCP](https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html#jdbc). See [Database Schema](./database/DB.md) and [Locations & Boundaries Guide](./src/docs/asciidoc/location-and-boundaries.adoc).
 - **Security**: [Micronaut Security](https://micronaut-projects.github.io/micronaut-security/latest/guide/index.html) JWT authentication via [authentik](https://goauthentik.io/).
 - **Serialization & Validation**: Java 25 Records via [Micronaut Serialization](https://micronaut-projects.github.io/micronaut-serialization/latest/guide/) (compile-time, reflection-free) and [Jakarta Validation](https://micronaut-projects.github.io/micronaut-validation/latest/guide/).
 - **Build & Optimization**: Gradle with [Micronaut AOT](https://micronaut-projects.github.io/micronaut-aot/latest/guide/) and [GraalVM](https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html).
