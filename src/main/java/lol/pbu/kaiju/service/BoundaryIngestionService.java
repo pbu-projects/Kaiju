@@ -68,6 +68,7 @@ public class BoundaryIngestionService {
         RETURNING r.name, s.orig_pts, ST_NPoints(r.geom::geometry) AS simp_pts, ST_IsValid(r.geom::geometry) AS is_valid
     """;
 
+    private final AdministrativeRegionService administrativeRegionService;
     private final JdbcOperations jdbcOperations;
     private final ObjectMapper objectMapper;
     private final JtsGeometrySerde jtsGeometrySerde;
@@ -77,13 +78,15 @@ public class BoundaryIngestionService {
 
     @Inject
     public BoundaryIngestionService(
-            JdbcOperations jdbcOperations,
+            @Nullable AdministrativeRegionService administrativeRegionService,
+            @Nullable JdbcOperations jdbcOperations,
             ObjectMapper objectMapper,
             JtsGeometrySerde jtsGeometrySerde,
             @Nullable HttpClient httpClient,
             @Value("${kaiju.tigerweb.allowed-host:tigerweb.geo.census.gov}") String allowedHost,
             @Value("${kaiju.tigerweb.allowed-path-prefix:/arcgis/rest/services/TIGERweb/}") String allowedPathPrefix
     ) {
+        this.administrativeRegionService = administrativeRegionService;
         this.jdbcOperations = jdbcOperations;
         this.objectMapper = objectMapper;
         this.jtsGeometrySerde = jtsGeometrySerde;
@@ -96,26 +99,55 @@ public class BoundaryIngestionService {
     }
 
     public BoundaryIngestionService(
+            AdministrativeRegionService administrativeRegionService,
             JdbcOperations jdbcOperations,
             ObjectMapper objectMapper,
             HttpClient httpClient,
             String allowedHost,
             String allowedPathPrefix
     ) {
-        this(jdbcOperations, objectMapper, new JtsGeometrySerde(), httpClient, allowedHost, allowedPathPrefix);
+        this(administrativeRegionService, jdbcOperations, objectMapper, new JtsGeometrySerde(), httpClient, allowedHost, allowedPathPrefix);
     }
 
+    public BoundaryIngestionService(
+            JdbcOperations jdbcOperations,
+            ObjectMapper objectMapper,
+            HttpClient httpClient,
+            String allowedHost,
+            String allowedPathPrefix
+    ) {
+        this(null, jdbcOperations, objectMapper, new JtsGeometrySerde(), httpClient, allowedHost, allowedPathPrefix);
+    }
 
+    public BoundaryIngestionService(
+            JdbcOperations jdbcOperations,
+            ObjectMapper objectMapper,
+            JtsGeometrySerde jtsGeometrySerde,
+            @Nullable HttpClient httpClient,
+            String allowedHost,
+            String allowedPathPrefix
+    ) {
+        this(null, jdbcOperations, objectMapper, jtsGeometrySerde, httpClient, allowedHost, allowedPathPrefix);
+    }
+
+    public JdbcOperations getJdbcOperations() {
+        return jdbcOperations;
+    }
+
+    public AdministrativeRegionService getAdministrativeRegionService() {
+        return administrativeRegionService;
+    }
 
     /**
      * Downloads boundary from authoritative Census Bureau endpoint, validates GeoJSON geometry,
      * simplifies geometry preserving topology, and updates administrative region in database.
      *
-     * @param regionId the administrative region UUID
-     * @param command  the ingest command containing source URL and optional tolerance
+     * @param regionId    the administrative region UUID
+     * @param command     the ingest command containing source URL and optional tolerance
+     * @param actorUserId the user initiating boundary ingestion
      * @return response containing region summary and reduction metrics
      */
-    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryCommand command) {
+    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryCommand command, @Nullable UUID actorUserId) {
         if (regionId == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Region ID must not be null.");
         }
@@ -140,7 +172,15 @@ public class BoundaryIngestionService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Failed to serialize geometry: " + e.getMessage());
         }
 
+        if (administrativeRegionService != null && actorUserId != null) {
+            return administrativeRegionService.applyIngestedBoundary(regionId, geomJson, tolerance, command.sourceUrl(), actorUserId);
+        }
+
         return updateRegionBoundary(regionId, geomJson, tolerance);
+    }
+
+    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryCommand command) {
+        return ingestBoundary(regionId, command, null);
     }
 
     private URI validateSourceUrl(String sourceUrl) {

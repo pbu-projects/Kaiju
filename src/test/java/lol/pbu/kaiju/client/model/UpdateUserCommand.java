@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * Note: 'role' is intentionally excluded to prevent self-privilege escalation during profile update. Roles are modified exclusively via AdminUserController#updateUserRole.
+ * UpdateUserCommand
  */
 @JsonPropertyOrder(UpdateUserCommand.JSON_PROPERTY_EMAIL)
 @Serdeable

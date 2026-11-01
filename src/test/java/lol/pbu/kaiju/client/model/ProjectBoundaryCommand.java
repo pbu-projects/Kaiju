@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * Child boundary command embedded inside Project commands. CRITICAL: Contains NO 'id' field, eliminating child entity mass assignment (Issue #26).
+ * ProjectBoundaryCommand
  */
 @JsonPropertyOrder({
     ProjectBoundaryCommand.JSON_PROPERTY_NAME,
