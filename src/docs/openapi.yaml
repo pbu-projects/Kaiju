@@ -15,20 +15,15 @@ security:
 paths:
   /admin/users/{id}/role:
     put:
-      summary: Explicit endpoint for role elevation.
-      description: Explicit endpoint for role elevation. Prevents Mass Assignment
-        by only accepting a RoleUpdateRequest.
       operationId: updateUserRole
       parameters:
       - name: id
         in: path
-        description: the ID of the user to promote/demote
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the requested role
         content:
           application/json:
             schema:
@@ -36,22 +31,24 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated user
+          description: updateUserRole 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
-  /administrative-regions:
+  /administrative-region-audit-logs:
     get:
-      summary: Retrieves a paginated list of administrative regions using cursor-based
-        pagination.
-      description: Retrieves a paginated list of administrative regions using cursor-based
-        pagination. Accessible to all authenticated platform roles.
-      operationId: getAdministrativeRegions
+      operationId: getAdministrativeRegionAuditLogs
       parameters:
+      - name: regionId
+        in: query
+        explode: false
+        schema:
+          type: string
+          format: uuid
+          nullable: true
       - name: pageable
         in: query
-        description: "cursor pagination parameters (cursor, limit, sort)"
         explode: false
         schema:
           nullable: true
@@ -59,20 +56,49 @@ paths:
           - $ref: "#/components/schemas/CursoredPageable"
       responses:
         "200":
-          description: a CursoredPage containing administrative region entities and
-            next cursor details
+          description: getAdministrativeRegionAuditLogs 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CursoredPage_AdministrativeRegionAuditLog_"
+  /administrative-region-audit-logs/{id}:
+    get:
+      operationId: getAdministrativeRegionAuditLog
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: getAdministrativeRegionAuditLog 200 response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdministrativeRegionAuditLog"
+  /administrative-regions:
+    get:
+      operationId: getAdministrativeRegions
+      parameters:
+      - name: pageable
+        in: query
+        explode: false
+        schema:
+          nullable: true
+          allOf:
+          - $ref: "#/components/schemas/CursoredPageable"
+      responses:
+        "200":
+          description: getAdministrativeRegions 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CursoredPage_AdministrativeRegion_"
     post:
-      summary: Creates and persists a new administrative region polygon.
-      description: Creates and persists a new administrative region polygon. Restricted
-        to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
       operationId: addAdministrativeRegion
       requestBody:
-        description: "the administrative region creation command, including its geographic\
-          \ boundary coordinates"
         content:
           application/json:
             schema:
@@ -80,48 +106,38 @@ paths:
         required: true
       responses:
         "200":
-          description: the persisted AdministrativeRegion with its assigned identifier
+          description: addAdministrativeRegion 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdministrativeRegion"
   /administrative-regions/{id}:
     get:
-      summary: Retrieves an administrative region by its unique identifier.
-      description: Retrieves an administrative region by its unique identifier. Accessible
-        to all authenticated platform roles.
       operationId: getAdministrativeRegion
       parameters:
       - name: id
         in: path
-        description: the unique UUID of the administrative region
         required: true
         schema:
           type: string
           format: uuid
       responses:
         "200":
-          description: "an Optional containing the matching AdministrativeRegion,\
-            \ or empty if not found"
+          description: getAdministrativeRegion 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdministrativeRegion"
     put:
-      summary: Updates an existing administrative region by ID.
-      description: Updates an existing administrative region by ID. Restricted to
-        platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
       operationId: updateAdministrativeRegion
       parameters:
       - name: id
         in: path
-        description: the unique UUID of the administrative region to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated region command data
         content:
           application/json:
             schema:
@@ -129,20 +145,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated AdministrativeRegion
+          description: updateAdministrativeRegion 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/AdministrativeRegion"
     delete:
-      summary: Deletes an administrative region by its unique identifier.
-      description: Deletes an administrative region by its unique identifier. Restricted
-        to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
       operationId: deleteAdministrativeRegion
       parameters:
       - name: id
         in: path
-        description: the unique UUID of the administrative region to delete
         required: true
         schema:
           type: string
@@ -152,23 +164,15 @@ paths:
           description: deleteAdministrativeRegion 200 response
   /administrative-regions/{id}/boundary/ingest:
     post:
-      summary: "Ingests, simplifies, and validates a geographic boundary for an administrative\
-        \ region from an authoritative external source such as US Census Bureau TIGERweb."
-      description: "Ingests, simplifies, and validates a geographic boundary for an\
-        \ administrative region from an authoritative external source such as US Census\
-        \ Bureau TIGERweb. Restricted strictly to platform administrators (`GLOBAL_ADMIN`)."
       operationId: ingestBoundary
       parameters:
       - name: id
         in: path
-        description: the unique UUID of the administrative region to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the boundary ingestion command containing source URL and optional
-          tolerance
         content:
           application/json:
             schema:
@@ -176,20 +180,17 @@ paths:
         required: true
       responses:
         "200":
-          description: the ingestion summary response
+          description: ingestBoundary 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/IngestBoundaryResponse"
   /boundaries:
     get:
-      summary: Retrieves a paginated list of geographic boundaries.
-      description: Retrieves a paginated list of geographic boundaries.
       operationId: getBoundaries
       parameters:
       - name: pageable
         in: query
-        description: pagination and sorting parameters
         explode: false
         schema:
           nullable: true
@@ -197,18 +198,14 @@ paths:
           - $ref: "#/components/schemas/CursoredPageable"
       responses:
         "200":
-          description: a cursored page of Boundary records
+          description: getBoundaries 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CursoredPage_Boundary_"
     post:
-      summary: Creates a new boundary polygon.
-      description: Creates a new boundary polygon. Restricted to platform administrators
-        (`system:admin`) and regional managers (`region:manage`).
       operationId: addBoundary
       requestBody:
-        description: the payload containing boundary name and polygon coordinates
         content:
           application/json:
             schema:
@@ -216,48 +213,38 @@ paths:
         required: true
       responses:
         "200":
-          description: the persisted Boundary
+          description: addBoundary 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Boundary"
   /boundaries/{id}:
     get:
-      summary: Retrieves a specific boundary by its identifier.
-      description: Retrieves a specific boundary by its identifier.
       operationId: getBoundary
       parameters:
       - name: id
         in: path
-        description: the unique identifier of the boundary
         required: true
         schema:
           type: string
           format: uuid
       responses:
         "200":
-          description: an optional containing the Boundary if found
+          description: getBoundary 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Boundary"
     put:
-      summary: Updates an existing boundary by its ID after validating that it exists.
-      description: Updates an existing boundary by its ID after validating that it
-        exists. Restricted to platform administrators (`system:admin`) and regional
-        managers (`region:manage`). Throws 404 NOT_FOUND if the boundary does not
-        exist.
       operationId: updateBoundary
       parameters:
       - name: id
         in: path
-        description: the ID of the boundary to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated boundary details
         content:
           application/json:
             schema:
@@ -265,21 +252,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated boundary
+          description: updateBoundary 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Boundary"
     delete:
-      summary: Deletes a boundary by its ID after validating that it exists.
-      description: Deletes a boundary by its ID after validating that it exists. Restricted
-        to platform administrators (`system:admin`) and regional managers (`region:manage`).
-        Throws 404 NOT_FOUND if the boundary does not exist.
       operationId: deleteBoundary
       parameters:
       - name: id
         in: path
-        description: the ID of the boundary to delete
         required: true
         schema:
           type: string
@@ -306,12 +288,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/CursoredPage_Location_"
     post:
-      summary: Creates a new location.
-      description: Creates a new location. Restricted to platform administrators and
-        regional managers.
       operationId: addLocation
       requestBody:
-        description: the payload containing location details
         content:
           application/json:
             schema:
@@ -319,7 +297,7 @@ paths:
         required: true
       responses:
         "200":
-          description: the persisted location
+          description: addLocation 200 response
           content:
             application/json:
               schema:
@@ -342,21 +320,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Location"
     put:
-      summary: Updates an existing location by its ID after validating that it exists.
-      description: Updates an existing location by its ID after validating that it
-        exists. Restricted to platform administrators and regional managers. Throws
-        404 NOT_FOUND if the location does not exist.
       operationId: updateLocation
       parameters:
       - name: id
         in: path
-        description: the ID of the location to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated location details
         content:
           application/json:
             schema:
@@ -364,21 +336,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated location
+          description: updateLocation 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Location"
     delete:
-      summary: Deletes a location by its ID after validating that it exists.
-      description: Deletes a location by its ID after validating that it exists. Restricted
-        to platform administrators and regional managers. Throws 404 NOT_FOUND if
-        the location does not exist.
       operationId: deleteById
       parameters:
       - name: id
         in: path
-        description: the ID of the location to delete
         required: true
         schema:
           type: string
@@ -558,15 +525,10 @@ paths:
                 $ref: "#/components/schemas/Organization"
   /organizations/search-by-location:
     get:
-      summary: Searches organizations by geographic coordinates and radius.
-      description: "Searches organizations by geographic coordinates and radius. Finds\
-        \ organizations associated with locations within `radiusMeters` of the given\
-        \ point, ordered by distance ascending."
       operationId: searchByLocation
       parameters:
       - name: longitude
         in: query
-        description: the longitude of the center point
         required: true
         explode: false
         schema:
@@ -576,7 +538,6 @@ paths:
           format: double
       - name: latitude
         in: query
-        description: the latitude of the center point
         required: true
         explode: false
         schema:
@@ -586,7 +547,6 @@ paths:
           format: double
       - name: radiusMeters
         in: query
-        description: the search radius in meters
         required: true
         explode: false
         schema:
@@ -597,68 +557,52 @@ paths:
           format: double
       - name: pageable
         in: query
-        description: pagination parameters
         required: true
         explode: false
         schema:
           $ref: "#/components/schemas/Pageable"
       responses:
         "200":
-          description: "a page of organizations within range, closest first"
+          description: searchByLocation 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Page_Organization_"
   /organizations/search-by-name:
     get:
-      summary: Searches organizations by name.
-      description: "Searches organizations by name. Supports exact name matching when\
-        \ `exact=true` or when the search query is enclosed in quotes (e.g. \"The\
-        \ Salvation Army\"). Otherwise, performs an intelligent tiered ranking search\
-        \ where exact matches are ranked first, followed by prefix matches, word-boundary\
-        \ matches, general substring matches, and typo-tolerant trigram similarity\
-        \ matches."
       operationId: searchByName
       parameters:
       - name: name
         in: query
-        description: the organization name or query string
         required: true
         explode: false
         schema:
           type: string
       - name: exact
         in: query
-        description: whether to force an exact case-insensitive match
         explode: false
         schema:
           type: boolean
           default: false
       - name: pageable
         in: query
-        description: pagination parameters
         required: true
         explode: false
         schema:
           $ref: "#/components/schemas/Pageable"
       responses:
         "200":
-          description: a page of matching organizations
+          description: searchByName 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Page_Organization_"
   /organizations/search-by-region:
     get:
-      summary: Searches organizations associated with an administrative region.
-      description: "Searches organizations associated with an administrative region.\
-        \ Only returns verified, public organizations operating within the specified\
-        \ region."
       operationId: searchByRegion
       parameters:
       - name: regionId
         in: query
-        description: the unique identifier of the administrative region
         required: true
         explode: false
         schema:
@@ -666,14 +610,13 @@ paths:
           format: uuid
       - name: pageable
         in: query
-        description: pagination parameters
         required: true
         explode: false
         schema:
           $ref: "#/components/schemas/Pageable"
       responses:
         "200":
-          description: a page of matching organizations in the region
+          description: searchByRegion 200 response
           content:
             application/json:
               schema:
@@ -696,21 +639,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Organization"
     put:
-      summary: Updates an existing organization by its ID after validating that it
-        exists.
-      description: Updates an existing organization by its ID after validating that
-        it exists. Throws 404 NOT_FOUND if the organization does not exist.
       operationId: updateOrganization
       parameters:
       - name: id
         in: path
-        description: the ID of the organization to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated organization command
         content:
           application/json:
             schema:
@@ -718,20 +655,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated organization
+          description: updateOrganization 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Organization"
     delete:
-      summary: Deletes an organization by its ID after validating that it exists.
-      description: Deletes an organization by its ID after validating that it exists.
-        Throws 404 NOT_FOUND if the organization does not exist.
       operationId: deleteOrganization
       parameters:
       - name: id
         in: path
-        description: the ID of the organization to delete
         required: true
         schema:
           type: string
@@ -815,16 +748,10 @@ paths:
                 $ref: "#/components/schemas/Project"
   /projects/search-by-location:
     get:
-      summary: Searches active projects by their closest location coordinates within
-        a given radius.
-      description: "Searches active projects by their closest location coordinates\
-        \ within a given radius. Each project is returned only once, representing\
-        \ its closest location within range."
       operationId: searchByLocation_1
       parameters:
       - name: longitude
         in: query
-        description: the longitude of the center point
         required: true
         explode: false
         schema:
@@ -834,7 +761,6 @@ paths:
           format: double
       - name: latitude
         in: query
-        description: the latitude of the center point
         required: true
         explode: false
         schema:
@@ -844,7 +770,6 @@ paths:
           format: double
       - name: radiusMeters
         in: query
-        description: the search radius in meters
         required: true
         explode: false
         schema:
@@ -855,14 +780,13 @@ paths:
           format: double
       - name: pageable
         in: query
-        description: pagination information
         required: true
         explode: false
         schema:
           $ref: "#/components/schemas/Pageable"
       responses:
         "200":
-          description: a page of project search cards sorted by distance
+          description: searchByLocation_1 200 response
           content:
             application/json:
               schema:
@@ -885,9 +809,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Project"
     put:
-      summary: Updates an existing project by its ID after validating that it exists.
-      description: Updates an existing project by its ID after validating that it
-        exists.
       operationId: updateProject
       parameters:
       - name: id
@@ -910,8 +831,6 @@ paths:
               schema:
                 $ref: "#/components/schemas/Project"
     delete:
-      summary: Deletes a project by its ID after validating that it exists.
-      description: Deletes a project by its ID after validating that it exists.
       operationId: deleteProject
       parameters:
       - name: id
@@ -925,9 +844,6 @@ paths:
           description: deleteProject 200 response
   /projects/{id}/status:
     put:
-      summary: Endpoint for Regional Admins to approve a pending project.
-      description: Endpoint for Regional Admins to approve a pending project. The
-        service layer enforces that the Regional Admin actually has geographic jurisdiction.
       operationId: approveProject
       parameters:
       - name: id
@@ -945,13 +861,10 @@ paths:
                 $ref: "#/components/schemas/Project"
   /region-users:
     get:
-      summary: Retrieves a paginated list of regional user associations.
-      description: Retrieves a paginated list of regional user associations.
       operationId: getRegionUsers
       parameters:
       - name: pageable
         in: query
-        description: pagination and sorting parameters
         explode: false
         schema:
           nullable: true
@@ -959,20 +872,14 @@ paths:
           - $ref: "#/components/schemas/CursoredPageable"
       responses:
         "200":
-          description: a cursored page of RegionUser records
+          description: getRegionUsers 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CursoredPage_RegionUser_"
     post:
-      summary: Associates a user with an administrative region under a designated
-        role.
-      description: Associates a user with an administrative region under a designated
-        role. Restricted to platform administrators (`system:admin`) and regional
-        managers (`region:manage`).
       operationId: addRegionUser
       requestBody:
-        description: "the payload containing the target user ID, region ID, and role"
         content:
           application/json:
             schema:
@@ -980,61 +887,50 @@ paths:
         required: true
       responses:
         "200":
-          description: the persisted RegionUser relationship
+          description: addRegionUser 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegionUser"
   /region-users/{userId}/{regionId}:
     get:
-      summary: Retrieves a specific region-user association by composite identifier.
-      description: Retrieves a specific region-user association by composite identifier.
       operationId: getRegionUser
       parameters:
       - name: userId
         in: path
-        description: the unique identifier of the user
         required: true
         schema:
           type: string
           format: uuid
       - name: regionId
         in: path
-        description: the unique identifier of the region
         required: true
         schema:
           type: string
           format: uuid
       responses:
         "200":
-          description: an optional containing the RegionUser if found
+          description: getRegionUser 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegionUser"
     put:
-      summary: Updates an existing user role assignment within an administrative region.
-      description: Updates an existing user role assignment within an administrative
-        region. Restricted to platform administrators (`system:admin`) and regional
-        managers (`region:manage`).
       operationId: updateRegionUser
       parameters:
       - name: userId
         in: path
-        description: the unique identifier of the user
         required: true
         schema:
           type: string
           format: uuid
       - name: regionId
         in: path
-        description: the unique identifier of the region
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the payload containing the new role assignment
         content:
           application/json:
             schema:
@@ -1042,27 +938,22 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated RegionUser relationship
+          description: updateRegionUser 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/RegionUser"
     delete:
-      summary: Removes a user role assignment from an administrative region.
-      description: Removes a user role assignment from an administrative region. Restricted
-        to platform administrators (`system:admin`) and regional managers (`region:manage`).
       operationId: deleteRegionUser
       parameters:
       - name: userId
         in: path
-        description: the unique identifier of the user to remove
         required: true
         schema:
           type: string
           format: uuid
       - name: regionId
         in: path
-        description: the unique identifier of the region
         required: true
         schema:
           type: string
@@ -1121,22 +1012,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/Shift"
     put:
-      summary: Updates an existing shift by its ID after validating that it exists.
-      description: Updates an existing shift by its ID after validating that it exists.
-        Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project.
-        Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND
-        if the shift does not exist.
       operationId: updateShift
       parameters:
       - name: id
         in: path
-        description: the ID of the shift to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated shift details
         content:
           application/json:
             schema:
@@ -1144,22 +1028,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated shift
+          description: updateShift 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Shift"
     delete:
-      summary: Deletes a shift by its ID after validating that it exists.
-      description: Deletes a shift by its ID after validating that it exists. Enforces
-        that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws
-        403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND
-        if the shift does not exist.
       operationId: deleteShift
       parameters:
       - name: id
         in: path
-        description: the ID of the shift to delete
         required: true
         schema:
           type: string
@@ -1169,13 +1047,10 @@ paths:
           description: deleteShift 200 response
   /tags:
     get:
-      summary: Retrieves a paginated list of tags.
-      description: Retrieves a paginated list of tags.
       operationId: getTags
       parameters:
       - name: pageable
         in: query
-        description: pagination and sorting parameters
         explode: false
         schema:
           nullable: true
@@ -1183,18 +1058,14 @@ paths:
           - $ref: "#/components/schemas/CursoredPageable"
       responses:
         "200":
-          description: a cursored page of tags
+          description: getTags 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/CursoredPage_Tag_"
     post:
-      summary: Creates a new tag.
-      description: Creates a new tag. Restricted to platform administrators and regional
-        managers.
       operationId: addTag
       requestBody:
-        description: the payload containing tag details
         content:
           application/json:
             schema:
@@ -1202,47 +1073,38 @@ paths:
         required: true
       responses:
         "200":
-          description: the persisted tag
+          description: addTag 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Tag"
   /tags/{id}:
     get:
-      summary: Retrieves a specific tag by its identifier.
-      description: Retrieves a specific tag by its identifier.
       operationId: getTag
       parameters:
       - name: id
         in: path
-        description: the unique identifier of the tag
         required: true
         schema:
           type: string
           format: uuid
       responses:
         "200":
-          description: an optional containing the tag if found
+          description: getTag 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Tag"
     put:
-      summary: Updates an existing tag by its ID after validating that it exists.
-      description: Updates an existing tag by its ID after validating that it exists.
-        Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND
-        if the tag does not exist.
       operationId: updateTag
       parameters:
       - name: id
         in: path
-        description: the ID of the tag to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated tag details
         content:
           application/json:
             schema:
@@ -1250,21 +1112,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated tag
+          description: updateTag 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Tag"
     delete:
-      summary: Deletes a tag by its ID after validating that it exists.
-      description: Deletes a tag by its ID after validating that it exists. Restricted
-        to platform administrators and regional managers. Throws 404 NOT_FOUND if
-        the tag does not exist.
       operationId: deleteTag
       parameters:
       - name: id
         in: path
-        description: the ID of the tag to delete
         required: true
         schema:
           type: string
@@ -1333,23 +1190,15 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
     put:
-      summary: Updates an existing user by its ID.
-      description: "Updates an existing user by its ID. Prevents Mass Assignment by\
-        \ explicitly retaining the existing user's role and createdAt timestamp. Enforces\
-        \ horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.\
-        \ Throws 403 FORBIDDEN if the user attempts to modify another account without\
-        \ system manage privileges. Throws 404 NOT_FOUND if the user does not exist."
       operationId: updateUser
       parameters:
       - name: id
         in: path
-        description: the ID of the user to update
         required: true
         schema:
           type: string
           format: uuid
       requestBody:
-        description: the updated user details
         content:
           application/json:
             schema:
@@ -1357,22 +1206,16 @@ paths:
         required: true
       responses:
         "200":
-          description: the updated user
+          description: updateUser 200 response
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
     delete:
-      summary: Deletes a user by its ID after validating that it exists.
-      description: "Deletes a user by its ID after validating that it exists. Enforces\
-        \ horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.\
-        \ Throws 403 FORBIDDEN if the user attempts to delete another account without\
-        \ system manage privileges. Throws 404 NOT_FOUND if the user does not exist."
       operationId: deleteUser
       parameters:
       - name: id
         in: path
-        description: the ID of the user to delete
         required: true
         schema:
           type: string
@@ -1403,6 +1246,32 @@ components:
           type: string
           format: uuid
           nullable: true
+    AdministrativeRegionAuditLog:
+      required:
+      - action
+      - actor
+      - createdAt
+      - id
+      - regionId
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        regionId:
+          type: string
+          format: uuid
+          x-not-null-message: Audit log region ID is required.
+        actor:
+          $ref: "#/components/schemas/User"
+        action:
+          $ref: "#/components/schemas/RegionAuditAction"
+        metadata:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
     AuditAction:
       type: string
       enum:
@@ -1748,9 +1617,27 @@ components:
           nullable: true
           allOf:
           - $ref: "#/components/schemas/UserRole"
-      description: "Note: 'role' is @Nullable to guarantee registration defaults safely\
-        \ to STANDARD_USER. Role Escalation Guard: Only callers holding SYSTEM_USER_MANAGE_CLAIM\
-        \ may assign an elevated role."
+    CursoredPage_AdministrativeRegionAuditLog_:
+      required:
+      - cursors
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Page_AdministrativeRegionAuditLog_"
+      - $ref: "#/components/schemas/Slice_AdministrativeRegionAuditLog_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
+          cursors:
+            type: array
+            items:
+              $ref: "#/components/schemas/Pageable.Cursor"
     CursoredPage_AdministrativeRegion_:
       required:
       - cursors
@@ -2313,6 +2200,21 @@ components:
       - ORG_MEMBER
       - ORG_MANAGER
       - ORG_ADMIN
+    Page_AdministrativeRegionAuditLog_:
+      required:
+      - totalPages
+      - totalSize
+      type: object
+      allOf:
+      - $ref: "#/components/schemas/Slice_AdministrativeRegionAuditLog_"
+      - type: object
+        properties:
+          totalSize:
+            type: integer
+            format: int64
+          totalPages:
+            type: integer
+            format: int32
     Page_AdministrativeRegion_:
       required:
       - totalPages
@@ -2693,9 +2595,6 @@ components:
             $ref: "#/components/schemas/CoordinateDto"
           x-size-message: A polygon boundary must contain at least 3 coordinates.
           x-not-null-message: Boundary coordinates are required.
-      description: "Child boundary command embedded inside Project commands. CRITICAL:\
-        \ Contains NO 'id' field, eliminating child entity mass assignment (Issue\
-        \ #26)."
     ProjectLocationCommand:
       required:
       - addressLine
@@ -2754,9 +2653,6 @@ components:
           x-maximum-message: Latitude must be less than or equal to 90.
           x-minimum-message: Latitude must be greater than or equal to -90.
           x-not-null-message: Latitude is required.
-      description: "Child location command embedded inside Project commands. CRITICAL:\
-        \ Contains NO 'id' field, eliminating child entity mass assignment (Issue\
-        \ #26)."
     ProjectSearchCard:
       required:
       - locationId
@@ -2794,6 +2690,13 @@ components:
       - STANDARD
       - OPEN_DOOR
       - REGIONAL
+    RegionAuditAction:
+      type: string
+      enum:
+      - CREATE
+      - UPDATE
+      - DELETE
+      - BOUNDARY_INGEST
     RegionUser:
       required:
       - id
@@ -2861,6 +2764,37 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Tag"
+    Slice_AdministrativeRegionAuditLog_:
+      required:
+      - content
+      - empty
+      - numberOfElements
+      - offset
+      - pageNumber
+      - pageable
+      - size
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdministrativeRegionAuditLog"
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        pageNumber:
+          type: integer
+          format: int32
+        offset:
+          type: integer
+          format: int64
+        size:
+          type: integer
+          format: int32
+        empty:
+          type: boolean
+        numberOfElements:
+          type: integer
+          format: int32
     Slice_AdministrativeRegion_:
       required:
       - content
@@ -3539,8 +3473,6 @@ components:
           format: email
           x-pattern-message: User email must be a valid email address.
           x-size-message: User email must be between 1 and 255 characters.
-      description: "Note: 'role' is intentionally excluded to prevent self-privilege\
-        \ escalation during profile update. Roles are modified exclusively via AdminUserController#updateUserRole."
     User:
       required:
       - createdAt

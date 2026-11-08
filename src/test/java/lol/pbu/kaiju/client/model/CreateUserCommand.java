@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * Note: 'role' is @Nullable to guarantee registration defaults safely to STANDARD_USER. Role Escalation Guard: Only callers holding SYSTEM_USER_MANAGE_CLAIM may assign an elevated role.
+ * CreateUserCommand
  */
 @JsonPropertyOrder({
     CreateUserCommand.JSON_PROPERTY_EMAIL,

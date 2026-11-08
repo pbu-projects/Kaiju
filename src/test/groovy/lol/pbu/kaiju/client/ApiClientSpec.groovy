@@ -6,6 +6,7 @@ import lol.pbu.kaiju.client.api.DefaultApi
 import lol.pbu.kaiju.client.model.AdministrativeRegion
 import lol.pbu.kaiju.client.model.CreateTagCommand
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegion
+import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegionAuditLog
 import lol.pbu.kaiju.client.model.CursoredPageBoundary
 import lol.pbu.kaiju.client.model.CursoredPageLocation
 import lol.pbu.kaiju.client.model.CursoredPageOrganization
@@ -245,6 +246,12 @@ class ApiClientSpec extends BaseControllerSpec {
 
         then: "project audit logs response is valid"
         projLogs != null
+
+        when: "fetching administrative region audit logs"
+        CursoredPageAdministrativeRegionAuditLog regionLogs = defaultApi.getAdministrativeRegionAuditLogs(null, null)
+
+        then: "administrative region audit logs response is valid"
+        regionLogs != null
     }
 
     def "can list region users and organization users"() {

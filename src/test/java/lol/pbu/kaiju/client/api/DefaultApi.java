@@ -16,6 +16,7 @@ import io.micronaut.core.annotation.*;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.core.convert.format.Format;
 import lol.pbu.kaiju.client.model.AdministrativeRegion;
+import lol.pbu.kaiju.client.model.AdministrativeRegionAuditLog;
 import lol.pbu.kaiju.client.model.Boundary;
 import lol.pbu.kaiju.client.model.CreateAdministrativeRegionCommand;
 import lol.pbu.kaiju.client.model.CreateBoundaryCommand;
@@ -28,6 +29,7 @@ import lol.pbu.kaiju.client.model.CreateShiftCommand;
 import lol.pbu.kaiju.client.model.CreateTagCommand;
 import lol.pbu.kaiju.client.model.CreateUserCommand;
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegion;
+import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegionAuditLog;
 import lol.pbu.kaiju.client.model.CursoredPageBoundary;
 import lol.pbu.kaiju.client.model.CursoredPageLocation;
 import lol.pbu.kaiju.client.model.CursoredPageOrganization;
@@ -80,12 +82,11 @@ import jakarta.validation.constraints.*;
 public interface DefaultApi {
 
     /**
-     * {@summary Creates and persists a new administrative region polygon.}
-     * Creates and persists a new administrative region polygon. Restricted to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
+     * addAdministrativeRegion
      *
-     * @param createAdministrativeRegionCommand the administrative region creation command, including its geographic boundary coordinates (required)
+     * @param createAdministrativeRegionCommand (required)
      *
-     * @return the persisted AdministrativeRegion with its assigned identifier (status code 200)
+     * @return addAdministrativeRegion 200 response (status code 200)
      */
     @Post("/administrative-regions")
     AdministrativeRegion addAdministrativeRegion(
@@ -93,12 +94,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Creates a new boundary polygon.}
-     * Creates a new boundary polygon. Restricted to platform administrators (`system:admin`) and regional managers (`region:manage`).
+     * addBoundary
      *
-     * @param createBoundaryCommand the payload containing boundary name and polygon coordinates (required)
+     * @param createBoundaryCommand (required)
      *
-     * @return the persisted Boundary (status code 200)
+     * @return addBoundary 200 response (status code 200)
      */
     @Post("/boundaries")
     Boundary addBoundary(
@@ -106,12 +106,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Creates a new location.}
-     * Creates a new location. Restricted to platform administrators and regional managers.
+     * addLocation
      *
-     * @param createLocationCommand the payload containing location details (required)
+     * @param createLocationCommand (required)
      *
-     * @return the persisted location (status code 200)
+     * @return addLocation 200 response (status code 200)
      */
     @Post("/locations")
     Location addLocation(
@@ -143,12 +142,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Associates a user with an administrative region under a designated role.}
-     * Associates a user with an administrative region under a designated role. Restricted to platform administrators (`system:admin`) and regional managers (`region:manage`).
+     * addRegionUser
      *
-     * @param createRegionUserCommand the payload containing the target user ID, region ID, and role (required)
+     * @param createRegionUserCommand (required)
      *
-     * @return the persisted RegionUser relationship (status code 200)
+     * @return addRegionUser 200 response (status code 200)
      */
     @Post("/region-users")
     RegionUser addRegionUser(
@@ -168,12 +166,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Creates a new tag.}
-     * Creates a new tag. Restricted to platform administrators and regional managers.
+     * addTag
      *
-     * @param createTagCommand the payload containing tag details (required)
+     * @param createTagCommand (required)
      *
-     * @return the persisted tag (status code 200)
+     * @return addTag 200 response (status code 200)
      */
     @Post("/tags")
     Tag addTag(
@@ -193,8 +190,7 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Endpoint for Regional Admins to approve a pending project.}
-     * Endpoint for Regional Admins to approve a pending project. The service layer enforces that the Regional Admin actually has geographic jurisdiction.
+     * approveProject
      *
      * @param id (required)
      *
@@ -206,10 +202,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes an administrative region by its unique identifier.}
-     * Deletes an administrative region by its unique identifier. Restricted to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
+     * deleteAdministrativeRegion
      *
-     * @param id the unique UUID of the administrative region to delete (required)
+     * @param id (required)
      */
     @Delete("/administrative-regions/{id}")
     void deleteAdministrativeRegion(
@@ -217,10 +212,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a boundary by its ID after validating that it exists.}
-     * Deletes a boundary by its ID after validating that it exists. Restricted to platform administrators (`system:admin`) and regional managers (`region:manage`). Throws 404 NOT_FOUND if the boundary does not exist.
+     * deleteBoundary
      *
-     * @param id the ID of the boundary to delete (required)
+     * @param id (required)
      */
     @Delete("/boundaries/{id}")
     void deleteBoundary(
@@ -228,10 +222,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a location by its ID after validating that it exists.}
-     * Deletes a location by its ID after validating that it exists. Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND if the location does not exist.
+     * deleteById
      *
-     * @param id the ID of the location to delete (required)
+     * @param id (required)
      */
     @Delete("/locations/{id}")
     void deleteById(
@@ -239,10 +232,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes an organization by its ID after validating that it exists.}
-     * Deletes an organization by its ID after validating that it exists. Throws 404 NOT_FOUND if the organization does not exist.
+     * deleteOrganization
      *
-     * @param id the ID of the organization to delete (required)
+     * @param id (required)
      */
     @Delete("/organizations/{id}")
     void deleteOrganization(
@@ -262,8 +254,7 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a project by its ID after validating that it exists.}
-     * Deletes a project by its ID after validating that it exists.
+     * deleteProject
      *
      * @param id (required)
      */
@@ -273,11 +264,10 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Removes a user role assignment from an administrative region.}
-     * Removes a user role assignment from an administrative region. Restricted to platform administrators (`system:admin`) and regional managers (`region:manage`).
+     * deleteRegionUser
      *
-     * @param userId the unique identifier of the user to remove (required)
-     * @param regionId the unique identifier of the region (required)
+     * @param userId (required)
+     * @param regionId (required)
      */
     @Delete("/region-users/{userId}/{regionId}")
     void deleteRegionUser(
@@ -286,10 +276,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a shift by its ID after validating that it exists.}
-     * Deletes a shift by its ID after validating that it exists. Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND if the shift does not exist.
+     * deleteShift
      *
-     * @param id the ID of the shift to delete (required)
+     * @param id (required)
      */
     @Delete("/shifts/{id}")
     void deleteShift(
@@ -297,10 +286,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a tag by its ID after validating that it exists.}
-     * Deletes a tag by its ID after validating that it exists. Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND if the tag does not exist.
+     * deleteTag
      *
-     * @param id the ID of the tag to delete (required)
+     * @param id (required)
      */
     @Delete("/tags/{id}")
     void deleteTag(
@@ -308,10 +296,9 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a user by its ID after validating that it exists.}
-     * Deletes a user by its ID after validating that it exists. Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE. Throws 403 FORBIDDEN if the user attempts to delete another account without system manage privileges. Throws 404 NOT_FOUND if the user does not exist.
+     * deleteUser
      *
-     * @param id the ID of the user to delete (required)
+     * @param id (required)
      */
     @Delete("/users/{id}")
     void deleteUser(
@@ -319,12 +306,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves an administrative region by its unique identifier.}
-     * Retrieves an administrative region by its unique identifier. Accessible to all authenticated platform roles.
+     * getAdministrativeRegion
      *
-     * @param id the unique UUID of the administrative region (required)
+     * @param id (required)
      *
-     * @return an Optional containing the matching AdministrativeRegion, or empty if not found (status code 200)
+     * @return getAdministrativeRegion 200 response (status code 200)
      */
     @Get("/administrative-regions/{id}")
     AdministrativeRegion getAdministrativeRegion(
@@ -332,12 +318,37 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a paginated list of administrative regions using cursor-based pagination.}
-     * Retrieves a paginated list of administrative regions using cursor-based pagination. Accessible to all authenticated platform roles.
+     * getAdministrativeRegionAuditLog
      *
-     * @param pageable cursor pagination parameters (cursor, limit, sort) (optional)
+     * @param id (required)
      *
-     * @return a CursoredPage containing administrative region entities and next cursor details (status code 200)
+     * @return getAdministrativeRegionAuditLog 200 response (status code 200)
+     */
+    @Get("/administrative-region-audit-logs/{id}")
+    AdministrativeRegionAuditLog getAdministrativeRegionAuditLog(
+        @PathVariable("id") @NotNull UUID id
+    );
+
+    /**
+     * getAdministrativeRegionAuditLogs
+     *
+     * @param regionId (optional)
+     * @param pageable (optional)
+     *
+     * @return getAdministrativeRegionAuditLogs 200 response (status code 200)
+     */
+    @Get("/administrative-region-audit-logs")
+    CursoredPageAdministrativeRegionAuditLog getAdministrativeRegionAuditLogs(
+        @QueryValue("regionId") @Nullable UUID regionId,
+        @QueryValue("pageable") @Nullable @Valid CursoredPageable pageable
+    );
+
+    /**
+     * getAdministrativeRegions
+     *
+     * @param pageable (optional)
+     *
+     * @return getAdministrativeRegions 200 response (status code 200)
      */
     @Get("/administrative-regions")
     CursoredPageAdministrativeRegion getAdministrativeRegions(
@@ -345,12 +356,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a paginated list of geographic boundaries.}
-     * Retrieves a paginated list of geographic boundaries.
+     * getBoundaries
      *
-     * @param pageable pagination and sorting parameters (optional)
+     * @param pageable (optional)
      *
-     * @return a cursored page of Boundary records (status code 200)
+     * @return getBoundaries 200 response (status code 200)
      */
     @Get("/boundaries")
     CursoredPageBoundary getBoundaries(
@@ -358,12 +368,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a specific boundary by its identifier.}
-     * Retrieves a specific boundary by its identifier.
+     * getBoundary
      *
-     * @param id the unique identifier of the boundary (required)
+     * @param id (required)
      *
-     * @return an optional containing the Boundary if found (status code 200)
+     * @return getBoundary 200 response (status code 200)
      */
     @Get("/boundaries/{id}")
     Boundary getBoundary(
@@ -527,13 +536,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a specific region-user association by composite identifier.}
-     * Retrieves a specific region-user association by composite identifier.
+     * getRegionUser
      *
-     * @param userId the unique identifier of the user (required)
-     * @param regionId the unique identifier of the region (required)
+     * @param userId (required)
+     * @param regionId (required)
      *
-     * @return an optional containing the RegionUser if found (status code 200)
+     * @return getRegionUser 200 response (status code 200)
      */
     @Get("/region-users/{userId}/{regionId}")
     RegionUser getRegionUser(
@@ -542,12 +550,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a paginated list of regional user associations.}
-     * Retrieves a paginated list of regional user associations.
+     * getRegionUsers
      *
-     * @param pageable pagination and sorting parameters (optional)
+     * @param pageable (optional)
      *
-     * @return a cursored page of RegionUser records (status code 200)
+     * @return getRegionUsers 200 response (status code 200)
      */
     @Get("/region-users")
     CursoredPageRegionUser getRegionUsers(
@@ -579,12 +586,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a specific tag by its identifier.}
-     * Retrieves a specific tag by its identifier.
+     * getTag
      *
-     * @param id the unique identifier of the tag (required)
+     * @param id (required)
      *
-     * @return an optional containing the tag if found (status code 200)
+     * @return getTag 200 response (status code 200)
      */
     @Get("/tags/{id}")
     Tag getTag(
@@ -592,12 +598,11 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Retrieves a paginated list of tags.}
-     * Retrieves a paginated list of tags.
+     * getTags
      *
-     * @param pageable pagination and sorting parameters (optional)
+     * @param pageable (optional)
      *
-     * @return a cursored page of tags (status code 200)
+     * @return getTags 200 response (status code 200)
      */
     @Get("/tags")
     CursoredPageTag getTags(
@@ -629,13 +634,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Ingests, simplifies, and validates a geographic boundary for an administrative region from an authoritative external source such as US Census Bureau TIGERweb.}
-     * Ingests, simplifies, and validates a geographic boundary for an administrative region from an authoritative external source such as US Census Bureau TIGERweb. Restricted strictly to platform administrators (`GLOBAL_ADMIN`).
+     * ingestBoundary
      *
-     * @param id the unique UUID of the administrative region to update (required)
-     * @param ingestBoundaryCommand the boundary ingestion command containing source URL and optional tolerance (required)
+     * @param id (required)
+     * @param ingestBoundaryCommand (required)
      *
-     * @return the ingestion summary response (status code 200)
+     * @return ingestBoundary 200 response (status code 200)
      */
     @Post("/administrative-regions/{id}/boundary/ingest")
     IngestBoundaryResponse ingestBoundary(
@@ -644,15 +648,14 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Searches organizations by geographic coordinates and radius.}
-     * Searches organizations by geographic coordinates and radius. Finds organizations associated with locations within `radiusMeters` of the given point, ordered by distance ascending.
+     * searchByLocation
      *
-     * @param longitude the longitude of the center point (required)
-     * @param latitude the latitude of the center point (required)
-     * @param radiusMeters the search radius in meters (required)
-     * @param pageable pagination parameters (required)
+     * @param longitude (required)
+     * @param latitude (required)
+     * @param radiusMeters (required)
+     * @param pageable (required)
      *
-     * @return a page of organizations within range, closest first (status code 200)
+     * @return searchByLocation 200 response (status code 200)
      */
     @Get("/organizations/search-by-location")
     PageOrganization searchByLocation(
@@ -663,15 +666,14 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Searches active projects by their closest location coordinates within a given radius.}
-     * Searches active projects by their closest location coordinates within a given radius. Each project is returned only once, representing its closest location within range.
+     * searchByLocation1
      *
-     * @param longitude the longitude of the center point (required)
-     * @param latitude the latitude of the center point (required)
-     * @param radiusMeters the search radius in meters (required)
-     * @param pageable pagination information (required)
+     * @param longitude (required)
+     * @param latitude (required)
+     * @param radiusMeters (required)
+     * @param pageable (required)
      *
-     * @return a page of project search cards sorted by distance (status code 200)
+     * @return searchByLocation_1 200 response (status code 200)
      */
     @Get("/projects/search-by-location")
     PageProjectSearchCard searchByLocation1(
@@ -682,14 +684,13 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Searches organizations by name.}
-     * Searches organizations by name. Supports exact name matching when `exact=true` or when the search query is enclosed in quotes (e.g. \"The Salvation Army\"). Otherwise, performs an intelligent tiered ranking search where exact matches are ranked first, followed by prefix matches, word-boundary matches, general substring matches, and typo-tolerant trigram similarity matches.
+     * searchByName
      *
-     * @param name the organization name or query string (required)
-     * @param pageable pagination parameters (required)
-     * @param exact whether to force an exact case-insensitive match (optional, default to false)
+     * @param name (required)
+     * @param pageable (required)
+     * @param exact (optional, default to false)
      *
-     * @return a page of matching organizations (status code 200)
+     * @return searchByName 200 response (status code 200)
      */
     @Get("/organizations/search-by-name")
     PageOrganization searchByName(
@@ -699,13 +700,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Searches organizations associated with an administrative region.}
-     * Searches organizations associated with an administrative region. Only returns verified, public organizations operating within the specified region.
+     * searchByRegion
      *
-     * @param regionId the unique identifier of the administrative region (required)
-     * @param pageable pagination parameters (required)
+     * @param regionId (required)
+     * @param pageable (required)
      *
-     * @return a page of matching organizations in the region (status code 200)
+     * @return searchByRegion 200 response (status code 200)
      */
     @Get("/organizations/search-by-region")
     PageOrganization searchByRegion(
@@ -726,13 +726,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing administrative region by ID.}
-     * Updates an existing administrative region by ID. Restricted to platform administrators (`GLOBAL_ADMIN`) and regional managers (`REGIONAL_ADMIN`).
+     * updateAdministrativeRegion
      *
-     * @param id the unique UUID of the administrative region to update (required)
-     * @param updateAdministrativeRegionCommand the updated region command data (required)
+     * @param id (required)
+     * @param updateAdministrativeRegionCommand (required)
      *
-     * @return the updated AdministrativeRegion (status code 200)
+     * @return updateAdministrativeRegion 200 response (status code 200)
      */
     @Put("/administrative-regions/{id}")
     AdministrativeRegion updateAdministrativeRegion(
@@ -741,13 +740,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing boundary by its ID after validating that it exists.}
-     * Updates an existing boundary by its ID after validating that it exists. Restricted to platform administrators (`system:admin`) and regional managers (`region:manage`). Throws 404 NOT_FOUND if the boundary does not exist.
+     * updateBoundary
      *
-     * @param id the ID of the boundary to update (required)
-     * @param updateBoundaryCommand the updated boundary details (required)
+     * @param id (required)
+     * @param updateBoundaryCommand (required)
      *
-     * @return the updated boundary (status code 200)
+     * @return updateBoundary 200 response (status code 200)
      */
     @Put("/boundaries/{id}")
     Boundary updateBoundary(
@@ -756,13 +754,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing location by its ID after validating that it exists.}
-     * Updates an existing location by its ID after validating that it exists. Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND if the location does not exist.
+     * updateLocation
      *
-     * @param id the ID of the location to update (required)
-     * @param updateLocationCommand the updated location details (required)
+     * @param id (required)
+     * @param updateLocationCommand (required)
      *
-     * @return the updated location (status code 200)
+     * @return updateLocation 200 response (status code 200)
      */
     @Put("/locations/{id}")
     Location updateLocation(
@@ -771,13 +768,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing organization by its ID after validating that it exists.}
-     * Updates an existing organization by its ID after validating that it exists. Throws 404 NOT_FOUND if the organization does not exist.
+     * updateOrganization
      *
-     * @param id the ID of the organization to update (required)
-     * @param updateOrganizationCommand the updated organization command (required)
+     * @param id (required)
+     * @param updateOrganizationCommand (required)
      *
-     * @return the updated organization (status code 200)
+     * @return updateOrganization 200 response (status code 200)
      */
     @Put("/organizations/{id}")
     Organization updateOrganization(
@@ -802,8 +798,7 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing project by its ID after validating that it exists.}
-     * Updates an existing project by its ID after validating that it exists.
+     * updateProject
      *
      * @param id (required)
      * @param updateProjectCommand (required)
@@ -817,14 +812,13 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing user role assignment within an administrative region.}
-     * Updates an existing user role assignment within an administrative region. Restricted to platform administrators (`system:admin`) and regional managers (`region:manage`).
+     * updateRegionUser
      *
-     * @param userId the unique identifier of the user (required)
-     * @param regionId the unique identifier of the region (required)
-     * @param updateRegionUserCommand the payload containing the new role assignment (required)
+     * @param userId (required)
+     * @param regionId (required)
+     * @param updateRegionUserCommand (required)
      *
-     * @return the updated RegionUser relationship (status code 200)
+     * @return updateRegionUser 200 response (status code 200)
      */
     @Put("/region-users/{userId}/{regionId}")
     RegionUser updateRegionUser(
@@ -834,13 +828,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing shift by its ID after validating that it exists.}
-     * Updates an existing shift by its ID after validating that it exists. Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND if the shift does not exist.
+     * updateShift
      *
-     * @param id the ID of the shift to update (required)
-     * @param updateShiftCommand the updated shift details (required)
+     * @param id (required)
+     * @param updateShiftCommand (required)
      *
-     * @return the updated shift (status code 200)
+     * @return updateShift 200 response (status code 200)
      */
     @Put("/shifts/{id}")
     Shift updateShift(
@@ -849,13 +842,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing tag by its ID after validating that it exists.}
-     * Updates an existing tag by its ID after validating that it exists. Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND if the tag does not exist.
+     * updateTag
      *
-     * @param id the ID of the tag to update (required)
-     * @param updateTagCommand the updated tag details (required)
+     * @param id (required)
+     * @param updateTagCommand (required)
      *
-     * @return the updated tag (status code 200)
+     * @return updateTag 200 response (status code 200)
      */
     @Put("/tags/{id}")
     Tag updateTag(
@@ -864,13 +856,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing user by its ID.}
-     * Updates an existing user by its ID. Prevents Mass Assignment by explicitly retaining the existing user's role and createdAt timestamp. Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE. Throws 403 FORBIDDEN if the user attempts to modify another account without system manage privileges. Throws 404 NOT_FOUND if the user does not exist.
+     * updateUser
      *
-     * @param id the ID of the user to update (required)
-     * @param updateUserCommand the updated user details (required)
+     * @param id (required)
+     * @param updateUserCommand (required)
      *
-     * @return the updated user (status code 200)
+     * @return updateUser 200 response (status code 200)
      */
     @Put("/users/{id}")
     User updateUser(
@@ -879,13 +870,12 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Explicit endpoint for role elevation.}
-     * Explicit endpoint for role elevation. Prevents Mass Assignment by only accepting a RoleUpdateRequest.
+     * updateUserRole
      *
-     * @param id the ID of the user to promote/demote (required)
-     * @param roleUpdateRequest the requested role (required)
+     * @param id (required)
+     * @param roleUpdateRequest (required)
      *
-     * @return the updated user (status code 200)
+     * @return updateUserRole 200 response (status code 200)
      */
     @Put("/admin/users/{id}/role")
     User updateUserRole(

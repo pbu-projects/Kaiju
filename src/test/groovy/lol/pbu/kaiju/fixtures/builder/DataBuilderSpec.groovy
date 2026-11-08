@@ -587,7 +587,7 @@ class DataBuilderSpec extends Specification {
 
         then: "teardown statements are executed in reverse foreign key order"
         verifyAll {
-            executedQueries.size() >= 19
+            executedQueries.size() >= 21
             executedQueries[0] == "DELETE FROM shift_signups WHERE shift_id = ? AND user_id = ?"
             executedQueries[1] == "DELETE FROM shift_tags WHERE shift_id = ? AND tag_id = ?"
             executedQueries[2] == "DELETE FROM shifts WHERE id = ?"
@@ -604,10 +604,12 @@ class DataBuilderSpec extends Specification {
             executedQueries.contains("DELETE FROM organizations WHERE id = ?")
             executedQueries.contains("DELETE FROM locations WHERE id = ?")
             executedQueries.contains("DELETE FROM boundaries WHERE id = ?" )
+            executedQueries.contains("DELETE FROM administrative_region_audit_logs WHERE region_id = ?")
             executedQueries.contains("DELETE FROM administrative_regions WHERE id = ?")
             executedQueries.contains("DELETE FROM tags WHERE id = ?")
             executedQueries.contains("DELETE FROM project_audit_logs WHERE actor_id = ?")
             executedQueries.contains("DELETE FROM organization_audit_logs WHERE actor_id = ?")
+            executedQueries.contains("DELETE FROM administrative_region_audit_logs WHERE actor_id = ?")
             executedQueries.contains("DELETE FROM users WHERE id = ?")
             dataBuilder.trackedUserIds.isEmpty()
             dataBuilder.trackedOrganizationIds.isEmpty()
