@@ -23,10 +23,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,24 +32,10 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
 
     private static final Logger LOG = LoggerFactory.getLogger(AdministrativeRegionServiceImpl.class);
 
-    private static final String UPDATE_SQL = """
-        WITH raw_geom AS (
-            SELECT ST_SetSRID(ST_GeomFromGeoJSON(?), 4326) AS g
-        ),
-        simplified AS (
-            SELECT
-                ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(ST_MakeValid(g), ?)), 3)) AS geom,
-                ST_NPoints(g) AS orig_pts
-            FROM raw_geom
-        )
-        UPDATE administrative_regions r
-        SET geom = s.geom
-        FROM simplified s
-        WHERE r.id = ?
-          AND ST_IsValid(s.geom::geometry)
-          AND NOT ST_IsEmpty(s.geom::geometry)
-        RETURNING r.name, s.orig_pts, ST_NPoints(r.geom::geometry) AS simp_pts, ST_IsValid(r.geom::geometry) AS is_valid
-    """;
+    private static final String ACTOR_NOT_FOUND = "Actor user not found";
+    private static final String REGION_NOT_FOUND = "Administrative region not found";
+    private static final String PARENT_NOT_FOUND = "Parent administrative region does not exist";
+    private static final String INVALID_GEOMETRY = "Region geometry is topologically invalid";
 
     private final AdministrativeRegionRepository regionRepository;
     private final UserRepository userRepository;
@@ -97,16 +79,15 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             @NonNull CreateAdministrativeRegionCommand command,
             @NonNull UUID actorUserId
     ) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+        User actor = resolveActor(actorUserId);
 
         if (command.parentRegionId() != null && !regionRepository.existsById(command.parentRegionId())) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Parent administrative region does not exist");
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, PARENT_NOT_FOUND);
         }
 
         Polygon polygon = spatialMappingService.toPolygon(command.coordinates());
         if (!polygon.isValid()) {
-            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Region geometry is topologically invalid");
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
         }
 
         AdministrativeRegion region = new AdministrativeRegion(
@@ -130,23 +111,22 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             @NonNull UpdateAdministrativeRegionCommand command,
             @NonNull UUID actorUserId
     ) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+        User actor = resolveActor(actorUserId);
 
         if (command.parentRegionId() != null && id.equals(command.parentRegionId())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "An administrative region cannot be its own parent");
         }
 
         if (command.parentRegionId() != null && !regionRepository.existsById(command.parentRegionId())) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Parent administrative region does not exist");
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, PARENT_NOT_FOUND);
         }
 
         AdministrativeRegion existing = regionRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND));
 
         Polygon polygon = spatialMappingService.toPolygon(command.coordinates());
         if (!polygon.isValid()) {
-            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Region geometry is topologically invalid");
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
         }
 
         AdministrativeRegion updated = new AdministrativeRegion(
@@ -165,18 +145,17 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     @Override
     @Transactional
     public void deleteAdministrativeRegion(@NonNull UUID id, @NonNull UUID actorUserId) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+        User actor = resolveActor(actorUserId);
 
         AdministrativeRegion existing = regionRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND));
 
         String metadata = buildMetadata(Map.of("deletedName", existing.name()));
         auditService.recordAdministrativeRegionAudit(id, actor, RegionAuditAction.DELETE, metadata);
 
         long deleted = regionRepository.removeById(id);
         if (deleted == 0) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND);
         }
     }
 
@@ -190,10 +169,14 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             @NonNull String sourceUrl,
             @NonNull UUID actorUserId
     ) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+        User actor = resolveActor(actorUserId);
 
-        IngestBoundaryResponse response = executeBoundaryUpdate(regionId, geomJson, tolerance);
+        IngestBoundaryResponse response = BoundaryIngestionService.executeBoundaryUpdate(
+                jdbcOperations,
+                regionId,
+                geomJson,
+                tolerance
+        );
 
         String metadata = buildMetadata(Map.of(
                 "sourceUrl", sourceUrl,
@@ -207,55 +190,9 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
         return response;
     }
 
-    private IngestBoundaryResponse executeBoundaryUpdate(UUID regionId, String geomJson, double tolerance) {
-        return jdbcOperations.execute(connection -> {
-            try (PreparedStatement updateStmt = connection.prepareStatement(UPDATE_SQL)) {
-                updateStmt.setString(1, geomJson);
-                updateStmt.setDouble(2, tolerance);
-                updateStmt.setObject(3, regionId);
-
-                try (ResultSet rs = updateStmt.executeQuery()) {
-                    if (rs.next()) {
-                        String regionName = rs.getString("name");
-                        int origPoints = rs.getInt("orig_pts");
-                        int simpPoints = rs.getInt("simp_pts");
-                        boolean isValid = rs.getBoolean("is_valid");
-
-                        double reduction = origPoints > 0 ? (1.0 - (double) simpPoints / origPoints) * 100.0 : 0.0;
-                        String reductionRatio = String.format(Locale.ROOT, "%.2f%%", reduction);
-
-                        return new IngestBoundaryResponse(
-                                regionId,
-                                regionName,
-                                origPoints,
-                                simpPoints,
-                                reductionRatio,
-                                isValid
-                        );
-                    }
-                }
-            } catch (SQLException e) {
-                LOG.error("Failed executing atomic boundary update for region {}: {}", regionId, e.getMessage(), e);
-                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error updating administrative region boundary.");
-            }
-
-            boolean regionExists;
-            try (PreparedStatement checkStmt = connection.prepareStatement("SELECT 1 FROM administrative_regions WHERE id = ?")) {
-                checkStmt.setObject(1, regionId);
-                try (ResultSet rs = checkStmt.executeQuery()) {
-                    regionExists = rs.next();
-                }
-            } catch (SQLException e) {
-                LOG.error("Failed verifying administrative region existence for {}: {}", regionId, e.getMessage(), e);
-                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error verifying administrative region existence.");
-            }
-
-            if (!regionExists) {
-                throw new HttpStatusException(HttpStatus.NOT_FOUND, "Administrative region not found");
-            }
-
-            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
-        });
+    private User resolveActor(UUID actorUserId) {
+        return userRepository.findById(actorUserId)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_NOT_FOUND));
     }
 
     private String buildMetadata(Map<String, ?> data) {

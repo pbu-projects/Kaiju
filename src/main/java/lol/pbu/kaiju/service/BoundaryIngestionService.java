@@ -415,7 +415,12 @@ public class BoundaryIngestionService {
         return Math.clamp(requestedTolerance, MIN_TOLERANCE, MAX_TOLERANCE);
     }
 
-    private IngestBoundaryResponse updateRegionBoundary(UUID regionId, String geomJson, double tolerance) {
+    static IngestBoundaryResponse executeBoundaryUpdate(
+            JdbcOperations jdbcOperations,
+            UUID regionId,
+            String geomJson,
+            double tolerance
+    ) {
         return jdbcOperations.execute(connection -> {
             try (PreparedStatement updateStmt = connection.prepareStatement(UPDATE_SQL)) {
                 updateStmt.setString(1, geomJson);
@@ -465,5 +470,9 @@ public class BoundaryIngestionService {
 
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
         });
+    }
+
+    private IngestBoundaryResponse updateRegionBoundary(UUID regionId, String geomJson, double tolerance) {
+        return executeBoundaryUpdate(jdbcOperations, regionId, geomJson, tolerance);
     }
 }
