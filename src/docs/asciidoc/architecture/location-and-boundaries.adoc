@@ -1,0 +1,140 @@
+= Places, City Borders, and Map Lookups
+:toc:
+:toc-levels: 3
+:icons: font
+
+A guide explaining how Kaiju turns street addresses into map pins, checks county borders, and saves money for local charities.
+
+== How Addresses and City Borders Work Together
+
+Every volunteer shift happens at a real place, like a church food pantry, a public park, or a school gym. At the same time, regional leaders and local charities are only allowed to run projects within their assigned territory.
+
+Kaiju handles this using a simple two-step process that separates **looking up an address** from **checking borders**:
+
+. **Step 1: Look Up the Address Once (`locations` table)**
+When an event leader enters an address (such as `1437 Bannock St, Denver, CO 80202`), an address lookup tool turns that text into a single map point with latitude and longitude coordinates (`POINT(-104.9928 39.7392)`). Kaiju saves that point in the `locations` table and sets the local time zone (such as `America/Denver`).
+
+. **Step 2: Check Borders and Run Searches Locally (`administrative_regions` table)**
+Once a location is saved, Kaiju never needs to look up that street address again. When a volunteer looks for projects within 5 miles of home (using https://postgis.net/docs/ST_DWithin.html[`ST_DWithin`]), or when the system checks if a project is inside a county leader's area (using https://postgis.net/docs/ST_Intersects.html[`ST_Intersects`] and https://postgis.net/docs/ST_Covers.html[`ST_Covers`]), everything runs right inside our https://www.postgresql.org/[PostgreSQL] database using https://postgis.net/[PostGIS].
+
+== Why We Keep City Borders in Our Database (Instead of Asking OpenStreetMap Every Time)
+
+A fair question is: *"If we use open tools like https://nominatim.org/[Nominatim] to find coordinates on https://www.openstreetmap.org/[OpenStreetMap], why not just ask OpenStreetMap for city borders whenever we need them?"*
+
+We store borders in our own `administrative_regions` table for four practical reasons:
+
+=== 1. Blazing Fast Permission Checks (Under 1 Millisecond)
+When Daniel County Director reviews a volunteer project that has five cleanup sites, Kaiju must make sure all five sites are inside Denver County. Kaiju joins the project, its sites, and Daniel's county border in a single, instant database query.
+
+Because PostGIS uses a https://postgis.net/workshops/postgis-intro/indexing.html[spatial index], this check takes less than a single millisecond. If we had to send five web requests over the internet to an outside map service, it would take hundreds of milliseconds, waste mobile data, and break if city names did not match word for word (such as `"Denver"` versus `"City and County of Denver"`).
+
+=== 2. Custom Neighborhoods and Emergency Zones
+Volunteers and emergency crews often organize around community areas that do not exist in official government census maps:
+
+* **Downtown Outreach Zones**: Clara City Lead manages the `Denver Downtown Core`, a focused grassroots area around the 16th Street Mall.
+* **Multi-County Charity Chapters**: A local food bank network might serve three counties plus one neighboring town.
+* **Emergency Relief Zones**: A wildfire or flood cleanup project (`project_boundaries`) follows the real path of the disaster rather than city lines.
+
+By storing borders directly in our database, Kaiju checks custom neighborhood zones and official county lines using the exact same fast database queries.
+
+=== 3. Smoothing Out Complex Borders (Why We Simplify Shapes)
+Official government border files from the https://tigerweb.geo.census.gov/[US Census Bureau TIGERweb] service trace every tiny creek, ditch, and gravel road with tens of thousands of coordinate points. Checking thousands of tiny points on every lookup slows down searches on mobile phones.
+
+When Kaiju imports a border, it runs a tool called https://postgis.net/docs/ST_SimplifyPreserveTopology.html[`ST_SimplifyPreserveTopology`]. This smooths out 80% to 95% of unneeded points along straight borders while protecting real landmarks:
+
+* It keeps long corridors, such as the 18-mile strip of land connecting Denver to Denver International Airport.
+* It keeps interior enclave holes, such as the town of Glendale sitting entirely inside Denver.
+* It ensures borders never fold over themselves or create broken geometry.
+
+=== 4. It Keeps Working Even If Outside Services Go Down
+We only use an outside address tool once when an address is first saved. After that point is stored in our database, 100% of volunteer searches, shift signups, and project approvals run locally inside PostgreSQL. Even if outside map services go offline or suffer network outages, volunteers and organizers can keep working without any hiccups.
+
+== Why Simple Circles and Rectangles Do Not Work for City Borders
+
+Drawing a simple circle or rectangular box on a map works well when a volunteer searches for *"projects within 5 miles of my house."* However, simple shapes fail when managing real community boundaries.
+
+Real cities and counties are not neat boxes or circles. Our Colorado test data illustrates three real examples:
+
+* **The Town of Glendale**: The City of Glendale belongs to Arapahoe County, but it is physically surrounded by the City of Denver. A simple box or circle around Denver would falsely place Glendale's community pantry (`950 S Birch St, Glendale, CO`) under Denver County. Our real border shape has a cutout hole for Glendale, keeping both communities accurate.
+* **The Denver Airport Corridor**: Denver International Airport (`8500 Pena Blvd`) is part of Denver County, but it sits miles to the northeast, connected by a narrow strip of land. A circle drawn around downtown Denver either misses the airport entirely or accidentally swallows half of neighboring Aurora (`15151 E Alameda Pkwy`).
+* **Neighboring Cities in One County**: In El Paso County, Colorado Springs City (`107 N Nevada Ave`) and Fountain City (`116 S Main St`) share irregular borders. Using exact shapes ensures a city leader in Colorado Springs cannot accidentally alter projects in Fountain, while the county director can oversee both.
+
+== How County and State Borders Scale Without Extra Work
+
+You might wonder if we have to draw every city, town, and county on Earth before we can launch. The answer is no!
+
+Kaiju organizes regions into a three-tier ladder where parent regions automatically cover everything inside them:
+
+[cols="25%,30%,45%",options="header"]
+|===
+| Level | Example Region | What It Covers
+
+| *Level 1 (State / Province)*
+| `Colorado State Region`
+| Covers the whole state of Colorado. This includes towns like Boulder (`1300 Pearl St`) that do not yet have their own separate city border in the database.
+
+| *Level 2 (County / District)*
+| `Denver County Region`, `Arapahoe County Region`, `El Paso County Region`
+| Covers all neighborhoods and towns inside that county for county directors.
+
+| *Level 3 (City / Local Area)*
+| `Denver City`, `Denver Downtown Core`, `Glendale City`, `Aurora City`, `Colorado Springs City`, `Fountain City`
+| Fences local city leads or neighborhood directors to their specific town limits.
+|===
+
+Because Kaiju checks whether a point falls inside the region assigned to a user or group:
+
+* Rachel State Director (`Colorado State Chapter`) can already approve projects in Boulder (`Boulder Pearl Street Station`), because Boulder sits inside Colorado.
+* We only need to import a smaller city or county border when a local leader like Daniel County Director needs to be restricted to that smaller border.
+
+== Why We Do Not Use Google Maps (and Why Open Tools Fit Our POC)
+
+When someone types in a street address, Kaiju needs a lookup service to turn that text into latitude and longitude coordinates.
+
+=== Why We Avoid Google Maps (and Commercial Map Services)
+Many corporate websites use Google Maps or Mapbox by default. Kaiju chooses not to use commercial map services for three reasons:
+
+1. **Unexpected Bills for Nonprofits**: Commercial map services charge for every thousand lookups and require a credit card on file. If an urgent community drive goes viral, a small charity could receive an unexpected cloud bill for hundreds or thousands of dollars.
+2. **Strict Rules on Saving Coordinates**: The https://cloud.google.com/maps-platform/terms[Google Maps Terms of Service] forbid saving coordinates permanently in your own database unless you also pay to display them on a Google Map. In contrast, open data from https://www.openstreetmap.org/copyright[OpenStreetMap] and the public https://www.census.gov/programs-surveys/geography/guidance/tiger-data-products-guide.html[US Census Bureau] allows Kaiju to save coordinates permanently in our `locations` table with zero restrictions.
+3. **Protecting Volunteer Privacy**: Commercial map widgets frequently track user locations and searches to build advertising profiles. Open tools keep volunteer searches private and secure.
+
+=== Why the Free Public Nominatim API Fits Our POC
+For local development, testing, and our Proof of Concept (POC), Kaiju uses the free public https://nominatim.org/[Nominatim API] (backed by OpenStreetMap data), with the free https://geocoding.geo.census.gov/geocoder/[US Census Geocoder API] available as an American fallback:
+
+* **Zero Extra Containers for Developers**: Team members running the app locally do not need to download heavy map files or run an extra server container just to try out the app.
+* **Respecting Community Guidelines**: We follow the https://operations.osmfoundation.org/policies/nominatim/[OpenStreetMap Nominatim Usage Policy]:
+  * We send a clear `User-Agent` header identifying the Kaiju app.
+  * We only look up an address once when a site is created or updated, and we cache the resulting point permanently in our database.
+  * We keep our requests well below the community limit of 1 request per second.
+
+== Moving to Self-Hosted Map Tools When We Grow
+
+The free public Nominatim API is shared by volunteer communities across the globe and caps traffic at **1 request per second**.
+
+=== When to Move to Self-Hosted Tools
+We will switch from the free public service to our own container when:
+
+* Non-profits start uploading spreadsheets with hundreds of project addresses at the same time.
+* Normal daily traffic approaches 1 lookup per second during busy hours.
+* Production requirements call for a dedicated private server with guaranteed uptime.
+
+=== Self-Hosted Options (Why We Do Not Load the Whole Planet)
+Because Kaiju keeps address lookups behind a clean service layer, switching to a self-hosted server only takes one configuration change: updating the service web address in our settings. No application code or database tables need to change.
+
+We have two zero-cost options when self-hosting:
+
+[cols="30%,35%,35%",options="header"]
+|===
+| Option | Storage & Memory Needs | Best Fit
+
+| *Option 1: Self-Hosted Nominatim Container (`mediagis/nominatim`)*
+| *Colorado Only*: ~250 MB download, ~3 GB disk, 2 GB RAM +
+*Entire United States*: ~11 GB download, ~65 GB disk, 16 GB RAM
+| Regional or nationwide groups that want fast, unlimited address searches by loading only the state or national map slices they need from https://download.geofabrik.de/[Geofabrik].
+
+| *Option 2: Built-In https://postgis.net/docs/Extras.html#Tiger_Geocoder[PostGIS TIGER Geocoder]*
+| Runs right inside our existing PostgreSQL database container (~3 GB per state). Zero extra Docker containers.
+| United States deployments that want address lookups without running an extra server container.
+|===
+
+Just like our city borders, we do not need to load a 100-gigabyte map of the entire planet if an organization only operates in Colorado or the United States. Starting with just the state or national slices we need keeps hosting costs tiny while giving charities fast, private address lookups.
