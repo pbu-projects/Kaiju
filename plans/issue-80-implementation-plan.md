@@ -45,6 +45,7 @@ CREATE INDEX idx_admin_region_audit_logs_actor ON administrative_region_audit_lo
 ```
 
 #### Key Schema Decision: Foreign Key on `region_id`
+
 In `administrative_region_audit_logs`, `region_id` stores the region UUID without an `ON DELETE CASCADE` foreign key reference to `administrative_regions(id)`. 
 - **Reason**: When an administrative region is deleted, an immutable audit log must preserve the history of who deleted the region and what was removed. A cascade delete would erase the audit trail, while a restrict constraint would block region deletions.
 - `actor_id` references `users(id)` matching `project_audit_logs`.
@@ -227,6 +228,7 @@ public interface AdministrativeRegionAuditLogRepository
 In accordance with architectural principles established in Release 0.0.5 (Issues #54 and #65), all multi-entity mutations, boundary validations, and audit log writes must execute within transactional service boundaries. Controllers remain lean HTTP adaptors.
 
 #### Service Interface
+
 Create `lol.pbu.kaiju.service.AdministrativeRegionService`:
 
 ```java
@@ -271,6 +273,7 @@ public interface AdministrativeRegionService {
 ```
 
 #### Service Implementation Guardrails
+
 `AdministrativeRegionServiceImpl` enforces domain guardrails within `@Transactional` methods:
 1. **Cycle Prevention**: A region cannot be its own parent (`id.equals(command.parentRegionId())` throws HTTP 400).
 2. **Parent Region Existence**: When `parentRegionId` is provided, the parent must exist in `administrative_regions` (throws HTTP 400 if missing).
@@ -421,6 +424,7 @@ To avoid the AOP self-invocation trap and protect the HikariCP connection pool:
 ### 2.8 Controller Layer & Security Bindings
 
 #### 1. `AdministrativeRegionController`
+
 - Delegates entirely to `AdministrativeRegionService` and `BoundaryIngestionService`.
 - Binds native Micronaut `Authentication authentication`.
 - Keeps controller methods clean and concise:
@@ -470,6 +474,7 @@ public IngestBoundaryResponse ingestBoundary(
 ```
 
 #### 2. `AdministrativeRegionAuditLogController`
+
 - Path: `/administrative-region-audit-logs`.
 - Supports optional `regionId` query parameter matching the index `idx_admin_region_audit_logs_region`.
 - Strictly read-only (`GET` only). Any `POST`, `PUT`, or `DELETE` attempt returns HTTP 405 Method Not Allowed.
@@ -512,6 +517,7 @@ public class AdministrativeRegionAuditLogController {
 ### 2.9 Test Data Management (`KaijuDataBuilder.groovy`)
 
 Update test teardown in `KaijuDataBuilder.groovy` to clean up the new table before regions or users are deleted:
+
 ```groovy
 deleteSingle(conn, "DELETE FROM administrative_region_audit_logs WHERE region_id = ?", trackedRegionIds)
 deleteSingle(conn, "DELETE FROM administrative_region_audit_logs WHERE actor_id = ?", trackedUserIds)
@@ -535,35 +541,43 @@ flowchart TD
 ```
 
 ### Step 1: Database Migration
+
 - Add `database/init/11-administrative-region-audit-logs.sql`.
 - Document table schema in `database/DB.md`.
 
 ### Step 2: PostgreSQL JSONB Converter
+
 - Implement `JsonbAttributeConverter` in `lol.pbu.kaiju.converter`.
 - Add unit tests verifying conversion to and from `PGobject`.
 
 ### Step 3: Domain & Data Access
+
 - Add enum `lol.pbu.kaiju.model.RegionAuditAction`.
 - Add record `lol.pbu.kaiju.domain.AdministrativeRegionAuditLog`.
 - Add repository `lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository` with `@Join("actor")` and `findByRegionId`.
 
 ### Step 4: Application Service Layer
+
 - Create `AdministrativeRegionService` and `AdministrativeRegionServiceImpl` with `@Transactional` boundaries, cycle checks, parent existence verification, and geometry validation.
 - Update `AuditService` and `AuditServiceImpl` to support `recordAdministrativeRegionAudit`.
 
 ### Step 5: Boundary Ingestion Hardening
+
 - Update `BoundaryIngestionService` to separate external network fetch from the transactional database update by delegating Phase 2 to `administrativeRegionService.applyIngestedBoundary(...)`.
 - Emit `BOUNDARY_INGEST` audit log entry with detailed reduction metrics.
 
 ### Step 6: Controllers
+
 - Refactor `AdministrativeRegionController` to delegate to service layer with `Authentication` bindings.
 - Add read-only `AdministrativeRegionAuditLogController` with optional `regionId` filter.
 
 ### Step 7: Test Fixture Hygiene
+
 - Update `KaijuDataBuilder.groovy` with teardown queries for `administrative_region_audit_logs`.
 - Update `DataBuilderSpec.groovy`.
 
 ### Step 8: Integration Tests & Verification
+
 - `AdministrativeRegionServiceSpec`: Unit test service orchestration, validation, cycle prevention, and audit dispatch.
 - `AdministrativeRegionControllerSpec`: Verify HTTP responses, security roles, and audit record generation.
 - `AdministrativeRegionAuditLogControllerSpec`: Verify cursored pagination, `regionId` filtering, and ID lookup.
