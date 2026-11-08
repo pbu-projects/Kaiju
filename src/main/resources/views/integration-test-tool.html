@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaiju Integration Testing Tool - Manual Journey Testbench (Not Production UI)</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #0284c7;
+      --primary-hover: #0369a1;
+      --success: #16a34a;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --purple: #7c3aed;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* Top Persona Switcher Bar */
+    header {
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 12px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      border-bottom: 3px solid var(--primary);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .brand p {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .test-badge {
+      background: #b45309;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-left: 6px;
+    }
+
+    .persona-nav {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      background: #1e293b;
+      padding: 4px;
+      border-radius: 8px;
+    }
+
+    .persona-tab {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .persona-tab:hover {
+      color: #f8fafc;
+      background: #334155;
+    }
+
+    .persona-tab.active {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .persona-banner {
+      background: #e0f2fe;
+      border-bottom: 1px solid #bae6fd;
+      padding: 10px 24px;
+      font-size: 13px;
+      color: #0369a1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .persona-banner strong {
+      color: #075985;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1240px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .journey-view {
+      display: none;
+    }
+
+    .journey-view.active {
+      display: block;
+    }
+
+    /* Cards & Components */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .btn-outline:hover { background: #f1f5f9; }
+
+    .input-field {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 13px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+    .input-field:focus { border-color: var(--primary); }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 18px;
+    }
+
+    .project-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+    }
+
+    .project-card:hover {
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.06);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .badge-active { background: #dcfce7; color: #15803d; }
+    .badge-pending { background: #fef3c7; color: #b45309; }
+    .badge-rejected { background: #fee2e2; color: #b91c1c; }
+
+    .capacity-bar {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .capacity-fill {
+      height: 100%;
+      background: var(--primary);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #0f172a;
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header>
+    <div class="brand">
+      <div style="background: var(--primary); color: #fff; width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;">K</div>
+      <div>
+        <h1>Kaiju Integration Testing Tool <span class="test-badge">Manual Test Harness - Not Production UI</span></h1>
+        <p>End-User Journey Testbench for Backend Verification</p>
+      </div>
+    </div>
+
+    <!-- Persona Selector -->
+    <div class="persona-nav">
+      <button class="persona-tab active" onclick="switchPersona('volunteer')">
+        <span>🧑‍🤝‍🧑 Volunteer (Victor)</span>
+      </button>
+      <button class="persona-tab" onclick="switchPersona('organizer')">
+        <span>📋 Organizer (Jenny)</span>
+      </button>
+      <button class="persona-tab" onclick="switchPersona('specialist')">
+        <span>🛡️ Specialist Approver (Daniel)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Context Banner -->
+  <div id="personaBanner" class="persona-banner">
+    <div>Active Mode: <strong id="personaName">Victor Volunteer (STANDARD_USER)</strong> - Testing Project Discovery & Shift Commitment</div>
+    <div id="backendStatus" style="font-size: 12px; color: #0284c7;">● Live Backend Connected</div>
+  </div>
+
+  <main>
+    <!-- VIEW 1: VOLUNTEER DISCOVERY & COMMITMENT (Victor Volunteer) -->
+    <div id="view-volunteer" class="journey-view active">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Journey 1: Volunteer Discovers and Commits to a Project</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+              Victor searches nearby initiatives, filters opportunities by category, and reserves shift spots.
+            </p>
+          </div>
+          <button class="btn btn-outline" onclick="fetchLiveProjects()">↻ Refresh Projects</button>
+        </div>
+
+        <!-- My Commitments Box -->
+        <div id="myCommitmentsBox" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 12px 16px; margin-bottom: 18px; display: none;">
+          <div style="font-weight: 700; color: #166534; font-size: 13px; display: flex; justify-content: space-between; align-items: center;">
+            <span>✅ My Active Volunteer Commitments</span>
+            <span id="commitmentCount" class="badge badge-active">1 Shift</span>
+          </div>
+          <div id="commitmentsList" style="margin-top: 8px; font-size: 13px; color: #14532d;"></div>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+          <input type="text" id="volunteerSearchInput" class="input-field" style="flex: 2; min-width: 240px;" placeholder="Search projects by keyword (e.g. Garden, Food, Park, Clean)..." onkeyup="filterVolunteerProjects()" />
+          <select id="volunteerTypeFilter" class="input-field" style="max-width: 180px;" onchange="filterVolunteerProjects()">
+            <option value="">All Categories</option>
+            <option value="ENVIRONMENTAL">Environmental</option>
+            <option value="SOCIAL">Social Support</option>
+            <option value="EDUCATION">Education</option>
+          </select>
+          <select id="volunteerRadiusFilter" class="input-field" style="max-width: 170px;" onchange="filterVolunteerProjects()">
+            <option value="all">Any Distance</option>
+            <option value="5">Within 5 miles</option>
+            <option value="15">Within 15 miles</option>
+            <option value="25">Within 25 miles</option>
+          </select>
+        </div>
+
+        <!-- Project Cards Grid -->
+        <div id="volunteerProjectsGrid" class="project-grid">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+
+
+    <!-- VIEW 2: PROJECT SUBMISSION WIZARD (Jenny Niu / Organizer) -->
+    <div id="view-organizer" class="journey-view">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Journey 2: Organization Posts a Project (Project Wizard)</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+              Jenny drafts an initiative with locations, boundaries, and shifts, submitting it to the moderation queue.
+            </p>
+          </div>
+          <span class="badge badge-pending">Org Admin / Jenny Niu</span>
+        </div>
+
+        <form id="projectSubmissionForm" onsubmit="handleProjectSubmit(event)">
+          <div class="form-grid">
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label for="projTitle">Project Title *</label>
+              <input type="text" id="projTitle" class="input-field" required placeholder="e.g. South Platte River Cleanup 2026" />
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label for="projDescription">Description (20 to 4,000 characters) *</label>
+                <span id="charCounter" style="font-size: 11px; color: var(--text-muted);">0 / 4000</span>
+              </div>
+              <textarea id="projDescription" class="input-field" style="height: 100px; resize: vertical;" required minlength="20" maxlength="4000" placeholder="Describe the mission, community goals, what to bring, and expectations..." onkeyup="updateCharCounter()"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="projOrg">Sponsoring Organization *</label>
+              <select id="projOrg" class="input-field">
+                <option value="f43706e6-e5d8-4179-b90e-13e93b806479">Starfleet Volunteer Corps</option>
+                <option value="c0000000-0000-0000-0000-000000000002">Arapahoe Open Spaces</option>
+                <option value="c0000000-0000-0000-0000-000000000003">Community Food Bank</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="projCategory">Category</label>
+              <select id="projCategory" class="input-field">
+                <option value="ENVIRONMENTAL">Environmental Cleanup</option>
+                <option value="SOCIAL">Community Support</option>
+                <option value="EDUCATION">Youth Tutoring</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="projLocationName">Primary Staging Location *</label>
+              <input type="text" id="projLocationName" class="input-field" required value="Grant Frontier Park Staging Area" />
+            </div>
+
+            <div class="form-group">
+              <label for="projCoords">Coordinates (Lon, Lat) *</label>
+              <input type="text" id="projCoords" class="input-field" required value="-104.9989, 39.6738" />
+            </div>
+
+            <div class="form-group">
+              <label for="projShiftDate">First Shift Schedule</label>
+              <input type="text" id="projShiftDate" class="input-field" value="Saturday, 9:00 AM - 1:00 PM" />
+            </div>
+
+            <div class="form-group">
+              <label for="projCapacity">Shift Volunteer Capacity</label>
+              <input type="number" id="projCapacity" class="input-field" value="15" min="1" max="500" />
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 12px;">
+            <button type="button" class="btn btn-outline" onclick="resetForm()">Reset Form</button>
+            <button type="submit" class="btn btn-primary">🚀 Submit Project for Specialist Review</button>
+          </div>
+        </form>
+
+        <hr style="margin: 24px 0; border: none; border-top: 1px solid var(--border);" />
+
+        <div>
+          <h3 style="font-size: 14px; font-weight: 700; margin-bottom: 12px;">Initiatives Managed by Jenny's Organization</h3>
+          <div id="organizerProjectsList" class="project-grid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- VIEW 3: SPECIALIST MODERATION QUEUE (Daniel Director) -->
+    <div id="view-specialist" class="journey-view">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Journey 3: Specialist Reviews and Approves a Submitted Project</div>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">
+              Daniel Director evaluates pending submissions for regional boundary compliance and approves them for public discovery.
+            </p>
+          </div>
+          <span class="badge badge-active">Region Director / Daniel</span>
+        </div>
+
+        <div id="moderationQueueContainer">
+          <div id="moderationProjectsList" class="project-grid">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast">Action completed successfully</div>
+
+  <script>
+    // In-memory data store for testing
+    let projects = [
+      {
+        id: "p-101",
+        title: "South Platte River Trail Restoration",
+        description: "Join our weekend volunteer crew to clean up river banks, clear invasive tamarisk, and restore native riparian flora along the South Platte Greenway.",
+        organization: { name: "Starfleet Volunteer Corps" },
+        category: "ENVIRONMENTAL",
+        status: "ACTIVE",
+        location: { name: "Overland Pond Park", lon: -104.9965, lat: 39.6845 },
+        shifts: [{ id: "s-1", date: "Saturday, 9:00 AM - 12:00 PM", capacity: 20, registered: 8 }]
+      },
+      {
+        id: "p-102",
+        title: "Community Food Pantry Sorting & Delivery",
+        description: "Package fresh produce, assemble emergency dry goods boxes, and stage family nutritional hampers for Arapahoe County residents in need.",
+        organization: { name: "Community Food Bank" },
+        category: "SOCIAL",
+        status: "ACTIVE",
+        location: { name: "Arapahoe Distribution Hub", lon: -104.8872, lat: 39.6133 },
+        shifts: [{ id: "s-2", date: "Sunday, 1:00 PM - 4:00 PM", capacity: 12, registered: 11 }]
+      },
+      {
+        id: "p-103",
+        title: "Cherry Creek Basin Tree Planting",
+        description: "Help expand our urban forest canopy by digging root collars, staking saplings, and applying protective bark mulch near the Cherry Creek spillway.",
+        organization: { name: "Arapahoe Open Spaces" },
+        category: "ENVIRONMENTAL",
+        status: "PENDING",
+        location: { name: "Cherry Creek State Park Staging", lon: -104.8520, lat: 39.6380 },
+        shifts: [{ id: "s-3", date: "Next Saturday, 8:30 AM - 1:00 PM", capacity: 25, registered: 0 }]
+      }
+    ];
+
+    let myCommitments = [];
+
+    // Switch between personas & journeys
+    function switchPersona(persona) {
+      document.querySelectorAll('.persona-tab').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.journey-view').forEach(v => v.classList.remove('active'));
+
+      const bannerText = document.getElementById('personaName');
+      if (persona === 'volunteer') {
+        document.querySelectorAll('.persona-tab')[0].classList.add('active');
+        document.getElementById('view-volunteer').classList.add('active');
+        bannerText.textContent = "Victor Volunteer (STANDARD_USER) - Testing Discovery & Shift Commitment";
+      } else if (persona === 'organizer') {
+        document.querySelectorAll('.persona-tab')[1].classList.add('active');
+        document.getElementById('view-organizer').classList.add('active');
+        bannerText.textContent = "Jenny Niu (ORG_ADMIN / Organizer) - Testing Project Submission & Shift Setup";
+      } else if (persona === 'specialist') {
+        document.querySelectorAll('.persona-tab')[2].classList.add('active');
+        document.getElementById('view-specialist').classList.add('active');
+        bannerText.textContent = "Daniel Director (REGION_DIRECTOR) - Testing Regional Moderation & Approval";
+      }
+      renderAllViews();
+    }
+
+    // Live backend fetch
+    async function fetchLiveProjects() {
+      try {
+        const res = await fetch('/projects');
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.content || (Array.isArray(data) ? data : []);
+          if (Array.isArray(list) && list.length > 0) {
+            list.forEach(lp => {
+              if (!projects.some(ep => ep.id === lp.id)) {
+                projects.unshift({
+                  id: lp.id,
+                  title: lp.title,
+                  description: lp.description,
+                  organization: { name: lp.organization?.name || "Civic Partner" },
+                  category: "ENVIRONMENTAL",
+                  status: lp.status || "PENDING",
+                  location: { name: "Designated Staging Area", lon: -104.99, lat: 39.67 },
+                  shifts: [{ id: 's-' + lp.id, date: 'Upcoming Weekend', capacity: 15, registered: 0 }]
+                });
+              }
+            });
+          }
+          document.getElementById('backendStatus').innerHTML = "● Live Backend Connected (/projects)";
+        } else {
+          document.getElementById('backendStatus').innerHTML = "○ Standalone / Anonymous Mode (Demo State Active)";
+        }
+      } catch (err) {
+        document.getElementById('backendStatus').innerHTML = "○ Standalone / Anonymous Mode (Demo State Active)";
+      }
+      renderAllViews();
+    }
+
+    // JOURNEY 1: VOLUNTEER (Victor Volunteer)
+    function renderVolunteerProjects(filteredList = null) {
+      const list = filteredList || projects.filter(p => p.status === 'ACTIVE');
+      const grid = document.getElementById('volunteerProjectsGrid');
+
+      if (list.length === 0) {
+        grid.innerHTML = `<div style="grid-column: 1 / -1; padding: 32px; text-align: center; color: var(--text-muted);">
+          No active volunteer opportunities match your search criteria.
+        </div>`;
+        return;
+      }
+
+      grid.innerHTML = list.map(p => {
+        const shift = p.shifts && p.shifts[0] ? p.shifts[0] : { capacity: 10, registered: 0, date: 'TBD' };
+        const remaining = Math.max(0, shift.capacity - shift.registered);
+        const isCommitted = myCommitments.some(c => c.projectId === p.id);
+        const percentFilled = Math.min(100, Math.round((shift.registered / shift.capacity) * 100));
+
+        return `
+          <div class="project-card">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+              <span class="badge badge-active">${escapeHtml(p.category || 'COMMUNITY')}</span>
+              <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${escapeHtml(p.organization.name)}</span>
+            </div>
+            <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin-top: 4px;">${escapeHtml(p.title)}</h3>
+            <p style="font-size: 12px; color: #475569; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+              ${escapeHtml(p.description)}
+            </p>
+            <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">
+              📍 ${escapeHtml(p.location ? p.location.name : 'Arapahoe County')}
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 6px; padding: 10px; margin-top: 6px;">
+              <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600;">
+                <span>📅 ${escapeHtml(shift.date)}</span>
+                <span style="color: ${remaining > 0 ? 'var(--success)' : 'var(--danger)'};">
+                  ${remaining} spots remaining
+                </span>
+              </div>
+              <div class="capacity-bar">
+                <div class="capacity-fill" style="width: ${percentFilled}%;"></div>
+              </div>
+            </div>
+            <div style="margin-top: auto; padding-top: 8px;">
+              ${isCommitted ? `
+                <button class="btn btn-danger" style="width: 100%;" onclick="cancelVolunteer('${p.id}')">
+                  ✕ Cancel My Commitment
+                </button>
+              ` : `
+                <button class="btn btn-success" style="width: 100%;" onclick="commitVolunteer('${p.id}', '${escapeHtml(p.title)}', '${escapeHtml(shift.date)}')">
+                  ✓ Volunteer for this Project
+                </button>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterVolunteerProjects() {
+      const q = document.getElementById('volunteerSearchInput').value.toLowerCase();
+      const cat = document.getElementById('volunteerTypeFilter').value;
+      const filtered = projects.filter(p => {
+        if (p.status !== 'ACTIVE') return false;
+        const matchesQuery = p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+        const matchesCategory = !cat || p.category === cat;
+        return matchesQuery && matchesCategory;
+      });
+      renderVolunteerProjects(filtered);
+    }
+
+    function commitVolunteer(projectId, title, shiftDate) {
+      if (myCommitments.some(c => c.projectId === projectId)) return;
+      myCommitments.push({ projectId, title, shiftDate });
+
+      const p = projects.find(x => x.id === projectId);
+      if (p && p.shifts && p.shifts[0]) {
+        p.shifts[0].registered += 1;
+      }
+
+      showToast(`Committed! You are registered for "${title}".`);
+      renderCommitmentsBox();
+      renderVolunteerProjects();
+    }
+
+    function cancelVolunteer(projectId) {
+      myCommitments = myCommitments.filter(c => c.projectId !== projectId);
+
+      const p = projects.find(x => x.id === projectId);
+      if (p && p.shifts && p.shifts[0] && p.shifts[0].registered > 0) {
+        p.shifts[0].registered -= 1;
+      }
+
+      showToast(`Your commitment has been cancelled.`);
+      renderCommitmentsBox();
+      renderVolunteerProjects();
+    }
+
+    function renderCommitmentsBox() {
+      const box = document.getElementById('myCommitmentsBox');
+      const listEl = document.getElementById('commitmentsList');
+      const countEl = document.getElementById('commitmentCount');
+
+      if (myCommitments.length === 0) {
+        box.style.display = 'none';
+        return;
+      }
+
+      box.style.display = 'block';
+      countEl.textContent = `${myCommitments.length} Commitment${myCommitments.length > 1 ? 's' : ''}`;
+      listEl.innerHTML = myCommitments.map(c => `
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 4px 0; border-bottom: 1px dashed #dcfce7;">
+          <span><strong>${escapeHtml(c.title)}</strong> - ${escapeHtml(c.shiftDate)}</span>
+          <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11px;" onclick="cancelVolunteer('${c.projectId}')">Cancel</button>
+        </div>
+      `).join('');
+    }
+
+    // JOURNEY 2: PROJECT SUBMISSION (Jenny Niu / Organizer)
+    function updateCharCounter() {
+      const len = document.getElementById('projDescription').value.length;
+      const counter = document.getElementById('charCounter');
+      counter.textContent = `${len} / 4000`;
+      counter.style.color = (len >= 20 && len <= 4000) ? 'var(--success)' : 'var(--danger)';
+    }
+
+    async function handleProjectSubmit(e) {
+      e.preventDefault();
+      const title = document.getElementById('projTitle').value.trim();
+      const description = document.getElementById('projDescription').value.trim();
+      const orgId = document.getElementById('projOrg').value;
+      const orgName = document.getElementById('projOrg').selectedOptions[0].text;
+      const category = document.getElementById('projCategory').value;
+      const locName = document.getElementById('projLocationName').value.trim();
+      const coords = document.getElementById('projCoords').value.split(',').map(n => parseFloat(n.trim()));
+      const shiftDate = document.getElementById('projShiftDate').value.trim();
+      const capacity = parseInt(document.getElementById('projCapacity').value, 10) || 10;
+
+      if (description.length < 20) {
+        alert('Description must be at least 20 characters long per community standards.');
+        return;
+      }
+
+      const newId = 'proj-' + Date.now();
+      const newProj = {
+        id: newId,
+        title,
+        description,
+        organization: { id: orgId, name: orgName },
+        category,
+        status: 'PENDING',
+        location: { name: locName, lon: coords[0] || -104.99, lat: coords[1] || 39.67 },
+        shifts: [{ id: 's-' + Date.now(), date: shiftDate, capacity, registered: 0 }]
+      };
+
+      try {
+        const payload = {
+          title,
+          description,
+          organizationId: orgId,
+          locations: [{
+            name: locName,
+            point: { longitude: coords[0] || -104.99, latitude: coords[1] || 39.67 }
+          }],
+          boundaries: [{
+            name: title + " Perimeter",
+            coordinates: [
+              { longitude: coords[0] - 0.01, latitude: coords[1] - 0.01 },
+              { longitude: coords[0] + 0.01, latitude: coords[1] - 0.01 },
+              { longitude: coords[0] + 0.01, latitude: coords[1] + 0.01 },
+              { longitude: coords[0] - 0.01, latitude: coords[1] + 0.01 },
+              { longitude: coords[0] - 0.01, latitude: coords[1] - 0.01 }
+            ]
+          }]
+        };
+
+        const res = await fetch('/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const saved = await res.json();
+          newProj.id = saved.id || newProj.id;
+        }
+      } catch (err) {
+        // Fallback for standalone demo
+      }
+
+      projects.unshift(newProj);
+      showToast(`Project "${title}" submitted! It is now in the Pending queue awaiting specialist review.`);
+      resetForm();
+      renderAllViews();
+      switchPersona('specialist');
+    }
+
+    function resetForm() {
+      document.getElementById('projectSubmissionForm').reset();
+      updateCharCounter();
+    }
+
+    function renderOrganizerList() {
+      const grid = document.getElementById('organizerProjectsList');
+      grid.innerHTML = projects.map(p => `
+        <div class="project-card">
+          <div style="display: flex; justify-content: space-between;">
+            <span class="badge ${p.status === 'ACTIVE' ? 'badge-active' : p.status === 'REJECTED' ? 'badge-rejected' : 'badge-pending'}">${p.status}</span>
+            <span style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.category)}</span>
+          </div>
+          <h4 style="font-size: 14px; font-weight: 700;">${escapeHtml(p.title)}</h4>
+          <p style="font-size: 12px; color: #475569; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+            ${escapeHtml(p.description)}
+          </p>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: auto;">
+            ID: <code style="font-size: 10px;">${p.id}</code>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // JOURNEY 3: SPECIALIST MODERATION (Daniel Director)
+    function renderModerationQueue() {
+      const pending = projects.filter(p => p.status === 'PENDING');
+      const container = document.getElementById('moderationProjectsList');
+
+      if (pending.length === 0) {
+        container.innerHTML = `
+          <div style="grid-column: 1 / -1; padding: 40px; text-align: center; background: #f8fafc; border-radius: 8px; border: 1px dashed var(--border);">
+            <div style="font-size: 28px; margin-bottom: 8px;">🎉</div>
+            <h4 style="font-weight: 700; color: #0f172a;">Moderation Queue Clean!</h4>
+            <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">No pending projects require regional review right now.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = pending.map(p => `
+        <div class="project-card" style="border-left: 4px solid var(--warning);">
+          <div style="display: flex; justify-content: space-between;">
+            <span class="badge badge-pending">PENDING APPROVAL</span>
+            <span style="font-size: 11px; color: var(--text-muted); font-weight: 600;">${escapeHtml(p.organization.name)}</span>
+          </div>
+          <h3 style="font-size: 15px; font-weight: 700; color: #0f172a;">${escapeHtml(p.title)}</h3>
+          <p style="font-size: 12px; color: #475569; line-height: 1.4;">
+            ${escapeHtml(p.description)}
+          </p>
+          <div style="font-size: 11px; color: var(--text-muted); background: #f8fafc; padding: 8px; border-radius: 4px;">
+            📍 Staging: <strong>${escapeHtml(p.location ? p.location.name : 'Primary Site')}</strong><br/>
+            🌐 Jurisdiction: Arapahoe Regional Service District
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: auto;">
+            <button class="btn btn-success" style="flex: 1;" onclick="approveProject('${p.id}', '${escapeHtml(p.title)}')">
+              ✓ Approve Project (Make Active)
+            </button>
+            <button class="btn btn-outline" style="color: #dc2626;" onclick="rejectProject('${p.id}', '${escapeHtml(p.title)}')">
+              ✕ Reject
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function approveProject(projectId, title) {
+      try {
+        await fetch(`/projects/${projectId}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'ACTIVE' })
+        });
+      } catch (e) {
+        // Fallback for standalone demo
+      }
+
+      const p = projects.find(x => x.id === projectId);
+      if (p) {
+        p.status = 'ACTIVE';
+      }
+
+      showToast(`Approved "${title}"! The project is now ACTIVE and discoverable in the Volunteer portal.`);
+      renderAllViews();
+    }
+
+    function rejectProject(projectId, title) {
+      const p = projects.find(x => x.id === projectId);
+      if (p) {
+        p.status = 'REJECTED';
+      }
+      showToast(`Project "${title}" marked as REJECTED.`);
+      renderAllViews();
+    }
+
+    // Helper utilities
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3500);
+    }
+
+    function renderAllViews() {
+      renderVolunteerProjects();
+      renderOrganizerList();
+      renderModerationQueue();
+    }
+
+    // Init
+    updateCharCounter();
+    fetchLiveProjects();
+  </script>
+</body>
+</html>
