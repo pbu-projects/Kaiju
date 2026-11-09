@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-@Client("${kaiju.sluice.url:`http://localhost:8088`}")
+@Client("${kaiju.sluice.url:`http://localhost:8085`}")
 public interface SluiceClient {
 
     @Get("/api/v1/boundaries/states")

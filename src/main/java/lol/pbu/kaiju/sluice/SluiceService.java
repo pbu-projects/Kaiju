@@ -61,7 +61,8 @@ public class SluiceService {
             return Optional.empty();
         }
         try {
-            return sluiceClient.resolve(lat, lon);
+            return sluiceClient.resolve(lat, lon)
+                    .filter(res -> res.state() != null || res.county() != null || res.city() != null);
         } catch (Exception e) {
             LOG.warn("Error resolving coordinates ({}, {}): {}", lat, lon, e.getMessage());
             return Optional.empty();

@@ -102,12 +102,12 @@ class SluiceClientSpec extends Specification {
         Optional<SluiceReverseGeocodeResult> result = sluiceClient.resolve(40.7608d, -111.8910d)
 
         then: "reverse geocode result contains civic boundaries and time zone"
-        result.isPresent()
-        verifyAll(result.get()) {
-            state() == "Utah"
-            county() == "Salt Lake County"
-            city() == "Salt Lake City"
-            timeZone() == "America/Denver"
+        verifyAll {
+            result.isPresent()
+            result.get().state() == "UT"
+            result.get().county() == "Salt Lake County"
+            result.get().city() == "Salt Lake City"
+            result.get().timeZone() == "America/Denver"
         }
     }
 
@@ -124,25 +124,35 @@ class SluiceClientSpec extends Specification {
 
     def "service checks availability and finds boundaries"() {
         expect: "service reports available against healthy endpoint"
-        sluiceService.isAvailable()
-        sluiceService.isEnabled()
+        verifyAll(sluiceService) {
+            isAvailable()
+            isEnabled()
+        }
 
         when: "finding state boundary via service"
         Optional<SluiceBoundaryDto> stateBoundary = sluiceService.findStateBoundary("UT")
 
         then: "state boundary is returned"
-        stateBoundary.isPresent()
-        stateBoundary.get().name() == "Utah"
+        verifyAll(stateBoundary) {
+            isPresent()
+            get().name() == "Utah"
+        }
 
         when: "resolving coordinates via service"
         Optional<SluiceReverseGeocodeResult> geoResult = sluiceService.resolveCoordinates(40.7608d, -111.8910d)
 
         then: "civic location is returned"
-        geoResult.isPresent()
-        verifyAll(geoResult.get()) {
-            state() == "Utah"
-            city() == "Salt Lake City"
+        verifyAll {
+            geoResult.isPresent()
+            geoResult.get().state() == "UT"
+            geoResult.get().city() == "Salt Lake City"
         }
+
+        when: "resolving coordinates outside known boundaries"
+        Optional<SluiceReverseGeocodeResult> emptyResult = sluiceService.resolveCoordinates(89.0d, -140.0d)
+
+        then: "empty optional is returned when all fields are null"
+        emptyResult.isEmpty()
 
         when: "finding missing state boundary"
         Optional<SluiceBoundaryDto> missing = sluiceService.findStateBoundary("ZZ")
@@ -258,7 +268,10 @@ class SluiceClientSpec extends Specification {
         HttpResponse<SluiceReverseGeocodeResult> resolve(@QueryValue Double lat, @QueryValue Double lon) {
             lastQueryParams.put("lat", String.valueOf(lat))
             lastQueryParams.put("lon", String.valueOf(lon))
-            return HttpResponse.ok(new SluiceReverseGeocodeResult("Utah", "Salt Lake County", "Salt Lake City", "America/Denver"))
+            if (lat != null && lat > 85.0d) {
+                return HttpResponse.ok(new SluiceReverseGeocodeResult(null, null, null, null))
+            }
+            return HttpResponse.ok(new SluiceReverseGeocodeResult("UT", "Salt Lake County", "Salt Lake City", "America/Denver"))
         }
 
         @Get("/health")

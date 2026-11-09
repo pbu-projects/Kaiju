@@ -43,6 +43,6 @@ test-resources:
 
 kaiju:
   sluice:
-    url: ${SLUICE_URL:`http://localhost:8088`}
+    url: ${SLUICE_URL:`http://localhost:8085`}
     enabled: ${SLUICE_ENABLED:true}
 
