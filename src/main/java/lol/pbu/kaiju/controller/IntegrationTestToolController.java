@@ -2,7 +2,9 @@ package lol.pbu.kaiju.controller;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -15,6 +17,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.serde.annotation.Serdeable;
+import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,22 +49,49 @@ public class IntegrationTestToolController {
     private static final Pattern CODE_PATTERN = Pattern.compile("code=([^&]+)");
     private static final Pattern TOKEN_PATTERN = Pattern.compile("\"id_token\"\\s*:\\s*\"([^\"]+)\"");
     private static final Pattern ACCESS_TOKEN_PATTERN = Pattern.compile("\"access_token\"\\s*:\\s*\"([^\"]+)\"");
+    private static final String MESSAGE_KEY = "message";
 
     private final String htmlContent;
     private final String authentikBaseUrl;
+    private final String authFlowUrl;
     private final String clientId;
     private final String clientSecret;
+    private final HttpClient httpClient;
 
+    @Inject
     public IntegrationTestToolController(
             ResourceResolver resourceResolver,
             @Value("${authentik.base-url:http://localhost:9000}") String authentikBaseUrl,
+            @Value("${authentik.flow-path:/api/v3/flows/executor/default-authentication-flow/?query=}") String authFlowPath,
             @Value("${micronaut.security.oauth2.clients.authentik.client-id:kaiju-client}") String clientId,
-            @Value("${micronaut.security.oauth2.clients.authentik.client-secret:kaiju-secret}") String clientSecret
+            @Value("${micronaut.security.oauth2.clients.authentik.client-secret:kaiju-secret}") String clientSecret,
+            @Nullable HttpClient httpClient
     ) {
         this.htmlContent = loadResource(resourceResolver);
         this.authentikBaseUrl = authentikBaseUrl;
+        this.authFlowUrl = authentikBaseUrl + authFlowPath;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+        this.httpClient = (httpClient != null) ? httpClient : createDefaultClient();
+    }
+
+    public IntegrationTestToolController(
+            ResourceResolver resourceResolver,
+            String authentikBaseUrl,
+            String clientId,
+            String clientSecret
+    ) {
+        this(resourceResolver, authentikBaseUrl, clientId, clientSecret, null);
+    }
+
+    public IntegrationTestToolController(
+            ResourceResolver resourceResolver,
+            String authentikBaseUrl,
+            String clientId,
+            String clientSecret,
+            @Nullable HttpClient httpClient
+    ) {
+        this(resourceResolver, authentikBaseUrl, "/api/v3/flows/executor/default-authentication-flow/?query=", clientId, clientSecret, httpClient);
     }
 
     @Get(value = "/", produces = MediaType.TEXT_HTML)
@@ -104,9 +134,9 @@ public class IntegrationTestToolController {
     }
 
     @Post(value = "/integration-test-tool/api/login")
-    public HttpResponse<?> login(@Body LoginCommand command) {
+    public HttpResponse<Object> login(@Body LoginCommand command) {
         if (command == null || command.username() == null || command.username().isBlank()) {
-            return HttpResponse.badRequest(Map.of("message", "Username or email is required."));
+            return HttpResponse.badRequest(Map.of(MESSAGE_KEY, "Username or email is required."));
         }
 
         String username = command.username().trim();
@@ -118,49 +148,46 @@ public class IntegrationTestToolController {
             LoginResult result = performAuthentikLogin(username, password);
             if (result == null || result.idToken() == null) {
                 return HttpResponse.status(HttpStatus.UNAUTHORIZED)
-                        .body(Map.of("message", "Authentik authentication failed. Check user credentials."));
+                        .body(Map.of(MESSAGE_KEY, "Authentik authentication failed. Check user credentials."));
             }
             return HttpResponse.ok(result);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            LOG.warn("Authentik login interrupted for {}: {}", username, e.getMessage());
+            return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of(MESSAGE_KEY, "Authentik login was interrupted."));
         } catch (Exception e) {
             LOG.warn("Failed to complete Authentik login for {}: {}", username, e.getMessage());
             return HttpResponse.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(Map.of("message", "Authentik IdP is unavailable: " + e.getMessage()));
+                    .body(Map.of(MESSAGE_KEY, "Authentik IdP is unavailable: " + e.getMessage()));
         }
     }
 
     private LoginResult performAuthentikLogin(String username, String password) throws IOException, InterruptedException {
-        CookieManager cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
-        HttpClient client = HttpClient.newBuilder()
-                .cookieHandler(cookieManager)
-                .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(5))
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
-
         // 1. Initialize authentication flow
         HttpRequest initReq = HttpRequest.newBuilder()
-                .uri(URI.create(authentikBaseUrl + "/api/v3/flows/executor/default-authentication-flow/?query="))
+                .uri(URI.create(authFlowUrl))
                 .GET()
                 .build();
-        client.send(initReq, BodyHandlers.discarding());
+        httpClient.send(initReq, BodyHandlers.discarding());
 
         // 2. Identification stage
         String idBody = "{\"component\": \"ak-stage-identification\", \"uid_field\": \"" + escapeJson(username) + "\"}";
         HttpRequest idReq = HttpRequest.newBuilder()
-                .uri(URI.create(authentikBaseUrl + "/api/v3/flows/executor/default-authentication-flow/?query="))
-                .header("Content-Type", "application/json")
+                .uri(URI.create(authFlowUrl))
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(idBody))
                 .build();
-        client.send(idReq, BodyHandlers.discarding());
+        httpClient.send(idReq, BodyHandlers.discarding());
 
         // 3. Password stage
         String pwdBody = "{\"component\": \"ak-stage-password\", \"password\": \"" + escapeJson(password) + "\"}";
         HttpRequest pwdReq = HttpRequest.newBuilder()
-                .uri(URI.create(authentikBaseUrl + "/api/v3/flows/executor/default-authentication-flow/?query="))
-                .header("Content-Type", "application/json")
+                .uri(URI.create(authFlowUrl))
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(pwdBody))
                 .build();
-        client.send(pwdReq, BodyHandlers.discarding());
+        httpClient.send(pwdReq, BodyHandlers.discarding());
 
         // 4. Authorize stage to get authorization code
         String redirectUri = "http://localhost:8080/oauth/callback/authentik";
@@ -174,7 +201,7 @@ public class IntegrationTestToolController {
                 .uri(URI.create(authUrl))
                 .GET()
                 .build();
-        java.net.http.HttpResponse<String> authResp = client.send(authReq, BodyHandlers.ofString());
+        var authResp = httpClient.send(authReq, BodyHandlers.ofString());
 
         String location = authResp.headers().firstValue("Location").orElse(null);
         if (location == null) {
@@ -198,10 +225,10 @@ public class IntegrationTestToolController {
 
         HttpRequest tokenReq = HttpRequest.newBuilder()
                 .uri(URI.create(authentikBaseUrl + "/application/o/token/"))
-                .header("Content-Type", "application/x-www-form-urlencoded")
+                .header(HttpHeaders.CONTENT_TYPE, "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(tokenBody))
                 .build();
-        java.net.http.HttpResponse<String> tokenResp = client.send(tokenReq, BodyHandlers.ofString());
+        var tokenResp = httpClient.send(tokenReq, BodyHandlers.ofString());
         String tokenJson = tokenResp.body();
 
         String idToken = extractJsonField(TOKEN_PATTERN, tokenJson);
@@ -211,6 +238,16 @@ public class IntegrationTestToolController {
         String displayName = resolveDisplayName(username);
 
         return new LoginResult(idToken, accessToken, username, displayName, role);
+    }
+
+    private static HttpClient createDefaultClient() {
+        CookieManager cookieManager = new CookieManager(null, CookiePolicy.ACCEPT_ALL);
+        return HttpClient.newBuilder()
+                .cookieHandler(cookieManager)
+                .version(HttpClient.Version.HTTP_1_1)
+                .connectTimeout(Duration.ofSeconds(5))
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
     }
 
     private static String extractJsonField(Pattern pattern, String json) {
@@ -252,7 +289,7 @@ public class IntegrationTestToolController {
         if (stream.isPresent()) {
             try (InputStream in = stream.get()) {
                 return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            } catch (IOException e) {
+            } catch (IOException _) {
                 return "<html><body><h1>Error loading Integration Testing Tool</h1></body></html>";
             }
         }
