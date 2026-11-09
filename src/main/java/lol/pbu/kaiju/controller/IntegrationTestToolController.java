@@ -14,6 +14,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
+import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.serde.annotation.Serdeable;
@@ -57,6 +58,7 @@ public class IntegrationTestToolController {
     private final String clientId;
     private final String clientSecret;
     private final HttpClient httpClient;
+    private final EmbeddedServer embeddedServer;
 
     @Inject
     public IntegrationTestToolController(
@@ -65,7 +67,8 @@ public class IntegrationTestToolController {
             @Value("${authentik.flow-path:/api/v3/flows/executor/default-authentication-flow/?query=}") String authFlowPath,
             @Value("${micronaut.security.oauth2.clients.authentik.client-id:kaiju-client}") String clientId,
             @Value("${micronaut.security.oauth2.clients.authentik.client-secret:kaiju-secret}") String clientSecret,
-            @Nullable HttpClient httpClient
+            @Nullable HttpClient httpClient,
+            @Nullable EmbeddedServer embeddedServer
     ) {
         this.htmlContent = loadResource(resourceResolver);
         this.authentikBaseUrl = authentikBaseUrl;
@@ -73,6 +76,7 @@ public class IntegrationTestToolController {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.httpClient = (httpClient != null) ? httpClient : createDefaultClient();
+        this.embeddedServer = embeddedServer;
     }
 
     public IntegrationTestToolController(
@@ -81,7 +85,7 @@ public class IntegrationTestToolController {
             String clientId,
             String clientSecret
     ) {
-        this(resourceResolver, authentikBaseUrl, clientId, clientSecret, null);
+        this(resourceResolver, authentikBaseUrl, clientId, clientSecret, null, null);
     }
 
     public IntegrationTestToolController(
@@ -91,7 +95,18 @@ public class IntegrationTestToolController {
             String clientSecret,
             @Nullable HttpClient httpClient
     ) {
-        this(resourceResolver, authentikBaseUrl, "/api/v3/flows/executor/default-authentication-flow/?query=", clientId, clientSecret, httpClient);
+        this(resourceResolver, authentikBaseUrl, "/api/v3/flows/executor/default-authentication-flow/?query=", clientId, clientSecret, httpClient, null);
+    }
+
+    public IntegrationTestToolController(
+            ResourceResolver resourceResolver,
+            String authentikBaseUrl,
+            String authFlowPath,
+            String clientId,
+            String clientSecret,
+            @Nullable HttpClient httpClient
+    ) {
+        this(resourceResolver, authentikBaseUrl, authFlowPath, clientId, clientSecret, httpClient, null);
     }
 
     @Get(value = "/", produces = MediaType.TEXT_HTML)
@@ -190,7 +205,7 @@ public class IntegrationTestToolController {
         httpClient.send(pwdReq, BodyHandlers.discarding());
 
         // 4. Authorize stage to get authorization code
-        String redirectUri = "http://localhost:8080/oauth/callback/authentik";
+        String redirectUri = resolveRedirectUri();
         String authUrl = authentikBaseUrl + "/application/o/authorize/?"
                 + "client_id=" + URLEncoder.encode(clientId, StandardCharsets.UTF_8)
                 + "&response_type=code"
@@ -278,6 +293,17 @@ public class IntegrationTestToolController {
             return "Victor Volunteer";
         }
         return username;
+    }
+
+    String resolveRedirectUri() {
+        if (embeddedServer != null && embeddedServer.isRunning()) {
+            String base = embeddedServer.getURI().toString();
+            if (base.endsWith("/")) {
+                base = base.substring(0, base.length() - 1);
+            }
+            return base + "/oauth/callback/authentik";
+        }
+        return "http://localhost:8080/oauth/callback/authentik";
     }
 
     private static String escapeJson(String s) {

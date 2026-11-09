@@ -1,6 +1,7 @@
 package lol.pbu.kaiju.controller
 
 import io.micronaut.core.io.ResourceResolver
+import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -361,6 +362,119 @@ class IntegrationTestToolControllerSpec extends BaseControllerSpec {
         verifyAll {
             controller != null
             controller.root().contains("Kaiju Integration Testing Tool")
+        }
+    }
+
+    def "resolveRedirectUri returns dynamic server URI when embedded server is running"() {
+        given: "an embedded server running on an ephemeral port"
+        def server = Mock(EmbeddedServer) {
+            isRunning() >> true
+            getURI() >> URI.create("http://localhost:54321")
+        }
+        def controller = new IntegrationTestToolController(
+                resourceResolver,
+                "http://localhost:9000",
+                "/api/v3/flows/executor/default-authentication-flow/?query=",
+                "kaiju-client",
+                "kaiju-secret",
+                null,
+                server
+        )
+
+        expect: "redirect URI uses dynamic port"
+        verifyAll {
+            controller.resolveRedirectUri() == "http://localhost:54321/oauth/callback/authentik"
+        }
+    }
+
+    def "resolveRedirectUri strips trailing slash when embedded server URI ends with slash"() {
+        given: "an embedded server returning a URI with a trailing slash"
+        def server = Mock(EmbeddedServer) {
+            isRunning() >> true
+            getURI() >> URI.create("http://localhost:54321/")
+        }
+        def controller = new IntegrationTestToolController(
+                resourceResolver,
+                "http://localhost:9000",
+                "/api/v3/flows/executor/default-authentication-flow/?query=",
+                "kaiju-client",
+                "kaiju-secret",
+                null,
+                server
+        )
+
+        expect: "redirect URI strips trailing slash"
+        verifyAll {
+            controller.resolveRedirectUri() == "http://localhost:54321/oauth/callback/authentik"
+        }
+    }
+
+    def "resolveRedirectUri falls back to port 8080 when embedded server is stopped or null"() {
+        given: "a stopped embedded server and a controller with null server"
+        def stoppedServer = Mock(EmbeddedServer) {
+            isRunning() >> false
+        }
+        def controllerStopped = new IntegrationTestToolController(
+                resourceResolver,
+                "http://localhost:9000",
+                "/api/v3/flows/executor/default-authentication-flow/?query=",
+                "kaiju-client",
+                "kaiju-secret",
+                null,
+                stoppedServer
+        )
+        def controllerNull = new IntegrationTestToolController(
+                resourceResolver,
+                "http://localhost:9000",
+                "kaiju-client",
+                "kaiju-secret"
+        )
+
+        expect: "fallback to default port 8080"
+        verifyAll {
+            controllerStopped.resolveRedirectUri() == "http://localhost:8080/oauth/callback/authentik"
+            controllerNull.resolveRedirectUri() == "http://localhost:8080/oauth/callback/authentik"
+        }
+    }
+
+    def "login uses dynamic server port in redirect URI when embedded server is active"() {
+        given: "an embedded server on port 43210 and a stub http client capturing the redirect URI"
+        def server = Mock(EmbeddedServer) {
+            isRunning() >> true
+            getURI() >> URI.create("http://localhost:43210")
+        }
+        String capturedAuthUri = null
+        def stubClient = new StubHttpClient(sendHandler: { JavaHttpRequest req, JavaHttpResponse.BodyHandler<?> handler ->
+            String uriStr = req.uri().toString()
+            if (uriStr.contains("/application/o/authorize/")) {
+                capturedAuthUri = uriStr
+                JavaHttpHeaders headers = JavaHttpHeaders.of(["Location": ["http://localhost:43210/oauth/callback/authentik?code=dynamic-port-code"]], { String k, String v -> true })
+                return new StubAuthentikResponse<String>(302, "", headers)
+            } else if (uriStr.contains("/application/o/token/")) {
+                String tokenPayload = '{"id_token": "header.eyJlbWFpbCI6ICJ2aWN0b3JAcGJ1LmxvbCIsICJuYW1lIjogIlZpY3RvciJ9.signature", "access_token": "acc-token"}'
+                return new StubAuthentikResponse<String>(200, tokenPayload)
+            } else {
+                return new StubAuthentikResponse<Void>(200, null)
+            }
+        })
+        def controller = new IntegrationTestToolController(
+                resourceResolver,
+                "http://localhost:9000",
+                "/api/v3/flows/executor/default-authentication-flow/?query=",
+                "kaiju-client",
+                "kaiju-secret",
+                stubClient,
+                server
+        )
+
+        when: "logging in with victor"
+        def result = controller.login(new LoginCommand("victor", "correct-password"))
+
+        then: "authorization request encoded the dynamic port in redirect_uri and login succeeded"
+        verifyAll {
+            capturedAuthUri != null
+            capturedAuthUri.contains("redirect_uri=http%3A%2F%2Flocalhost%3A43210%2Foauth%2Fcallback%2Fauthentik")
+            result.status() == HttpStatus.OK
         }
     }
 
