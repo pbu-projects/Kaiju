@@ -41,3 +41,8 @@ test-resources:
     keycloak:
       enabled: false
 
+kaiju:
+  sluice:
+    url: ${SLUICE_URL:`http://localhost:8088`}
+    enabled: ${SLUICE_ENABLED:true}
+
