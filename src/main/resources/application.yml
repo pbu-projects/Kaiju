@@ -2,7 +2,7 @@ micronaut:
   application:
     name: kaiju
   server:
-    port: ${MICRONAUT_SERVER_PORT:-1}
+    port: -1
     thread-selection: AUTO
   executors:
     io:
@@ -39,8 +39,8 @@ micronaut:
 datasources:
   default:
     url: jdbc:postgresql://localhost:5432/volunteer_monster
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:}
+    username: ${DB_USERNAME:jimmy}
+    password: ${DB_PASSWORD:warm-farts-smell-worse}
     driver-class-name: org.postgresql.Driver
     db-type: postgres
     schema-generate: NONE
@@ -49,6 +49,8 @@ flyway:
   datasources:
     default:
       enabled: true
+      baseline-on-migrate: true
+      baseline-version: "11"
       locations:
         - filesystem:database/init
       sql-migration-prefix: ""

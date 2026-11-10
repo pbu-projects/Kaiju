@@ -62,6 +62,7 @@ dependencies {
 
     runtimeOnly("ch.qos.logback:logback-classic")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
+    runtimeOnly("org.yaml:snakeyaml")
 
     testImplementation("io.micronaut:micronaut-http-client")
     testImplementation("org.apache.commons:commons-compress:${project.properties["commonsCompressVersion"]}")
