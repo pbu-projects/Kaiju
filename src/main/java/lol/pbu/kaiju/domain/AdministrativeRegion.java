@@ -5,13 +5,12 @@ import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
 import io.micronaut.data.annotation.MappedEntity;
 import io.micronaut.data.annotation.TypeDef;
+import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.model.JtsPolygonConverter;
 import org.locationtech.jts.geom.Geometry;
-
-import io.micronaut.serde.annotation.Serdeable;
 
 import java.util.UUID;
 
@@ -33,27 +32,40 @@ public record AdministrativeRegion(
 
         @NotNull(message = "Administrative region geometry is required.")
         @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
-        Geometry geom
+        Geometry geom,
+
+        @Nullable
+        Integer level,
+
+        @Nullable
+        String countryCode,
+
+        @Nullable
+        String stateCode,
+
+        @Nullable
+        String timeZone
 ) {
+    public AdministrativeRegion(UUID id, String name, UUID parentRegionId, Geometry geom) {
+        this(id, name, parentRegionId, geom, null, null, null, null);
+    }
+
     @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
     @Override
     public Geometry geom() {
         return geom;
     }
 
-    /**
-     * Instead of using setters, this method gives the opportunity to take an existing administrative region ID and assign that to
-     * the administrative region properties in this administrative region record.
-     *
-     * @param newId The UUID to assign to the administrative region.
-     * @return A new {@link AdministrativeRegion} with the given ID.
-     */
     public AdministrativeRegion withId(@NotNull UUID newId) {
         return new AdministrativeRegion(
                 newId,
                 this.name(),
                 this.parentRegionId(),
-                this.geom()
+                this.geom(),
+                this.level(),
+                this.countryCode(),
+                this.stateCode(),
+                this.timeZone()
         );
     }
 }

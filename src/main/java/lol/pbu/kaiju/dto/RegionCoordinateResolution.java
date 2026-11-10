@@ -1,10 +1,12 @@
-package lol.pbu.kaiju.sluice;
+package lol.pbu.kaiju.dto;
 
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.serde.annotation.Serdeable;
 
+@Introspected
 @Serdeable
-public record SluiceReverseGeocodeResult(
+public record RegionCoordinateResolution(
         @Nullable String state,
         @Nullable String county,
         @Nullable String city,
