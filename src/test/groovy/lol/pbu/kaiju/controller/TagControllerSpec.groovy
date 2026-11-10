@@ -159,13 +159,18 @@ class TagControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "READ | should reject unauthenticated GET /tags/{id} with 401 UNAUTHORIZED"() {
-        when: "an unauthenticated caller attempts to get a tag"
-        client.exchange(HttpRequest.GET("/tags/${UUID.randomUUID()}"), Tag)
+    def "READ | should allow unauthenticated GET /tags/{id} with 200 OK"() {
+        given: "a persisted tag"
+        def tag = dataBuilder.tag().withName("public-tag-${faker.number().digits(5)}").persist()
 
-        then: "a 401 UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        when: "an unauthenticated caller attempts to get a tag"
+        def response = client.exchange(HttpRequest.GET("/tags/${tag.id()}"), Tag)
+
+        then: "a 200 OK response is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body().id() == tag.id()
+        }
     }
 
     /********** UPDATE Tests **********/
@@ -382,12 +387,14 @@ class TagControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "LIST | should reject unauthenticated GET /tags with 401 UNAUTHORIZED"() {
+    def "LIST | should allow unauthenticated GET /tags with 200 OK"() {
         when: "an unauthenticated caller attempts to list tags"
-        client.exchange(HttpRequest.GET("/tags"))
+        def response = client.exchange(HttpRequest.GET("/tags"), Map)
 
-        then: "a 401 UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK response is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body() != null
+        }
     }
 }

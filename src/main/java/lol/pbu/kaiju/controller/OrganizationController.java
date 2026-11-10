@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
+import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
@@ -89,6 +90,7 @@ public class OrganizationController {
      * @return a page of matching organizations
      */
     @Get("/search-by-name")
+    @Secured(IS_ANONYMOUS)
     public Page<Organization> searchByName(
             @QueryValue @NonNull String name,
             @QueryValue(defaultValue = "false") boolean exact,
@@ -150,6 +152,7 @@ public class OrganizationController {
      * @return a page of organizations within range, closest first
      */
     @Get("/search-by-location")
+    @Secured(IS_ANONYMOUS)
     public Page<Organization> searchByLocation(
             @QueryValue @Min(-180) @Max(180) double longitude,
             @QueryValue @Min(-90) @Max(90) double latitude,
@@ -170,6 +173,7 @@ public class OrganizationController {
      * @return a page of matching organizations in the region
      */
     @Get("/search-by-region")
+    @Secured(IS_ANONYMOUS)
     public Page<Organization> searchByRegion(
             @QueryValue @NonNull UUID regionId,
             @Valid Pageable pageable
@@ -199,6 +203,7 @@ public class OrganizationController {
     }
 
     @Get("/{id}")
+    @Secured(IS_ANONYMOUS)
     public Optional<Organization> getOrganization(@PathVariable UUID id) {
         return organizationService.getOrganizationById(id);
     }

@@ -281,16 +281,18 @@ class ShiftControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "READ | should reject unauthenticated GET /shifts/{id} with 401 UNAUTHORIZED"() {
+    def "READ | should allow unauthenticated GET /shifts/{id} with 200 OK"() {
         given: "an existing shift ID"
         UUID id = getAnyShiftId()
 
         when: "an unauthenticated caller requests a shift"
-        client.exchange(HttpRequest.GET("/shifts/${id}"), Shift)
+        def response = client.exchange(HttpRequest.GET("/shifts/${id}"), Shift)
 
-        then: "a 401 UNAUTHORIZED is thrown"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body().id() == id
+        }
     }
 
     /********** UPDATE Tests **********/
@@ -484,12 +486,14 @@ class ShiftControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "LIST | should reject unauthenticated GET /shifts with 401 UNAUTHORIZED"() {
+    def "LIST | should allow unauthenticated GET /shifts with 200 OK"() {
         when: "an unauthenticated caller attempts to list shifts"
-        client.exchange(HttpRequest.GET("/shifts"))
+        def response = client.exchange(HttpRequest.GET("/shifts"), Map)
 
-        then: "a 401 UNAUTHORIZED is thrown"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body() != null
+        }
     }
 }

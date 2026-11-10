@@ -33,6 +33,7 @@ import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.BAD_REQUEST;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
+import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 
 @ExecuteOn(TaskExecutors.VIRTUAL)
@@ -57,11 +58,13 @@ public class ShiftController {
     }
 
     @Get
+    @Secured(IS_ANONYMOUS)
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable) {
         return shiftService.getShifts(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
+    @Secured(IS_ANONYMOUS)
     public Optional<Shift> getShift(@PathVariable UUID id) {
         return shiftService.getShiftById(id);
     }

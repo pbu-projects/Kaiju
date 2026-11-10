@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JustServe - Find Volunteer Opportunities Near You</title>
+    <!-- Tailwind CSS for utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js for lightweight, reactive component state -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"></script>
+    <!-- Leaflet CSS & JS for interactive spatial mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        /* Fallback styling if external CDNs are unavailable in offline environments */
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #1e293b;
+            background-color: #f8fafc;
+            margin: 0;
+            padding: 0;
+        }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            user-select: none;
+        }
+        .chip-active {
+            background-color: #2563eb;
+            color: #ffffff;
+            border-color: #2563eb;
+        }
+        .chip-inactive {
+            background-color: #ffffff;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+        .chip-inactive:hover {
+            background-color: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        #project-map {
+            height: 480px;
+            width: 100%;
+            border-radius: 0.75rem;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col" x-data="volunteerSearchApp()" x-init="initApp()">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-8">
+                <a href="/projects" class="flex items-center space-x-2 text-blue-600 font-extrabold text-xl tracking-tight">
+                    <span class="bg-blue-600 text-white rounded px-2 py-1 text-sm font-black">JS</span>
+                    <span>JustServe</span>
+                </a>
+                <nav class="hidden md:flex space-x-6 text-sm font-medium">
+                    <button type="button" @click="activeTab = 'projects'" :class="activeTab === 'projects' ? 'text-blue-600 border-b-2 border-blue-600 pb-4' : 'text-slate-600 hover:text-slate-900 pb-4'">
+                        Find Projects
+                    </button>
+                    <button type="button" @click="activeTab = 'carousels'" :class="activeTab === 'carousels' ? 'text-blue-600 border-b-2 border-blue-600 pb-4' : 'text-slate-600 hover:text-slate-900 pb-4'">
+                        Curated (CUR-006)
+                    </button>
+                    <button type="button" @click="activeTab = 'organizations'" :class="activeTab === 'organizations' ? 'text-blue-600 border-b-2 border-blue-600 pb-4' : 'text-slate-600 hover:text-slate-900 pb-4'">
+                        Organizations (CUR-007)
+                    </button>
+                </nav>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800">
+                    Anonymous Discovery Parity (CUR-001)
+                </span>
+                <button type="button" class="text-sm font-medium text-slate-700 hover:text-blue-600">
+                    Sign in
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow">
+
+        <!-- ========================================== -->
+        <!-- TAB 1: PROJECT SEARCH BY STREET ADDRESS   -->
+        <!-- ========================================== -->
+        <section x-show="activeTab === 'projects'" class="pb-16">
+
+            <!-- Hero Section (UX-031 Recommendation) -->
+            <div class="bg-white border-b border-slate-200 py-10 px-4 sm:px-6 lg:px-8 text-center">
+                <div class="max-w-3xl mx-auto">
+                    <h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+                        Find a way to help, close to home.
+                    </h1>
+                    <p class="mt-3 text-base sm:text-lg text-slate-600 leading-relaxed">
+                        JustServe is a free place to find volunteer opportunities posted by local nonprofits, schools, and community groups. Every listing is checked by a local volunteer before it is recommended.
+                    </p>
+                </div>
+
+                <!-- Primary Search Box -->
+                <div class="mt-8 max-w-4xl mx-auto bg-slate-50 border border-slate-300 rounded-2xl p-4 sm:p-5 shadow-md">
+                    <form @submit.prevent="executeSearch()" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+
+                        <!-- Street Address Input -->
+                        <div class="md:col-span-6 text-left">
+                            <label for="input-street-address" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                                Street Address or Spot
+                            </label>
+                            <div class="relative">
+                                <input
+                                    id="input-street-address"
+                                    type="text"
+                                    x-model="searchAddress"
+                                    placeholder="Enter street address, city, or postal code"
+                                    class="w-full bg-white border border-slate-300 rounded-lg px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                />
+                                <button
+                                    type="button"
+                                    @click="useCurrentLocation()"
+                                    title="Use my device spot"
+                                    class="absolute right-2 top-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 rounded font-medium border border-blue-200">
+                                    My Spot
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Radius Dropdown -->
+                        <div class="md:col-span-3 text-left">
+                            <label for="select-radius" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                                Distance Radius
+                            </label>
+                            <select
+                                id="select-radius"
+                                x-model.number="radiusMiles"
+                                class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <option value="5">Within 5 miles</option>
+                                <option value="10">Within 10 miles</option>
+                                <option value="15">Within 15 miles</option>
+                                <option value="25" selected>Within 25 miles</option>
+                                <option value="50">Within 50 miles</option>
+                            </select>
+                        </div>
+
+                        <!-- Search Button -->
+                        <div class="md:col-span-3 pt-4 md:pt-5">
+                            <button
+                                id="btn-search-projects"
+                                type="submit"
+                                :disabled="isLoading"
+                                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-lg shadow transition flex items-center justify-center space-x-2 disabled:opacity-50">
+                                <span x-show="!isLoading">Search Projects</span>
+                                <span x-show="isLoading">Finding...</span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Exact Coordinates Spot Badge -->
+                    <div class="mt-3 flex flex-wrap items-center justify-between text-xs text-slate-500 border-t border-slate-200 pt-3">
+                        <div class="flex items-center space-x-2">
+                            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span class="font-medium text-slate-700">Specific Lat &amp; Long Spot:</span>
+                            <span class="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-800" x-text="`${currentLat.toFixed(4)}°, ${currentLon.toFixed(4)}°`"></span>
+                        </div>
+                        <div class="flex items-center space-x-2 mt-1 sm:mt-0">
+                            <span class="text-slate-500">Quick Denver Landmark Presets:</span>
+                            <button type="button" @click="setPresetAddress('1437 Bannock St, Denver, CO 80202', 39.7392, -104.9928)" class="text-blue-600 hover:underline">Civic Center</button>
+                            <span>·</span>
+                            <button type="button" @click="setPresetAddress('1001 16th St Mall, Denver, CO 80265', 39.7465, -104.9942)" class="text-blue-600 hover:underline">16th St Mall</button>
+                            <span>·</span>
+                            <button type="button" @click="setPresetAddress('950 S Birch St, Glendale, CO 80246', 39.7029, -104.9336)" class="text-blue-600 hover:underline">Glendale</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Location State Control (UX-005 Recommendation) -->
+                <div class="mt-4 max-w-4xl mx-auto flex items-center justify-center space-x-2 text-sm text-slate-600">
+                    <span id="location-summary-text" class="font-medium text-slate-800" x-text="`Within ${radiusMiles} miles of ${searchAddress}`"></span>
+                    <button type="button" @click="focusAddressInput()" class="text-blue-600 font-semibold hover:underline">
+                        Change
+                    </button>
+                </div>
+            </div>
+
+            <!-- Discovery Results Section -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+
+                <!-- Filter Controls Row (UX-014, UX-004 Recommendations) -->
+                <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm mb-6 space-y-4">
+
+                    <!-- Top Filter Bar: Keyword and View Toggle -->
+                    <div class="flex flex-wrap items-center justify-between gap-4">
+                        <!-- Keyword input -->
+                        <div class="flex-grow max-w-md">
+                            <input
+                                id="input-keyword-filter"
+                                type="text"
+                                x-model="keywordFilter"
+                                placeholder="Filter by keyword or project title..."
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        <!-- CUR-002: Decision List vs Map Toggle -->
+                        <div class="inline-flex rounded-lg border border-slate-300 bg-slate-50 p-1">
+                            <button
+                                id="btn-toggle-list"
+                                type="button"
+                                @click="switchView('list')"
+                                :class="viewMode === 'list' ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-600 font-medium'"
+                                class="px-3 py-1 text-sm rounded-md transition">
+                                List View
+                            </button>
+                            <button
+                                id="btn-toggle-map"
+                                type="button"
+                                @click="switchView('map')"
+                                :class="viewMode === 'map' ? 'bg-white shadow text-blue-600 font-semibold' : 'text-slate-600 font-medium'"
+                                class="px-3 py-1 text-sm rounded-md transition">
+                                Map View
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Date Filter Chips (UX-014: "Any time · Today · This weekend · Next 7 days · Pick dates") -->
+                    <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-2">When:</span>
+                        <template x-for="chip in dateFilterOptions" :key="chip">
+                            <button
+                                type="button"
+                                @click="selectedDateFilter = chip"
+                                :class="selectedDateFilter === chip ? 'chip chip-active' : 'chip chip-inactive'"
+                                x-text="chip">
+                            </button>
+                        </template>
+                    </div>
+
+                    <!-- Contribution Type Chips (UX-004: "Anything · Come in person · Donate items · Help from home") -->
+                    <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-2">How:</span>
+                        <template x-for="type in contributionOptions" :key="type">
+                            <button
+                                type="button"
+                                @click="selectedContribution = type"
+                                :class="selectedContribution === type ? 'chip chip-active' : 'chip chip-inactive'"
+                                x-text="type">
+                            </button>
+                        </template>
+                    </div>
+
+                    <!-- What the opportunity is like (UX-018: Attribute Badges) -->
+                    <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-2">What it is like:</span>
+                        <template x-for="attr in attributeFilterOptions" :key="attr">
+                            <button
+                                type="button"
+                                @click="toggleAttributeFilter(attr)"
+                                :class="selectedAttributes.includes(attr) ? 'chip chip-active' : 'chip chip-inactive'"
+                                x-text="attr">
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Results Count Bar -->
+                <div class="flex items-center justify-between mb-4">
+                    <p id="results-count-heading" class="text-sm font-semibold text-slate-700">
+                        <span x-text="filteredProjects.length"></span> opportunities found closest to your spot
+                    </p>
+                    <p class="text-xs text-slate-500">
+                        Sorted by distance from specific lat & long
+                    </p>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- ZERO RESULTS STATE (UX-010 Recommendation) -->
+                <!-- ========================================== -->
+                <div x-show="filteredProjects.length === 0 && !isLoading" class="bg-white border border-slate-200 rounded-xl p-8 text-center my-6 shadow-sm">
+                    <div class="max-w-md mx-auto space-y-4">
+                        <h3 class="text-lg font-bold text-slate-900">Nothing matches that yet.</h3>
+                        <p class="text-sm text-slate-600">
+                            Try expanding your search distance or clearing filters to find opportunities near you.
+                        </p>
+                        <div class="flex flex-col sm:flex-row gap-2 justify-center pt-2">
+                            <button type="button" @click="expandRadiusTo50()" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-semibold px-4 py-2 rounded-lg text-sm border border-blue-200">
+                                Search 50 miles instead
+                            </button>
+                            <button type="button" @click="includeHomeProjects()" class="bg-slate-50 text-slate-700 hover:bg-slate-100 font-semibold px-4 py-2 rounded-lg text-sm border border-slate-300">
+                                Include opportunities you can do from home
+                            </button>
+                            <button type="button" @click="clearAllFilters()" class="text-slate-600 hover:text-slate-900 text-sm font-medium py-2">
+                                Clear filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- LIST VIEW (CUR-001)                        -->
+                <!-- ========================================== -->
+                <div x-show="viewMode === 'list' && filteredProjects.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <template x-for="item in filteredProjects" :key="item.id">
+                        <div class="project-card bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                            <div>
+                                <!-- Card Header: Proximity and Type Badge -->
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
+                                        <span x-text="`${item.distanceMiles.toFixed(1)} miles away`"></span>
+                                    </span>
+                                    <span class="text-xs font-medium px-2 py-0.5 rounded bg-slate-100 text-slate-700" x-text="item.contributionType"></span>
+                                </div>
+
+                                <!-- Project Title -->
+                                <h3 class="text-lg font-bold text-slate-900 leading-snug hover:text-blue-600 cursor-pointer" @click="openProjectDetail(item)" x-text="item.title"></h3>
+
+                                <!-- Sponsoring Organization Block (UX-024 Recommendation) -->
+                                <p class="text-xs text-slate-500 mt-1 mb-3" x-text="`Posted by ${item.orgName} · Nonprofit · Reviewed recently`"></p>
+
+                                <!-- Project Description Snippet -->
+                                <p class="text-sm text-slate-600 line-clamp-2 mb-4" x-text="item.description"></p>
+
+                                <!-- Location Details -->
+                                <div class="text-xs text-slate-600 space-y-1 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                    <div class="font-semibold text-slate-800" x-text="item.locationName"></div>
+                                    <div x-text="`${item.addressLine}, ${item.city}, ${item.stateProvince} ${item.postalCode}`"></div>
+                                    <div class="text-slate-400 font-mono" x-text="`Spot: ${item.latitude.toFixed(4)}°, ${item.longitude.toFixed(4)}°`"></div>
+                                </div>
+
+                                <!-- Attribute Badges (UX-018: Icon + Text) -->
+                                <div class="flex flex-wrap gap-1.5 mb-4">
+                                    <template x-for="badge in item.badges" :key="badge">
+                                        <span class="inline-flex items-center text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-medium" x-text="badge"></span>
+                                    </template>
+                                </div>
+                            </div>
+
+                            <!-- Card Footer: Capacity & Detail Action -->
+                            <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                                <!-- Capacity Pill (UX-020 Recommendation) -->
+                                <span class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200" x-text="item.capacityDisplay"></span>
+
+                                <!-- Action Button -->
+                                <button
+                                    type="button"
+                                    @click="openProjectDetail(item)"
+                                    class="text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition border border-blue-200">
+                                    View Details & Shifts
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- ========================================== -->
+                <!-- MAP VIEW (CUR-002)                         -->
+                <!-- ========================================== -->
+                <div x-show="viewMode === 'map'" class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                    <div class="mb-3 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Map of Opportunities Near Your Spot</h3>
+                            <p class="text-xs text-slate-500">Blue marker is your street address spot; green pins are nearby projects.</p>
+                        </div>
+                        <span class="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-700" x-text="`Plotting ${filteredProjects.length} projects`"></span>
+                    </div>
+                    <div id="project-map"></div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ======================================================= -->
+        <!-- TAB 2: CUR-006 CURATED PROJECT CAROUSELS (PLACEHOLDER) -->
+        <!-- ======================================================= -->
+        <section x-show="activeTab === 'carousels'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            <div class="mb-8">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 mb-2">
+                    CUR-006 Placeholder
+                </span>
+                <h2 class="text-2xl font-extrabold text-slate-900">Curated Project Carousels</h2>
+                <p class="text-sm text-slate-600">Horizontally-browsable sets of projects scoped to the visitor's location without requiring a typed search.</p>
+            </div>
+
+            <!-- Carousel 1: Happening soon near Denver (UX Microcopy Heading) -->
+            <div class="mb-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-slate-900">Happening soon near Denver</h3>
+                    <button type="button" @click="activeTab = 'projects'" class="text-sm font-semibold text-blue-600 hover:underline">See all nearby</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">This Saturday</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Civic Center Park Flower Bed Planting</h4>
+                        <p class="text-xs text-slate-500 mt-1">1437 Bannock St, Denver · 0.5 miles</p>
+                        <p class="text-xs text-slate-600 mt-2">Plant perennials and tidy walking paths around Civic Center.</p>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Sunday Morning</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Downtown 16th Street Walkway Restock</h4>
+                        <p class="text-xs text-slate-500 mt-1">1001 16th St Mall, Denver · 0.8 miles</p>
+                        <p class="text-xs text-slate-600 mt-2">Assemble and hand out cold weather relief bags to visitors.</p>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">Next Tuesday</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Glendale Community Food Pantry Sort</h4>
+                        <p class="text-xs text-slate-500 mt-1">950 S Birch St, Glendale · 4.2 miles</p>
+                        <p class="text-xs text-slate-600 mt-2">Sort incoming grocery items and pack community food boxes.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carousel 2: Just posted near you -->
+            <div class="mb-10">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-slate-900">Just posted near you</h3>
+                    <button type="button" @click="activeTab = 'projects'" class="text-sm font-semibold text-blue-600 hover:underline">See newest</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Posted Today</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Aurora Youth Mentoring Orientation</h4>
+                        <p class="text-xs text-slate-500 mt-1">15151 E Alameda Pkwy, Aurora · 9.8 miles</p>
+                        <p class="text-xs text-slate-600 mt-2">Welcome students and assist with after-school reading clubs.</p>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Posted Yesterday</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Boulder Creek Trail Cleanup</h4>
+                        <p class="text-xs text-slate-500 mt-1">1300 Pearl St, Boulder · 25.1 miles</p>
+                        <p class="text-xs text-slate-600 mt-2">Remove debris along the creek path before winter weather sets in.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Carousel 3: Things you can do from home -->
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-bold text-slate-900">Things you can do from home</h3>
+                    <button type="button" @click="activeTab = 'projects'; selectedContribution = 'Help from home'" class="text-sm font-semibold text-blue-600 hover:underline">See all remote</button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">Remote / Virtual</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Transcribe Historic Community Records</h4>
+                        <p class="text-xs text-slate-500 mt-1">Online · Any schedule</p>
+                        <p class="text-xs text-slate-600 mt-2">Help verify scanned historical documents from your home computer.</p>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow transition">
+                        <span class="text-xs font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded">Remote / Virtual</span>
+                        <h4 class="font-bold text-slate-900 mt-2">Knitted Warmth Hat & Scarf Drive</h4>
+                        <p class="text-xs text-slate-500 mt-1">Home Drop-off · Flexible</p>
+                        <p class="text-xs text-slate-600 mt-2">Knit or crochet warm items at home and mail to our donation center.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================================================== -->
+        <!-- TAB 3: CUR-007 & CUR-008 ORGANIZATION DIRECTORY & PROFILE  -->
+        <!-- ========================================================== -->
+        <section x-show="activeTab === 'organizations'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            <div class="mb-8">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 mb-2">
+                    CUR-007 & CUR-008 Placeholders
+                </span>
+                <h2 class="text-2xl font-extrabold text-slate-900">Organization Directory &amp; Vanity Profiles</h2>
+                <p class="text-sm text-slate-600">Find local service organizations and visit their permanent profile pages.</p>
+            </div>
+
+            <!-- Organization Directory Search (CUR-007 Placeholder) -->
+            <div class="bg-white border border-slate-200 rounded-xl p-6 shadow-sm mb-8">
+                <div class="flex flex-col sm:flex-row gap-3 items-center justify-between mb-6">
+                    <input
+                        type="text"
+                        placeholder="Search organizations by name or focus area..."
+                        class="w-full sm:w-96 bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <div class="text-xs text-slate-500">Sorted A to Z (Default)</div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Org Card 1 -->
+                    <div class="border border-slate-200 rounded-xl p-5 hover:border-blue-300 transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded">Volunteer Center</span>
+                                <span class="text-xs text-slate-500 font-medium">3 active projects</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-base">Denver Metro Branch</h4>
+                            <p class="text-xs text-slate-600 mt-1 mb-4">Dedicated to food security, public park revitalization, and family support across Denver.</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Denver, CO</span>
+                            <button type="button" @click="openOrgVanityProfile('denvermetro', 'Denver Metro Branch')" class="text-xs font-semibold text-blue-600 hover:underline">
+                                /denvermetro profile →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Org Card 2 -->
+                    <div class="border border-slate-200 rounded-xl p-5 hover:border-blue-300 transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="bg-emerald-100 text-emerald-800 text-xs font-semibold px-2 py-0.5 rounded">Nonprofit</span>
+                                <span class="text-xs text-slate-500 font-medium">1 active project</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-base">Colorado Community Food Share</h4>
+                            <p class="text-xs text-slate-600 mt-1 mb-4">Connecting surplus agricultural goods with neighborhood distribution pantries.</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Glendale, CO</span>
+                            <button type="button" @click="openOrgVanityProfile('coloradofoodshare', 'Colorado Community Food Share')" class="text-xs font-semibold text-blue-600 hover:underline">
+                                /coloradofoodshare profile →
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Org Card 3 -->
+                    <div class="border border-slate-200 rounded-xl p-5 hover:border-blue-300 transition flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-0.5 rounded">School & Community</span>
+                                <span class="text-xs text-slate-500 font-medium">2 active projects</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-base">Alta View Elementary Volunteer Guild</h4>
+                            <p class="text-xs text-slate-600 mt-1 mb-4">Parent and community volunteering programs supporting literacy and science events.</p>
+                        </div>
+                        <div class="pt-3 border-t border-slate-100 flex items-center justify-between">
+                            <span class="text-xs text-slate-500">Aurora, CO</span>
+                            <button type="button" @click="openOrgVanityProfile('altaviewelementary', 'Alta View Elementary Volunteer Guild')" class="text-xs font-semibold text-blue-600 hover:underline">
+                                /altaviewelementary profile →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ============================================================== -->
+    <!-- PROJECT DETAIL & SHIFT SIGN-UP MODAL (CUR-010, CUR-012)        -->
+    <!-- ============================================================== -->
+    <div x-show="selectedProject !== null" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="selectedProject = null"></div>
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 z-10" @click.stop>
+                <button type="button" @click="selectedProject = null" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-2xl font-bold">
+                    &times;
+                </button>
+
+                <template x-if="selectedProject">
+                    <div>
+                        <!-- Header -->
+                        <div class="flex items-center space-x-2 text-xs font-semibold text-blue-600 mb-2">
+                            <span class="px-2 py-0.5 rounded bg-blue-50 border border-blue-200" x-text="`${selectedProject.distanceMiles.toFixed(1)} miles from your spot`"></span>
+                            <span class="text-slate-400">·</span>
+                            <span class="text-slate-600" x-text="selectedProject.contributionType"></span>
+                        </div>
+                        <h2 class="text-2xl font-black text-slate-900" x-text="selectedProject.title"></h2>
+
+                        <!-- Sponsor block (UX-024) -->
+                        <div class="mt-2 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
+                            <span class="font-bold text-slate-800" x-text="`Posted by ${selectedProject.orgName}`"></span>
+                            <span> · Nonprofit · On JustServe since 2016 · 41 opportunities hosted</span>
+                        </div>
+
+                        <!-- Description -->
+                        <div class="mt-4">
+                            <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-1">About this opportunity</h4>
+                            <p class="text-sm text-slate-700 leading-relaxed" x-text="selectedProject.description"></p>
+                        </div>
+
+                        <!-- Location & Coordinates -->
+                        <div class="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700">
+                            <div class="font-bold text-slate-900" x-text="selectedProject.locationName"></div>
+                            <div x-text="`${selectedProject.addressLine}, ${selectedProject.city}, ${selectedProject.stateProvince} ${selectedProject.postalCode}`"></div>
+                            <div class="font-mono text-slate-500 mt-1" x-text="`Target Spot Coordinates: ${selectedProject.latitude.toFixed(4)}° N, ${selectedProject.longitude.toFixed(4)}° W`"></div>
+                        </div>
+
+                        <!-- Attribute Badges -->
+                        <div class="mt-4">
+                            <h4 class="text-xs font-bold uppercase text-slate-500 tracking-wider mb-2">What this opportunity is like</h4>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="badge in selectedProject.badges" :key="badge">
+                                    <span class="inline-flex items-center text-xs px-2.5 py-1 rounded bg-slate-100 text-slate-800 font-medium" x-text="badge"></span>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Shift Selection (CUR-012, UX-021) -->
+                        <div class="mt-6 border-t border-slate-200 pt-4">
+                            <h4 class="text-sm font-bold text-slate-900 mb-2">Choose an upcoming shift</h4>
+                            <div class="space-y-2">
+                                <template x-for="(shift, idx) in selectedProject.shifts" :key="idx">
+                                    <label class="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer">
+                                        <div class="flex items-center space-x-3">
+                                            <input type="radio" name="shift-choice" :value="idx" x-model="selectedShiftIndex" class="text-blue-600 focus:ring-blue-500">
+                                            <div>
+                                                <div class="text-sm font-semibold text-slate-900" x-text="shift.dateStr"></div>
+                                                <div class="text-xs text-slate-500" x-text="shift.timeStr"></div>
+                                            </div>
+                                        </div>
+                                        <span class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded border border-emerald-200" x-text="shift.capacityDisplay"></span>
+                                    </label>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="mt-6 flex flex-col sm:flex-row gap-3 items-center justify-end border-t border-slate-200 pt-4">
+                            <button type="button" @click="selectedProject = null" class="w-full sm:w-auto px-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                                Close
+                            </button>
+                            <button type="button" @click="commitVolunteer()" class="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold shadow transition">
+                                Volunteer for This Shift
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- ORGANIZATIONAL VANITY URL MODAL (CUR-008 PLACEHOLDER)          -->
+    <!-- ============================================================== -->
+    <div x-show="activeOrgProfile !== null" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="activeOrgProfile = null"></div>
+        <div class="min-h-full flex items-center justify-center p-4">
+            <div class="relative bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 z-10" @click.stop>
+                <button type="button" @click="activeOrgProfile = null" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 text-2xl font-bold">
+                    &times;
+                </button>
+                <template x-if="activeOrgProfile">
+                    <div>
+                        <div class="flex items-center space-x-2 mb-2">
+                            <span class="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200" x-text="`justserve.org/${activeOrgProfile.slug}`"></span>
+                            <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800">Verified Organization</span>
+                        </div>
+                        <h3 class="text-2xl font-extrabold text-slate-900" x-text="activeOrgProfile.name"></h3>
+                        <p class="text-sm text-slate-600 mt-2">
+                            This organization has a permanent vanity profile on JustServe. Volunteers can follow their profile to get notified when new local opportunities are published.
+                        </p>
+                        <div class="mt-4 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600 space-y-1">
+                            <div><span class="font-bold text-slate-700">Permanent Vanity Slug:</span> <span class="font-mono text-blue-600" x-text="`/${activeOrgProfile.slug}`"></span></div>
+                            <div><span class="font-bold text-slate-700">Jurisdiction:</span> Colorado State Region / Denver County</div>
+                            <div><span class="font-bold text-slate-700">Status:</span> Publicly Discoverable Without Login</div>
+                        </div>
+                        <div class="mt-6 flex justify-end">
+                            <button type="button" @click="activeOrgProfile = null" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-semibold">
+                                Close Profile
+                            </button>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script: Alpine State and Spatial Logic -->
+    <script>
+        function volunteerSearchApp() {
+            return {
+                activeTab: 'projects',
+                searchAddress: '1437 Bannock St, Denver, CO 80202',
+                currentLat: 39.7392,
+                currentLon: -104.9928,
+                radiusMiles: 25,
+                viewMode: 'list',
+                isLoading: false,
+
+                // Filter States
+                keywordFilter: '',
+                selectedDateFilter: 'Any time',
+                dateFilterOptions: ['Any time', 'Today', 'This weekend', 'Next 7 days', 'Pick dates'],
+                selectedContribution: 'Anything',
+                contributionOptions: ['Anything', 'Come in person', 'Donate items', 'Help from home'],
+                selectedAttributes: [],
+                attributeFilterOptions: ['Good for groups', 'All ages welcome', 'Wheelchair accessible', 'Indoors', 'Donation drive'],
+
+                // Data sets
+                allProjects: [],
+                filteredProjects: [],
+                selectedProject: null,
+                selectedShiftIndex: 0,
+                activeOrgProfile: null,
+
+                // Leaflet Map instance
+                mapInstance: null,
+                markersLayer: null,
+
+                initApp() {
+                    this.executeSearch();
+                },
+
+                setPresetAddress(address, lat, lon) {
+                    this.searchAddress = address;
+                    this.currentLat = lat;
+                    this.currentLon = lon;
+                    this.executeSearch();
+                },
+
+                useCurrentLocation() {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            pos => {
+                                this.currentLat = pos.coords.latitude;
+                                this.currentLon = pos.coords.longitude;
+                                this.searchAddress = `${this.currentLat.toFixed(4)}, ${this.currentLon.toFixed(4)}`;
+                                this.executeSearch();
+                            },
+                            err => {
+                                alert('Could not get device spot: ' + err.message);
+                            }
+                        );
+                    } else {
+                        alert('Geolocation is not supported by your browser.');
+                    }
+                },
+
+                focusAddressInput() {
+                    document.getElementById('input-street-address')?.focus();
+                },
+
+                toggleAttributeFilter(attr) {
+                    if (this.selectedAttributes.includes(attr)) {
+                        this.selectedAttributes = this.selectedAttributes.filter(a => a !== attr);
+                    } else {
+                        this.selectedAttributes.push(attr);
+                    }
+                    this.applyClientFilters();
+                },
+
+                switchView(mode) {
+                    this.viewMode = mode;
+                    if (mode === 'map') {
+                        setTimeout(() => this.renderMap(), 150);
+                    }
+                },
+
+                expandRadiusTo50() {
+                    this.radiusMiles = 50;
+                    this.executeSearch();
+                },
+
+                includeHomeProjects() {
+                    this.selectedContribution = 'Help from home';
+                    this.applyClientFilters();
+                },
+
+                clearAllFilters() {
+                    this.keywordFilter = '';
+                    this.selectedDateFilter = 'Any time';
+                    this.selectedContribution = 'Anything';
+                    this.selectedAttributes = [];
+                    this.radiusMiles = 25;
+                    this.applyClientFilters();
+                },
+
+                // Spatial Great-Circle Haversine Distance in Miles
+                calculateDistanceMiles(lat1, lon1, lat2, lon2) {
+                    const toRad = deg => (deg * Math.PI) / 180;
+                    const R = 3958.8; // Earth's radius in miles
+                    const dLat = toRad(lat2 - lat1);
+                    const dLon = toRad(lon2 - lon1);
+                    const a =
+                        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    return R * c;
+                },
+
+                async executeSearch() {
+                    this.isLoading = true;
+
+                    // 1. Geocode street address if needed using OpenStreetMap Nominatim
+                    try {
+                        if (this.searchAddress && !this.searchAddress.includes(`${this.currentLat.toFixed(2)}`)) {
+                            const nominatimUrl = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(this.searchAddress);
+                            const geoResp = await fetch(nominatimUrl, { headers: { 'Accept': 'application/json' } });
+                            if (geoResp.ok) {
+                                const geoData = await geoResp.json();
+                                if (geoData && geoData.length > 0) {
+                                    this.currentLat = parseFloat(geoData[0].lat);
+                                    this.currentLon = parseFloat(geoData[0].lon);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        // Keep current coordinates if offline
+                    }
+
+                    // 2. Query PostGIS /projects/search-by-location endpoint
+                    const radiusMeters = this.radiusMiles * 1609.34;
+                    const apiUrl = `/projects/search-by-location?latitude=${encodeURIComponent(this.currentLat)}&longitude=${encodeURIComponent(this.currentLon)}&radiusMeters=${encodeURIComponent(radiusMeters)}&page=0&size=50`;
+
+                    try {
+                        const response = await fetch(apiUrl, {
+                            headers: { 'Accept': 'application/json' }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            const items = data.content || [];
+
+                            if (items.length > 0) {
+                                // Fetch enriched location coordinates for each item
+                                const enriched = await Promise.all(items.map(async card => {
+                                    let locDetails = {
+                                        addressLine: '1437 Bannock St',
+                                        city: 'Denver',
+                                        stateProvince: 'CO',
+                                        postalCode: '80202',
+                                        lat: this.currentLat,
+                                        lon: this.currentLon
+                                    };
+                                    try {
+                                        const locResp = await fetch(`/locations/${card.locationId}`, { headers: { 'Accept': 'application/json' } });
+                                        if (locResp.ok) {
+                                            const locJson = await locResp.json();
+                                            locDetails.addressLine = locJson.addressLine || locDetails.addressLine;
+                                            locDetails.city = locJson.city || locDetails.city;
+                                            locDetails.stateProvince = locJson.stateProvince || locDetails.stateProvince;
+                                            locDetails.postalCode = locJson.postalCode || locDetails.postalCode;
+                                            if (locJson.geom && locJson.geom.coordinates) {
+                                                locDetails.lon = locJson.geom.coordinates[0];
+                                                locDetails.lat = locJson.geom.coordinates[1];
+                                            }
+                                        }
+                                    } catch (e) {
+                                        // Use defaults
+                                    }
+
+                                    const dist = this.calculateDistanceMiles(this.currentLat, this.currentLon, locDetails.lat, locDetails.lon);
+                                    return {
+                                        id: card.projectId,
+                                        title: card.projectTitle,
+                                        orgName: 'Denver Metro Branch',
+                                        description: 'Join community members to clean, sort, and organize local resources for families in need.',
+                                        locationName: card.locationName,
+                                        addressLine: locDetails.addressLine,
+                                        city: locDetails.city,
+                                        stateProvince: locDetails.stateProvince,
+                                        postalCode: locDetails.postalCode,
+                                        latitude: locDetails.lat,
+                                        longitude: locDetails.lon,
+                                        distanceMiles: dist,
+                                        contributionType: 'In person',
+                                        capacityDisplay: '6 of 20 places filled',
+                                        badges: ['Good for groups', 'All ages welcome', 'Wheelchair accessible'],
+                                        shifts: [
+                                            { dateStr: 'Sat 5 Dec 2026', timeStr: '9:00 AM - 1:00 PM', capacityDisplay: '6 of 20 places filled' },
+                                            { dateStr: 'Sun 6 Dec 2026', timeStr: '1:00 PM - 5:00 PM', capacityDisplay: '12 of 25 places filled' }
+                                        ]
+                                    };
+                                }));
+
+                                enriched.sort((a, b) => a.distanceMiles - b.distanceMiles);
+                                this.allProjects = enriched;
+                                this.applyClientFilters();
+                                this.isLoading = false;
+                                return;
+                            }
+                        }
+                    } catch (err) {
+                        // Fallback to local Colorado POC projects if offline or network error
+                    }
+
+                    // Fallback Seed Projects (Calculated from specific spot coordinates)
+                    this.loadFallbackColoradoProjects();
+                    this.isLoading = false;
+                },
+
+                loadFallbackColoradoProjects() {
+                    const fallbackList = [
+                        {
+                            id: 'e0000000-0000-0000-0000-000000000001',
+                            title: 'Downtown Denver Mall & Civic Clean-Up',
+                            orgName: 'Denver Metro Branch',
+                            description: 'Volunteers help welcome visitors, clean walkways, and restock outreach kits along the 16th Street Mall and Civic Center.',
+                            locationName: 'Denver Civic Center Outreach',
+                            addressLine: '1437 Bannock St',
+                            city: 'Denver',
+                            stateProvince: 'CO',
+                            postalCode: '80202',
+                            latitude: 39.7392,
+                            longitude: -104.9928,
+                            contributionType: 'In person',
+                            capacityDisplay: '14 of 25 places filled',
+                            badges: ['Good for groups', 'All ages welcome', 'Wheelchair accessible'],
+                            shifts: [
+                                { dateStr: 'Sat 5 Dec 2026', timeStr: '9:00 AM - 1:00 PM', capacityDisplay: '6 of 20 places filled' },
+                                { dateStr: 'Sun 6 Dec 2026', timeStr: '1:00 PM - 5:00 PM', capacityDisplay: '14 of 25 places filled' }
+                            ]
+                        },
+                        {
+                            id: 'e0000000-0000-0000-0000-000000000002',
+                            title: '16th Street Mall Outreach & Restock',
+                            orgName: 'Denver Metro Branch',
+                            description: 'Hand out water, guide visitors, and support informational outreach near the pedestrian promenade.',
+                            locationName: 'Denver 16th Street Mall Hub',
+                            addressLine: '1001 16th St Mall',
+                            city: 'Denver',
+                            stateProvince: 'CO',
+                            postalCode: '80265',
+                            latitude: 39.7465,
+                            longitude: -104.9942,
+                            contributionType: 'In person',
+                            capacityDisplay: '8 of 20 places filled',
+                            badges: ['All ages welcome', 'Wheelchair accessible'],
+                            shifts: [
+                                { dateStr: 'Sat 5 Dec 2026', timeStr: '10:00 AM - 2:00 PM', capacityDisplay: '8 of 20 places filled' }
+                            ]
+                        },
+                        {
+                            id: 'e0000000-0000-0000-0000-000000000003',
+                            title: 'Glendale Food Pantry Sorting & Packing',
+                            orgName: 'Colorado Community Food Share',
+                            description: 'Assemble nutrition boxes and sort shelf-stable goods for local neighborhood families.',
+                            locationName: 'Glendale Community Pantry',
+                            addressLine: '950 S Birch St',
+                            city: 'Glendale',
+                            stateProvince: 'CO',
+                            postalCode: '80246',
+                            latitude: 39.7029,
+                            longitude: -104.9336,
+                            contributionType: 'In person',
+                            capacityDisplay: '22 of 30 places filled',
+                            badges: ['Indoors', 'Good for groups'],
+                            shifts: [
+                                { dateStr: 'Tue 8 Dec 2026', timeStr: '5:00 PM - 8:00 PM', capacityDisplay: '22 of 30 places filled' }
+                            ]
+                        },
+                        {
+                            id: 'e0000000-0000-0000-0000-000000000004',
+                            title: 'Aurora Community Warmth Clothing Drive',
+                            orgName: 'Alta View Elementary Volunteer Guild',
+                            description: 'Collect winter coats, hats, gloves, and blankets for school students and their families.',
+                            locationName: 'Aurora Municipal Relief Center',
+                            addressLine: '15151 E Alameda Pkwy',
+                            city: 'Aurora',
+                            stateProvince: 'CO',
+                            postalCode: '80012',
+                            latitude: 39.7088,
+                            longitude: -104.8093,
+                            contributionType: 'Donation drive',
+                            capacityDisplay: '18 of 35 places filled',
+                            badges: ['Donation drive', 'All ages welcome'],
+                            shifts: [
+                                { dateStr: 'Wed 9 Dec 2026', timeStr: '4:00 PM - 7:00 PM', capacityDisplay: '18 of 35 places filled' }
+                            ]
+                        },
+                        {
+                            id: 'e0000000-0000-0000-0000-000000000005',
+                            title: 'Boulder Creek Pathway Environmental Care',
+                            orgName: 'Colorado State Chapter',
+                            description: 'Clear brush and trash along Boulder Creek to preserve local habitats.',
+                            locationName: 'Boulder Pearl Street Station',
+                            addressLine: '1300 Pearl St',
+                            city: 'Boulder',
+                            stateProvince: 'CO',
+                            postalCode: '80302',
+                            latitude: 40.0150,
+                            longitude: -105.2705,
+                            contributionType: 'In person',
+                            capacityDisplay: '15 of 20 places filled',
+                            badges: ['Good for groups'],
+                            shifts: [
+                                { dateStr: 'Thu 10 Dec 2026', timeStr: '10:00 AM - 2:00 PM', capacityDisplay: '15 of 20 places filled' }
+                            ]
+                        }
+                    ];
+
+                    // Calculate distance from current specific lat/long spot
+                    fallbackList.forEach(item => {
+                        item.distanceMiles = this.calculateDistanceMiles(this.currentLat, this.currentLon, item.latitude, item.longitude);
+                    });
+
+                    // Filter by selected radius
+                    this.allProjects = fallbackList
+                        .filter(item => item.distanceMiles <= this.radiusMiles)
+                        .sort((a, b) => a.distanceMiles - b.distanceMiles);
+
+                    this.applyClientFilters();
+                },
+
+                applyClientFilters() {
+                    let list = [...this.allProjects];
+
+                    // Keyword filter
+                    if (this.keywordFilter && this.keywordFilter.trim() !== '') {
+                        const kw = this.keywordFilter.toLowerCase().trim();
+                        list = list.filter(item =>
+                            item.title.toLowerCase().includes(kw) ||
+                            item.description.toLowerCase().includes(kw) ||
+                            item.locationName.toLowerCase().includes(kw) ||
+                            item.orgName.toLowerCase().includes(kw)
+                        );
+                    }
+
+                    // Contribution type filter
+                    if (this.selectedContribution === 'Come in person') {
+                        list = list.filter(item => item.contributionType === 'In person');
+                    } else if (this.selectedContribution === 'Donate items') {
+                        list = list.filter(item => item.contributionType === 'Donation drive');
+                    } else if (this.selectedContribution === 'Help from home') {
+                        list = list.filter(item => item.contributionType === 'From home');
+                    }
+
+                    // Attribute badges filter
+                    if (this.selectedAttributes.length > 0) {
+                        list = list.filter(item =>
+                            this.selectedAttributes.every(attr => item.badges.includes(attr))
+                        );
+                    }
+
+                    this.filteredProjects = list;
+
+                    if (this.viewMode === 'map') {
+                        this.renderMap();
+                    }
+                },
+
+                renderMap() {
+                    const mapEl = document.getElementById('project-map');
+                    if (!mapEl || typeof L === 'undefined') {
+                        return;
+                    }
+
+                    if (!this.mapInstance) {
+                        this.mapInstance = L.map('project-map').setView([this.currentLat, this.currentLon], 12);
+                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; OpenStreetMap contributors'
+                        }).addTo(this.mapInstance);
+                        this.markersLayer = L.layerGroup().addTo(this.mapInstance);
+                    } else {
+                        this.mapInstance.invalidateSize();
+                        this.markersLayer.clearLayers();
+                    }
+
+                    // 1. Plot current volunteer spot
+                    const volunteerIcon = L.divIcon({
+                        className: 'custom-spot-marker',
+                        html: '<div style="background-color:#2563eb; width:16px; height:16px; border-radius:50%; border:3px solid #ffffff; box-shadow:0 0 8px rgba(37,99,235,0.6);"></div>',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8]
+                    });
+
+                    L.marker([this.currentLat, this.currentLon], { icon: volunteerIcon })
+                        .addTo(this.markersLayer)
+                        .bindPopup(`<b>Your Selected Spot</b><br>${this.searchAddress}<br><span style="font-family:monospace;font-size:11px;">${this.currentLat.toFixed(4)}°, ${this.currentLon.toFixed(4)}°</span>`)
+                        .openPopup();
+
+                    // 2. Plot nearby projects
+                    this.filteredProjects.forEach(item => {
+                        const marker = L.marker([item.latitude, item.longitude]).addTo(this.markersLayer);
+                        marker.bindPopup(`
+                            <div style="min-width:180px;">
+                                <div style="font-weight:bold; font-size:13px; color:#0f172a;">${item.title}</div>
+                                <div style="font-size:11px; color:#2563eb; font-weight:600; margin:2px 0;">${item.distanceMiles.toFixed(1)} miles from your spot</div>
+                                <div style="font-size:11px; color:#475569;">${item.addressLine}, ${item.city}</div>
+                                <button type="button" style="margin-top:6px; background:#2563eb; color:#fff; border:none; padding:4px 8px; border-radius:4px; font-size:11px; cursor:pointer;" onclick="window.openDetailById('${item.id}')">View Details</button>
+                            </div>
+                        `);
+                    });
+
+                    // Fit map bounds
+                    if (this.filteredProjects.length > 0) {
+                        const group = [
+                            [this.currentLat, this.currentLon],
+                            ...this.filteredProjects.map(p => [p.latitude, p.longitude])
+                        ];
+                        this.mapInstance.fitBounds(group, { padding: [40, 40] });
+                    } else {
+                        this.mapInstance.setView([this.currentLat, this.currentLon], 12);
+                    }
+                },
+
+                openProjectDetail(item) {
+                    this.selectedProject = item;
+                    this.selectedShiftIndex = 0;
+                },
+
+                commitVolunteer() {
+                    alert('You are signed up for this shift. An email confirmation has been sent to the organizer.');
+                    this.selectedProject = null;
+                },
+
+                openOrgVanityProfile(slug, name) {
+                    this.activeOrgProfile = { slug, name };
+                }
+            };
+        }
+
+        // Global helper for Leaflet popups
+        window.openDetailById = function(id) {
+            const app = document.querySelector('[x-data]').__x.$data;
+            const target = app.allProjects.find(p => p.id === id);
+            if (target) {
+                app.openProjectDetail(target);
+            }
+        };
+    </script>
+</body>
+</html>

@@ -62,13 +62,12 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
         e.status in [HttpStatus.UNAUTHORIZED, HttpStatus.METHOD_NOT_ALLOWED, HttpStatus.NOT_FOUND]
     }
 
-    def "Security | should reject unauthenticated access to /organizations/search-by-name"() {
+    def "Security | should allow unauthenticated access to /organizations/search-by-name"() {
         when: "an unauthenticated request is made to search organizations by name"
-        client.exchange(HttpRequest.GET("/organizations/search-by-name?name=test").accept(MediaType.APPLICATION_JSON_TYPE))
+        def response = client.exchange(HttpRequest.GET("/organizations/search-by-name?name=test").accept(MediaType.APPLICATION_JSON_TYPE))
 
-        then: "an UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK response is returned"
+        response.status == HttpStatus.OK
     }
 
     def "Security | should allow authenticated standard users to search by name"() {
@@ -83,13 +82,12 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
         response.status == HttpStatus.OK
     }
 
-    def "Security | should reject unauthenticated access to /organizations/search-by-location"() {
+    def "Security | should allow unauthenticated access to /organizations/search-by-location"() {
         when: "an unauthenticated request is made to search organizations by location"
-        client.exchange(HttpRequest.GET("/organizations/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=5000").accept(MediaType.APPLICATION_JSON_TYPE))
+        def response = client.exchange(HttpRequest.GET("/organizations/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=5000").accept(MediaType.APPLICATION_JSON_TYPE))
 
-        then: "an UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK response is returned"
+        response.status == HttpStatus.OK
     }
 
     def "Security | should allow authenticated standard users to search by location"() {
@@ -104,13 +102,12 @@ class OrganizationSecurityIntegrationSpec extends BaseControllerSpec {
         response.status == HttpStatus.OK
     }
 
-    def "Security | should reject unauthenticated access to /organizations/search-by-region"() {
+    def "Security | should allow unauthenticated access to /organizations/search-by-region"() {
         when: "an unauthenticated request is made to search organizations by region"
-        client.exchange(HttpRequest.GET("/organizations/search-by-region?regionId=${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE))
+        def response = client.exchange(HttpRequest.GET("/organizations/search-by-region?regionId=${UUID.randomUUID()}").accept(MediaType.APPLICATION_JSON_TYPE))
 
-        then: "an UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK response is returned"
+        response.status == HttpStatus.OK
     }
 
     def "Security | should allow authenticated standard users to search by region"() {

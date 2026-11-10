@@ -312,13 +312,18 @@ class LocationControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "READ | should reject unauthenticated GET /locations/{id} with 401 UNAUTHORIZED"() {
-        when: "an unauthenticated caller attempts to get a location"
-        client.exchange(HttpRequest.GET("/locations/${UUID.randomUUID()}"), Location)
+    def "READ | should allow unauthenticated GET /locations/{id} with 200 OK"() {
+        given: "a persisted location"
+        def location = dataBuilder.location().withName("Public Location").withGeometry(createPoint()).persist()
 
-        then: "a 401 UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        when: "an unauthenticated caller attempts to get a location"
+        def response = client.exchange(HttpRequest.GET("/locations/${location.id()}"), Location)
+
+        then: "a 200 OK response is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body().id() == location.id()
+        }
     }
 
     /********** UPDATE Tests **********/
@@ -774,12 +779,14 @@ class LocationControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "LIST | should reject unauthenticated GET /locations with 401 UNAUTHORIZED"() {
+    def "LIST | should allow unauthenticated GET /locations with 200 OK"() {
         when: "an unauthenticated caller attempts to list locations"
-        client.exchange(HttpRequest.GET("/locations"))
+        def response = client.exchange(HttpRequest.GET("/locations"), Map)
 
-        then: "a 401 UNAUTHORIZED response is returned"
-        def e = thrown(HttpClientResponseException)
-        e.status == HttpStatus.UNAUTHORIZED
+        then: "a 200 OK response is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body() != null
+        }
     }
 }
