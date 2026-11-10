@@ -748,28 +748,32 @@
                 </div>
                 <div class="form-grid">
                     <div>
-                        <label for="j1-city-zip">City or ZIP Override (CUR-001)</label>
-                        <input type="text" id="j1-city-zip" value="Denver, CO 80265" placeholder="City or ZIP code">
+                        <label for="j1-city-zip">City, State, or ZIP Code (CUR-001)</label>
+                        <input type="text" id="j1-city-zip" value="Denver, CO 80265" placeholder="e.g. Denver, CO, 80202, Littleton, CO, Colorado Springs, CO" oninput="updateJourney1ResolvedLocationPreview()">
                     </div>
                     <div>
-                        <label for="j1-lat">Center Latitude</label>
-                        <input type="number" step="0.0001" id="j1-lat" value="39.7465">
+                        <label for="j1-radius">Search Radius</label>
+                        <select id="j1-radius">
+                            <option value="8000">5 miles (8,000 m)</option>
+                            <option value="16000">10 miles (16,000 m)</option>
+                            <option value="25000" selected>15 miles (25,000 m)</option>
+                            <option value="40000">25 miles (40,000 m)</option>
+                            <option value="80000">50 miles (80,000 m)</option>
+                        </select>
                     </div>
                     <div>
-                        <label for="j1-lon">Center Longitude</label>
-                        <input type="number" step="0.0001" id="j1-lon" value="-104.9942">
-                    </div>
-                    <div>
-                        <label for="j1-radius">Search Radius (Meters)</label>
-                        <input type="number" step="1000" id="j1-radius" value="25000">
+                        <label>Derived Search Center (Client-Side Geocoder)</label>
+                        <div class="score-pill mono" id="j1-resolved-coords-pill" style="font-size: 0.77rem; padding: 0.48rem 0.65rem;">
+                            Denver, CO 80265 -&gt; 39.7465, -104.9942
+                        </div>
                     </div>
                 </div>
                 <div class="btn-row">
-                    <button type="button" onclick="runSpatialSearch()">Search Near Coordinates (GET /projects/search-by-location)</button>
+                    <button type="button" onclick="runSpatialSearch()">Search by Location (GET /projects/search-by-location)</button>
                     <button type="button" class="secondary" onclick="probeGetProjects()">Browse All Projects (GET /projects)</button>
-                    <button type="button" class="secondary" onclick="setSpatialPreset('Denver 16th St Mall', 39.7465, -104.9942, 25000)">Denver Downtown</button>
-                    <button type="button" class="secondary" onclick="setSpatialPreset('Glendale / Arapahoe County', 39.7029, -104.9336, 20000)">Arapahoe County</button>
-                    <button type="button" class="secondary" onclick="setSpatialPreset('Colorado Springs Downtown', 38.8339, -104.8214, 25000)">Colorado Springs</button>
+                    <button type="button" class="secondary" onclick="setSpatialPreset('Denver, CO 80265', 25000)">Denver, CO 80265</button>
+                    <button type="button" class="secondary" onclick="setSpatialPreset('Glendale, CO 80246', 20000)">Glendale / Arapahoe, CO</button>
+                    <button type="button" class="secondary" onclick="setSpatialPreset('Colorado Springs, CO 80903', 25000)">Colorado Springs, CO</button>
                     <div style="margin-left: auto;" class="btn-row">
                         <button type="button" class="secondary" id="btn-view-list" onclick="toggleSearchView('LIST')">List View (CUR-002)</button>
                         <button type="button" class="secondary" id="btn-view-map" onclick="toggleSearchView('MAP')">Map View (CUR-002)</button>
@@ -838,7 +842,7 @@
 
                         <div id="j1-list-container" class="project-cards-grid">
                             <div style="color: var(--muted); font-size: 0.85rem;">
-                                Click "Search Near Coordinates" or "Browse All Projects" above to load live projects from Kaiju.
+                                Click "Search by Location" or "Browse All Projects" above to load live projects from Kaiju.
                             </div>
                         </div>
 
@@ -1110,28 +1114,30 @@
                 <div class="wizard-pane hidden" id="wizard-pane-2">
                     <div class="form-grid">
                         <div>
-                            <label for="j2-loc-name">Location Name</label>
+                            <label for="j2-loc-name">Location / Venue Name</label>
                             <input type="text" id="j2-loc-name" value="Denver Civic Center Community Plot">
                         </div>
                         <div>
                             <label for="j2-loc-addr">Street Address</label>
-                            <input type="text" id="j2-loc-addr" value="1437 Bannock St">
+                            <input type="text" id="j2-loc-addr" value="1437 Bannock St" oninput="updateJourney2ResolvedLocationPreview()">
                         </div>
                         <div>
                             <label for="j2-loc-city">City</label>
-                            <input type="text" id="j2-loc-city" value="Denver">
+                            <input type="text" id="j2-loc-city" value="Denver" oninput="updateJourney2ResolvedLocationPreview()">
                         </div>
                         <div>
-                            <label for="j2-loc-zip">Postal Code</label>
-                            <input type="text" id="j2-loc-zip" value="80202">
+                            <label for="j2-loc-state">State</label>
+                            <input type="text" id="j2-loc-state" value="CO" oninput="updateJourney2ResolvedLocationPreview()">
                         </div>
                         <div>
-                            <label for="j2-proj-lat">Latitude</label>
-                            <input type="number" step="0.0001" id="j2-proj-lat" value="39.7392">
+                            <label for="j2-loc-zip">Postal / ZIP Code</label>
+                            <input type="text" id="j2-loc-zip" value="80202" oninput="updateJourney2ResolvedLocationPreview()">
                         </div>
                         <div>
-                            <label for="j2-proj-lon">Longitude</label>
-                            <input type="number" step="0.0001" id="j2-proj-lon" value="-104.9928">
+                            <label>Derived PostGIS Coordinates (From Address)</label>
+                            <div class="score-pill mono" id="j2-resolved-coords-pill" style="font-size: 0.77rem; padding: 0.48rem 0.65rem;">
+                                1437 Bannock St, Denver, CO 80202 -&gt; 39.7392, -104.9928
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1741,8 +1747,71 @@
     }
 
     // =========================================================================
-    // JOURNEY 1 FLOWS
+    // CLIENT-SIDE HUMAN LOCATION GEOCODER & JOURNEY 1 FLOWS
     // =========================================================================
+    const HUMAN_LOCATION_DIRECTORY = [
+        { keys: ["80265", "16th st", "16th street", "downtown denver"], label: "Denver, CO 80265 (16th St Mall)", latitude: 39.7465, longitude: -104.9942 },
+        { keys: ["80202", "1437 bannock", "civic center", "bannock"], label: "Denver Civic Center, CO 80202", latitude: 39.7392, longitude: -104.9928 },
+        { keys: ["80203", "capitol hill"], label: "Capitol Hill, Denver, CO 80203", latitude: 39.7312, longitude: -104.9826 },
+        { keys: ["80204", "colfax", "west denver"], label: "West Colfax, Denver, CO 80204", latitude: 39.7399, longitude: -105.0252 },
+        { keys: ["80249", "dia", "airport", "pena blvd"], label: "Denver International Airport, CO 80249", latitude: 39.8561, longitude: -104.6737 },
+        { keys: ["80246", "glendale", "cherry creek", "arapahoe"], label: "Glendale / Arapahoe County, CO 80246", latitude: 39.7029, longitude: -104.9336 },
+        { keys: ["80120", "littleton"], label: "Littleton, CO 80120", latitude: 39.6133, longitude: -105.0166 },
+        { keys: ["80012", "aurora"], label: "Aurora, CO 80012", latitude: 39.7109, longitude: -104.8125 },
+        { keys: ["80112", "centennial", "englewood", "tech center"], label: "Centennial / DTC, CO 80112", latitude: 39.5792, longitude: -104.8769 },
+        { keys: ["80903", "80905", "colorado springs", "el paso", "pikes peak", "fountain"], label: "Colorado Springs, CO 80903", latitude: 38.8339, longitude: -104.8214 },
+        { keys: ["80401", "80465", "golden", "morrison", "foothills", "red rocks"], label: "Golden / Front Range Foothills, CO 80401", latitude: 39.7555, longitude: -105.2211 },
+        { keys: ["80302", "boulder"], label: "Boulder, CO 80302", latitude: 40.0150, longitude: -105.2705 },
+        { keys: ["80521", "fort collins"], label: "Fort Collins, CO 80521", latitude: 40.5853, longitude: -105.0844 },
+        { keys: ["84101", "salt lake"], label: "Salt Lake City, UT 84101", latitude: 40.7608, longitude: -111.8910 },
+        { keys: ["denver"], label: "Denver, CO", latitude: 39.7465, longitude: -104.9942 }
+    ];
+
+    function resolveHumanReadableLocation(rawText) {
+        const cleaned = (rawText || "").trim();
+        const lower = cleaned.toLowerCase();
+        for (const entry of HUMAN_LOCATION_DIRECTORY) {
+            if (entry.keys.some(k => lower.includes(k))) {
+                return {
+                    query: cleaned || entry.label,
+                    matchedLabel: entry.label,
+                    latitude: entry.latitude,
+                    longitude: entry.longitude
+                };
+            }
+        }
+        return {
+            query: cleaned || "Denver, CO",
+            matchedLabel: cleaned ? (cleaned + " (Defaulted to Denver Metro Center)") : "Denver, CO",
+            latitude: 39.7392,
+            longitude: -104.9928
+        };
+    }
+
+    function updateJourney1ResolvedLocationPreview() {
+        const inputVal = document.getElementById("j1-city-zip").value;
+        const resolved = resolveHumanReadableLocation(inputVal);
+        const pill = document.getElementById("j1-resolved-coords-pill");
+        if (pill) {
+            pill.textContent = resolved.matchedLabel + " -> " + resolved.latitude.toFixed(4) + ", " + resolved.longitude.toFixed(4);
+        }
+        return resolved;
+    }
+
+    function updateJourney2ResolvedLocationPreview() {
+        const addr = document.getElementById("j2-loc-addr").value.trim();
+        const city = document.getElementById("j2-loc-city").value.trim();
+        const stateCode = document.getElementById("j2-loc-state").value.trim() || "CO";
+        const zip = document.getElementById("j2-loc-zip").value.trim();
+        const combined = [addr, city, stateCode, zip].filter(Boolean).join(", ");
+        const resolved = resolveHumanReadableLocation(combined);
+        const pill = document.getElementById("j2-resolved-coords-pill");
+        if (pill) {
+            pill.textContent = (combined || resolved.matchedLabel) + " -> " + resolved.latitude.toFixed(4) + ", " + resolved.longitude.toFixed(4);
+        }
+        return resolved;
+    }
+
     function switchJ1Screen(screen) {
         document.getElementById("j1-sub-discover-btn").classList.toggle("active", screen === "DISCOVER");
         document.getElementById("j1-sub-dashboard-btn").classList.toggle("active", screen === "DASHBOARD");
@@ -1753,17 +1822,22 @@
         }
     }
 
-    function setSpatialPreset(label, lat, lon, radius) {
-        document.getElementById("j1-city-zip").value = label;
-        document.getElementById("j1-lat").value = lat;
-        document.getElementById("j1-lon").value = lon;
-        document.getElementById("j1-radius").value = radius;
+    function setSpatialPreset(locationLabel, radiusMeters) {
+        document.getElementById("j1-city-zip").value = locationLabel;
+        const radiusSelect = document.getElementById("j1-radius");
+        if ([...radiusSelect.options].some(o => Number(o.value) === radiusMeters)) {
+            radiusSelect.value = String(radiusMeters);
+        } else {
+            radiusSelect.value = "25000";
+        }
+        updateJourney1ResolvedLocationPreview();
         runSpatialSearch();
     }
 
     async function runSpatialSearch() {
-        const lat = document.getElementById("j1-lat").value;
-        const lon = document.getElementById("j1-lon").value;
+        const resolved = updateJourney1ResolvedLocationPreview();
+        const lat = resolved.latitude;
+        const lon = resolved.longitude;
         const radius = document.getElementById("j1-radius").value;
         const url = "/projects/search-by-location?latitude=" + encodeURIComponent(lat) +
             "&longitude=" + encodeURIComponent(lon) +
@@ -1793,8 +1867,8 @@
             "j1-discovery-banner",
             "partial",
             "Step 1.2 PARTIAL (CUR-001) - HTTP " + res.status,
-            "PostGIS Spatial Search Returned " + cards.length + " Active Project(s)",
-            "GET /projects/search-by-location orders results by PostGIS ST_Distance within radiusMeters. Note: IP geolocation and city/ZIP text geocoding ('" + document.getElementById("j1-city-zip").value + "') are not implemented on the server.",
+            "PostGIS Spatial Search Near '" + resolved.query + "' Returned " + cards.length + " Active Project(s)",
+            "The UI resolved human-readable location '" + resolved.query + "' into coordinates (" + lat + ", " + lon + ") client-side because GET /projects/search-by-location only accepts numeric latitude, longitude, and radiusMeters query parameters.",
             res.data
         );
     }
@@ -2219,8 +2293,10 @@
     }
 
     async function submitProjectWizardLive() {
-        const lat = parseFloat(document.getElementById("j2-proj-lat").value);
-        const lon = parseFloat(document.getElementById("j2-proj-lon").value);
+        const resolved = updateJourney2ResolvedLocationPreview();
+        const lat = resolved.latitude;
+        const lon = resolved.longitude;
+        const stateCode = document.getElementById("j2-loc-state").value.trim() || "CO";
         const regionVal = document.getElementById("j2-proj-region").value.trim();
         const payload = {
             organizationId: document.getElementById("j2-proj-org").value.trim(),
@@ -2233,7 +2309,7 @@
                     name: document.getElementById("j2-loc-name").value,
                     addressLine: document.getElementById("j2-loc-addr").value,
                     city: document.getElementById("j2-loc-city").value,
-                    stateProvince: "CO",
+                    stateProvince: stateCode,
                     postalCode: document.getElementById("j2-loc-zip").value,
                     countryCode: "US",
                     latitude: lat,
@@ -2295,9 +2371,13 @@
 
     async function probeUnderReviewVisibility() {
         const projectId = document.getElementById("j2-created-project-id").value.trim() || "e0000000-0000-0000-0000-000000000001";
+        const resolved = updateJourney2ResolvedLocationPreview();
+        const searchUrl = "/projects/search-by-location?latitude=" + encodeURIComponent(resolved.latitude) +
+            "&longitude=" + encodeURIComponent(resolved.longitude) +
+            "&radiusMeters=50000";
         const [projRes, searchRes] = await Promise.all([
             apiFetch("GET", "/projects/" + projectId),
-            apiFetch("GET", "/projects/search-by-location?latitude=39.7392&longitude=-104.9928&radiusMeters=50000")
+            apiFetch("GET", searchUrl)
         ]);
         const inSearch = searchRes.status === 200 &&
             searchRes.data &&

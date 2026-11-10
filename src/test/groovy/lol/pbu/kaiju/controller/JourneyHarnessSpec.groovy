@@ -35,6 +35,11 @@ class JourneyHarnessSpec extends BaseControllerSpec {
             rootResponse.body().contains("Org Communicates with Volunteers")
             rootResponse.body().contains("/projects/search-by-location")
             rootResponse.body().contains("/shift-signups")
+            rootResponse.body().contains("resolveHumanReadableLocation")
+            !rootResponse.body().contains("id=\"j1-lat\"")
+            !rootResponse.body().contains("id=\"j1-lon\"")
+            !rootResponse.body().contains("id=\"j2-proj-lat\"")
+            !rootResponse.body().contains("id=\"j2-proj-lon\"")
             !rootResponse.body().contains("\u2014")
             !rootResponse.body().contains("&mdash;")
             harnessResponse.status == HttpStatus.OK

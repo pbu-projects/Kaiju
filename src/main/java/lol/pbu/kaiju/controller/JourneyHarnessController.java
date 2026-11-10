@@ -488,7 +488,7 @@ public class JourneyHarnessController {
                         List.of("CUR-001"),
                         "PARTIAL",
                         "GET /projects/search-by-location",
-                        "GET /projects/search-by-location supports latitude, longitude, and radiusMeters up to 500,000 meters using PostGIS ST_DWithin. IP geolocation and city or ZIP text geocoding are not implemented on the server, and anonymous callers receive 401 Unauthorized."
+                        "GET /projects/search-by-location requires pre-resolved latitude, longitude, and radiusMeters query parameters rather than accepting a human-readable city or postalCode directly. The UI must geocode city or ZIP inputs into coordinates client-side, and anonymous callers receive 401 Unauthorized."
                 ),
                 new HarnessStep(
                         "1.3",
