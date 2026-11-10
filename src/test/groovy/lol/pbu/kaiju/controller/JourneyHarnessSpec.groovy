@@ -86,8 +86,8 @@ class JourneyHarnessSpec extends BaseControllerSpec {
             report != null
             report.specFile() == "docs/functional-spec/05-key-user-journeys.adoc"
             report.totalSteps() == 34
-            report.readyCount() == 3
-            report.partialCount() == 18
+            report.readyCount() == 4
+            report.partialCount() == 17
             report.missingCount() == 13
             report.journeys().size() == 4
             report.journeys()[0].journeyNumber() == 1

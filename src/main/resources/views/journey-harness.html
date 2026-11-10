@@ -111,7 +111,7 @@
         .page-wrap {
             max-width: 1500px;
             margin: 0 auto;
-            padding: 1.1rem 1.5rem;
+            padding: 1.1rem 1.5rem 260px 1.5rem;
         }
 
         /* Badges */
@@ -647,8 +647,8 @@
     <section class="scorecard-strip">
         <div class="score-pills">
             <span class="score-pill">Total Spec Steps: <strong id="metric-total">34</strong></span>
-            <span class="score-pill" style="color: var(--ready);">Ready: <strong id="metric-ready">3</strong></span>
-            <span class="score-pill" style="color: var(--partial);">Partial: <strong id="metric-partial">18</strong></span>
+            <span class="score-pill" style="color: var(--ready);">Ready: <strong id="metric-ready">4</strong></span>
+            <span class="score-pill" style="color: var(--partial);">Partial: <strong id="metric-partial">17</strong></span>
             <span class="score-pill" style="color: var(--missing);">Missing: <strong id="metric-missing">13</strong></span>
             <span id="persona-description-box" style="font-size: 0.79rem; color: var(--muted);">
                 Browse as an Anonymous Visitor or sign in as any seeded persona (Victor Volunteer, Jenny Niu, Leo Org Admin, Daniel County Director, Ethan Sibling Director, Sarah Admin).
@@ -769,8 +769,8 @@
                     </div>
                 </div>
                 <div class="btn-row">
-                    <button type="button" onclick="runSpatialSearch()">Search by Location (GET /projects/search-by-location)</button>
-                    <button type="button" class="secondary" onclick="probeGetProjects()">Browse All Projects (GET /projects)</button>
+                    <button type="button" id="btn-j1-spatial-search" onclick="runSpatialSearch()">Search by Location (GET /projects/search-by-location)</button>
+                    <button type="button" id="btn-j1-browse-all" class="secondary" onclick="probeGetProjects()">Browse All Projects (GET /projects)</button>
                     <button type="button" class="secondary" onclick="setSpatialPreset('Denver, CO 80265', 25000)">Denver, CO 80265</button>
                     <button type="button" class="secondary" onclick="setSpatialPreset('Glendale, CO 80246', 20000)">Glendale / Arapahoe, CO</button>
                     <button type="button" class="secondary" onclick="setSpatialPreset('Colorado Springs, CO 80903', 25000)">Colorado Springs, CO</button>
@@ -825,7 +825,7 @@
                         </select>
                     </div>
                     <div class="btn-row">
-                        <button type="button" onclick="applyJourney1Filters()">Apply Filters</button>
+                        <button type="button" id="btn-j1-apply-filters" onclick="applyJourney1Filters()">Apply Filters</button>
                         <button type="button" class="secondary" onclick="probeGetTags()">Load Tags (GET /tags)</button>
                     </div>
                     <div id="j1-filter-banner"></div>
@@ -1595,6 +1595,7 @@
             renderScorecard();
             renderActiveJourneySteps();
         }
+        await runSpatialSearch();
     }
 
     function renderPersonasSelect() {
@@ -1609,11 +1610,15 @@
             }
             select.appendChild(opt);
         });
-        select.onchange = () => {
+        select.onchange = async () => {
             const chosen = state.personas.find(p => p.email === select.value);
             if (chosen) {
                 state.activePersona = chosen;
                 updatePersonaDescriptionBox(chosen);
+                await authenticateSelectedPersona();
+                if (state.activeJourney === 1) {
+                    await runSpatialSearch();
+                }
             }
         };
     }
@@ -1928,6 +1933,19 @@
 
         const url = "/projects" + (queryParts.length > 0 ? "?" + queryParts.join("&") : "");
         const res = await apiFetch("GET", url);
+
+        if (res.status === 200 && res.data && Array.isArray(res.data.content)) {
+            const mappedCards = res.data.content.map(p => ({
+                projectId: p.id,
+                projectTitle: p.title,
+                locationId: null,
+                locationName: p.organization ? p.organization.name : "Sponsoring Organization",
+                nextShiftStart: p.status
+            }));
+            state.lastSpatialSearchCards = mappedCards;
+            renderProjectCards(mappedCards);
+            renderSpatialMapSvg();
+        }
 
         renderSpecBanner(
             "j1-filter-banner",

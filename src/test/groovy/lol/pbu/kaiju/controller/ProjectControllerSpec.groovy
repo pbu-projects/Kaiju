@@ -1732,12 +1732,37 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         where:
         method   | uri
-        "GET"    | "/projects"
-        "GET"    | "/projects/${UUID.randomUUID()}"
-        "GET"    | "/projects/search-by-location?longitude=0&latitude=0&radiusMeters=1000"
         "POST"   | "/projects"
         "PUT"    | "/projects/${UUID.randomUUID()}"
         "DELETE" | "/projects/${UUID.randomUUID()}"
         "PUT"    | "/projects/${UUID.randomUUID()}/status"
+    }
+
+    def "Security | should allow anonymous visitors to perform public project discovery"() {
+        given: "a persisted project"
+        def org = getRandomOrganization()
+        def project = dataBuilder.project().forOrg(org).persist()
+
+        when: "anonymous visitor requests projects list"
+        def listResponse = client.exchange(HttpRequest.GET("/projects"), Map)
+
+        and: "anonymous visitor requests a specific project"
+        def getResponse = client.exchange(HttpRequest.GET("/projects/${project.id}"), Map)
+
+        and: "anonymous visitor searches by location"
+        def searchResponse = client.exchange(
+                HttpRequest.GET("/projects/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=50000"),
+                Map
+        )
+
+        then: "all public discovery operations succeed with 200 OK"
+        verifyAll {
+            listResponse.status == HttpStatus.OK
+            listResponse.body() != null
+            getResponse.status == HttpStatus.OK
+            getResponse.body()?.id == project.id.toString()
+            searchResponse.status == HttpStatus.OK
+            searchResponse.body() != null
+        }
     }
 }

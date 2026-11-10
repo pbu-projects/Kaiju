@@ -476,9 +476,9 @@ public class JourneyHarnessController {
                         "STEP",
                         "Volunteer lands on the home page or /projects, signed in or not",
                         List.of("CUR-001"),
-                        "PARTIAL",
+                        "READY",
                         "GET /projects",
-                        "ProjectController secures all /projects routes with IS_AUTHENTICATED. Signed-in users receive 200 OK with a cursored page of projects, but anonymous visitors receive 401 Unauthorized instead of public project discovery."
+                        "Anonymous and signed-in visitors can land on /projects and browse active projects without receiving 401 Unauthorized. GET /projects is accessible anonymously."
                 ),
                 new HarnessStep(
                         "1.2",
@@ -488,7 +488,7 @@ public class JourneyHarnessController {
                         List.of("CUR-001"),
                         "PARTIAL",
                         "GET /projects/search-by-location",
-                        "GET /projects/search-by-location requires pre-resolved latitude, longitude, and radiusMeters query parameters rather than accepting a human-readable city or postalCode directly. The UI must geocode city or ZIP inputs into coordinates client-side, and anonymous callers receive 401 Unauthorized."
+                        "GET /projects/search-by-location supports anonymous discovery with pre-resolved coordinates. Geocoding a human-readable city or ZIP into latitude and longitude is performed client-side."
                 ),
                 new HarnessStep(
                         "1.3",

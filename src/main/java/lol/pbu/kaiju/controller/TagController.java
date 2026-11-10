@@ -26,6 +26,7 @@ import lol.pbu.kaiju.util.PageableUtils;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
@@ -33,7 +34,7 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 /**
  * REST controller for managing tags.
  *
- * <p>Enforces a two-tier security model: read operations require general authentication,
+ * <p>Public discovery and read operations are open to all visitors,
  * while mutating operations are restricted to platform administrators and regional managers.</p>
  *
  * @see Permission#SYSTEM_ADMIN_CLAIM
@@ -61,6 +62,7 @@ public class TagController {
      * @return a cursored page of tags
      */
     @Get
+    @Secured(IS_ANONYMOUS)
     public CursoredPage<Tag> getTags(@Nullable @Valid CursoredPageable pageable) {
         return tagRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
@@ -72,6 +74,7 @@ public class TagController {
      * @return an optional containing the tag if found
      */
     @Get("/{id}")
+    @Secured(IS_ANONYMOUS)
     public Optional<Tag> getTag(@PathVariable UUID id) {
         return tagRepository.findById(id);
     }

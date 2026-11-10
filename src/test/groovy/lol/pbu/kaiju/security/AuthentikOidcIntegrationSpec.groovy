@@ -225,7 +225,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         when: "calling a secured endpoint with the expired token"
         client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer ${expiredToken}")
         )
 
@@ -252,7 +252,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         when: "calling a secured endpoint with the untrusted issuer token"
         client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer ${untrustedToken}")
         )
 
@@ -274,7 +274,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         String validToken = validJWT.serialize()
 
         def response = client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer ${validToken}")
         )
 
@@ -300,7 +300,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         when: "calling a secured endpoint with the mismatched audience token"
         client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer ${untrustedAudienceToken}")
         )
 
@@ -318,7 +318,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         when: "calling a secured endpoint with the signature-tampered token"
         client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer ${tamperedToken}")
         )
 
@@ -338,7 +338,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
         when: "calling a secured endpoint with the forged claims token"
         client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer ${forgedToken}")
         )
 
@@ -419,7 +419,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
 
     def "unauthenticated requests to protected endpoints return 401 Unauthorized"() {
         when: "calling a secured endpoint without credentials"
-        client.exchange(HttpRequest.GET("/projects"))
+        client.exchange(HttpRequest.GET("/administrative-regions"))
 
         then: "access is rejected with 401 Unauthorized"
         HttpClientResponseException ex = thrown()
@@ -429,7 +429,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
     def "HTTP requests with tampered or malformed authorization token return 401 Unauthorized"() {
         when: "calling a secured endpoint with an invalid bearer token"
         client.exchange(
-                HttpRequest.GET("/projects")
+                HttpRequest.GET("/administrative-regions")
                         .header("Authorization", "Bearer eyJhbGciOiJSUzI1NiJ9.invalid.signature")
         )
 

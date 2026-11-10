@@ -28,6 +28,7 @@ import org.locationtech.jts.geom.Point;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
@@ -35,7 +36,7 @@ import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 /**
  * REST controller for managing locations.
  *
- * <p>Enforces a two-tier security model: read operations require general authentication,
+ * <p>Public discovery and read operations are open to all visitors,
  * while mutating operations are restricted to platform administrators and regional managers.</p>
  *
  * @see Permission#SYSTEM_ADMIN_CLAIM
@@ -59,11 +60,13 @@ public class LocationController {
     }
 
     @Get
+    @Secured(IS_ANONYMOUS)
     public CursoredPage<Location> getLocations(@Nullable @Valid CursoredPageable pageable) {
         return locationRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
+    @Secured(IS_ANONYMOUS)
     public Optional<Location> getLocation(@PathVariable UUID id) {
         return locationRepository.findById(id);
     }

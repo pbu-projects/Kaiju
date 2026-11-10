@@ -42,6 +42,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.PROJECT_APPROVE_CLAIM;
 
@@ -67,6 +68,7 @@ public class ProjectController {
     }
 
     @Get
+    @Secured(IS_ANONYMOUS)
     public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
         CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         if (title == null || title.isBlank()) {
@@ -76,6 +78,7 @@ public class ProjectController {
     }
 
     @Get("/{id}")
+    @Secured(IS_ANONYMOUS)
     public Optional<Project> getProject(@PathVariable UUID id) {
         return projectService.getProjectById(id);
     }
@@ -165,6 +168,7 @@ public class ProjectController {
      * @return a page of project search cards sorted by distance
      */
     @Get("/search-by-location")
+    @Secured(IS_ANONYMOUS)
     public Page<ProjectSearchCard> searchByLocation(
             @QueryValue @Min(-180) @Max(180) double longitude,
             @QueryValue @Min(-90) @Max(90) double latitude,
