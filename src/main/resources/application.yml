@@ -2,6 +2,7 @@ micronaut:
   application:
     name: kaiju
   server:
+    port: ${MICRONAUT_SERVER_PORT:-1}
     thread-selection: AUTO
   executors:
     io:

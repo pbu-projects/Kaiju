@@ -1,0 +1,2594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kaiju - Functional Spec User Journey Test Harness</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --surface-alt: #263449;
+            --surface-dark: #0b1120;
+            --border: #334155;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --accent: #38bdf8;
+            --accent-bg: rgba(56, 189, 248, 0.14);
+            --ready: #10b981;
+            --ready-bg: rgba(16, 185, 129, 0.14);
+            --partial: #f59e0b;
+            --partial-bg: rgba(245, 158, 11, 0.14);
+            --missing: #ef4444;
+            --missing-bg: rgba(239, 68, 68, 0.14);
+            --decision: #c084fc;
+            --decision-bg: rgba(168, 85, 247, 0.15);
+            --failure: #fb923c;
+            --failure-bg: rgba(249, 115, 22, 0.15);
+            --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0 0 260px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            line-height: 1.5;
+        }
+
+        /* Top Harness Control Bar */
+        .harness-topbar {
+            background: var(--surface-dark);
+            border-bottom: 1px solid var(--border);
+            padding: 0.75rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .topbar-row {
+            max-width: 1500px;
+            margin: 0 auto;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 0.85rem;
+        }
+
+        .brand-logo {
+            background: var(--primary);
+            color: #fff;
+            font-weight: 800;
+            font-size: 0.95rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 0.35rem;
+            letter-spacing: 0.04em;
+        }
+
+        .brand-title {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+
+        .brand-subtitle {
+            margin: 0;
+            font-size: 0.78rem;
+            color: var(--muted);
+        }
+
+        .persona-controls {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .persona-controls select,
+        .persona-controls input {
+            width: auto;
+            min-width: 220px;
+            padding: 0.4rem 0.6rem;
+            font-size: 0.8rem;
+        }
+
+        /* Main Layout */
+        .page-wrap {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 1.1rem 1.5rem;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.15rem 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid transparent;
+            gap: 0.25rem;
+        }
+
+        .badge-ready { background: var(--ready-bg); color: var(--ready); border-color: rgba(16, 185, 129, 0.4); }
+        .badge-partial { background: var(--partial-bg); color: var(--partial); border-color: rgba(245, 158, 11, 0.4); }
+        .badge-missing { background: var(--missing-bg); color: var(--missing); border-color: rgba(239, 68, 68, 0.4); }
+        .badge-spec { background: var(--accent-bg); color: var(--accent); border-color: rgba(56, 189, 248, 0.35); }
+        .badge-decision { background: var(--decision-bg); color: var(--decision); border-color: rgba(168, 85, 247, 0.4); }
+        .badge-failure { background: var(--failure-bg); color: var(--failure); border-color: rgba(249, 115, 22, 0.4); }
+        .badge-step { background: rgba(148, 163, 184, 0.14); color: var(--muted); border-color: rgba(148, 163, 184, 0.3); }
+
+        /* Spec Scorecard Bar */
+        .scorecard-strip {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.85rem 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .score-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.65rem;
+            align-items: center;
+        }
+
+        .score-pill {
+            background: var(--surface-dark);
+            border: 1px solid var(--border);
+            border-radius: 0.4rem;
+            padding: 0.35rem 0.75rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+        }
+
+        /* Journey Navigation Tabs */
+        .journey-nav {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 0.65rem;
+            margin-bottom: 1.15rem;
+        }
+
+        @media (max-width: 980px) {
+            .journey-nav {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 580px) {
+            .journey-nav {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .journey-tab {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.75rem 0.95rem;
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            color: var(--text);
+        }
+
+        .journey-tab:hover {
+            border-color: var(--accent);
+        }
+
+        .journey-tab.active {
+            background: linear-gradient(180deg, rgba(37, 99, 235, 0.25), rgba(30, 41, 59, 0.95));
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent);
+        }
+
+        .journey-tab-num {
+            font-size: 0.74rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .journey-tab-title {
+            font-size: 0.92rem;
+            font-weight: 700;
+            margin: 0.2rem 0 0.45rem;
+        }
+
+        /* Sub-navigation inside a Journey */
+        .subnav-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.65rem;
+        }
+
+        .subnav-btn {
+            background: var(--surface-alt);
+            color: var(--muted);
+            border: 1px solid var(--border);
+            padding: 0.45rem 0.85rem;
+            border-radius: 0.35rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .subnav-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: #60a5fa;
+        }
+
+        /* Panels & Forms */
+        .app-layout-2col {
+            display: grid;
+            grid-template-columns: 310px 1fr;
+            gap: 1.15rem;
+            align-items: start;
+        }
+
+        @media (max-width: 960px) {
+            .app-layout-2col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem 1.2rem;
+            margin-bottom: 1rem;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.8rem;
+            padding-bottom: 0.55rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        label {
+            display: block;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-bottom: 0.25rem;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            background: var(--surface-dark);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 0.35rem;
+            padding: 0.48rem 0.65rem;
+            font-family: var(--font-sans);
+            font-size: 0.84rem;
+        }
+
+        input.mono, textarea.mono {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .field-group {
+            margin-bottom: 0.7rem;
+        }
+
+        button {
+            background: var(--primary);
+            color: #fff;
+            border: 1px solid #3b82f6;
+            border-radius: 0.35rem;
+            padding: 0.48rem 0.9rem;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button.secondary {
+            background: var(--surface-alt);
+            border-color: var(--border);
+            color: var(--text);
+        }
+
+        button.secondary:hover {
+            background: #334155;
+        }
+
+        button.success {
+            background: #059669;
+            border-color: var(--ready);
+        }
+
+        button.warn {
+            background: #b45309;
+            border-color: var(--partial);
+        }
+
+        button.danger {
+            background: #b91c1c;
+            border-color: var(--missing);
+        }
+
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        /* Spec Feedback Banner inside UI flows */
+        .spec-banner {
+            border-radius: 0.4rem;
+            padding: 0.75rem 0.95rem;
+            margin: 0.75rem 0;
+            font-size: 0.83rem;
+            border: 1px solid var(--border);
+            background: var(--surface-dark);
+        }
+
+        .spec-banner.ready {
+            border-left: 4px solid var(--ready);
+            background: rgba(16, 185, 129, 0.08);
+        }
+
+        .spec-banner.partial {
+            border-left: 4px solid var(--partial);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .spec-banner.missing {
+            border-left: 4px solid var(--missing);
+            background: rgba(239, 68, 68, 0.08);
+        }
+
+        .spec-banner-title {
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.45rem;
+        }
+
+        /* Project Discovery Cards */
+        .project-cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 0.9rem;
+        }
+
+        .project-card {
+            background: var(--surface-dark);
+            border: 1px solid var(--border);
+            border-radius: 0.45rem;
+            padding: 0.95rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            gap: 0.65rem;
+            transition: border-color 0.15s ease;
+        }
+
+        .project-card:hover {
+            border-color: var(--accent);
+        }
+
+        .project-card h4 {
+            margin: 0;
+            font-size: 0.96rem;
+            color: var(--text);
+        }
+
+        .project-card-meta {
+            font-size: 0.8rem;
+            color: var(--muted);
+        }
+
+        /* Interactive SVG Map View */
+        .map-viewport {
+            background: #07101f;
+            border: 1px solid var(--accent);
+            border-radius: 0.45rem;
+            padding: 0.85rem;
+        }
+
+        .map-svg {
+            width: 100%;
+            height: 290px;
+            background: radial-gradient(circle at center, #0f2442 0%, #060d1a 100%);
+            border: 1px solid var(--border);
+            border-radius: 0.35rem;
+            display: block;
+        }
+
+        /* Wizard Stepper */
+        .wizard-stepper {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 0.35rem;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 960px) {
+            .wizard-stepper {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        .wizard-step-btn {
+            background: var(--surface-dark);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 0.45rem 0.4rem;
+            border-radius: 0.35rem;
+            font-size: 0.75rem;
+            text-align: center;
+            cursor: pointer;
+        }
+
+        .wizard-step-btn.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        /* Escalation Chain */
+        .escalation-chain {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+            gap: 0.6rem;
+            margin-top: 0.65rem;
+        }
+
+        .escalation-tier {
+            background: var(--surface-dark);
+            border: 1px solid var(--border);
+            border-radius: 0.4rem;
+            padding: 0.65rem;
+            font-size: 0.78rem;
+        }
+
+        .escalation-tier strong {
+            display: block;
+            color: var(--accent);
+            margin-bottom: 0.2rem;
+        }
+
+        /* Spec Checklist Drawer */
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.55rem;
+        }
+
+        .step-card {
+            background: var(--surface-dark);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--border);
+            border-radius: 0.4rem;
+            padding: 0.7rem 0.9rem;
+        }
+
+        .step-card.status-READY { border-left-color: var(--ready); }
+        .step-card.status-PARTIAL { border-left-color: var(--partial); }
+        .step-card.status-MISSING { border-left-color: var(--missing); }
+
+        .step-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 0.88rem;
+        }
+
+        .step-assessment {
+            margin: 0.3rem 0 0;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+        }
+
+        /* Bottom Docked Network & Spec Inspector */
+        .bottom-inspector {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface-dark);
+            border-top: 2px solid var(--border);
+            z-index: 120;
+            height: 235px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bottom-inspector.collapsed {
+            height: 42px;
+        }
+
+        .inspector-bar {
+            padding: 0.45rem 1.25rem;
+            background: #070b14;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .inspector-logs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.6rem 1.25rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+            gap: 0.6rem;
+            align-content: start;
+        }
+
+        .log-entry {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.35rem;
+            padding: 0.5rem 0.65rem;
+            font-family: var(--font-mono);
+            font-size: 0.73rem;
+        }
+
+        .status-2xx { color: var(--ready); font-weight: 700; }
+        .status-4xx { color: var(--partial); font-weight: 700; }
+        .status-5xx { color: var(--missing); font-weight: 700; }
+
+        table.data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+
+        table.data-table th,
+        table.data-table td {
+            border: 1px solid var(--border);
+            padding: 0.45rem 0.6rem;
+            text-align: left;
+        }
+
+        table.data-table th {
+            background: var(--surface-alt);
+            color: var(--muted);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Sticky Top Bar: Persona Switcher & Live Session Context -->
+<header class="harness-topbar">
+    <div class="topbar-row">
+        <div class="brand-group">
+            <span class="brand-logo">KAIJU</span>
+            <div>
+                <h1 class="brand-title">Functional Spec User Journey Test Harness</h1>
+                <p class="brand-subtitle">Emulates real user journeys against <code id="spec-file-pill">docs/functional-spec/05-key-user-journeys.adoc</code> with zero fake state</p>
+            </div>
+        </div>
+        <div class="persona-controls">
+            <span class="badge badge-step" id="active-auth-badge">Active: Anonymous Visitor (No Token)</span>
+            <select id="persona-select" aria-label="Select Seeded Persona"></select>
+            <button type="button" id="btn-login-persona" onclick="authenticateSelectedPersona()">Sign In as Persona</button>
+            <button type="button" class="secondary" onclick="probeCurrentUser()">My Profile (/users/me)</button>
+            <button type="button" class="secondary" onclick="clearAuthToken()">Sign Out</button>
+            <input type="text" id="jwt-token-input" class="mono" placeholder="Custom Bearer JWT (optional)" style="min-width: 170px;">
+        </div>
+    </div>
+</header>
+
+<div class="page-wrap">
+    <!-- Compact Spec Readiness Scorecard Strip -->
+    <section class="scorecard-strip">
+        <div class="score-pills">
+            <span class="score-pill">Total Spec Steps: <strong id="metric-total">34</strong></span>
+            <span class="score-pill" style="color: var(--ready);">Ready: <strong id="metric-ready">3</strong></span>
+            <span class="score-pill" style="color: var(--partial);">Partial: <strong id="metric-partial">18</strong></span>
+            <span class="score-pill" style="color: var(--missing);">Missing: <strong id="metric-missing">13</strong></span>
+            <span id="persona-description-box" style="font-size: 0.79rem; color: var(--muted);">
+                Browse as an Anonymous Visitor or sign in as any seeded persona (Victor Volunteer, Jenny Niu, Leo Org Admin, Daniel County Director, Ethan Sibling Director, Sarah Admin).
+            </span>
+        </div>
+        <div class="btn-row">
+            <button type="button" class="secondary" onclick="toggleSpecChecklistDrawer()">Toggle 34-Step Spec Checklist &amp; Filters</button>
+        </div>
+    </section>
+
+    <!-- Collapsible Full 34-Step Spec Checklist & Filter Panel -->
+    <section class="panel hidden" id="spec-checklist-drawer">
+        <div class="panel-header">
+            <h2 class="panel-title" id="active-journey-heading">Journey Specification Steps</h2>
+            <div class="btn-row">
+                <select id="filter-status" onchange="renderActiveJourneySteps()" style="width: auto;">
+                    <option value="ALL">All Statuses</option>
+                    <option value="READY">READY Only</option>
+                    <option value="PARTIAL">PARTIAL Only</option>
+                    <option value="MISSING">MISSING Only</option>
+                </select>
+                <select id="filter-type" onchange="renderActiveJourneySteps()" style="width: auto;">
+                    <option value="ALL">All Step Types</option>
+                    <option value="STEP">STEP</option>
+                    <option value="DECISION">DECISION</option>
+                    <option value="FAILURE_STATE">FAILURE_STATE</option>
+                </select>
+                <span class="badge badge-spec" id="active-journey-counts"></span>
+            </div>
+        </div>
+        <p id="active-journey-summary" style="margin-top: 0; font-size: 0.83rem; color: var(--muted);"></p>
+        <div class="step-list" id="journey-steps-container"></div>
+    </section>
+
+    <!-- 4 User Journey Application Tabs -->
+    <nav class="journey-nav" id="journey-tabs">
+        <button type="button" class="journey-tab active" data-journey="1" onclick="selectJourneyTab(1)">
+            <div class="journey-tab-num">Journey 1 (12 Steps)</div>
+            <div class="journey-tab-title">Volunteer Discovers &amp; Commits</div>
+            <div class="btn-row">
+                <span class="badge badge-partial">6 Partial</span>
+                <span class="badge badge-missing">6 Missing</span>
+            </div>
+        </button>
+        <button type="button" class="journey-tab" data-journey="2" onclick="selectJourneyTab(2)">
+            <div class="journey-tab-num">Journey 2 (9 Steps)</div>
+            <div class="journey-tab-title">Org Onboarding &amp; Project Wizard</div>
+            <div class="btn-row">
+                <span class="badge badge-ready">2 Ready</span>
+                <span class="badge badge-partial">6 Partial</span>
+                <span class="badge badge-missing">1 Missing</span>
+            </div>
+        </button>
+        <button type="button" class="journey-tab" data-journey="3" onclick="selectJourneyTab(3)">
+            <div class="journey-tab-num">Journey 3 (7 Steps)</div>
+            <div class="journey-tab-title">Specialist Reviews &amp; Approves</div>
+            <div class="btn-row">
+                <span class="badge badge-ready">1 Ready</span>
+                <span class="badge badge-partial">5 Partial</span>
+                <span class="badge badge-missing">1 Missing</span>
+            </div>
+        </button>
+        <button type="button" class="journey-tab" data-journey="4" onclick="selectJourneyTab(4)">
+            <div class="journey-tab-num">Journey 4 (6 Steps)</div>
+            <div class="journey-tab-title">Org Communicates with Volunteers</div>
+            <div class="btn-row">
+                <span class="badge badge-partial">1 Partial</span>
+                <span class="badge badge-missing">5 Missing</span>
+            </div>
+        </button>
+    </nav>
+
+    <!-- =================================================================== -->
+    <!-- JOURNEY 1 UI: VOLUNTEER PORTAL & MY DASHBOARD                        -->
+    <!-- =================================================================== -->
+    <section class="journey-view" id="view-journey-1">
+        <div class="subnav-bar">
+            <button type="button" class="subnav-btn active" id="j1-sub-discover-btn" onclick="switchJ1Screen('DISCOVER')">
+                Discover Projects (/projects &amp; Map Search - Steps 1.1 to 1.9)
+            </button>
+            <button type="button" class="subnav-btn" id="j1-sub-dashboard-btn" onclick="switchJ1Screen('DASHBOARD')">
+                My Dashboard -&gt; Upcoming Commitments &amp; Unvolunteer (Steps 1.10 to 1.12)
+            </button>
+        </div>
+
+        <!-- J1 Screen A: Project Discovery, Filters, List/Map Toggle & Project Detail Drawer -->
+        <div id="j1-screen-discover">
+            <!-- Top Search & Location Override Bar (Steps 1.1 & 1.2) -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Find Volunteer Opportunities Near You (Steps 1.1 &amp; 1.2)</h2>
+                    <div class="btn-row">
+                        <span class="badge badge-spec">CUR-001</span>
+                        <span class="badge badge-spec">CUR-002</span>
+                        <span class="badge badge-spec">CUR-003</span>
+                    </div>
+                </div>
+                <div class="form-grid">
+                    <div>
+                        <label for="j1-city-zip">City or ZIP Override (CUR-001)</label>
+                        <input type="text" id="j1-city-zip" value="Denver, CO 80265" placeholder="City or ZIP code">
+                    </div>
+                    <div>
+                        <label for="j1-lat">Center Latitude</label>
+                        <input type="number" step="0.0001" id="j1-lat" value="39.7465">
+                    </div>
+                    <div>
+                        <label for="j1-lon">Center Longitude</label>
+                        <input type="number" step="0.0001" id="j1-lon" value="-104.9942">
+                    </div>
+                    <div>
+                        <label for="j1-radius">Search Radius (Meters)</label>
+                        <input type="number" step="1000" id="j1-radius" value="25000">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" onclick="runSpatialSearch()">Search Near Coordinates (GET /projects/search-by-location)</button>
+                    <button type="button" class="secondary" onclick="probeGetProjects()">Browse All Projects (GET /projects)</button>
+                    <button type="button" class="secondary" onclick="setSpatialPreset('Denver 16th St Mall', 39.7465, -104.9942, 25000)">Denver Downtown</button>
+                    <button type="button" class="secondary" onclick="setSpatialPreset('Glendale / Arapahoe County', 39.7029, -104.9336, 20000)">Arapahoe County</button>
+                    <button type="button" class="secondary" onclick="setSpatialPreset('Colorado Springs Downtown', 38.8339, -104.8214, 25000)">Colorado Springs</button>
+                    <div style="margin-left: auto;" class="btn-row">
+                        <button type="button" class="secondary" id="btn-view-list" onclick="toggleSearchView('LIST')">List View (CUR-002)</button>
+                        <button type="button" class="secondary" id="btn-view-map" onclick="toggleSearchView('MAP')">Map View (CUR-002)</button>
+                    </div>
+                </div>
+                <div id="j1-discovery-banner"></div>
+            </div>
+
+            <div class="app-layout-2col">
+                <!-- Left Filter Sidebar (Step 1.3: CUR-003) -->
+                <aside class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">Filter Projects (Step 1.3)</h3>
+                        <span class="badge badge-partial">CUR-003</span>
+                    </div>
+                    <div class="field-group">
+                        <label for="j1-title-filter">Keyword / Exact Title</label>
+                        <input type="text" id="j1-title-filter" placeholder="e.g. Downtown Denver Mall & Civic Clean-Up">
+                    </div>
+                    <div class="field-group">
+                        <label for="j1-filter-date">Date Range</label>
+                        <input type="date" id="j1-filter-date" value="2026-12-05">
+                    </div>
+                    <div class="field-group">
+                        <label for="j1-filter-day">Day of Week</label>
+                        <select id="j1-filter-day">
+                            <option value="">Any Day</option>
+                            <option value="SATURDAY">Saturday</option>
+                            <option value="SUNDAY">Sunday</option>
+                            <option value="WEEKDAYS">Weekdays</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="j1-filter-time">Time of Day</label>
+                        <select id="j1-filter-time">
+                            <option value="">Any Time</option>
+                            <option value="MORNING">Morning</option>
+                            <option value="AFTERNOON">Afternoon</option>
+                            <option value="EVENING">Evening</option>
+                        </select>
+                    </div>
+                    <div class="field-group">
+                        <label for="j1-filter-skill">Attributes / Skills / Interests</label>
+                        <select id="j1-filter-skill">
+                            <option value="">All Attributes &amp; Skills</option>
+                            <option value="FAMILY_FRIENDLY">Family Friendly</option>
+                            <option value="OUTDOORS">Outdoors &amp; Trail Work</option>
+                            <option value="FOOD_PANTRY">Food Preparation &amp; Sorting</option>
+                        </select>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" onclick="applyJourney1Filters()">Apply Filters</button>
+                        <button type="button" class="secondary" onclick="probeGetTags()">Load Tags (GET /tags)</button>
+                    </div>
+                    <div id="j1-filter-banner"></div>
+                </aside>
+
+                <!-- Right Results Area: Project Cards List OR Coordinate Map + Project Detail Drawer -->
+                <div>
+                    <!-- List View Container -->
+                    <div class="panel" id="j1-results-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title" id="j1-results-heading">Search Results</h3>
+                            <span class="badge badge-step" id="j1-results-count">0 projects loaded</span>
+                        </div>
+
+                        <div id="j1-list-container" class="project-cards-grid">
+                            <div style="color: var(--muted); font-size: 0.85rem;">
+                                Click "Search Near Coordinates" or "Browse All Projects" above to load live projects from Kaiju.
+                            </div>
+                        </div>
+
+                        <!-- Coordinate Map View Container (Step 1.4: CUR-002) -->
+                        <div id="j1-map-container" class="map-viewport hidden">
+                            <div class="btn-row" style="justify-content: space-between; margin-bottom: 0.6rem;">
+                                <span style="font-size: 0.82rem; color: var(--accent);">
+                                    DECISION (Step 1.4 / CUR-002): Map View plots the exact same result set as List View.
+                                </span>
+                                <button type="button" class="secondary" onclick="enrichSearchCoordinates()">
+                                    Resolve Missing Coordinates via GET /locations/{id}
+                                </button>
+                            </div>
+                            <svg class="map-svg" id="j1-map-svg" viewBox="0 0 600 260"></svg>
+                            <div id="j1-map-legend" style="margin-top: 0.55rem; font-size: 0.79rem; color: var(--muted);"></div>
+                        </div>
+                    </div>
+
+                    <!-- Project Detail & Shift Occurrence Selector View (Steps 1.5, 1.6, 1.7, 1.8, 1.9) -->
+                    <div class="panel" id="j1-project-detail-panel">
+                        <div class="panel-header">
+                            <h3 class="panel-title">Project Detail &amp; Shift Sign-Up (Steps 1.5 to 1.9)</h3>
+                            <div class="btn-row">
+                                <select id="j1-project-id" style="width: auto;" onchange="inspectProjectAndShifts()">
+                                    <option value="e0000000-0000-0000-0000-000000000001">Downtown Denver Mall &amp; Civic Clean-Up (2 shifts)</option>
+                                    <option value="e0000000-0000-0000-0000-000000000002">DIA Traveler Assistance &amp; Corridor Outreach</option>
+                                    <option value="e0000000-0000-0000-0000-000000000003">Arapahoe County Food &amp; Relief Drive (2 shifts)</option>
+                                    <option value="e0000000-0000-0000-0000-000000000004">Front Range Foothills Trail &amp; Creek Stewardship</option>
+                                    <option value="e0000000-0000-0000-0000-000000000005">Pikes Peak &amp; Fountain Valley Pantry Distribution</option>
+                                </select>
+                                <button type="button" class="secondary" onclick="inspectProjectAndShifts()">Open Project (GET /projects/{id})</button>
+                            </div>
+                        </div>
+
+                        <div id="j1-project-detail-view">
+                            <p style="color: var(--muted); font-size: 0.84rem; margin: 0;">
+                                Click any project card above or click "Open Project" to review project details, sponsor, and available shift dates.
+                            </p>
+                        </div>
+
+                        <!-- Multi-Shift Occurrence Selector (Step 1.6: CUR-012) -->
+                        <div style="margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid var(--border);">
+                            <label for="j1-shift-select">DECISION (Step 1.6 / CUR-012): Select a Specific Shift Occurrence</label>
+                            <div class="form-grid">
+                                <select id="j1-shift-select">
+                                    <option value="f0000000-0000-0000-0000-000000000001">Shift f000...0001 (2026-12-05 16:00Z - Denver 16th St Mall Hub)</option>
+                                    <option value="f0000000-0000-0000-0000-000000000002">Shift f000...0002 (2026-12-06 16:00Z - Denver Civic Center)</option>
+                                </select>
+                                <div class="btn-row">
+                                    <button type="button" class="success" onclick="clickVolunteerButton()">
+                                        Volunteer for Selected Shift (Step 1.8 / CUR-033)
+                                    </button>
+                                    <button type="button" class="warn" onclick="simulateCapacityCheck()">
+                                        Test Capacity Full Check (Step 1.7 / CUR-020)
+                                    </button>
+                                    <button type="button" class="secondary" onclick="exportShiftCalendar()">
+                                        Add to Calendar .ics (Step 1.9 / CUR-024)
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="j1-signup-banner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- J1 Screen B: My Dashboard -> Upcoming Commitments & Unvolunteer (Steps 1.10 to 1.12) -->
+        <div id="j1-screen-dashboard" class="hidden">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">My Dashboard -&gt; Upcoming Volunteer Commitments (Steps 1.10 to 1.12)</h2>
+                    <div class="btn-row">
+                        <span class="badge badge-missing">CUR-022</span>
+                        <span class="badge badge-missing">CUR-021</span>
+                        <span class="badge badge-failure">ENH-021</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--muted); margin-top: 0;">
+                    When a volunteer opens their dashboard, the UI fetches their profile (<code>GET /users/me</code>) and their upcoming shift commitments (<code>GET /users/me/commitments</code>), with an "Unvolunteer" button (<code>DELETE /shift-signups/{id}</code>) if plans change.
+                </p>
+                <div class="btn-row">
+                    <button type="button" onclick="loadVolunteerDashboard()">Load My Upcoming Commitments</button>
+                    <button type="button" class="danger" onclick="clickUnvolunteerButton()">
+                        Unvolunteer from Shift f000...0001 (Step 1.11 / CUR-021 &amp; ENH-021)
+                    </button>
+                </div>
+                <div id="j1-dashboard-banner"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- JOURNEY 2 UI: ORGANIZATION ONBOARDING & 8-STEP PROJECT WIZARD        -->
+    <!-- =================================================================== -->
+    <section class="journey-view hidden" id="view-journey-2">
+        <div class="subnav-bar">
+            <button type="button" class="subnav-btn active" id="j2-sub-contact-btn" onclick="switchJ2Screen('CONTACT')">
+                1. Prospective Org: /contact Referral Form (Step 2.1)
+            </button>
+            <button type="button" class="subnav-btn" id="j2-sub-onboard-btn" onclick="switchJ2Screen('ONBOARD')">
+                2. Specialist: Create Organization &amp; Grant Admin (Steps 2.2 to 2.4)
+            </button>
+            <button type="button" class="subnav-btn" id="j2-sub-wizard-btn" onclick="switchJ2Screen('WIZARD')">
+                3. Org Admin: 8-Step Project Wizard &amp; Public Page (Steps 2.5 to 2.9)
+            </button>
+        </div>
+
+        <!-- J2 Screen 1: Prospective Org /content/add-an-organization & /contact (Step 2.1) -->
+        <div id="j2-screen-contact" class="panel">
+            <div class="panel-header">
+                <h2 class="panel-title">Add an Organization &amp; Request a Local Specialist Referral (Step 2.1)</h2>
+                <span class="badge badge-missing">CUR-052</span>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--muted); margin-top: 0;">
+                A prospective community organization reads <code>/content/add-an-organization</code> and submits the <code>/contact</code> form to be referred to a local JustServe specialist.
+            </p>
+            <div class="form-grid">
+                <div>
+                    <label for="j2-ref-org">Prospective Organization Name</label>
+                    <input type="text" id="j2-ref-org" value="Mile High Youth Mentoring Alliance">
+                </div>
+                <div>
+                    <label for="j2-ref-contact">Primary Contact Name</label>
+                    <input type="text" id="j2-ref-contact" value="Elena Martinez">
+                </div>
+                <div>
+                    <label for="j2-ref-email">Contact Email</label>
+                    <input type="email" id="j2-ref-email" value="elena@milehighmentoring.example.org">
+                </div>
+                <div>
+                    <label for="j2-ref-zip">City / Postal Code</label>
+                    <input type="text" id="j2-ref-zip" value="Denver, CO 80203">
+                </div>
+            </div>
+            <div class="btn-row">
+                <button type="button" onclick="submitContactReferralForm()">Submit Referral Form (POST /contact)</button>
+                <button type="button" class="secondary" onclick="probeContentAddOrgPage()">Open /content/add-an-organization</button>
+            </div>
+            <div id="j2-contact-banner"></div>
+        </div>
+
+        <!-- J2 Screen 2: Specialist Creates Org & Grants Org Admin (Steps 2.2, 2.3, 2.4) -->
+        <div id="j2-screen-onboard" class="hidden">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Specialist Onboarding: Create Organization Record (Step 2.2)</h2>
+                    <span class="badge badge-partial">CUR-026</span>
+                </div>
+                <p style="font-size: 0.84rem; color: var(--muted); margin-top: 0;">
+                    Fill out all organization onboarding fields required by <code>CUR-026</code> and submit to <code>POST /organizations</code> to see which fields Kaiju persists vs drops.
+                </p>
+                <div class="form-grid">
+                    <div>
+                        <label for="j2-org-name">Organization Name (Persisted)</label>
+                        <input type="text" id="j2-org-name" value="Mile High Community Kitchen">
+                    </div>
+                    <div>
+                        <label for="j2-org-slug">Permanent URL Slug (CUR-026 Gap)</label>
+                        <input type="text" id="j2-org-slug" value="mile-high-community-kitchen">
+                    </div>
+                    <div>
+                        <label for="j2-org-url">Website URL (Persisted)</label>
+                        <input type="text" id="j2-org-url" value="https://milehighkitchen.example.org">
+                    </div>
+                    <div>
+                        <label for="j2-org-contact">Contact Email &amp; Phone (CUR-026 Gap)</label>
+                        <input type="text" id="j2-org-contact" value="info@milehighkitchen.example.org | (303) 555-0192">
+                    </div>
+                    <div>
+                        <label for="j2-org-address">Verified Street Address (CUR-026 Gap)</label>
+                        <input type="text" id="j2-org-address" value="1437 Bannock St, Denver, CO 80202">
+                    </div>
+                    <div>
+                        <label for="j2-org-desc">Organization Description (CUR-026 Gap)</label>
+                        <input type="text" id="j2-org-desc" value="Prepares hot meals and pantry boxes for families across metro Denver.">
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" onclick="createOrganizationLive()">Create Organization (POST /organizations)</button>
+                </div>
+                <div id="j2-org-banner"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Grant Organization Admin Rights &amp; Lead Admin Check (Steps 2.3 &amp; 2.4)</h2>
+                    <div class="btn-row">
+                        <span class="badge badge-ready">Step 2.3 READY</span>
+                        <span class="badge badge-partial">Step 2.4 PARTIAL (CUR-027)</span>
+                    </div>
+                </div>
+                <p style="font-size: 0.84rem; color: var(--muted); margin-top: 0;">
+                    Sign in as an Organization Admin (Leo Local Admin) or System Admin (Sarah Admin) to grant <code>ORG_ADMIN</code> rights via <code>POST /organization-users</code>.
+                </p>
+                <div class="form-grid">
+                    <div>
+                        <label for="j2-orguser-orgid">Organization UUID</label>
+                        <input type="text" class="mono" id="j2-orguser-orgid" value="b0000000-0000-0000-0000-000000000004">
+                    </div>
+                    <div>
+                        <label for="j2-orguser-userid">Named Individual User UUID</label>
+                        <input type="text" class="mono" id="j2-orguser-userid" value="c0000000-0000-0000-0000-000000000025">
+                    </div>
+                    <div>
+                        <label for="j2-orguser-role">Organization Role</label>
+                        <select id="j2-orguser-role">
+                            <option value="ORG_ADMIN">ORG_ADMIN</option>
+                            <option value="ORG_MANAGER">ORG_MANAGER</option>
+                            <option value="ORG_MEMBER">ORG_MEMBER</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-row">
+                    <button type="button" onclick="grantOrgRoleLive()">Grant Role (POST /organization-users)</button>
+                    <button type="button" class="secondary" onclick="listOrgUsersLive()">Inspect Org Admins (GET /organization-users)</button>
+                </div>
+                <div id="j2-orguser-banner"></div>
+            </div>
+        </div>
+
+        <!-- J2 Screen 3: 8-Step Project Wizard (Steps 2.5 to 2.9) -->
+        <div id="j2-screen-wizard" class="hidden">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Project Wizard: Overview -&gt; Location -&gt; Date/Time -&gt; Details -&gt; Attachments -&gt; Organization -&gt; Preview -&gt; Submit (Steps 2.5 to 2.9)</h2>
+                    <div class="btn-row">
+                        <span class="badge badge-spec">CUR-011</span>
+                        <span class="badge badge-ready">ENH-007</span>
+                        <span class="badge badge-partial">CUR-018</span>
+                    </div>
+                </div>
+
+                <!-- 8-Step Wizard Stepper -->
+                <div class="wizard-stepper" id="wizard-stepper">
+                    <button type="button" class="wizard-step-btn active" data-wstep="1" onclick="selectWizardStep(1)">1. Overview</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="2" onclick="selectWizardStep(2)">2. Location</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="3" onclick="selectWizardStep(3)">3. Date/Time</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="4" onclick="selectWizardStep(4)">4. Details</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="5" onclick="selectWizardStep(5)">5. Attachments</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="6" onclick="selectWizardStep(6)">6. Organization</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="7" onclick="selectWizardStep(7)">7. Preview</button>
+                    <button type="button" class="wizard-step-btn" data-wstep="8" onclick="selectWizardStep(8)">8. Submit</button>
+                </div>
+
+                <!-- Wizard Step 1: Overview -->
+                <div class="wizard-pane" id="wizard-pane-1">
+                    <div class="form-grid">
+                        <div>
+                            <label for="j2-proj-title">Project Title (Required, 1-255 chars)</label>
+                            <input type="text" id="j2-proj-title" value="Capitol Hill Community Garden Build">
+                        </div>
+                        <div>
+                            <label for="j2-proj-type">Project Type</label>
+                            <select id="j2-proj-type">
+                                <option value="STANDARD">STANDARD</option>
+                                <option value="OPEN_DOOR">OPEN_DOOR</option>
+                                <option value="REGIONAL">REGIONAL</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label for="j2-proj-desc">Project Description (Required, 20-4000 chars)</label>
+                        <textarea id="j2-proj-desc" rows="3">Volunteers assemble raised garden beds and install drip irrigation lines for neighborhood families in Denver.</textarea>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 2: Location -->
+                <div class="wizard-pane hidden" id="wizard-pane-2">
+                    <div class="form-grid">
+                        <div>
+                            <label for="j2-loc-name">Location Name</label>
+                            <input type="text" id="j2-loc-name" value="Denver Civic Center Community Plot">
+                        </div>
+                        <div>
+                            <label for="j2-loc-addr">Street Address</label>
+                            <input type="text" id="j2-loc-addr" value="1437 Bannock St">
+                        </div>
+                        <div>
+                            <label for="j2-loc-city">City</label>
+                            <input type="text" id="j2-loc-city" value="Denver">
+                        </div>
+                        <div>
+                            <label for="j2-loc-zip">Postal Code</label>
+                            <input type="text" id="j2-loc-zip" value="80202">
+                        </div>
+                        <div>
+                            <label for="j2-proj-lat">Latitude</label>
+                            <input type="number" step="0.0001" id="j2-proj-lat" value="39.7392">
+                        </div>
+                        <div>
+                            <label for="j2-proj-lon">Longitude</label>
+                            <input type="number" step="0.0001" id="j2-proj-lon" value="-104.9928">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 3: Date/Time Shifts -->
+                <div class="wizard-pane hidden" id="wizard-pane-3">
+                    <div class="form-grid">
+                        <div>
+                            <label for="j2-shift-start">Shift Start (ISO-8601 UTC)</label>
+                            <input type="text" class="mono" id="j2-shift-start" value="2026-12-15T16:00:00Z">
+                        </div>
+                        <div>
+                            <label for="j2-shift-end">Shift End (ISO-8601 UTC)</label>
+                            <input type="text" class="mono" id="j2-shift-end" value="2026-12-15T20:00:00Z">
+                        </div>
+                        <div>
+                            <label for="j2-shift-cap">Target Volunteer Capacity (CUR-020 Gap)</label>
+                            <input type="number" id="j2-shift-cap" value="25">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 4: Details -->
+                <div class="wizard-pane hidden" id="wizard-pane-4">
+                    <div class="form-grid">
+                        <div>
+                            <label for="j2-detail-poc">Point of Contact Name &amp; Phone (CUR-010 Gap)</label>
+                            <input type="text" id="j2-detail-poc" value="Leo Local Admin | (303) 555-0144">
+                        </div>
+                        <div>
+                            <label for="j2-detail-badges">Attribute Badges &amp; Skills (CUR-003 Gap)</label>
+                            <input type="text" id="j2-detail-badges" value="Wheelchair Accessible, Family Friendly, Gardening">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 5: Attachments -->
+                <div class="wizard-pane hidden" id="wizard-pane-5">
+                    <div class="spec-banner missing">
+                        <div class="spec-banner-title">
+                            <span class="badge badge-missing">CUR-011 Attachment Step Not Implemented</span>
+                            <span>Project Photo &amp; Waiver File Upload</span>
+                        </div>
+                        <div>
+                            <code>CreateProjectCommand</code> has no fields or multipart upload endpoints for project photos or PDF waiver attachments.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 6: Organization & Region -->
+                <div class="wizard-pane hidden" id="wizard-pane-6">
+                    <div class="form-grid">
+                        <div>
+                            <label for="j2-proj-org">Sponsoring Organization UUID (Step 2.8 / CUR-032)</label>
+                            <input type="text" class="mono" id="j2-proj-org" value="b0000000-0000-0000-0000-000000000004">
+                        </div>
+                        <div>
+                            <label for="j2-proj-region">Managing Region UUID (Denver County = a000...0002)</label>
+                            <input type="text" class="mono" id="j2-proj-region" value="a0000000-0000-0000-0000-000000000002">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wizard Step 7: Preview & Save as Template -->
+                <div class="wizard-pane hidden" id="wizard-pane-7">
+                    <div class="spec-banner partial">
+                        <div class="spec-banner-title">
+                            <span class="badge badge-partial">Step 2.8 / CUR-015</span>
+                            <span>Preview &amp; Reusable Project Template</span>
+                        </div>
+                        <div>
+                            Previewing your project before submission works below. Click "Save as Reusable Template" to test <code>POST /project-templates</code> (not yet implemented).
+                        </div>
+                    </div>
+                    <button type="button" class="warn" onclick="probeSaveProjectTemplate()">Save as Reusable Template (CUR-015)</button>
+                </div>
+
+                <!-- Wizard Step 8: Submit & ENH-007 Validation Check -->
+                <div class="wizard-pane hidden" id="wizard-pane-8">
+                    <p style="font-size: 0.84rem; color: var(--muted); margin-top: 0;">
+                        Click "Publish Project" to execute <code>POST /projects</code>, or click "Test Invalid Submission (ENH-007)" to verify that invalid wizard inputs return specific field validation errors instead of a generic error.
+                    </p>
+                </div>
+
+                <!-- Always-Accessible Wizard Action Bar -->
+                <div class="btn-row" style="margin-top: 0.9rem; padding-top: 0.8rem; border-top: 1px solid var(--border);">
+                    <button type="button" class="success" onclick="submitProjectWizardLive()">
+                        Publish Project (POST /projects - Step 2.5)
+                    </button>
+                    <button type="button" class="warn" onclick="testEnh007ValidationFailure()">
+                        Test Validation Failure (Step 2.6 / ENH-007)
+                    </button>
+                    <button type="button" class="secondary" onclick="probeUnderReviewVisibility()">
+                        Check Under-Review &amp; Public Search Visibility (Steps 2.7 &amp; 2.9 / CUR-018)
+                    </button>
+                    <input type="text" class="mono" id="j2-created-project-id" placeholder="Created Project UUID" style="width: 290px; margin-left: auto;">
+                </div>
+                <div id="j2-wizard-banner"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- JOURNEY 3 UI: SPECIALIST MODERATION & ESCALATION CONSOLE             -->
+    <!-- =================================================================== -->
+    <section class="journey-view hidden" id="view-journey-3">
+        <div class="app-layout-2col">
+            <!-- Left Column: Specialist Pending Queue (Steps 3.1, 3.2, 3.3) -->
+            <aside class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Pending Projects Queue (Steps 3.1 to 3.3)</h2>
+                    <span class="badge badge-partial">CUR-042 / ENH-038</span>
+                </div>
+                <p style="font-size: 0.8rem; color: var(--muted); margin-top: 0;">
+                    Sign in as Daniel County Director (Denver) or Connie County Agent, then load the queue or seed a new <code>PENDING</code> project in Denver.
+                </p>
+                <div class="btn-row" style="margin-bottom: 0.7rem;">
+                    <button type="button" onclick="loadPendingQueueClientSide()">Refresh Queue (GET /projects)</button>
+                    <button type="button" class="secondary" onclick="seedPendingProjectForReview()">+ Seed PENDING Denver Project</button>
+                </div>
+                <div id="j3-queue-list" class="step-list">
+                    <div style="font-size: 0.8rem; color: var(--muted);">Click "Refresh Queue" to load projects for review.</div>
+                </div>
+            </aside>
+
+            <!-- Right Column: Community Guidelines Review, Direct Edit, Approve/Reject & Escalation -->
+            <div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2 class="panel-title">Specialist Community Guidelines Review &amp; Editor (Steps 3.4, 3.5 &amp; 3.7)</h2>
+                        <div class="btn-row">
+                            <span class="badge badge-ready">Step 3.4 Edit READY</span>
+                            <span class="badge badge-partial">Step 3.5 Approve/Reject PARTIAL</span>
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label for="j3-target-project-id">Selected Project UUID</label>
+                            <input type="text" class="mono" id="j3-target-project-id" value="e0000000-0000-0000-0000-000000000001">
+                        </div>
+                        <div>
+                            <label for="j3-edit-title">Review / Edit Project Title (CUR-019)</label>
+                            <input type="text" id="j3-edit-title" value="Specialist Reviewed &amp; Approved Denver Project">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label for="j3-edit-desc">Review / Edit Project Description (CUR-019)</label>
+                        <textarea id="j3-edit-desc" rows="2">Reviewed against JustServe Community Guidelines (non-political, non-profit community service in Denver County).</textarea>
+                    </div>
+                    <div class="btn-row">
+                        <button type="button" onclick="specialistEditProjectLive()">
+                            Save Direct Edits (PUT /projects/{id} - Step 3.4)
+                        </button>
+                        <button type="button" class="success" onclick="approveProjectLive()">
+                            Approve Project (PUT /projects/{id}/status - Step 3.5)
+                        </button>
+                        <button type="button" class="danger" onclick="rejectProjectLive()">
+                            Reject Project (PUT /projects/{id}/reject - Step 3.5 Gap)
+                        </button>
+                        <button type="button" class="secondary" onclick="loadProjectAuditLogs()">
+                            View Audit Trail (GET /project-audit-logs)
+                        </button>
+                    </div>
+                    <div id="j3-approval-banner"></div>
+                </div>
+
+                <!-- Step 3.6 & 3.7: Escalation Window & Boundary Routing Model -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">DECISION (Step 3.6) &amp; FAILURE STATE (Step 3.7): 3/3/7-Day Escalation Chain &amp; Boundary Model</h3>
+                        <span class="badge badge-missing">Step 3.6 Escalation Timer MISSING</span>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--muted); margin-top: 0;">
+                        PostGIS enforces strict 3-tier spatial containment (Level 3 City -&gt; Level 2 County -&gt; Level 1 State), blocking out-of-region specialists (like Ethan Sibling Director in El Paso County) with <code>403 Forbidden</code>. However, no scheduled background job exists yet to auto-escalate unreviewed projects across the 3/3/7-day windows:
+                    </p>
+                    <div class="escalation-chain">
+                        <div class="escalation-tier">
+                            <strong>1. Local Specialist (Day 0)</strong>
+                            Clara City Lead (Denver Downtown Core) or Connie County Agent
+                        </div>
+                        <div class="escalation-tier">
+                            <strong>2. Stake / City Lead (+3 Days)</strong>
+                            Escalates if unreviewed after 72 hours (Not Implemented)
+                        </div>
+                        <div class="escalation-tier">
+                            <strong>3. County Director (+3 Days)</strong>
+                            Daniel County Director (Denver County Region)
+                        </div>
+                        <div class="escalation-tier">
+                            <strong>4. Area / State Lead (+3 Days)</strong>
+                            Rachel State Director (Colorado State Region)
+                        </div>
+                        <div class="escalation-tier">
+                            <strong>5. Headquarters (+7 Days)</strong>
+                            Sarah Admin (Global System Admin)
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =================================================================== -->
+    <!-- JOURNEY 4 UI: ORGANIZER MANAGE VOLUNTEERS & COMMUNICATIONS           -->
+    <!-- =================================================================== -->
+    <section class="journey-view hidden" id="view-journey-4">
+        <div class="app-layout-2col">
+            <!-- Left Column: Project & Specific Shift Filter + Volunteer Roster (Steps 4.1 & 4.2) -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Manage Volunteers &amp; Filter by Shift (Steps 4.1 &amp; 4.2)</h2>
+                    <span class="badge badge-missing">CUR-025 / ENH-040</span>
+                </div>
+                <div class="field-group">
+                    <label for="j4-project-id">Select Managed Project</label>
+                    <select id="j4-project-id" onchange="loadShiftsForJourney4()">
+                        <option value="e0000000-0000-0000-0000-000000000001">Downtown Denver Mall &amp; Civic Clean-Up</option>
+                        <option value="e0000000-0000-0000-0000-000000000003">Arapahoe County Food &amp; Relief Drive</option>
+                        <option value="e0000000-0000-0000-0000-000000000005">Pikes Peak &amp; Fountain Valley Pantry Distribution</option>
+                    </select>
+                </div>
+                <div class="field-group">
+                    <label for="j4-shift-id">DECISION (Step 4.2 / ENH-040): Filter Volunteers by Specific Shift Occurrence</label>
+                    <select id="j4-shift-id">
+                        <option value="f0000000-0000-0000-0000-000000000001">Shift f000...0001 (2026-12-05 16:00Z)</option>
+                        <option value="f0000000-0000-0000-0000-000000000002">Shift f000...0002 (2026-12-06 16:00Z)</option>
+                    </select>
+                </div>
+                <div class="btn-row">
+                    <button type="button" class="secondary" onclick="loadShiftsForJourney4()">Load Project Shifts (GET /shifts)</button>
+                    <button type="button" onclick="loadProjectVolunteerRoster()">Load Project Volunteers (Step 4.1)</button>
+                    <button type="button" class="warn" onclick="loadShiftVolunteerRoster()">Filter Roster by Shift (Step 4.2 / ENH-040)</button>
+                </div>
+
+                <table class="data-table" style="margin-top: 0.85rem;">
+                    <thead>
+                        <tr>
+                            <th>Volunteer</th>
+                            <th>Shift Occurrence</th>
+                            <th>Sign-Up Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="j4-roster-tbody">
+                        <tr>
+                            <td colspan="3" style="color: var(--muted);">Click "Load Project Volunteers" or "Filter Roster by Shift" to query the backend.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div id="j4-roster-banner"></div>
+            </div>
+
+            <!-- Right Column: Email Volunteers Composer (Step 4.3) & Cancel Project Modal (Steps 4.4 to 4.6) -->
+            <div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2 class="panel-title">Email Signed-Up Volunteers (Step 4.3)</h2>
+                        <span class="badge badge-missing">CUR-025</span>
+                    </div>
+                    <div class="form-grid">
+                        <div>
+                            <label for="j4-msg-recipient">Recipients</label>
+                            <select id="j4-msg-recipient">
+                                <option value="SELECTED_SHIFT">Volunteers in Selected Shift Only (ENH-040)</option>
+                                <option value="ALL_SHIFTS">All Upcoming Project Volunteers</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="j4-msg-subject">Message Subject</label>
+                            <input type="text" id="j4-msg-subject" value="Parking &amp; Check-In Instructions for Saturday">
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label for="j4-msg-body">Message to Volunteers</label>
+                        <textarea id="j4-msg-body" rows="2">Thank you for signing up! Please meet at the 16th Street Mall welcome kiosk 10 minutes before your shift begins.</textarea>
+                    </div>
+                    <button type="button" onclick="sendOrganizerVolunteerMessage()">Send Message to Volunteers (POST /projects/{id}/messages)</button>
+                    <div id="j4-message-banner"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2 class="panel-title">DECISION (Step 4.4) &amp; FAILURE STATE (Step 4.5): Cancel Project with Volunteer Notice</h2>
+                        <div class="btn-row">
+                            <span class="badge badge-partial">CUR-047</span>
+                            <span class="badge badge-failure">ENH-045</span>
+                        </div>
+                    </div>
+                    <div class="field-group">
+                        <label for="j4-cancel-project-id">Project UUID to Cancel (Tip: use a disposable project created in Journey 2)</label>
+                        <input type="text" class="mono" id="j4-cancel-project-id" placeholder="Enter Project UUID to delete/cancel">
+                    </div>
+                    <div class="field-group">
+                        <label for="j4-cancel-reason">Custom Cancellation Notice Emailed to Signed-Up Volunteers (CUR-047)</label>
+                        <input type="text" id="j4-cancel-reason" value="Project cancelled due to severe winter weather warning in Denver.">
+                    </div>
+                    <button type="button" class="danger" onclick="cancelProjectLive()">Cancel Project &amp; Notify Volunteers (DELETE /projects/{id})</button>
+                    <div id="j4-cancel-banner"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Docked Bottom Live HTTP & Spec Inspector -->
+<footer class="bottom-inspector" id="bottom-inspector">
+    <div class="inspector-bar">
+        <div class="btn-row">
+            <strong style="font-size: 0.82rem; color: var(--accent);">Live Backend Network &amp; Spec Inspector</strong>
+            <span style="font-size: 0.76rem; color: var(--muted);">Every UI action executes a real HTTP request against Kaiju and logs the exact result below.</span>
+        </div>
+        <div class="btn-row">
+            <button type="button" class="secondary" style="padding: 0.2rem 0.6rem; font-size: 0.74rem;" onclick="clearInspectorLogs()">Clear Log</button>
+            <button type="button" class="secondary" style="padding: 0.2rem 0.6rem; font-size: 0.74rem;" onclick="toggleInspectorHeight()">Minimize / Expand</button>
+        </div>
+    </div>
+    <div class="inspector-logs" id="inspector-log-list"></div>
+</footer>
+
+<script>
+    const state = {
+        personas: [],
+        activePersona: null,
+        jwtToken: "",
+        specReport: null,
+        activeJourneyNumber: 1,
+        lastSpatialSearchCards: [],
+        locationCoordsById: {},
+        searchViewMode: "LIST"
+    };
+
+    async function apiFetch(method, url, bodyObj = null) {
+        const start = performance.now();
+        const headers = { "Accept": "application/json" };
+        if (bodyObj !== null) {
+            headers["Content-Type"] = "application/json";
+        }
+        const currentToken = document.getElementById("jwt-token-input").value.trim();
+        if (currentToken.length > 0) {
+            headers["Authorization"] = "Bearer " + currentToken;
+        }
+        const options = { method, headers };
+        if (bodyObj !== null) {
+            options.body = JSON.stringify(bodyObj);
+        }
+
+        let status = 0;
+        let responseData = null;
+        try {
+            const response = await fetch(url, options);
+            status = response.status;
+            const rawText = await response.text();
+            if (rawText && rawText.trim().length > 0) {
+                try {
+                    responseData = JSON.parse(rawText);
+                } catch (_err) {
+                    responseData = rawText;
+                }
+            }
+        } catch (networkErr) {
+            status = 599;
+            responseData = { error: "Network error", details: String(networkErr) };
+        }
+        const elapsedMs = Math.round(performance.now() - start);
+        recordInspectorLog(method, url, status, elapsedMs, bodyObj, responseData);
+        return { status, data: responseData, elapsedMs };
+    }
+
+    function recordInspectorLog(method, url, status, elapsedMs, reqBody, respBody) {
+        const list = document.getElementById("inspector-log-list");
+        const item = document.createElement("div");
+        item.className = "log-entry";
+
+        let statusClass = "status-2xx";
+        if (status >= 500 || status === 0) {
+            statusClass = "status-5xx";
+        } else if (status >= 400) {
+            statusClass = "status-4xx";
+        }
+
+        const personaLabel = state.activePersona ? state.activePersona.email : "anonymous";
+        const timestamp = new Date().toISOString().substring(11, 19);
+        const formattedResp = typeof respBody === "string"
+            ? respBody
+            : JSON.stringify(respBody);
+
+        item.innerHTML =
+            "<div style=\"display:flex;justify-content:space-between;gap:0.5rem;\">" +
+                "<span><strong>" + escapeHtml(method) + "</strong> " + escapeHtml(url) + "</span>" +
+                "<span class=\"" + statusClass + "\">HTTP " + status + " (" + elapsedMs + "ms)</span>" +
+            "</div>" +
+            "<div style=\"color:#94a3b8;\">[" + timestamp + "] Persona: " + escapeHtml(personaLabel) + "</div>" +
+            (reqBody ? "<div style=\"color:#38bdf8;\">Req: " + escapeHtml(JSON.stringify(reqBody)) + "</div>" : "") +
+            "<div style=\"color:#cbd5e1;max-height:54px;overflow:auto;white-space:pre-wrap;\">" +
+                escapeHtml(formattedResp || "(empty body)") +
+            "</div>";
+        list.prepend(item);
+    }
+
+    function clearInspectorLogs() {
+        document.getElementById("inspector-log-list").innerHTML = "";
+    }
+
+    function toggleInspectorHeight() {
+        document.getElementById("bottom-inspector").classList.toggle("collapsed");
+    }
+
+    function toggleSpecChecklistDrawer() {
+        document.getElementById("spec-checklist-drawer").classList.toggle("hidden");
+    }
+
+    function escapeHtml(value) {
+        return String(value)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;");
+    }
+
+    function renderSpecBanner(targetElementId, level, badgeText, titleText, detailText, rawHttp = null) {
+        const el = document.getElementById(targetElementId);
+        if (!el) return;
+        let badgeClass = "badge-partial";
+        if (level === "ready") badgeClass = "badge-ready";
+        if (level === "missing") badgeClass = "badge-missing";
+
+        const rawBlock = rawHttp !== null
+            ? "<pre style=\"margin:0.45rem 0 0;padding:0.45rem;background:#070b14;border:1px solid var(--border);border-radius:0.3rem;font-family:var(--font-mono);font-size:0.74rem;max-height:140px;overflow:auto;white-space:pre-wrap;\">" +
+              escapeHtml(typeof rawHttp === "string" ? rawHttp : JSON.stringify(rawHttp, null, 2)) +
+              "</pre>"
+            : "";
+
+        el.innerHTML =
+            "<div class=\"spec-banner " + level + "\">" +
+                "<div class=\"spec-banner-title\">" +
+                    "<span class=\"badge " + badgeClass + "\">" + escapeHtml(badgeText) + "</span>" +
+                    "<span>" + escapeHtml(titleText) + "</span>" +
+                "</div>" +
+                "<div>" + escapeHtml(detailText) + "</div>" +
+                rawBlock +
+            "</div>";
+    }
+
+    async function initHarness() {
+        const [personasRes, journeysRes] = await Promise.all([
+            apiFetch("GET", "/harness/api/personas"),
+            apiFetch("GET", "/harness/api/journeys")
+        ]);
+
+        if (personasRes.status === 200 && Array.isArray(personasRes.data)) {
+            state.personas = personasRes.data;
+            renderPersonasSelect();
+        }
+        if (journeysRes.status === 200 && journeysRes.data) {
+            state.specReport = journeysRes.data;
+            renderScorecard();
+            renderActiveJourneySteps();
+        }
+    }
+
+    function renderPersonasSelect() {
+        const select = document.getElementById("persona-select");
+        select.innerHTML = "";
+        state.personas.forEach((persona, idx) => {
+            const opt = document.createElement("option");
+            opt.value = persona.email;
+            opt.textContent = persona.displayName + " [" + persona.systemRole + "]";
+            if (idx === 0) {
+                state.activePersona = persona;
+            }
+            select.appendChild(opt);
+        });
+        select.onchange = () => {
+            const chosen = state.personas.find(p => p.email === select.value);
+            if (chosen) {
+                state.activePersona = chosen;
+                updatePersonaDescriptionBox(chosen);
+            }
+        };
+    }
+
+    function updatePersonaDescriptionBox(persona) {
+        const box = document.getElementById("persona-description-box");
+        box.textContent =
+            persona.displayName +
+            " (" + persona.email + ") - " +
+            persona.description;
+    }
+
+    async function authenticateSelectedPersona() {
+        const email = document.getElementById("persona-select").value;
+        const chosen = state.personas.find(p => p.email === email) || null;
+        state.activePersona = chosen;
+
+        const res = await apiFetch("POST", "/harness/api/login", { email });
+        const badge = document.getElementById("active-auth-badge");
+        if (res.status === 200 && res.data) {
+            const token = res.data.token || "";
+            state.jwtToken = token;
+            document.getElementById("jwt-token-input").value = token;
+            if (res.data.authenticated) {
+                badge.textContent = "Signed In: " + res.data.email;
+                badge.className = "badge badge-ready";
+            } else {
+                badge.textContent = "Active: Anonymous Visitor (No Token)";
+                badge.className = "badge badge-step";
+            }
+            document.getElementById("persona-description-box").textContent = res.data.message;
+        } else {
+            badge.textContent = "Auth Error (HTTP " + res.status + ")";
+            badge.className = "badge badge-missing";
+            document.getElementById("persona-description-box").textContent =
+                "Authentik login failed: " + JSON.stringify(res.data);
+        }
+    }
+
+    function clearAuthToken() {
+        state.jwtToken = "";
+        document.getElementById("jwt-token-input").value = "";
+        document.getElementById("persona-select").value = "anonymous";
+        const anon = state.personas.find(p => p.email === "anonymous");
+        if (anon) {
+            state.activePersona = anon;
+            updatePersonaDescriptionBox(anon);
+        }
+        const badge = document.getElementById("active-auth-badge");
+        badge.textContent = "Active: Anonymous Visitor (No Token)";
+        badge.className = "badge badge-step";
+    }
+
+    async function probeCurrentUser() {
+        const res = await apiFetch("GET", "/users/me");
+        const box = document.getElementById("persona-description-box");
+        box.textContent = "GET /users/me -> HTTP " + res.status + ": " + JSON.stringify(res.data);
+    }
+
+    function renderScorecard() {
+        const report = state.specReport;
+        if (!report) return;
+        document.getElementById("spec-file-pill").textContent = report.specFile;
+        document.getElementById("metric-total").textContent = report.totalSteps;
+        document.getElementById("metric-ready").textContent = report.readyCount;
+        document.getElementById("metric-partial").textContent = report.partialCount;
+        document.getElementById("metric-missing").textContent = report.missingCount;
+    }
+
+    function selectJourneyTab(journeyNumber) {
+        state.activeJourneyNumber = journeyNumber;
+        document.querySelectorAll(".journey-tab").forEach(btn => {
+            btn.classList.toggle("active", Number(btn.getAttribute("data-journey")) === journeyNumber);
+        });
+        document.querySelectorAll(".journey-view").forEach(view => {
+            view.classList.toggle("hidden", view.id !== "view-journey-" + journeyNumber);
+        });
+        renderActiveJourneySteps();
+    }
+
+    function renderActiveJourneySteps() {
+        if (!state.specReport) return;
+        const journey = state.specReport.journeys.find(j => j.journeyNumber === state.activeJourneyNumber);
+        if (!journey) return;
+
+        document.getElementById("active-journey-heading").textContent = journey.title;
+        document.getElementById("active-journey-summary").textContent = journey.summary;
+        document.getElementById("active-journey-counts").textContent =
+            journey.totalSteps + " Steps (" + journey.readyCount + " Ready, " + journey.partialCount + " Partial, " + journey.missingCount + " Missing)";
+
+        const statusFilter = document.getElementById("filter-status").value;
+        const typeFilter = document.getElementById("filter-type").value;
+        const container = document.getElementById("journey-steps-container");
+        container.innerHTML = "";
+
+        const filtered = journey.steps.filter(step => {
+            const matchesStatus = statusFilter === "ALL" || step.status === statusFilter;
+            const matchesType = typeFilter === "ALL" || step.stepType === typeFilter;
+            return matchesStatus && matchesType;
+        });
+
+        filtered.forEach(step => {
+            const card = document.createElement("div");
+            card.className = "step-card status-" + step.status;
+
+            let statusBadgeClass = "badge-partial";
+            if (step.status === "READY") statusBadgeClass = "badge-ready";
+            if (step.status === "MISSING") statusBadgeClass = "badge-missing";
+
+            let typeBadgeClass = "badge-step";
+            if (step.stepType === "DECISION") typeBadgeClass = "badge-decision";
+            if (step.stepType === "FAILURE_STATE") typeBadgeClass = "badge-failure";
+
+            const specBadges = (step.specRefs || [])
+                .map(ref => "<span class=\"badge badge-spec\">" + escapeHtml(ref) + "</span>")
+                .join(" ");
+
+            card.innerHTML =
+                "<div class=\"step-top\">" +
+                    "<div class=\"step-title\">Step " + escapeHtml(step.stepId) + ": " + escapeHtml(step.title) + "</div>" +
+                    "<div class=\"btn-row\">" +
+                        "<span class=\"badge " + typeBadgeClass + "\">" + escapeHtml(step.stepType) + "</span>" +
+                        specBadges +
+                        "<span class=\"badge " + statusBadgeClass + "\">" + escapeHtml(step.status) + "</span>" +
+                        "<code style=\"font-size:0.75rem;color:var(--accent);\">" + escapeHtml(step.endpoint) + "</code>" +
+                    "</div>" +
+                "</div>" +
+                "<p class=\"step-assessment\">" + escapeHtml(step.honestAssessment) + "</p>";
+            container.appendChild(card);
+        });
+    }
+
+    // =========================================================================
+    // JOURNEY 1 FLOWS
+    // =========================================================================
+    function switchJ1Screen(screen) {
+        document.getElementById("j1-sub-discover-btn").classList.toggle("active", screen === "DISCOVER");
+        document.getElementById("j1-sub-dashboard-btn").classList.toggle("active", screen === "DASHBOARD");
+        document.getElementById("j1-screen-discover").classList.toggle("hidden", screen !== "DISCOVER");
+        document.getElementById("j1-screen-dashboard").classList.toggle("hidden", screen !== "DASHBOARD");
+        if (screen === "DASHBOARD") {
+            loadVolunteerDashboard();
+        }
+    }
+
+    function setSpatialPreset(label, lat, lon, radius) {
+        document.getElementById("j1-city-zip").value = label;
+        document.getElementById("j1-lat").value = lat;
+        document.getElementById("j1-lon").value = lon;
+        document.getElementById("j1-radius").value = radius;
+        runSpatialSearch();
+    }
+
+    async function runSpatialSearch() {
+        const lat = document.getElementById("j1-lat").value;
+        const lon = document.getElementById("j1-lon").value;
+        const radius = document.getElementById("j1-radius").value;
+        const url = "/projects/search-by-location?latitude=" + encodeURIComponent(lat) +
+            "&longitude=" + encodeURIComponent(lon) +
+            "&radiusMeters=" + encodeURIComponent(radius);
+        const res = await apiFetch("GET", url);
+
+        if (res.status === 401) {
+            state.lastSpatialSearchCards = [];
+            renderProjectCards([]);
+            renderSpecBanner(
+                "j1-discovery-banner",
+                "partial",
+                "Step 1.1 & 1.2 PARTIAL (CUR-001) - HTTP 401 Unauthorized",
+                "Anonymous Discovery Blocked by @Secured(IS_AUTHENTICATED)",
+                "05-key-user-journeys.adoc Step 1.1 states: 'Volunteer lands on the home page or /projects, signed in or not (CUR-001).' Currently ProjectController requires authentication on all routes. Sign in as Victor Volunteer in the top bar and click Search again.",
+                res.data
+            );
+            return;
+        }
+
+        const cards = (res.status === 200 && res.data && Array.isArray(res.data.content)) ? res.data.content : [];
+        state.lastSpatialSearchCards = cards;
+        renderProjectCards(cards);
+        renderSpatialMapSvg();
+
+        renderSpecBanner(
+            "j1-discovery-banner",
+            "partial",
+            "Step 1.2 PARTIAL (CUR-001) - HTTP " + res.status,
+            "PostGIS Spatial Search Returned " + cards.length + " Active Project(s)",
+            "GET /projects/search-by-location orders results by PostGIS ST_Distance within radiusMeters. Note: IP geolocation and city/ZIP text geocoding ('" + document.getElementById("j1-city-zip").value + "') are not implemented on the server.",
+            res.data
+        );
+    }
+
+    async function probeGetProjects() {
+        const title = document.getElementById("j1-title-filter").value.trim();
+        const url = title ? "/projects?title=" + encodeURIComponent(title) : "/projects";
+        const res = await apiFetch("GET", url);
+
+        if (res.status === 401) {
+            renderProjectCards([]);
+            renderSpecBanner(
+                "j1-discovery-banner",
+                "partial",
+                "Step 1.1 PARTIAL (CUR-001) - HTTP 401 Unauthorized",
+                "Anonymous Visitor Rejected on GET /projects",
+                "ProjectController is annotated with @Secured(IS_AUTHENTICATED), so unauthenticated visitors cannot browse /projects. Sign in as Victor Volunteer or Jenny Niu above to load projects.",
+                res.data
+            );
+            return;
+        }
+
+        const projects = (res.status === 200 && res.data && Array.isArray(res.data.content)) ? res.data.content : [];
+        const mappedCards = projects.map(p => ({
+            projectId: p.id,
+            projectTitle: p.title,
+            locationId: null,
+            locationName: p.organization ? p.organization.name : "Sponsoring Organization",
+            nextShiftStart: p.status
+        }));
+        state.lastSpatialSearchCards = mappedCards;
+        renderProjectCards(mappedCards);
+
+        renderSpecBanner(
+            "j1-discovery-banner",
+            "ready",
+            "GET /projects -> HTTP " + res.status,
+            "Loaded " + projects.length + " Project(s) from CursoredPage",
+            "Click any project card below to open its full detail view and shift occurrences.",
+            res.data
+        );
+    }
+
+    async function applyJourney1Filters() {
+        const title = document.getElementById("j1-title-filter").value.trim();
+        const dateVal = document.getElementById("j1-filter-date").value;
+        const dayVal = document.getElementById("j1-filter-day").value;
+        const timeVal = document.getElementById("j1-filter-time").value;
+        const skillVal = document.getElementById("j1-filter-skill").value;
+
+        const queryParts = [];
+        if (title) queryParts.push("title=" + encodeURIComponent(title));
+        if (dateVal) queryParts.push("date=" + encodeURIComponent(dateVal));
+        if (dayVal) queryParts.push("dayOfWeek=" + encodeURIComponent(dayVal));
+        if (timeVal) queryParts.push("timeOfDay=" + encodeURIComponent(timeVal));
+        if (skillVal) queryParts.push("attribute=" + encodeURIComponent(skillVal));
+
+        const url = "/projects" + (queryParts.length > 0 ? "?" + queryParts.join("&") : "");
+        const res = await apiFetch("GET", url);
+
+        renderSpecBanner(
+            "j1-filter-banner",
+            "partial",
+            "Step 1.3 PARTIAL (CUR-003) - HTTP " + res.status,
+            "Filter Assessment: Only Exact Title Filter Is Implemented",
+            "UI sent " + url + ". ProjectController.getProjects only binds @Nullable String title. Date, dayOfWeek, timeOfDay, attributes, interests, and skills query parameters are ignored by the backend.",
+            res.data
+        );
+    }
+
+    async function probeGetTags() {
+        const res = await apiFetch("GET", "/tags");
+        renderSpecBanner(
+            "j1-filter-banner",
+            res.status === 200 ? "ready" : "partial",
+            "GET /tags -> HTTP " + res.status,
+            "Loaded Shift Tags",
+            "Tags exist in the database and can be attached to shifts, but GET /projects has no tag filter parameter.",
+            res.data
+        );
+    }
+
+    function renderProjectCards(cards) {
+        const container = document.getElementById("j1-list-container");
+        document.getElementById("j1-results-count").textContent = cards.length + " project(s)";
+        if (cards.length === 0) {
+            container.innerHTML = "<div style=\"color: var(--muted); font-size: 0.84rem;\">No projects displayed. Authenticate a persona and run Search or Browse All Projects.</div>";
+            return;
+        }
+        container.innerHTML = cards.map(card =>
+            "<div class=\"project-card\">" +
+                "<div>" +
+                    "<div class=\"btn-row\" style=\"justify-content:space-between;margin-bottom:0.35rem;\">" +
+                        "<span class=\"badge badge-spec\">" + escapeHtml(card.locationName || "Project") + "</span>" +
+                        "<span style=\"font-size:0.74rem;color:var(--muted);\">" + escapeHtml(card.nextShiftStart || "") + "</span>" +
+                    "</div>" +
+                    "<h4>" + escapeHtml(card.projectTitle) + "</h4>" +
+                    "<div class=\"project-card-meta\">Project ID: <code>" + escapeHtml(card.projectId) + "</code></div>" +
+                "</div>" +
+                "<div class=\"btn-row\">" +
+                    "<button type=\"button\" onclick=\"openProjectFromCard('" + escapeHtml(card.projectId) + "')\">View Project &amp; Shifts (CUR-010)</button>" +
+                "</div>" +
+            "</div>"
+        ).join("");
+    }
+
+    function openProjectFromCard(projectId) {
+        const sel = document.getElementById("j1-project-id");
+        if (![...sel.options].some(o => o.value === projectId)) {
+            const opt = document.createElement("option");
+            opt.value = projectId;
+            opt.textContent = projectId;
+            sel.appendChild(opt);
+        }
+        sel.value = projectId;
+        inspectProjectAndShifts();
+    }
+
+    function toggleSearchView(mode) {
+        state.searchViewMode = mode;
+        document.getElementById("j1-list-container").classList.toggle("hidden", mode === "MAP");
+        document.getElementById("j1-map-container").classList.toggle("hidden", mode !== "MAP");
+        if (mode === "MAP") {
+            renderSpatialMapSvg();
+        }
+    }
+
+    async function enrichSearchCoordinates() {
+        for (const card of state.lastSpatialSearchCards) {
+            if (card.locationId && !state.locationCoordsById[card.locationId]) {
+                const locRes = await apiFetch("GET", "/locations/" + card.locationId);
+                if (locRes.status === 200 && locRes.data && locRes.data.geom) {
+                    state.locationCoordsById[card.locationId] = locRes.data.geom.coordinates;
+                }
+            }
+        }
+        renderSpatialMapSvg();
+    }
+
+    function renderSpatialMapSvg() {
+        const svg = document.getElementById("j1-map-svg");
+        const legend = document.getElementById("j1-map-legend");
+        const cards = state.lastSpatialSearchCards;
+        if (!cards || cards.length === 0) {
+            svg.innerHTML = "<text x=\"300\" y=\"130\" fill=\"#94a3b8\" text-anchor=\"middle\" font-size=\"13\">Run a spatial search first to plot results on the map.</text>";
+            legend.textContent = "0 results to plot.";
+            return;
+        }
+        let pinsSvg = "";
+        cards.forEach((card, idx) => {
+            const coords = card.locationId ? state.locationCoordsById[card.locationId] : null;
+            const x = coords ? Math.min(560, Math.max(40, Math.round((coords[0] + 105.3) * 520))) : (110 + idx * 115);
+            const y = coords ? Math.min(220, Math.max(35, Math.round((40.1 - coords[1]) * 160))) : 125;
+            const label = coords ? (coords[1].toFixed(3) + ", " + coords[0].toFixed(3)) : "No coords in ProjectSearchCard";
+            pinsSvg +=
+                "<g style=\"cursor:pointer\" onclick=\"openProjectFromCard('" + escapeHtml(card.projectId) + "')\">" +
+                    "<circle cx=\"" + x + "\" cy=\"" + y + "\" r=\"10\" fill=\"#38bdf8\" stroke=\"#0f172a\" stroke-width=\"2\"/>" +
+                    "<text x=\"" + x + "\" y=\"" + (y - 15) + "\" fill=\"#f8fafc\" text-anchor=\"middle\" font-size=\"11\" font-weight=\"bold\">" +
+                        escapeHtml(card.projectTitle.substring(0, 22)) +
+                    "</text>" +
+                    "<text x=\"" + x + "\" y=\"" + (y + 24) + "\" fill=\"#f59e0b\" text-anchor=\"middle\" font-size=\"10\">" +
+                        escapeHtml(label) +
+                    "</text>" +
+                "</g>";
+        });
+        svg.innerHTML = pinsSvg;
+        legend.textContent =
+            "Plotting " + cards.length + " project(s) from the active search result set. Note: ProjectSearchCard omits latitude/longitude, requiring GET /locations/{id} to place pins accurately (CUR-002 PARTIAL).";
+    }
+
+    async function inspectProjectAndShifts() {
+        const projectId = document.getElementById("j1-project-id").value;
+        const [projRes, shiftsRes] = await Promise.all([
+            apiFetch("GET", "/projects/" + projectId),
+            apiFetch("GET", "/shifts")
+        ]);
+
+        const detailDiv = document.getElementById("j1-project-detail-view");
+        if (projRes.status !== 200 || !projRes.data) {
+            detailDiv.innerHTML = "<div class=\"spec-banner missing\">GET /projects/" + escapeHtml(projectId) + " returned HTTP " + projRes.status + "</div>";
+            return;
+        }
+
+        const p = projRes.data;
+        let matchingShifts = [];
+        if (shiftsRes.status === 200 && shiftsRes.data && Array.isArray(shiftsRes.data.content)) {
+            matchingShifts = shiftsRes.data.content.filter(s => s.project && s.project.id === projectId);
+        }
+
+        const shiftSelect = document.getElementById("j1-shift-select");
+        if (matchingShifts.length > 0) {
+            shiftSelect.innerHTML = matchingShifts.map(s =>
+                "<option value=\"" + escapeHtml(s.id) + "\">" +
+                    escapeHtml(s.startTime) + " to " + escapeHtml(s.endTime) +
+                    " | " + (s.isVirtual ? "Virtual" : (s.location ? escapeHtml(s.location.name) : "In-Person")) +
+                    " (Capacity field omitted on Shift DTO - CUR-020 Gap)" +
+                "</option>"
+            ).join("");
+        }
+
+        const reviewBanner = p.status === "PENDING"
+            ? "<div class=\"spec-banner partial\"><div class=\"spec-banner-title\"><span class=\"badge badge-partial\">CUR-018</span><span>Project Under Review Banner</span></div><div>This project is in PENDING status awaiting specialist review.</div></div>"
+            : "";
+
+        detailDiv.innerHTML =
+            reviewBanner +
+            "<div style=\"background:var(--surface-dark);border:1px solid var(--border);border-radius:0.4rem;padding:0.85rem;\">" +
+                "<div class=\"btn-row\" style=\"justify-content:space-between;\">" +
+                    "<h4 style=\"margin:0;font-size:1rem;\">" + escapeHtml(p.title) + "</h4>" +
+                    "<span class=\"badge badge-spec\">Status: " + escapeHtml(p.status) + " | Type: " + escapeHtml(p.projectType) + "</span>" +
+                "</div>" +
+                "<p style=\"font-size:0.84rem;color:#cbd5e1;margin:0.45rem 0;\">" + escapeHtml(p.description) + "</p>" +
+                "<div style=\"font-size:0.79rem;color:var(--muted);\">" +
+                    "Sponsoring Org: <strong>" + escapeHtml(p.organization ? p.organization.name : "N/A") + "</strong> | " +
+                    "Managing Region: <strong>" + escapeHtml(p.managingRegion ? p.managingRegion.name : "Unassigned") + "</strong> | " +
+                    "Matching Shifts (filtered client-side from GET /shifts): <strong>" + matchingShifts.length + "</strong>" +
+                "</div>" +
+                "<div style=\"font-size:0.77rem;color:var(--partial);margin-top:0.35rem;\">" +
+                    "Step 1.5 (CUR-010) Gap Note: Point of contact details and project-level attribute badges are not present on the Project response." +
+                "</div>" +
+            "</div>";
+    }
+
+    async function clickVolunteerButton() {
+        const shiftId = document.getElementById("j1-shift-select").value;
+        const currentToken = document.getElementById("jwt-token-input").value.trim();
+        if (!currentToken) {
+            renderSpecBanner(
+                "j1-signup-banner",
+                "partial",
+                "Step 1.8 (CUR-033 / CUR-034) - Sign-In Prompted",
+                "Volunteer Clicked While Not Signed In",
+                "Per Step 1.8: 'Volunteer clicks Volunteer; if not signed in, is prompted to sign in or register.' Select Victor Volunteer or Jenny Niu in the top bar and click 'Sign In as Persona', then click Volunteer again."
+            );
+            return;
+        }
+        const res = await apiFetch("POST", "/shift-signups", { shiftId });
+        renderSpecBanner(
+            "j1-signup-banner",
+            "missing",
+            "Step 1.8 MISSING (CUR-033 / CUR-046) - HTTP " + res.status,
+            "POST /shift-signups Is Not Implemented on Main",
+            "The UI sent POST /shift-signups for shift " + shiftId + ". While the shift_signups table exists in PostgreSQL (01-schema.sql), no ShiftSignup entity, repository, service, or controller endpoint exists in Java, and no organizer confirmation email (CUR-046) is sent.",
+            res.data
+        );
+    }
+
+    async function simulateCapacityCheck() {
+        const shiftId = document.getElementById("j1-shift-select").value;
+        const res = await apiFetch("GET", "/shifts/" + shiftId);
+        renderSpecBanner(
+            "j1-signup-banner",
+            "missing",
+            "Step 1.7 FAILURE STATE MISSING (CUR-020 / ENH-015 / ENH-061)",
+            "Shift Capacity Field & Capacity Enforcement Missing in Java Layer",
+            "GET /shifts/" + shiftId + " returned HTTP " + res.status + ". Inspect the JSON below: although PostgreSQL defines shifts.capacity (INTEGER), the Java Shift record omits capacity and no sign-up capacity guard exists.",
+            res.data
+        );
+    }
+
+    async function exportShiftCalendar() {
+        const shiftId = document.getElementById("j1-shift-select").value;
+        const res = await apiFetch("GET", "/shifts/" + shiftId + "/calendar");
+        renderSpecBanner(
+            "j1-signup-banner",
+            "missing",
+            "Step 1.9 MISSING (CUR-024) - HTTP " + res.status,
+            "Personal Calendar Export (.ics) Endpoint Not Implemented",
+            "The UI requested GET /shifts/" + shiftId + "/calendar. Kaiju has no iCal/ICS export endpoint for shifts.",
+            res.data
+        );
+    }
+
+    async function loadVolunteerDashboard() {
+        const [meRes, commitmentsRes] = await Promise.all([
+            apiFetch("GET", "/users/me"),
+            apiFetch("GET", "/users/me/commitments")
+        ]);
+        renderSpecBanner(
+            "j1-dashboard-banner",
+            "missing",
+            "Step 1.10 MISSING (CUR-022) - GET /users/me (" + meRes.status + ") | GET /users/me/commitments (" + commitmentsRes.status + ")",
+            "My Dashboard -> Upcoming Commitments Endpoint Not Built",
+            "GET /users/me returns the signed-in user's profile, but GET /users/me/commitments returns HTTP " + commitmentsRes.status + " because volunteer shift sign-up persistence and queries are not yet implemented.",
+            { currentUser: meRes.data, commitmentsResponse: commitmentsRes.data }
+        );
+    }
+
+    async function clickUnvolunteerButton() {
+        const shiftId = document.getElementById("j1-shift-select").value;
+        const res = await apiFetch("DELETE", "/shift-signups/" + shiftId);
+        renderSpecBanner(
+            "j1-dashboard-banner",
+            "missing",
+            "Steps 1.11 & 1.12 MISSING (CUR-021 / ENH-021) - HTTP " + res.status,
+            "Unvolunteer Cancellation & Capacity Restoration Not Implemented",
+            "The UI sent DELETE /shift-signups/" + shiftId + ". No endpoint exists to cancel a volunteer sign-up, restore shift capacity, or return explicit cancellation confirmation.",
+            res.data
+        );
+    }
+
+    // =========================================================================
+    // JOURNEY 2 FLOWS
+    // =========================================================================
+    function switchJ2Screen(screen) {
+        document.getElementById("j2-sub-contact-btn").classList.toggle("active", screen === "CONTACT");
+        document.getElementById("j2-sub-onboard-btn").classList.toggle("active", screen === "ONBOARD");
+        document.getElementById("j2-sub-wizard-btn").classList.toggle("active", screen === "WIZARD");
+        document.getElementById("j2-screen-contact").classList.toggle("hidden", screen !== "CONTACT");
+        document.getElementById("j2-screen-onboard").classList.toggle("hidden", screen !== "ONBOARD");
+        document.getElementById("j2-screen-wizard").classList.toggle("hidden", screen !== "WIZARD");
+    }
+
+    async function submitContactReferralForm() {
+        const payload = {
+            organizationName: document.getElementById("j2-ref-org").value,
+            contactName: document.getElementById("j2-ref-contact").value,
+            email: document.getElementById("j2-ref-email").value,
+            postalCode: document.getElementById("j2-ref-zip").value
+        };
+        const res = await apiFetch("POST", "/contact", payload);
+        renderSpecBanner(
+            "j2-contact-banner",
+            "missing",
+            "Step 2.1 MISSING (CUR-052) - HTTP " + res.status,
+            "Prospective Organization /contact Referral Endpoint Not Implemented",
+            "The UI submitted the referral request to POST /contact. Neither /content/add-an-organization nor POST /contact exists on main.",
+            res.data
+        );
+    }
+
+    async function probeContentAddOrgPage() {
+        const res = await apiFetch("GET", "/content/add-an-organization");
+        renderSpecBanner(
+            "j2-contact-banner",
+            "missing",
+            "Step 2.1 MISSING (CUR-052) - HTTP " + res.status,
+            "GET /content/add-an-organization Not Found",
+            "Static or dynamic onboarding content page is not implemented.",
+            res.data
+        );
+    }
+
+    async function createOrganizationLive() {
+        const payload = {
+            name: document.getElementById("j2-org-name").value,
+            websiteUrl: document.getElementById("j2-org-url").value,
+            parentId: null,
+            isPublic: true
+        };
+        const res = await apiFetch("POST", "/organizations", payload);
+        if (res.status === 200 && res.data && res.data.id) {
+            document.getElementById("j2-orguser-orgid").value = res.data.id;
+            document.getElementById("j2-proj-org").value = res.data.id;
+        }
+        renderSpecBanner(
+            "j2-org-banner",
+            res.status === 200 ? "partial" : "missing",
+            "Step 2.2 PARTIAL (CUR-026) - HTTP " + res.status,
+            res.status === 200
+                ? "Organization Created (ID: " + res.data.id + ") with Partial Spec Fields"
+                : "POST /organizations Failed (Ensure you are signed in)",
+            "Kaiju persisted name, websiteUrl, isPublic, and verificationStatus=UNVERIFIED. However, permanent URL slug ('" +
+            document.getElementById("j2-org-slug").value + "'), description, verified street address, and contact details are missing from CreateOrganizationCommand.",
+            res.data
+        );
+    }
+
+    async function grantOrgRoleLive() {
+        const payload = {
+            organizationId: document.getElementById("j2-orguser-orgid").value.trim(),
+            userId: document.getElementById("j2-orguser-userid").value.trim(),
+            role: document.getElementById("j2-orguser-role").value
+        };
+        const res = await apiFetch("POST", "/organization-users", payload);
+        renderSpecBanner(
+            "j2-orguser-banner",
+            res.status === 200 ? "ready" : "partial",
+            "Step 2.3 READY / Step 2.4 PARTIAL (CUR-027) - HTTP " + res.status,
+            res.status === 200
+                ? "Granted " + payload.role + " to User " + payload.userId
+                : "POST /organization-users Returned HTTP " + res.status + " (Sign in as Leo Local Admin or Sarah Admin)",
+            "Step 2.3 (granting ORG_ADMIN) works and enforces organization admin authority. Step 2.4 (DECISION: automatically designating the sole admin as Lead Organization Admin) is PARTIAL because OrganizationUserRole has no LEAD_ORG_ADMIN distinction.",
+            res.data
+        );
+    }
+
+    async function listOrgUsersLive() {
+        const res = await apiFetch("GET", "/organization-users");
+        renderSpecBanner(
+            "j2-orguser-banner",
+            res.status === 200 ? "ready" : "partial",
+            "GET /organization-users -> HTTP " + res.status,
+            "Organization User Bindings",
+            "Lists user-to-organization role assignments.",
+            res.data
+        );
+    }
+
+    function selectWizardStep(stepNum) {
+        document.querySelectorAll(".wizard-step-btn").forEach(btn => {
+            btn.classList.toggle("active", Number(btn.getAttribute("data-wstep")) === stepNum);
+        });
+        document.querySelectorAll(".wizard-pane").forEach(pane => {
+            pane.classList.toggle("hidden", pane.id !== "wizard-pane-" + stepNum);
+        });
+    }
+
+    async function probeSaveProjectTemplate() {
+        const res = await apiFetch("POST", "/project-templates", {
+            title: document.getElementById("j2-proj-title").value,
+            organizationId: document.getElementById("j2-proj-org").value.trim()
+        });
+        renderSpecBanner(
+            "j2-wizard-banner",
+            "missing",
+            "Step 2.8 PARTIAL (CUR-015) - HTTP " + res.status,
+            "Save Project as Reusable Template Not Implemented",
+            "Linking a project to an organization (CUR-032) works via organizationId, but saving a project as a template for reuse (CUR-015) has no backend endpoint.",
+            res.data
+        );
+    }
+
+    async function submitProjectWizardLive() {
+        const lat = parseFloat(document.getElementById("j2-proj-lat").value);
+        const lon = parseFloat(document.getElementById("j2-proj-lon").value);
+        const regionVal = document.getElementById("j2-proj-region").value.trim();
+        const payload = {
+            organizationId: document.getElementById("j2-proj-org").value.trim(),
+            managingRegionId: regionVal.length > 0 ? regionVal : null,
+            title: document.getElementById("j2-proj-title").value,
+            description: document.getElementById("j2-proj-desc").value,
+            projectType: document.getElementById("j2-proj-type").value,
+            locations: [
+                {
+                    name: document.getElementById("j2-loc-name").value,
+                    addressLine: document.getElementById("j2-loc-addr").value,
+                    city: document.getElementById("j2-loc-city").value,
+                    stateProvince: "CO",
+                    postalCode: document.getElementById("j2-loc-zip").value,
+                    countryCode: "US",
+                    latitude: lat,
+                    longitude: lon
+                }
+            ],
+            boundaries: [
+                {
+                    name: "Wizard Service Boundary",
+                    coordinates: [
+                        { latitude: lat - 0.005, longitude: lon - 0.005 },
+                        { latitude: lat - 0.005, longitude: lon + 0.005 },
+                        { latitude: lat + 0.005, longitude: lon + 0.005 },
+                        { latitude: lat + 0.005, longitude: lon - 0.005 },
+                        { latitude: lat - 0.005, longitude: lon - 0.005 }
+                    ]
+                }
+            ]
+        };
+        const res = await apiFetch("POST", "/projects", payload);
+        if (res.status === 200 && res.data && res.data.id) {
+            document.getElementById("j2-created-project-id").value = res.data.id;
+            document.getElementById("j3-target-project-id").value = res.data.id;
+            document.getElementById("j4-cancel-project-id").value = res.data.id;
+        }
+        renderSpecBanner(
+            "j2-wizard-banner",
+            res.status === 200 ? "ready" : "partial",
+            "Step 2.5 & 2.7 (CUR-011 / CUR-018) - HTTP " + res.status,
+            res.status === 200
+                ? "Project Published with Initial Status: " + res.data.status + " (ID: " + res.data.id + ")"
+                : "Project Submission Returned HTTP " + res.status,
+            res.status === 200
+                ? "ProjectSecurityService evaluated the caller's role and region containment to assign status=" + res.data.status + ". Click 'Check Under-Review & Public Search Visibility' to test Step 2.7 & 2.9."
+                : "Sign in as Leo Local Admin (or Victor Volunteer) and submit again.",
+            res.data
+        );
+    }
+
+    async function testEnh007ValidationFailure() {
+        const invalidPayload = {
+            organizationId: document.getElementById("j2-proj-org").value.trim(),
+            title: "",
+            description: "Too short",
+            projectType: "STANDARD",
+            locations: [],
+            boundaries: []
+        };
+        const res = await apiFetch("POST", "/projects", invalidPayload);
+        renderSpecBanner(
+            "j2-wizard-banner",
+            res.status === 400 ? "ready" : "partial",
+            "Step 2.6 FAILURE STATE READY (ENH-007) - HTTP " + res.status,
+            "Actionable Field Validation Errors Returned (Zero Generic 500 Errors)",
+            "Sent invalid project payload (blank title, description under 20 chars, empty boundaries). Kaiju returned HTTP " + res.status + " with specific validation messages.",
+            res.data
+        );
+    }
+
+    async function probeUnderReviewVisibility() {
+        const projectId = document.getElementById("j2-created-project-id").value.trim() || "e0000000-0000-0000-0000-000000000001";
+        const [projRes, searchRes] = await Promise.all([
+            apiFetch("GET", "/projects/" + projectId),
+            apiFetch("GET", "/projects/search-by-location?latitude=39.7392&longitude=-104.9928&radiusMeters=50000")
+        ]);
+        const inSearch = searchRes.status === 200 &&
+            searchRes.data &&
+            Array.isArray(searchRes.data.content) &&
+            searchRes.data.content.some(c => c.projectId === projectId);
+        const statusStr = (projRes.data && projRes.data.status) ? projRes.data.status : ("HTTP " + projRes.status);
+        renderSpecBanner(
+            "j2-wizard-banner",
+            "partial",
+            "Steps 2.7 & 2.9 PARTIAL (CUR-018) - Project Status: " + statusStr,
+            "Visible in Spatial Search? " + inSearch,
+            "Spec Step 2.7 states: 'Project publishes immediately in a Project Under Review state - it is live and volunteer-signup-able before a specialist has approved it (CUR-018).' In Kaiju, ProjectRepository.searchByLocation filters strictly by WHERE p.status = 'ACTIVE' AND upcoming shifts, so PENDING projects are hidden from location discovery until approved.",
+            { project: projRes.data, foundInLocationSearch: inSearch }
+        );
+    }
+
+    // =========================================================================
+    // JOURNEY 3 FLOWS
+    // =========================================================================
+    async function seedPendingProjectForReview() {
+        const payload = {
+            organizationId: "b0000000-0000-0000-0000-000000000006",
+            managingRegionId: "a0000000-0000-0000-0000-000000000002",
+            title: "Pending Review Denver Pantry Project " + new Date().toISOString().substring(11, 19),
+            description: "Submitted by an unverified grassroots co-op in Downtown Denver so it enters PENDING status for specialist review.",
+            projectType: "STANDARD",
+            locations: [
+                {
+                    name: "Denver Civic Center Review Point",
+                    addressLine: "1437 Bannock St",
+                    city: "Denver",
+                    stateProvince: "CO",
+                    postalCode: "80202",
+                    countryCode: "US",
+                    latitude: 39.7392,
+                    longitude: -104.9928
+                }
+            ],
+            boundaries: [
+                {
+                    name: "Civic Center Boundary",
+                    coordinates: [
+                        { latitude: 39.735, longitude: -104.998 },
+                        { latitude: 39.735, longitude: -104.988 },
+                        { latitude: 39.744, longitude: -104.988 },
+                        { latitude: 39.744, longitude: -104.998 },
+                        { latitude: 39.735, longitude: -104.998 }
+                    ]
+                }
+            ]
+        };
+        const res = await apiFetch("POST", "/projects", payload);
+        if (res.status === 200 && res.data && res.data.id) {
+            document.getElementById("j3-target-project-id").value = res.data.id;
+            document.getElementById("j3-edit-title").value = res.data.title;
+            document.getElementById("j4-cancel-project-id").value = res.data.id;
+            await loadPendingQueueClientSide();
+        } else {
+            renderSpecBanner(
+                "j3-approval-banner",
+                "partial",
+                "POST /projects -> HTTP " + res.status,
+                "Could Not Seed Pending Project",
+                "Sign in as any authenticated persona (e.g. Victor Volunteer or Daniel County Director) and click '+ Seed PENDING Denver Project' again.",
+                res.data
+            );
+        }
+    }
+
+    async function loadPendingQueueClientSide() {
+        const res = await apiFetch("GET", "/projects");
+        const queueEl = document.getElementById("j3-queue-list");
+        if (res.status !== 200 || !res.data || !Array.isArray(res.data.content)) {
+            queueEl.innerHTML = "<div class=\"spec-banner missing\">GET /projects returned HTTP " + res.status + ". Sign in to view the queue.</div>";
+            return;
+        }
+        const allProjects = res.data.content;
+        const pendingProjects = allProjects.filter(p => p.status === "PENDING" || p.status === "PENDING_UPDATE");
+        if (pendingProjects.length > 0) {
+            document.getElementById("j3-target-project-id").value = pendingProjects[0].id;
+            document.getElementById("j3-edit-title").value = pendingProjects[0].title;
+        }
+
+        const listToRender = pendingProjects.length > 0 ? pendingProjects : allProjects;
+        queueEl.innerHTML =
+            "<div style=\"font-size:0.77rem;color:var(--partial);\">" +
+                "Loaded " + allProjects.length + " total project(s), " + pendingProjects.length + " PENDING (filtered client-side; GET /projects lacks ?status=PENDING filter)." +
+            "</div>" +
+            listToRender.map(p =>
+                "<div class=\"step-card status-" + (p.status === "PENDING" ? "PARTIAL" : "READY") + "\" style=\"cursor:pointer;\" onclick=\"selectProjectForReview('" + escapeHtml(p.id) + "', '" + escapeHtml(p.title) + "')\">" +
+                    "<div style=\"display:flex;justify-content:space-between;gap:0.4rem;\">" +
+                        "<strong style=\"font-size:0.82rem;\">" + escapeHtml(p.title) + "</strong>" +
+                        "<span class=\"badge badge-spec\">" + escapeHtml(p.status) + "</span>" +
+                    "</div>" +
+                    "<div style=\"font-size:0.74rem;color:var(--muted);\">ID: <code>" + escapeHtml(p.id) + "</code></div>" +
+                "</div>"
+            ).join("");
+    }
+
+    function selectProjectForReview(id, title) {
+        document.getElementById("j3-target-project-id").value = id;
+        document.getElementById("j3-edit-title").value = title;
+    }
+
+    async function specialistEditProjectLive() {
+        const projectId = document.getElementById("j3-target-project-id").value.trim();
+        const payload = {
+            organizationId: "b0000000-0000-0000-0000-000000000006",
+            managingRegionId: "a0000000-0000-0000-0000-000000000002",
+            title: document.getElementById("j3-edit-title").value,
+            description: document.getElementById("j3-edit-desc").value,
+            projectType: "STANDARD",
+            locations: [
+                {
+                    name: "Denver Civic Center Review Point",
+                    addressLine: "1437 Bannock St",
+                    city: "Denver",
+                    stateProvince: "CO",
+                    postalCode: "80202",
+                    countryCode: "US",
+                    latitude: 39.7392,
+                    longitude: -104.9928
+                }
+            ],
+            boundaries: [
+                {
+                    name: "Civic Center Boundary",
+                    coordinates: [
+                        { latitude: 39.735, longitude: -104.998 },
+                        { latitude: 39.735, longitude: -104.988 },
+                        { latitude: 39.744, longitude: -104.988 },
+                        { latitude: 39.744, longitude: -104.998 },
+                        { latitude: 39.735, longitude: -104.998 }
+                    ]
+                }
+            ]
+        };
+        const res = await apiFetch("PUT", "/projects/" + projectId, payload);
+        renderSpecBanner(
+            "j3-approval-banner",
+            res.status === 200 ? "ready" : "partial",
+            "Step 3.4 READY (CUR-019) - PUT /projects/" + projectId + " -> HTTP " + res.status,
+            res.status === 200
+                ? "Specialist Direct Project Edit Succeeded"
+                : "Specialist Edit Rejected (HTTP " + res.status + ")",
+            "In-region specialists (Daniel County Director, Connie County Agent, Rachel State Director) can edit projects directly during review. Out-of-region specialists (Ethan Sibling Director) receive 403 Forbidden.",
+            res.data
+        );
+    }
+
+    async function approveProjectLive() {
+        const projectId = document.getElementById("j3-target-project-id").value.trim();
+        const res = await apiFetch("PUT", "/projects/" + projectId + "/status");
+        renderSpecBanner(
+            "j3-approval-banner",
+            res.status === 200 ? "ready" : "partial",
+            "Steps 3.5 & 3.7 (CUR-018 / ENH-038) - PUT /projects/" + projectId + "/status -> HTTP " + res.status,
+            res.status === 200
+                ? "Project Approved! Status Transitioned to ACTIVE"
+                : "Project Approval Blocked with HTTP " + res.status,
+            res.status === 200
+                ? "Geographic jurisdiction verified via PostGIS ST_Covers and APPROVED audit log recorded."
+                : "Note: Only PENDING or PENDING_UPDATE projects can be approved, and the caller must hold PROJECT_APPROVE within the project's PostGIS region boundary.",
+            res.data
+        );
+        if (res.status === 200) {
+            loadPendingQueueClientSide();
+        }
+    }
+
+    async function rejectProjectLive() {
+        const projectId = document.getElementById("j3-target-project-id").value.trim();
+        const res = await apiFetch("PUT", "/projects/" + projectId + "/reject", { reason: "Does not meet Community Guidelines" });
+        renderSpecBanner(
+            "j3-approval-banner",
+            "missing",
+            "Step 3.5 PARTIAL (CUR-018 / CUR-019) - HTTP " + res.status,
+            "Reject Project REST Endpoint Missing on ProjectController",
+            "While ProjectServiceImpl.rejectProject(UUID id, UUID actorUserId) is implemented in the Java service layer, ProjectController only exposes PUT /projects/{id}/status for approval and has no REST route to reject a project.",
+            res.data
+        );
+    }
+
+    async function loadProjectAuditLogs() {
+        const res = await apiFetch("GET", "/project-audit-logs");
+        renderSpecBanner(
+            "j3-approval-banner",
+            res.status === 200 ? "ready" : "partial",
+            "GET /project-audit-logs -> HTTP " + res.status,
+            "Project Moderation Audit Trail",
+            "Records CREATED, EDITED, APPROVED, and REJECTED actions.",
+            res.data
+        );
+    }
+
+    // =========================================================================
+    // JOURNEY 4 FLOWS
+    // =========================================================================
+    async function loadShiftsForJourney4() {
+        const projectId = document.getElementById("j4-project-id").value;
+        const res = await apiFetch("GET", "/shifts");
+        if (res.status === 200 && res.data && Array.isArray(res.data.content)) {
+            const matching = res.data.content.filter(s => s.project && s.project.id === projectId);
+            const sel = document.getElementById("j4-shift-id");
+            if (matching.length > 0) {
+                sel.innerHTML = matching.map(s =>
+                    "<option value=\"" + escapeHtml(s.id) + "\">Shift " + escapeHtml(s.id.substring(0, 8)) + "... (" + escapeHtml(s.startTime) + ")</option>"
+                ).join("");
+            }
+            renderSpecBanner(
+                "j4-roster-banner",
+                "partial",
+                "Step 4.2 (ENH-040) - GET /shifts -> HTTP " + res.status,
+                "Loaded " + matching.length + " Shift Occurrence(s) for Project",
+                "Shifts loaded for dropdown selection. Now click 'Filter Roster by Shift' to test querying volunteers signed up for that specific shift."
+            );
+        }
+    }
+
+    async function loadProjectVolunteerRoster() {
+        const projectId = document.getElementById("j4-project-id").value;
+        const res = await apiFetch("GET", "/projects/" + projectId + "/volunteers");
+        renderSpecBanner(
+            "j4-roster-banner",
+            "missing",
+            "Step 4.1 MISSING (CUR-025) - HTTP " + res.status,
+            "GET /projects/" + projectId + "/volunteers Not Implemented",
+            "Organizers cannot view signed-up volunteers for a project because no shift_signups repository or controller endpoint exists.",
+            res.data
+        );
+    }
+
+    async function loadShiftVolunteerRoster() {
+        const shiftId = document.getElementById("j4-shift-id").value;
+        const res = await apiFetch("GET", "/shifts/" + shiftId + "/volunteers");
+        renderSpecBanner(
+            "j4-roster-banner",
+            "missing",
+            "Step 4.2 DECISION MISSING (CUR-025 / ENH-040) - HTTP " + res.status,
+            "GET /shifts/" + shiftId + "/volunteers Not Implemented",
+            "Per Step 4.2: 'Organizer must be able to see and filter volunteers by specific shift, not just all upcoming (CUR-025 / ENH-040).' This endpoint is not built yet.",
+            res.data
+        );
+    }
+
+    async function sendOrganizerVolunteerMessage() {
+        const projectId = document.getElementById("j4-project-id").value;
+        const payload = {
+            recipientScope: document.getElementById("j4-msg-recipient").value,
+            shiftId: document.getElementById("j4-shift-id").value,
+            subject: document.getElementById("j4-msg-subject").value,
+            body: document.getElementById("j4-msg-body").value
+        };
+        const res = await apiFetch("POST", "/projects/" + projectId + "/messages", payload);
+        renderSpecBanner(
+            "j4-message-banner",
+            "missing",
+            "Step 4.3 MISSING (CUR-025) - HTTP " + res.status,
+            "Organizer-to-Volunteer Messaging Endpoint Not Implemented",
+            "The UI sent POST /projects/" + projectId + "/messages. No message dispatch endpoint or email integration exists on main.",
+            res.data
+        );
+    }
+
+    async function cancelProjectLive() {
+        const projectId = document.getElementById("j4-cancel-project-id").value.trim();
+        const reason = document.getElementById("j4-cancel-reason").value;
+        if (!projectId) {
+            renderSpecBanner(
+                "j4-cancel-banner",
+                "partial",
+                "Project UUID Required",
+                "Enter a Disposable Project UUID to Test Cancellation",
+                "Tip: Publish a project in Journey 2 (or seed one in Journey 3) so its UUID is populated here, then click Cancel Project."
+            );
+            return;
+        }
+        const res = await apiFetch("DELETE", "/projects/" + projectId);
+        renderSpecBanner(
+            "j4-cancel-banner",
+            "partial",
+            "Steps 4.4, 4.5 & 4.6 PARTIAL/MISSING (CUR-047 / ENH-045) - HTTP " + res.status,
+            res.status === 200 || res.status === 204
+                ? "Project Deleted, But Custom Cancellation Email Was Not Sent"
+                : "DELETE /projects/" + projectId + " Returned HTTP " + res.status,
+            "DELETE /projects/{id} removes the project record, but does not accept the organizer's custom cancellation notice ('" + reason + "') and triggers no volunteer notification emails (ENH-045).",
+            res.data
+        );
+    }
+
+    window.addEventListener("DOMContentLoaded", initHarness);
+</script>
+</body>
+</html>
