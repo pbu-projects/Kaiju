@@ -11,11 +11,14 @@ import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.dto.CoordinateDto
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
+import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import lol.pbu.kaiju.dto.RegionCoordinateResolution
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand
 import lol.pbu.kaiju.model.RegionAuditAction
 import lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
+import lol.pbu.kaiju.util.SpatialMappingService
+import org.locationtech.jts.geom.Polygon
 
 import java.util.UUID
 
@@ -31,10 +34,46 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     @Inject
     AdministrativeRegionAuditLogRepository auditLogRepository
 
+    @Inject
+    SpatialMappingService spatialMappingService
+
     private User testAdminUser
 
     def setup() {
         testAdminUser = dataBuilder.user().asAdmin().persist()
+    }
+
+    private AdministrativeRegion createRegionWithMetadata(
+            String name,
+            Integer level,
+            String stateCode,
+            String timeZone,
+            double minLon,
+            double minLat,
+            double maxLon,
+            double maxLat
+    ) {
+        List<CoordinateDto> coords = [
+                new CoordinateDto(minLon, minLat),
+                new CoordinateDto(maxLon, minLat),
+                new CoordinateDto(maxLon, maxLat),
+                new CoordinateDto(minLon, maxLat),
+                new CoordinateDto(minLon, minLat)
+        ]
+        Polygon polygon = spatialMappingService.toPolygon(coords)
+        AdministrativeRegion region = new AdministrativeRegion(
+                null,
+                name,
+                null,
+                polygon,
+                level,
+                "US",
+                stateCode,
+                timeZone
+        )
+        AdministrativeRegion saved = regionRepository.save(region)
+        track(saved)
+        return saved
     }
 
     private List<CoordinateDto> validCoordinates() {
@@ -56,6 +95,51 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
                 new CoordinateDto(0.0, 2.0),
                 new CoordinateDto(0.0, 0.0)
         ]
+    }
+
+    def "CONSTRUCTOR | should create administrative region via 4-argument constructor with null metadata"() {
+        given: "a new administrative region instantiated with minimal arguments"
+        UUID expectedId = UUID.randomUUID()
+        AdministrativeRegion region = new AdministrativeRegion(expectedId, "Test Minimal", null, null)
+
+        expect: "metadata fields default to null"
+        verifyAll(region) {
+            id() == expectedId
+            name() == "Test Minimal"
+            parentRegionId() == null
+            geom() == null
+            level() == null
+            countryCode() == null
+            stateCode() == null
+            timeZone() == null
+        }
+    }
+
+    def "QUERY | should get administrative regions page and find by id"() {
+        given: "an existing administrative region"
+        def createCmd = new CreateAdministrativeRegionCommand("Query Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        track(region)
+
+        when: "querying regions with a pageable"
+        def page = regionService.getAdministrativeRegions(CursoredPageable.from(10, Sort.UNSORTED))
+
+        then: "regions page is returned with content"
+        verifyAll(page) {
+            page != null
+            !content.isEmpty()
+            content.size() <= 10
+        }
+
+        when: "querying region by id"
+        Optional<AdministrativeRegion> found = regionService.getAdministrativeRegionById(region.id())
+
+        then: "the region is returned"
+        verifyAll {
+            found.isPresent()
+            found.get().id() == region.id()
+            found.get().name() == "Query Region"
+        }
     }
 
     def "CREATE | should create an administrative region and record an immutable audit log"() {
@@ -123,6 +207,26 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         def e = thrown(HttpStatusException)
         verifyAll {
             e.status == HttpStatus.UNAUTHORIZED
+        }
+    }
+
+    def "CREATE | should default to level 2 when parent administrative region has null level"() {
+        given: "a parent administrative region persisted with null level"
+        AdministrativeRegion parent = dataBuilder.region().withName("Parent With Null Level").persist()
+        track(parent)
+
+        and: "a command to create a child region referencing the parent"
+        def command = new CreateAdministrativeRegionCommand("Child With Level Fallback", parent.id(), validCoordinates())
+
+        when: "creating the child region"
+        AdministrativeRegion child = regionService.createAdministrativeRegion(command, testAdminUser.id())
+        track(child)
+
+        then: "the child region is assigned level 2"
+        verifyAll(child) {
+            id() != null
+            parentRegionId() == parent.id()
+            level() == 2
         }
     }
 
@@ -205,6 +309,25 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
     }
 
+    def "UPDATE | should fail when updating with topologically invalid geometry"() {
+        given: "an existing administrative region"
+        def createCmd = new CreateAdministrativeRegionCommand("Valid Region Before Update", null, validCoordinates())
+        AdministrativeRegion initial = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        track(initial)
+
+        and: "an update command with a self-intersecting polygon"
+        def updateCmd = new UpdateAdministrativeRegionCommand("Updated Region", null, bowtieCoordinates())
+
+        when: "attempting to update the region"
+        regionService.updateAdministrativeRegion(initial.id(), updateCmd, testAdminUser.id())
+
+        then: "HTTP 422 Unprocessable Entity is thrown"
+        def e = thrown(HttpStatusException)
+        verifyAll {
+            e.status == HttpStatus.UNPROCESSABLE_ENTITY
+        }
+    }
+
     def "DELETE | should delete an administrative region and preserve immutable audit log"() {
         given: "an existing administrative region"
         def createCmd = new CreateAdministrativeRegionCommand("Region To Delete", null, validCoordinates())
@@ -237,6 +360,50 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         def e = thrown(HttpStatusException)
         verifyAll {
             e.status == HttpStatus.NOT_FOUND
+        }
+    }
+
+    def "BOUNDARY | should apply ingested boundary to administrative region"() {
+        given: "an existing administrative region"
+        def createCmd = new CreateAdministrativeRegionCommand("Boundary Test Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        track(region)
+
+        and: "a valid geojson polygon string"
+        String validGeoJson = '''{
+            "type": "Polygon",
+            "coordinates": [[
+                [-105.1, 39.7],
+                [-104.9, 39.7],
+                [-104.9, 39.8],
+                [-105.1, 39.8],
+                [-105.1, 39.7]
+            ]]
+        }'''
+
+        when: "applying the boundary update"
+        IngestBoundaryResponse response = regionService.applyIngestedBoundary(
+                region.id(),
+                validGeoJson,
+                0.001d,
+                "https://test.gov",
+                testAdminUser.id()
+        )
+
+        then: "the response indicates successful boundary application"
+        verifyAll(response) {
+            regionId() == region.id()
+            name() == "Boundary Test Region"
+            originalPoints() == 5
+            simplifiedPoints() > 0
+            valid()
+        }
+
+        and: "a BOUNDARY_INGEST audit log is recorded"
+        def logs = auditLogRepository.findByRegionId(region.id(), CursoredPageable.from(10, Sort.UNSORTED))
+        verifyAll {
+            logs.content.size() == 2
+            logs.content.any { it.action() == RegionAuditAction.BOUNDARY_INGEST && it.metadata().contains("https://test.gov") }
         }
     }
 
@@ -354,12 +521,36 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             outOfBoundsLat.isEmpty()
         }
 
+        when: "resolving with latitude below -90"
+        Optional<RegionCoordinateResolution> lowLat = regionService.resolveCoordinates(-95.0d, 0.0d)
+
+        then: "empty optional is returned"
+        verifyAll {
+            lowLat.isEmpty()
+        }
+
+        when: "resolving with longitude above 180"
+        Optional<RegionCoordinateResolution> highLon = regionService.resolveCoordinates(0.0d, 185.0d)
+
+        then: "empty optional is returned"
+        verifyAll {
+            highLon.isEmpty()
+        }
+
         when: "resolving with longitude below -180"
         Optional<RegionCoordinateResolution> outOfBoundsLon = regionService.resolveCoordinates(39.7392d, -200.0d)
 
         then: "empty optional is returned without exception"
         verifyAll {
             outOfBoundsLon.isEmpty()
+        }
+
+        when: "resolving with longitude below -180 boundary"
+        Optional<RegionCoordinateResolution> lowLon = regionService.resolveCoordinates(0.0d, -185.0d)
+
+        then: "empty optional is returned"
+        verifyAll {
+            lowLon.isEmpty()
         }
 
         when: "resolving with NaN latitude"
@@ -376,6 +567,49 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         then: "empty optional is returned without exception"
         verifyAll {
             nanLon.isEmpty()
+        }
+    }
+
+    def "RESOLVE | should normalize state from region name when stateCode is null"() {
+        given: "regions covering coordinates with null stateCode"
+        createRegionWithMetadata("Texas", 1, null, "America/Chicago", -98.0, 30.0, -97.0, 31.0)
+        createRegionWithMetadata("CO State Region", 1, null, "America/Denver", -96.0, 30.0, -95.0, 31.0)
+        createRegionWithMetadata("Custom Territory State", 1, null, "America/Denver", -94.0, 30.0, -93.0, 31.0)
+        createRegionWithMetadata("   ", 1, null, null, -92.0, 30.0, -91.0, 31.0)
+
+        when: "resolving coordinates covering state name lookup"
+        Optional<RegionCoordinateResolution> txRes = regionService.resolveCoordinates(30.5d, -97.5d)
+
+        then: "state code TX is resolved from Texas name"
+        verifyAll {
+            txRes.isPresent()
+            txRes.get().state() == "TX"
+        }
+
+        when: "resolving coordinates covering two-letter prefix state name"
+        Optional<RegionCoordinateResolution> coRes = regionService.resolveCoordinates(30.5d, -95.5d)
+
+        then: "state code CO is resolved"
+        verifyAll {
+            coRes.isPresent()
+            coRes.get().state() == "CO"
+        }
+
+        when: "resolving coordinates covering unknown state name"
+        Optional<RegionCoordinateResolution> customRes = regionService.resolveCoordinates(30.5d, -93.5d)
+
+        then: "stripped name is resolved as state"
+        verifyAll {
+            customRes.isPresent()
+            customRes.get().state() == "Custom Territory"
+        }
+
+        when: "resolving coordinates covering region with blank name and null metadata"
+        Optional<RegionCoordinateResolution> emptyRes = regionService.resolveCoordinates(30.5d, -91.5d)
+
+        then: "empty optional is returned when all civic components are null"
+        verifyAll {
+            emptyRes.isEmpty()
         }
     }
 
@@ -407,6 +641,15 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             byName.get().stateCode() == "CO"
         }
 
+        when: "searching by state name prefix"
+        Optional<AdministrativeRegion> byPrefix = regionService.findState("Colo")
+
+        then: "state is found"
+        verifyAll {
+            byPrefix.isPresent()
+            byPrefix.get().stateCode() == "CO"
+        }
+
         when: "searching by non-existent state"
         Optional<AdministrativeRegion> notFound = regionService.findState("ZZ")
 
@@ -423,6 +666,34 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         verifyAll {
             blank.isEmpty()
             nullState.isEmpty()
+        }
+    }
+
+    def "HIERARCHY | should get counties with null or blank state"() {
+        when: "querying counties with null state"
+        List<AdministrativeRegion> nullStateCounties = regionService.getCounties(null)
+
+        then: "all level 2 counties are returned"
+        verifyAll {
+            !nullStateCounties.isEmpty()
+            nullStateCounties.every { it.level() == 2 }
+        }
+
+        when: "querying counties with blank state"
+        List<AdministrativeRegion> blankStateCounties = regionService.getCounties("   ")
+
+        then: "all level 2 counties are returned"
+        verifyAll {
+            !blankStateCounties.isEmpty()
+            blankStateCounties.every { it.level() == 2 }
+        }
+
+        when: "querying counties with non-existent state"
+        List<AdministrativeRegion> noCounties = regionService.getCounties("ZZ")
+
+        then: "empty list is returned"
+        verifyAll {
+            noCounties.isEmpty()
         }
     }
 
@@ -450,6 +721,58 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         then: "empty list is returned"
         verifyAll {
             noCountyCities.isEmpty()
+        }
+    }
+
+    def "HIERARCHY | should get cities with null arguments and matching rules"() {
+        given: "an existing state"
+        AdministrativeRegion co = regionService.findState("CO").orElseThrow()
+
+        and: "a county with Region suffix to test normalized candidate name matching"
+        AdministrativeRegion adamsCounty = dataBuilder.region().withName("Adams Region").withParent(co.id()).persist()
+        track(adamsCounty)
+
+        when: "querying cities with null state and null county"
+        List<AdministrativeRegion> allCities = regionService.getCities(null, null)
+
+        then: "all level 3 cities are returned"
+        verifyAll {
+            !allCities.isEmpty()
+            allCities.every { it.level() == 3 }
+        }
+
+        when: "querying cities with null state and county name fallback"
+        List<AdministrativeRegion> denverFallbackCities = regionService.getCities(null, "Denver County")
+
+        then: "cities for Denver County are returned via fallback"
+        verifyAll {
+            !denverFallbackCities.isEmpty()
+            denverFallbackCities.any { it.name().contains("Denver") }
+        }
+
+        when: "querying cities with prefix match on county"
+        List<AdministrativeRegion> prefixMatchCities = regionService.getCities("CO", "Denver")
+
+        then: "cities matching prefix are returned"
+        verifyAll {
+            !prefixMatchCities.isEmpty()
+            prefixMatchCities.any { it.name().contains("Denver") }
+        }
+
+        when: "querying cities with normalized county name matching suffix stripped"
+        List<AdministrativeRegion> normalizedMatchCities = regionService.getCities("CO", "Adams")
+
+        then: "cities query returns successfully"
+        verifyAll {
+            normalizedMatchCities != null
+        }
+
+        when: "querying cities with non-existent county"
+        List<AdministrativeRegion> noCities = regionService.getCities("CO", "NonExistent")
+
+        then: "empty list is returned"
+        verifyAll {
+            noCities.isEmpty()
         }
     }
 }

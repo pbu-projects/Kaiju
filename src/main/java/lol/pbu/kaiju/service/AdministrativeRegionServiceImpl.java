@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -286,6 +287,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
                 .filter(r -> r.level() != null && r.level() >= 3)
                 .map(CoveringRegionDto::name)
                 .map(this::normalizeCityName)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
 
@@ -293,12 +295,14 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
                 .filter(r -> r.level() != null && r.level() == 2)
                 .map(CoveringRegionDto::name)
                 .map(this::normalizeCountyName)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
 
         String state = regions.stream()
                 .filter(r -> r.level() != null && r.level() == 1)
                 .map(this::normalizeState)
+                .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
 
