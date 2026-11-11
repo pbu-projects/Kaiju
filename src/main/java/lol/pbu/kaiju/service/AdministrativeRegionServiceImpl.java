@@ -158,7 +158,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
         }
 
-        Integer level = parent != null ? (parent.level() != null ? parent.level() + 1 : 2) : 1;
+        Integer level = determineLevel(parent);
         String countryCode = parent != null ? parent.countryCode() : "US";
         String stateCode = parent != null ? parent.stateCode() : null;
         String timeZone = parent != null ? parent.timeZone() : null;
@@ -404,6 +404,16 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             return regionRepository.findByLevelAndStateCodeIgnoreCaseOrderByNameAsc(3, stateCode);
         }
         return regionRepository.findByLevelOrderByNameAsc(3);
+    }
+
+    private Integer determineLevel(@Nullable AdministrativeRegion parent) {
+        if (parent == null) {
+            return 1;
+        }
+        if (parent.level() != null) {
+            return parent.level() + 1;
+        }
+        return 2;
     }
 
     private boolean matchesCounty(AdministrativeRegion candidate, String queryCounty) {
