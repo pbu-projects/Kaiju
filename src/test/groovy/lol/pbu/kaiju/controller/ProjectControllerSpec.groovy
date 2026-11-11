@@ -1732,12 +1732,41 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         where:
         method   | uri
-        "GET"    | "/projects"
-        "GET"    | "/projects/${UUID.randomUUID()}"
-        "GET"    | "/projects/search-by-location?longitude=0&latitude=0&radiusMeters=1000"
         "POST"   | "/projects"
         "PUT"    | "/projects/${UUID.randomUUID()}"
         "DELETE" | "/projects/${UUID.randomUUID()}"
         "PUT"    | "/projects/${UUID.randomUUID()}/status"
+    }
+
+    /********** Security Anonymous Discovery Tests **********/
+
+    def "Security | should allow anonymous visitors to discover and view projects"() {
+        given: "a persisted project"
+        def org = getRandomOrganization()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Public Discovery Project")
+                .withDescription("Public project description with at least twenty characters.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .persist()
+
+        when: "an anonymous visitor requests projects list"
+        def listResponse = client.exchange(HttpRequest.GET("/projects"), Map)
+
+        and: "an anonymous visitor requests project details by ID"
+        def detailResponse = client.exchange(HttpRequest.GET("/projects/${project.id()}"), Project)
+
+        and: "an anonymous visitor searches projects by location"
+        def searchResponse = client.exchange(HttpRequest.GET("/projects/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=50000"), Map)
+
+        then: "all endpoints return 200 OK and project details match"
+        verifyAll {
+            listResponse.status == HttpStatus.OK
+            detailResponse.status == HttpStatus.OK
+            detailResponse.body() != null
+            detailResponse.body()?.id() == project.id()
+            searchResponse.status == HttpStatus.OK
+        }
     }
 }
