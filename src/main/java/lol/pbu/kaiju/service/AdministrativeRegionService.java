@@ -5,9 +5,12 @@ import io.micronaut.data.model.CursoredPageable;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
+import lol.pbu.kaiju.dto.RegionCoordinateResolution;
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -35,4 +38,19 @@ public interface AdministrativeRegionService {
             @NonNull String sourceUrl,
             @NonNull UUID actorUserId
     );
+
+    @NonNull
+    Optional<RegionCoordinateResolution> resolveCoordinates(double lat, double lon);
+
+    @NonNull
+    List<AdministrativeRegion> getStates();
+
+    @NonNull
+    Optional<AdministrativeRegion> findState(@Nullable String state);
+
+    @NonNull
+    List<AdministrativeRegion> getCounties(@Nullable String state);
+
+    @NonNull
+    List<AdministrativeRegion> getCities(@Nullable String state, @Nullable String county);
 }

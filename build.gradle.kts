@@ -43,7 +43,6 @@ dependencies {
 
     compileOnly("io.micronaut:micronaut-http-client")
     compileOnly("io.swagger.core.v3:swagger-annotations")
-
     implementation("io.micronaut.flyway:micronaut-flyway")
     implementation("io.micronaut.data:micronaut-data-jdbc")
     implementation("io.micronaut.security:micronaut-security")
