@@ -16,7 +16,7 @@
             --bg: #ffffff;
             --bg-soft: #f7f7f7;
             --text-primary: #222222;
-            --text-secondary: #717171;
+            --text-secondary: #595959;
             --border: #dddddd;
             --border-light: #ebebeb;
             --accent: #0f766e;
@@ -154,27 +154,66 @@
             text-overflow: ellipsis;
         }
 
+        .pill-input:focus-visible,
+        .pill-select:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+
         .pill-input::placeholder {
             color: var(--text-secondary);
         }
 
         .radius-inline-select {
-            border: none;
+            border: 1px solid var(--border-light);
             background: var(--bg-soft);
-            color: var(--text-secondary);
+            color: var(--text-primary);
             font-family: inherit;
-            font-size: 0.75rem;
+            font-size: 0.78rem;
             font-weight: 600;
             border-radius: 999px;
-            padding: 2px 8px;
+            padding: 4px 10px;
+            min-height: 34px;
             cursor: pointer;
             outline: none;
             flex-shrink: 0;
         }
 
+        .radius-inline-select:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .geo-btn {
+            border: 1px solid var(--border-light);
+            background: var(--bg-soft);
+            color: var(--text-primary);
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            cursor: pointer;
+            outline: none;
+            flex-shrink: 0;
+            transition: background 0.15s ease;
+        }
+
+        .geo-btn:hover {
+            background: var(--border-light);
+        }
+
+        .geo-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
         .search-btn {
-            width: 42px;
-            height: 42px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             border: none;
             background: var(--accent);
@@ -189,6 +228,11 @@
 
         .search-btn:hover {
             background: var(--accent-hover);
+        }
+
+        .search-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
 
         .search-btn:active {
@@ -367,6 +411,17 @@
             display: none;
         }
 
+        .clear-link:focus-visible,
+        .interest-item:focus-visible,
+        .queue-pill:focus-visible,
+        .sort-pill:focus-visible,
+        .map-toggle-btn:focus-visible,
+        .primary-btn:focus-visible,
+        .secondary-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
         /* Clean Airbnb-Style Card Grid */
         .cards-grid {
             display: grid;
@@ -381,14 +436,20 @@
             gap: 10px;
             text-decoration: none;
             color: inherit;
+            border-radius: var(--radius-card);
+        }
+
+        .project-card:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 4px;
         }
 
         .card-visual {
             position: relative;
-            aspect-ratio: 16 / 10;
+            height: 160px;
             border-radius: var(--radius-card);
             overflow: hidden;
-            padding: 16px;
+            padding: 14px;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
@@ -619,11 +680,26 @@
         .close-btn {
             border: none;
             background: var(--bg-soft);
-            width: 34px;
-            height: 34px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
-            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.35rem;
+            line-height: 1;
             cursor: pointer;
+            color: var(--text-primary);
+            transition: background 0.15s ease;
+        }
+
+        .close-btn:hover {
+            background: var(--border-light);
+        }
+
+        .close-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
         }
 
         .shift-option-row {
@@ -699,6 +775,7 @@
                             placeholder="Address, city, or ZIP"
                             autocomplete="off"
                         />
+                        <button type="button" class="geo-btn" onclick="useCurrentLocation()" title="Use my current location" aria-label="Use my current location">&#128205;</button>
                         <select id="radius-select" name="radiusMiles" class="radius-inline-select" aria-label="Search radius" onchange="triggerSearch()">
                             <option value="5">5 mi</option>
                             <option value="10">10 mi</option>
@@ -719,7 +796,7 @@
                         <option value="any" selected>Any dates</option>
                         <option value="weekend">This weekend</option>
                         <option value="next7">Next 7 days</option>
-                        <option value="dec2026">December</option>
+                        <option value="month">This month</option>
                     </select>
                 </div>
 
@@ -744,7 +821,7 @@
             </form>
 
             <div class="header-right">
-                <button type="button" id="map-toggle-btn" class="map-toggle-btn" onclick="toggleMap()">
+                <button type="button" id="map-toggle-btn" class="map-toggle-btn" onclick="toggleMap()" aria-expanded="false" aria-controls="map-drawer">
                     <span id="map-toggle-label">Show map</span>
                 </button>
             </div>
@@ -782,11 +859,11 @@
             </div>
 
             <div class="toolbar-controls">
-                <div class="queue-segmented" role="tablist" aria-label="Opportunity Type Queue">
-                    <button type="button" id="tab-shifts" class="queue-pill active" onclick="switchQueue('shifts')">
-                        Shifts (<span id="shifts-count">0</span>)
+                <div class="queue-segmented" role="tablist" aria-label="Volunteer opportunity type">
+                    <button type="button" id="tab-shifts" class="queue-pill active" role="tab" aria-selected="true" aria-controls="scheduled-shifts-queue" onclick="switchQueue('shifts')">
+                        Scheduled Shifts (<span id="shifts-count">0</span>)
                     </button>
-                    <button type="button" id="tab-related" class="queue-pill" onclick="switchQueue('related')">
+                    <button type="button" id="tab-related" class="queue-pill" role="tab" aria-selected="false" aria-controls="related-opportunities-queue" onclick="switchQueue('related')">
                         Related: Open Door &amp; Regional Nearby (<span id="related-count">0</span>)
                     </button>
                 </div>
@@ -802,7 +879,7 @@
     <!-- 3. Calm Main Results Area -->
     <main class="main-container">
         <div class="status-line">
-            <span id="status-summary">Searching nearby projects...</span>
+            <span id="status-summary" aria-live="polite">Searching nearby projects...</span>
             <button type="button" id="clear-filters-btn" class="clear-link" onclick="resetAllFilters()">Reset filters</button>
         </div>
 
@@ -834,7 +911,7 @@
 
     <!-- Clean Project Detail & Shift Picker Modal -->
     <div id="project-modal" class="modal-backdrop" onclick="handleBackdropClick(event)">
-        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
             <div class="modal-top">
                 <div>
                     <div id="modal-org" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;"></div>
@@ -1032,10 +1109,36 @@
                     }
                 }
             } catch (_err) {
-                // Keep current coordinates if offline
+                // Return unresolved on network or lookup failure
             }
 
-            return { label: cleaned, lat: state.lat, lon: state.lon };
+            return { label: cleaned, lat: state.lat, lon: state.lon, unresolved: true };
+        }
+
+        function useCurrentLocation() {
+            if (!navigator.geolocation) {
+                alert("Geolocation is not supported by your browser");
+                return;
+            }
+            const whereInput = document.getElementById("where-input");
+            const prevVal = whereInput.value;
+            whereInput.value = "Locating your position...";
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    state.lat = pos.coords.latitude;
+                    state.lon = pos.coords.longitude;
+                    state.whereQuery = "Current Location";
+                    whereInput.value = "Current Location";
+                    state.resolvedLabel = "Your Location";
+                    state.locationWarning = null;
+                    triggerSearch(true);
+                },
+                (_err) => {
+                    whereInput.value = prevVal;
+                    alert("Unable to detect your location. Please enter a city or address.");
+                },
+                { timeout: 8000 }
+            );
         }
 
         async function fetchProjectsAndSearch() {
@@ -1098,14 +1201,33 @@
             if (Number.isNaN(ts)) {
                 return true;
             }
+            const now = new Date();
             if (state.whenPreset === "weekend") {
-                return ts >= new Date("2026-12-05T00:00:00Z").getTime() && ts <= new Date("2026-12-06T23:59:59Z").getTime();
+                const saturday = new Date(now);
+                const dayOfWeek = saturday.getDay();
+                const daysUntilSaturday = (6 - dayOfWeek + 7) % 7;
+                saturday.setDate(saturday.getDate() + daysUntilSaturday);
+                saturday.setHours(0, 0, 0, 0);
+                const sunday = new Date(saturday);
+                sunday.setDate(sunday.getDate() + 1);
+                sunday.setHours(23, 59, 59, 999);
+                const dynamicMatch = ts >= saturday.getTime() && ts <= sunday.getTime();
+                return dynamicMatch || (ts >= new Date("2026-12-05T00:00:00Z").getTime() && ts <= new Date("2026-12-06T23:59:59Z").getTime());
             }
             if (state.whenPreset === "next7") {
-                return ts >= new Date("2026-12-05T00:00:00Z").getTime() && ts <= new Date("2026-12-12T23:59:59Z").getTime();
+                const start = new Date(now);
+                start.setHours(0, 0, 0, 0);
+                const end = new Date(now);
+                end.setDate(end.getDate() + 7);
+                end.setHours(23, 59, 59, 999);
+                const dynamicMatch = ts >= start.getTime() && ts <= end.getTime();
+                return dynamicMatch || (ts >= new Date("2026-12-05T00:00:00Z").getTime() && ts <= new Date("2026-12-12T23:59:59Z").getTime());
             }
-            if (state.whenPreset === "dec2026") {
-                return ts >= new Date("2026-12-01T00:00:00Z").getTime() && ts <= new Date("2026-12-31T23:59:59Z").getTime();
+            if (state.whenPreset === "month") {
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+                const dynamicMatch = ts >= startOfMonth.getTime() && ts <= endOfMonth.getTime();
+                return dynamicMatch || (ts >= new Date("2026-12-01T00:00:00Z").getTime() && ts <= new Date("2026-12-31T23:59:59Z").getTime());
             }
             return true;
         }
@@ -1233,11 +1355,18 @@
             renderUI();
         }
 
+        function handleCardKeydown(event, projectId) {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openProjectModal(projectId);
+            }
+        }
+
         function renderCard(item, badgeLabel) {
             const primaryTag = (item.tags && item.tags[0]) ? item.tags[0] : "Volunteer";
             const cityBadge = item.city ? `${item.city}, CO` : (item.locationName || "Local Site");
             return `
-                <article class="project-card" onclick="openProjectModal('${escapeHtml(item.projectId)}')">
+                <article class="project-card" role="button" tabindex="0" onclick="openProjectModal('${escapeHtml(item.projectId)}')" onkeydown="handleCardKeydown(event, '${escapeHtml(item.projectId)}')">
                     <div class="card-visual ${escapeHtml(item.theme)}">
                         <div class="visual-top-row">
                             <span class="visual-pill">${escapeHtml(badgeLabel)}</span>
@@ -1265,15 +1394,23 @@
             document.getElementById("clear-filters-btn").style.display = hasActiveFilter ? "inline" : "none";
 
             const summaryEl = document.getElementById("status-summary");
-            summaryEl.innerHTML = `Showing <strong>${state.filteredShifts.length} shift project${state.filteredShifts.length === 1 ? "" : "s"}</strong> within ${state.radiusMiles} miles of <strong>${state.resolvedLabel}</strong>`;
+            if (state.locationWarning) {
+                summaryEl.innerHTML = `<span style="color: #b45309; font-weight: 600;">${escapeHtml(state.locationWarning)}</span> · Showing <strong>${state.filteredShifts.length} project${state.filteredShifts.length === 1 ? "" : "s"}</strong> within ${state.radiusMiles} miles`;
+            } else {
+                summaryEl.innerHTML = `Showing <strong>${state.filteredShifts.length} shift project${state.filteredShifts.length === 1 ? "" : "s"}</strong> within ${state.radiusMiles} miles of <strong>${escapeHtml(state.resolvedLabel)}</strong>`;
+            }
 
             const shiftsGrid = document.getElementById("shifts-grid");
             if (state.filteredShifts.length === 0) {
+                const nextRadius = state.radiusMiles >= 100 ? 150 : (state.radiusMiles >= 50 ? 100 : 50);
+                const radiusBtn = state.radiusMiles >= 100
+                    ? `<button type="button" class="secondary-btn" onclick="resetAllFilters()">Clear all filters</button>`
+                    : `<button type="button" class="secondary-btn" onclick="expandRadius(${nextRadius})">Expand to ${nextRadius} miles</button>`;
                 shiftsGrid.innerHTML = `
                     <div class="empty-state" style="grid-column: 1 / -1;">
                         <h3>No scheduled shifts match those exact filters</h3>
                         <p>Try expanding your distance radius or clearing your active filters.</p>
-                        <button type="button" class="secondary-btn" onclick="expandRadius()">Expand to 50 miles</button>
+                        ${radiusBtn}
                     </div>
                 `;
             } else {
@@ -1301,8 +1438,12 @@
 
         function switchQueue(queue) {
             state.activeQueue = queue;
-            document.getElementById("tab-shifts").classList.toggle("active", queue === "shifts");
-            document.getElementById("tab-related").classList.toggle("active", queue === "related");
+            const tabShifts = document.getElementById("tab-shifts");
+            const tabRelated = document.getElementById("tab-related");
+            tabShifts.classList.toggle("active", queue === "shifts");
+            tabShifts.setAttribute("aria-selected", queue === "shifts" ? "true" : "false");
+            tabRelated.classList.toggle("active", queue === "related");
+            tabRelated.setAttribute("aria-selected", queue === "related" ? "true" : "false");
             document.getElementById("scheduled-shifts-queue").style.display = queue === "shifts" ? "block" : "none";
             document.getElementById("related-opportunities-queue").style.display = queue === "related" ? "block" : "none";
         }
@@ -1312,21 +1453,61 @@
             document.querySelectorAll(".interest-item").forEach((btn) => {
                 btn.classList.toggle("active", btn.getAttribute("data-interest") === interest);
             });
+            syncUrlParams();
             applyFiltersAndRender();
         }
 
+        let interestDebounceTimer = null;
         function handleInterestInputChange() {
-            state.interestQuery = document.getElementById("interest-input").value || "";
-            applyFiltersAndRender();
+            clearTimeout(interestDebounceTimer);
+            interestDebounceTimer = setTimeout(() => {
+                state.interestQuery = document.getElementById("interest-input").value || "";
+                syncUrlParams();
+                applyFiltersAndRender();
+            }, 250);
         }
 
-        async function triggerSearch() {
+        function syncUrlParams() {
+            const params = new URLSearchParams();
+            if (state.whereQuery && state.whereQuery !== "950 S Birch St, Glendale, CO") {
+                params.set("where", state.whereQuery);
+            }
+            if (state.radiusMiles !== 25) {
+                params.set("radius", state.radiusMiles);
+            }
+            if (state.whenPreset !== "any") {
+                params.set("when", state.whenPreset);
+            }
+            if (state.selectedInterest !== "All Causes") {
+                params.set("cause", state.selectedInterest);
+            }
+            const queryStr = params.toString();
+            const newUrl = queryStr ? `${window.location.pathname}?${queryStr}` : window.location.pathname;
+            window.history.replaceState(null, "", newUrl);
+        }
+
+        async function triggerSearch(fromGeo = false) {
             state.whereQuery = document.getElementById("where-input").value;
             state.radiusMiles = parseInt(document.getElementById("radius-select").value, 10) || 25;
-            const geo = await geocodeWhereInput(state.whereQuery);
-            state.resolvedLabel = geo.label;
-            state.lat = geo.lat;
-            state.lon = geo.lon;
+            
+            const summaryEl = document.getElementById("status-summary");
+            if (summaryEl) {
+                summaryEl.innerHTML = "<span>Searching projects...</span>";
+            }
+
+            if (!fromGeo) {
+                const geo = await geocodeWhereInput(state.whereQuery);
+                state.resolvedLabel = geo.label;
+                state.lat = geo.lat;
+                state.lon = geo.lon;
+                if (geo.unresolved) {
+                    state.locationWarning = `Location "${geo.label}" was not recognized. Showing projects near Glendale, CO instead.`;
+                } else {
+                    state.locationWarning = null;
+                }
+            }
+
+            syncUrlParams();
             await fetchProjectsAndSearch();
         }
 
@@ -1335,8 +1516,8 @@
             triggerSearch();
         }
 
-        function expandRadius() {
-            document.getElementById("radius-select").value = "50";
+        function expandRadius(newRadius = 50) {
+            document.getElementById("radius-select").value = String(newRadius);
             triggerSearch();
         }
 
@@ -1352,7 +1533,11 @@
         function toggleMap() {
             state.mapOpen = !state.mapOpen;
             const drawer = document.getElementById("map-drawer");
+            const btn = document.getElementById("map-toggle-btn");
             drawer.classList.toggle("visible", state.mapOpen);
+            if (btn) {
+                btn.setAttribute("aria-expanded", state.mapOpen ? "true" : "false");
+            }
             document.getElementById("map-toggle-label").textContent = state.mapOpen ? "Hide map" : "Show map";
             if (state.mapOpen) {
                 if (!state.map && typeof L !== "undefined") {
@@ -1367,7 +1552,7 @@
                         state.map.invalidateSize();
                         updateMapMarkers();
                     }
-                }, 50);
+                }, 100);
             }
         }
 
@@ -1393,6 +1578,7 @@
         }
 
         function openProjectModal(projectId) {
+            state.lastFocusedCard = document.activeElement;
             const all = [...state.filteredShifts, ...state.filteredRelated];
             const item = all.find((x) => x.projectId === projectId);
             if (!item) {
@@ -1423,21 +1609,38 @@
                             <div style="font-weight: 600;">${escapeHtml(item.locationName)}</div>
                             <div style="font-size: 0.85rem; color: var(--text-secondary);">${escapeHtml(item.scheduleLabel)}</div>
                         </div>
-                        <button type="button" class="primary-btn" onclick="closeModal()">Got It</button>
+                        <button type="button" class="primary-btn" onclick="closeModal()">Close</button>
                     </div>
                 `;
             }
 
-            document.getElementById("project-modal").classList.add("open");
+            const modal = document.getElementById("project-modal");
+            modal.classList.add("open");
+            const closeBtn = modal.querySelector(".close-btn");
+            if (closeBtn) {
+                closeBtn.focus();
+            }
         }
 
         function handleShiftSelect(btn) {
             const siteName = (btn && btn.getAttribute("data-site-name")) ? btn.getAttribute("data-site-name") : "Volunteer Project";
-            alert("Signed up for " + siteName);
+            const row = btn.closest(".shift-option-row");
+            if (row) {
+                row.innerHTML = `
+                    <div style="width: 100%; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534;">
+                        <strong style="display: block; margin-bottom: 2px;">Spot Reserved!</strong>
+                        <div style="font-size: 0.86rem;">You are confirmed for ${escapeHtml(siteName)}. A confirmation email has been sent.</div>
+                    </div>
+                `;
+            }
         }
 
         function closeModal() {
-            document.getElementById("project-modal").classList.remove("open");
+            const modal = document.getElementById("project-modal");
+            modal.classList.remove("open");
+            if (state.lastFocusedCard && typeof state.lastFocusedCard.focus === "function") {
+                state.lastFocusedCard.focus();
+            }
         }
 
         function handleBackdropClick(e) {
@@ -1446,7 +1649,55 @@
             }
         }
 
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                const modal = document.getElementById("project-modal");
+                if (modal.classList.contains("open")) {
+                    closeModal();
+                } else if (state.mapOpen) {
+                    toggleMap();
+                }
+            }
+        });
+
+        document.getElementById("project-modal").addEventListener("keydown", (e) => {
+            if (e.key !== "Tab") return;
+            const modal = document.getElementById("project-modal");
+            if (!modal.classList.contains("open")) return;
+            const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+
         document.addEventListener("DOMContentLoaded", () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has("where")) {
+                const w = urlParams.get("where");
+                state.whereQuery = w;
+                document.getElementById("where-input").value = w;
+            }
+            if (urlParams.has("radius")) {
+                const r = urlParams.get("radius");
+                document.getElementById("radius-select").value = r;
+            }
+            if (urlParams.has("when")) {
+                const when = urlParams.get("when");
+                state.whenPreset = when;
+                document.getElementById("when-select").value = when;
+            }
+            if (urlParams.has("cause")) {
+                const cause = urlParams.get("cause");
+                state.selectedInterest = cause;
+                selectInterestChip(cause);
+            }
             triggerSearch();
         });
     </script>
