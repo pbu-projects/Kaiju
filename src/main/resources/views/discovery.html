@@ -1,0 +1,1454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kaiju - Find Volunteer Projects Near You</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌟</text></svg>">
+    <link
+        rel="stylesheet"
+        href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+        crossorigin=""
+    />
+    <style>
+        :root {
+            --bg: #ffffff;
+            --bg-soft: #f7f7f7;
+            --text-primary: #222222;
+            --text-secondary: #717171;
+            --border: #dddddd;
+            --border-light: #ebebeb;
+            --accent: #0f766e;
+            --accent-hover: #115e59;
+            --shadow-pill: 0 1px 2px rgba(0, 0, 0, 0.08), 0 4px 12px rgba(0, 0, 0, 0.05);
+            --shadow-pill-hover: 0 2px 4px rgba(0, 0, 0, 0.12), 0 8px 16px rgba(0, 0, 0, 0.08);
+            --radius-card: 14px;
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            line-height: 1.45;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 1. Calm, Airbnb-Style White Top Header */
+        .site-header {
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border-light);
+            padding: 16px 24px;
+        }
+
+        .header-row {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+        }
+
+        .brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+            flex-shrink: 0;
+        }
+
+        .brand-mark {
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            background: var(--accent);
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.95rem;
+            font-weight: 800;
+        }
+
+        /* 3-Part Search Pill (Where | When | Interest) */
+        .search-pill {
+            flex: 1;
+            max-width: 780px;
+            display: flex;
+            align-items: center;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            box-shadow: var(--shadow-pill);
+            padding: 6px 8px 6px 20px;
+            transition: box-shadow 0.18s ease;
+        }
+
+        .search-pill:focus-within,
+        .search-pill:hover {
+            box-shadow: var(--shadow-pill-hover);
+        }
+
+        .pill-segment {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 4px 14px;
+            min-width: 0;
+        }
+
+        .pill-segment:first-child {
+            flex: 1.45;
+            padding-left: 2px;
+        }
+
+        .pill-divider {
+            width: 1px;
+            height: 28px;
+            background: var(--border-light);
+            flex-shrink: 0;
+        }
+
+        .pill-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.01em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .pill-inline-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pill-input,
+        .pill-select {
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 0.88rem;
+            color: var(--text-primary);
+            padding: 2px 0;
+            width: 100%;
+            outline: none;
+            text-overflow: ellipsis;
+        }
+
+        .pill-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .radius-inline-select {
+            border: none;
+            background: var(--bg-soft);
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 999px;
+            padding: 2px 8px;
+            cursor: pointer;
+            outline: none;
+            flex-shrink: 0;
+        }
+
+        .search-btn {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: none;
+            background: var(--accent);
+            color: #ffffff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background 0.15s ease, transform 0.1s ease;
+        }
+
+        .search-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .search-btn:active {
+            transform: scale(0.96);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .map-toggle-btn {
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-primary);
+            border-radius: 999px;
+            padding: 9px 16px;
+            font-family: inherit;
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+
+        .map-toggle-btn:hover {
+            border-color: var(--text-primary);
+            background: var(--bg-soft);
+        }
+
+        /* 2. Minimalist Category / Interest Bar */
+        .category-bar {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border-light);
+            padding: 0 24px;
+        }
+
+        .category-bar-inner {
+            max-width: 1280px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+        }
+
+        .interest-strip {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 12px 0 0;
+        }
+
+        .interest-strip::-webkit-scrollbar {
+            display: none;
+        }
+
+        .interest-item {
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 4px 2px 12px;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: color 0.15s ease, border-color 0.15s ease;
+        }
+
+        .interest-item:hover {
+            color: var(--text-primary);
+            border-bottom-color: var(--border);
+        }
+
+        .interest-item.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--text-primary);
+        }
+
+        .interest-icon {
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        /* Queue & Sort Sub-Controls */
+        .toolbar-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+            padding: 8px 0;
+        }
+
+        .queue-segmented {
+            display: inline-flex;
+            background: var(--bg-soft);
+            padding: 3px;
+            border-radius: 999px;
+            border: 1px solid var(--border-light);
+        }
+
+        .queue-pill {
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 999px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .queue-pill.active {
+            background: var(--bg);
+            color: var(--text-primary);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .sort-pill {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 7px 12px;
+            cursor: pointer;
+            outline: none;
+        }
+
+        /* 3. Main Content Container */
+        .main-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 24px 24px 64px;
+        }
+
+        .status-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .status-line strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .clear-link {
+            border: none;
+            background: none;
+            color: var(--text-primary);
+            text-decoration: underline;
+            font-family: inherit;
+            font-size: 0.84rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: none;
+        }
+
+        /* Clean Airbnb-Style Card Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 28px 24px;
+        }
+
+        .project-card {
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .card-visual {
+            position: relative;
+            aspect-ratio: 16 / 10;
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            color: #ffffff;
+            transition: transform 0.2s ease;
+        }
+
+        .project-card:hover .card-visual {
+            transform: translateY(-2px);
+        }
+
+        .theme-food {
+            background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+        }
+
+        .theme-cleanup {
+            background: linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%);
+        }
+
+        .theme-outreach {
+            background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);
+        }
+
+        .theme-trails {
+            background: linear-gradient(135deg, #15803d 0%, #22c55e 100%);
+        }
+
+        .theme-regional {
+            background: linear-gradient(135deg, #b45309 0%, #f59e0b 100%);
+        }
+
+        .visual-top-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .visual-pill {
+            background: rgba(255, 255, 255, 0.92);
+            color: var(--text-primary);
+            font-size: 0.74rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .visual-bottom-tag {
+            align-self: flex-start;
+            background: rgba(0, 0, 0, 0.32);
+            backdrop-filter: blur(4px);
+            color: #ffffff;
+            font-size: 0.74rem;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 999px;
+        }
+
+        /* 4 Clean Lines of Card Copy (Airbnb Pattern) */
+        .card-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .card-line-1 {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 0.96rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-distance {
+            font-size: 0.84rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .card-line-2 {
+            font-size: 0.94rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-line-3 {
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-line-4 {
+            margin-top: 2px;
+            font-size: 0.86rem;
+            color: var(--text-secondary);
+        }
+
+        .card-line-4 strong {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        /* Subtle Related Queue Divider below Queue 1 */
+        .related-divider-section {
+            margin-top: 56px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .related-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            gap: 16px;
+        }
+
+        .related-header h2 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .related-header p {
+            margin: 4px 0 0;
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+        }
+
+        /* Map Panel (Hidden by Default for Calm Landing Experience) */
+        .map-drawer {
+            display: none;
+            margin-bottom: 28px;
+            border-radius: var(--radius-card);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            height: 420px;
+        }
+
+        .map-drawer.visible {
+            display: block;
+        }
+
+        #discovery-map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 56px 20px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-card);
+        }
+
+        .empty-state h3 {
+            margin: 0 0 8px;
+            font-size: 1.1rem;
+        }
+
+        .empty-state p {
+            margin: 0 0 18px;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+        }
+
+        .secondary-btn {
+            border: 1px solid var(--text-primary);
+            background: var(--bg);
+            color: var(--text-primary);
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* Clean Project Detail Modal */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 400;
+        }
+
+        .modal-backdrop.open {
+            display: flex;
+        }
+
+        .modal-dialog {
+            background: var(--bg);
+            border-radius: 16px;
+            max-width: 600px;
+            width: 100%;
+            max-height: 88vh;
+            overflow-y: auto;
+            padding: 28px;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+        }
+
+        .modal-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .modal-top h2 {
+            margin: 0;
+            font-size: 1.35rem;
+        }
+
+        .close-btn {
+            border: none;
+            background: var(--bg-soft);
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            font-size: 1.1rem;
+            cursor: pointer;
+        }
+
+        .shift-option-row {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .primary-btn {
+            border: none;
+            background: var(--accent);
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-family: inherit;
+            font-size: 0.86rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        @media (max-width: 860px) {
+            .header-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-pill {
+                flex-direction: column;
+                border-radius: 16px;
+                padding: 12px;
+                gap: 8px;
+            }
+
+            .pill-divider {
+                width: 100%;
+                height: 1px;
+            }
+
+            .category-bar-inner {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Clean Top Header with Centered 3-Part Search Pill -->
+    <header class="site-header">
+        <div class="header-row">
+            <a href="/" class="brand">
+                <span class="brand-mark">K</span>
+                <span>kaiju</span>
+            </a>
+
+            <form id="discovery-search-form" class="search-pill" onsubmit="handleSearchSubmit(event)">
+                <!-- Where -->
+                <div class="pill-segment">
+                    <label for="where-input" class="pill-label">Where</label>
+                    <div class="pill-inline-row">
+                        <input
+                            type="text"
+                            id="where-input"
+                            name="where"
+                            class="pill-input"
+                            value="950 S Birch St, Glendale, CO"
+                            placeholder="Address, city, or ZIP"
+                            autocomplete="off"
+                        />
+                        <select id="radius-select" name="radiusMiles" class="radius-inline-select" aria-label="Search radius" onchange="triggerSearch()">
+                            <option value="5">5 mi</option>
+                            <option value="10">10 mi</option>
+                            <option value="15">15 mi</option>
+                            <option value="25" selected>25 mi</option>
+                            <option value="50">50 mi</option>
+                            <option value="100">100 mi</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pill-divider"></div>
+
+                <!-- When -->
+                <div class="pill-segment">
+                    <label for="when-select" class="pill-label">When</label>
+                    <select id="when-select" name="when" class="pill-select" onchange="applyFiltersAndRender()">
+                        <option value="any" selected>Any dates</option>
+                        <option value="weekend">This weekend</option>
+                        <option value="next7">Next 7 days</option>
+                        <option value="dec2026">December</option>
+                    </select>
+                </div>
+
+                <div class="pill-divider"></div>
+
+                <!-- Interest / Keyword -->
+                <div class="pill-segment">
+                    <label for="interest-input" class="pill-label">Interest</label>
+                    <input
+                        type="text"
+                        id="interest-input"
+                        name="interest"
+                        class="pill-input"
+                        placeholder="Add cause or keyword"
+                        oninput="handleInterestInputChange()"
+                    />
+                </div>
+
+                <button type="submit" class="search-btn" title="Search projects" aria-label="Search projects">
+                    &#128269;
+                </button>
+            </form>
+
+            <div class="header-right">
+                <button type="button" id="map-toggle-btn" class="map-toggle-btn" onclick="toggleMap()">
+                    <span id="map-toggle-label">Show map</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. Minimalist Horizontal Interest Bar + Queue & Sort Controls -->
+    <section class="category-bar" aria-label="Volunteer Interests">
+        <div class="category-bar-inner">
+            <div id="interest-tag-strip" class="interest-strip">
+                <button type="button" class="interest-item active" data-interest="All Causes" onclick="selectInterestChip('All Causes')">
+                    <span class="interest-icon">&#10024;</span>
+                    <span>All Causes</span>
+                </button>
+                <button type="button" class="interest-item" data-interest="Food & Hunger" onclick="selectInterestChip('Food & Hunger')">
+                    <span class="interest-icon">&#129367;</span>
+                    <span>Food &amp; Hunger</span>
+                </button>
+                <button type="button" class="interest-item" data-interest="Civic Clean-Up" onclick="selectInterestChip('Civic Clean-Up')">
+                    <span class="interest-icon">&#129529;</span>
+                    <span>Civic Clean-Up</span>
+                </button>
+                <button type="button" class="interest-item" data-interest="Traveler & Shelter Outreach" onclick="selectInterestChip('Traveler & Shelter Outreach')">
+                    <span class="interest-icon">&#129309;</span>
+                    <span>Traveler &amp; Shelter Outreach</span>
+                </button>
+                <button type="button" class="interest-item" data-interest="Environment & Trails" onclick="selectInterestChip('Environment & Trails')">
+                    <span class="interest-icon">&#127794;</span>
+                    <span>Environment &amp; Trails</span>
+                </button>
+                <button type="button" class="interest-item" data-interest="Family Support" onclick="selectInterestChip('Family Support')">
+                    <span class="interest-icon">&#127968;</span>
+                    <span>Family Support</span>
+                </button>
+            </div>
+
+            <div class="toolbar-controls">
+                <div class="queue-segmented" role="tablist" aria-label="Opportunity Type Queue">
+                    <button type="button" id="tab-shifts" class="queue-pill active" onclick="switchQueue('shifts')">
+                        Shifts (<span id="shifts-count">0</span>)
+                    </button>
+                    <button type="button" id="tab-related" class="queue-pill" onclick="switchQueue('related')">
+                        Related: Open Door &amp; Regional Nearby (<span id="related-count">0</span>)
+                    </button>
+                </div>
+
+                <select id="sort-select" class="sort-pill" aria-label="Sort results" onchange="applyFiltersAndRender()">
+                    <option value="nearest" selected>Sort: Nearest (Location)</option>
+                    <option value="soonest">Sort: Soonest (Shift Date)</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3. Calm Main Results Area -->
+    <main class="main-container">
+        <div class="status-line">
+            <span id="status-summary">Searching nearby projects...</span>
+            <button type="button" id="clear-filters-btn" class="clear-link" onclick="resetAllFilters()">Reset filters</button>
+        </div>
+
+        <div id="map-drawer" class="map-drawer">
+            <div id="discovery-map"></div>
+        </div>
+
+        <!-- Queue 1: Scheduled Shifts -->
+        <section id="scheduled-shifts-queue" aria-label="Scheduled Shift Projects">
+            <div id="shifts-grid" class="cards-grid"></div>
+
+            <!-- Subtle Related Queue Section below Queue 1 -->
+            <div id="related-preview-section" class="related-divider-section">
+                <div class="related-header">
+                    <div>
+                        <h2>Also in your area: Open Door &amp; Regional ways to help</h2>
+                        <p>Walk-in locations and county-wide rosters that do not require booking a specific shift time.</p>
+                    </div>
+                </div>
+                <div id="related-preview-grid" class="cards-grid"></div>
+            </div>
+        </section>
+
+        <!-- Queue 2: Dedicated Open Door & Regional View -->
+        <section id="related-opportunities-queue" style="display: none;" aria-label="Open Door and Regional Opportunities">
+            <div id="related-grid" class="cards-grid"></div>
+        </section>
+    </main>
+
+    <!-- Clean Project Detail & Shift Picker Modal -->
+    <div id="project-modal" class="modal-backdrop" onclick="handleBackdropClick(event)">
+        <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+            <div class="modal-top">
+                <div>
+                    <div id="modal-org" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;"></div>
+                    <h2 id="modal-title"></h2>
+                </div>
+                <button type="button" class="close-btn" onclick="closeModal()" aria-label="Close">&times;</button>
+            </div>
+            <p id="modal-description" style="color: var(--text-secondary); margin: 0 0 20px;"></p>
+            <div id="modal-shifts-container"></div>
+        </div>
+    </div>
+
+    <script
+        src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+        crossorigin=""
+    ></script>
+    <script>
+        const METERS_PER_MILE = 1609.344;
+
+        const KNOWN_LOCATIONS = [
+            { keys: ["950 s birch", "glendale", "80246"], label: "950 S Birch St, Glendale, CO", lat: 39.7029, lon: -104.9336 },
+            { keys: ["1001 16th", "16th street", "80265"], label: "1001 16th St Mall, Denver, CO", lat: 39.7465, lon: -104.9942 },
+            { keys: ["1437 bannock", "denver", "80202", "80203"], label: "1437 Bannock St, Denver, CO", lat: 39.7392, lon: -104.9928 },
+            { keys: ["8500 pena", "dia", "airport", "80249"], label: "8500 Pena Blvd, Denver, CO", lat: 39.8561, lon: -104.6737 },
+            { keys: ["15151 e alameda", "aurora", "80012"], label: "Aurora, CO 80012", lat: 39.7088, lon: -104.8093 },
+            { keys: ["1300 pearl", "boulder", "80302", "80301"], label: "Boulder, CO 80302", lat: 40.0150, lon: -105.2705 },
+            { keys: ["107 n nevada", "colorado springs", "80903"], label: "Colorado Springs, CO 80903", lat: 38.8339, lon: -104.8214 },
+            { keys: ["116 s main", "fountain", "80817"], label: "Fountain, CO 80817", lat: 38.6822, lon: -104.7008 }
+        ];
+
+        const LOCATION_CATALOG = {
+            "d0000000-0000-0000-0000-000000000001": { id: "d0000000-0000-0000-0000-000000000001", name: "16th Street Mall Hub", addressLine: "1001 16th St Mall", city: "Denver", stateProvince: "CO", lat: 39.7465, lon: -104.9942 },
+            "d0000000-0000-0000-0000-000000000002": { id: "d0000000-0000-0000-0000-000000000002", name: "Denver Civic Center", addressLine: "1437 Bannock St", city: "Denver", stateProvince: "CO", lat: 39.7392, lon: -104.9928 },
+            "d0000000-0000-0000-0000-000000000003": { id: "d0000000-0000-0000-0000-000000000003", name: "DIA Welcome Desk", addressLine: "8500 Pena Blvd", city: "Denver", stateProvince: "CO", lat: 39.8561, lon: -104.6737 },
+            "d0000000-0000-0000-0000-000000000004": { id: "d0000000-0000-0000-0000-000000000004", name: "Glendale Community Pantry", addressLine: "950 S Birch St", city: "Glendale", stateProvince: "CO", lat: 39.7029, lon: -104.9336 },
+            "d0000000-0000-0000-0000-000000000005": { id: "d0000000-0000-0000-0000-000000000005", name: "Aurora Relief Center", addressLine: "15151 E Alameda Pkwy", city: "Aurora", stateProvince: "CO", lat: 39.7088, lon: -104.8093 },
+            "d0000000-0000-0000-0000-000000000006": { id: "d0000000-0000-0000-0000-000000000006", name: "Boulder Pearl Street Station", addressLine: "1300 Pearl St", city: "Boulder", stateProvince: "CO", lat: 40.0150, lon: -105.2705 },
+            "d0000000-0000-0000-0000-000000000007": { id: "d0000000-0000-0000-0000-000000000007", name: "Colorado Springs Civic Hub", addressLine: "107 N Nevada Ave", city: "Colorado Springs", stateProvince: "CO", lat: 38.8339, lon: -104.8214 },
+            "d0000000-0000-0000-0000-000000000008": { id: "d0000000-0000-0000-0000-000000000008", name: "Fountain Valley Food Bank", addressLine: "116 S Main St", city: "Fountain", stateProvince: "CO", lat: 38.6822, lon: -104.7008 },
+            "962211ec-af22-5512-aed0-68416451334f": { id: "962211ec-af22-5512-aed0-68416451334f", name: "Denver Donations Warehouse", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7557097, lon: -104.9883379 },
+            "c9f14c02-eb40-5d7e-9ccc-0b43c335ac26": { id: "c9f14c02-eb40-5d7e-9ccc-0b43c335ac26", name: "Denver Dining Hall", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7557097, lon: -104.9883379 },
+            "9cbc2c09-f708-565e-9484-2c85eec91f4c": { id: "9cbc2c09-f708-565e-9484-2c85eec91f4c", name: "Samaritan House Downtown", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.755554, lon: -104.988311 },
+            "ff57abce-1faf-5d7d-a635-e417bfdb7d75": { id: "ff57abce-1faf-5d7d-a635-e417bfdb7d75", name: "Denver Outreach Center", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7516303, lon: -104.987852 },
+            "8123f936-80da-5c18-bc1d-54a03569a843": { id: "8123f936-80da-5c18-bc1d-54a03569a843", name: "Denver Family Activity Hub", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7522498, lon: -104.9839254 },
+            "28c52695-d039-5e58-a633-522ed9a33973": { id: "28c52695-d039-5e58-a633-522ed9a33973", name: "Denver Toy Drive Depot", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7522498, lon: -104.9839254 },
+            "afc97525-dd6b-5890-abd0-30df7e304807": { id: "afc97525-dd6b-5890-abd0-30df7e304807", name: "Denver Community Tax Clinic", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7522498, lon: -104.9839254 },
+            "7858c8b2-0b29-5ada-b501-cae6d0e43097": { id: "7858c8b2-0b29-5ada-b501-cae6d0e43097", name: "Mile High United Way Corner", addressLine: "Denver, CO 80205", city: "Denver", stateProvince: "CO", lat: 39.7522498, lon: -104.9839254 },
+            "25363049-5746-537b-aac0-514b712cc81e": { id: "25363049-5746-537b-aac0-514b712cc81e", name: "Conversa Corps Hub", addressLine: "Denver, CO 80202", city: "Denver", stateProvince: "CO", lat: 39.7392358, lon: -104.990251 },
+            "4e1b1bb2-5b1c-5688-b573-3290963b2fae": { id: "4e1b1bb2-5b1c-5688-b573-3290963b2fae", name: "Denver Metro Events Hub", addressLine: "Denver, CO 80202", city: "Denver", stateProvince: "CO", lat: 39.7392358, lon: -104.990251 },
+            "d27226d4-9911-5273-81c3-4e4863fe3044": { id: "d27226d4-9911-5273-81c3-4e4863fe3044", name: "Vitalant Boulder Station", addressLine: "Boulder, CO 80301", city: "Boulder", stateProvince: "CO", lat: 40.0310487, lon: -105.259252 },
+            "0e86b38b-6396-5816-b511-90d43c0f13bb": { id: "0e86b38b-6396-5816-b511-90d43c0f13bb", name: "Boulder Housing Center", addressLine: "Boulder, CO 80303", city: "Boulder", stateProvince: "CO", lat: 40.005308, lon: -105.2566365 },
+            "f6bf260c-ae18-520d-90a1-1a003aadde14": { id: "f6bf260c-ae18-520d-90a1-1a003aadde14", name: "Boulder Food Pantry", addressLine: "Boulder, CO 80301", city: "Boulder", stateProvince: "CO", lat: 40.0250029, lon: -105.2408919 },
+            "5069dd1c-57a7-5ea6-8665-ff1d691dd9a5": { id: "5069dd1c-57a7-5ea6-8665-ff1d691dd9a5", name: "ARC Thrift Louisville", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9860464, lon: -105.2294184 },
+            "5a9834e9-0f57-5378-87cc-9e762747eda0": { id: "5a9834e9-0f57-5378-87cc-9e762747eda0", name: "Louisville Garden Share", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9597417, lon: -105.1192259 },
+            "575c1430-0ba8-5352-811b-7c7826030099": { id: "575c1430-0ba8-5352-811b-7c7826030099", name: "Blue Spruce Drivers Lafayette", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9597417, lon: -105.1192259 },
+            "0fd85dc7-7986-5f12-9b78-93435fa88a15": { id: "0fd85dc7-7986-5f12-9b78-93435fa88a15", name: "Louisville Harvest Donations", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9597417, lon: -105.1192259 },
+            "7ff047d3-93dc-5b90-83f2-acb3de9d36dd": { id: "7ff047d3-93dc-5b90-83f2-acb3de9d36dd", name: "Community Food Share Depot", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9597417, lon: -105.1192259 },
+            "2fe50ebf-f598-547a-ad7b-c8d4f59b6ecf": { id: "2fe50ebf-f598-547a-ad7b-c8d4f59b6ecf", name: "Feeding Families Pantry", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9597417, lon: -105.1192259 },
+            "faa11108-6242-5e4a-bba4-592c16bf9aa0": { id: "faa11108-6242-5e4a-bba4-592c16bf9aa0", name: "Community Food Share Warehouse", addressLine: "Louisville, CO 80027", city: "Louisville", stateProvince: "CO", lat: 39.9597274, lon: -105.1193762 },
+            "13fc803a-dd9a-519f-8e0f-71a06594ae07": { id: "13fc803a-dd9a-519f-8e0f-71a06594ae07", name: "Brighton Hospice Center", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8353142, lon: -104.8216009 },
+            "ecda8442-b4c6-5bc3-9811-4c04b9299e7e": { id: "ecda8442-b4c6-5bc3-9811-4c04b9299e7e", name: "Colorado Springs Vigil Care", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8353142, lon: -104.8216009 },
+            "cfe22421-4409-5f51-a8f6-c097f8724f23": { id: "cfe22421-4409-5f51-a8f6-c097f8724f23", name: "Colorado Springs Care Center", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8353142, lon: -104.8216009 },
+            "e32f0c7c-efff-5abe-a033-d1ed88387dd0": { id: "e32f0c7c-efff-5abe-a033-d1ed88387dd0", name: "Colorado Springs Veterans Center", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8353142, lon: -104.8216009 },
+            "0cc98e13-9fdc-5901-bd08-96a4cb17f76f": { id: "0cc98e13-9fdc-5901-bd08-96a4cb17f76f", name: "Colorado Springs Community Facility", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8353142, lon: -104.8216009 },
+            "c7cb48ec-c4d2-55f5-8ca4-2782d07ea376": { id: "c7cb48ec-c4d2-55f5-8ca4-2782d07ea376", name: "Partners in Housing Center", addressLine: "Colorado Springs, CO 80903", city: "Colorado Springs", stateProvince: "CO", lat: 38.8353142, lon: -104.8216009 },
+            "cffd6f5f-b6d9-5611-9095-dfe06a8c7920": { id: "cffd6f5f-b6d9-5611-9095-dfe06a8c7920", name: "Colorado Springs Childcare Center", addressLine: "Colorado Springs, CO 80903", city: "Colorado Springs", stateProvince: "CO", lat: 38.832706, lon: -104.817572 },
+            "a6b2f334-0b5b-511d-9635-2c00fe7e89ff": { id: "a6b2f334-0b5b-511d-9635-2c00fe7e89ff", name: "Colorado Springs Welcome Desk", addressLine: "Colorado Springs, CO 80903", city: "Colorado Springs", stateProvince: "CO", lat: 38.832706, lon: -104.817572 },
+            "bd56768c-8035-5364-a947-f162c0cefa7b": { id: "bd56768c-8035-5364-a947-f162c0cefa7b", name: "MADD Colorado Springs Center", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8338816, lon: -104.8213634 },
+            "04be1e67-e9a1-5c9f-882f-3fd71c50a2b9": { id: "04be1e67-e9a1-5c9f-882f-3fd71c50a2b9", name: "Colorado Springs Outreach", addressLine: "Colorado Springs, CO 80202", city: "Colorado Springs", stateProvince: "CO", lat: 38.8338816, lon: -104.8213634 }
+        };
+
+        const PROJECT_ENRICHMENT = {
+            "e0000000-0000-0000-0000-000000000001": {
+                locationIds: ["d0000000-0000-0000-0000-000000000001", "d0000000-0000-0000-0000-000000000002"],
+                tags: ["Civic Clean-Up", "Traveler & Shelter Outreach"],
+                remainingSeats: 20,
+                theme: "theme-cleanup",
+                shifts: [
+                    { locationId: "d0000000-0000-0000-0000-000000000001", startTime: "2026-12-05T16:00:00Z", seats: 20 },
+                    { locationId: "d0000000-0000-0000-0000-000000000002", startTime: "2026-12-06T16:00:00Z", seats: 25 }
+                ]
+            },
+            "e0000000-0000-0000-0000-000000000002": {
+                locationIds: ["d0000000-0000-0000-0000-000000000003"],
+                tags: ["Traveler & Shelter Outreach", "Family Support"],
+                remainingSeats: 15,
+                theme: "theme-outreach",
+                walkInHours: "Walk-in hours daily · 7:00 AM - 9:00 PM"
+            },
+            "e0000000-0000-0000-0000-000000000003": {
+                locationIds: ["d0000000-0000-0000-0000-000000000004", "d0000000-0000-0000-0000-000000000005"],
+                tags: ["Food & Hunger", "Family Support"],
+                remainingSeats: 30,
+                theme: "theme-food",
+                shifts: [
+                    { locationId: "d0000000-0000-0000-0000-000000000004", startTime: "2026-12-08T17:00:00Z", seats: 30 },
+                    { locationId: "d0000000-0000-0000-0000-000000000005", startTime: "2026-12-09T17:00:00Z", seats: 35 }
+                ]
+            },
+            "e0000000-0000-0000-0000-000000000004": {
+                locationIds: ["d0000000-0000-0000-0000-000000000006"],
+                tags: ["Environment & Trails", "Civic Clean-Up"],
+                remainingSeats: 20,
+                theme: "theme-trails",
+                shifts: [
+                    { locationId: "d0000000-0000-0000-0000-000000000006", startTime: "2026-12-10T16:00:00Z", seats: 20 }
+                ]
+            },
+            "e0000000-0000-0000-0000-000000000005": {
+                locationIds: ["d0000000-0000-0000-0000-000000000007", "d0000000-0000-0000-0000-000000000008"],
+                tags: ["Food & Hunger", "Family Support"],
+                remainingSeats: 25,
+                theme: "theme-food",
+                shifts: [
+                    { locationId: "d0000000-0000-0000-0000-000000000007", startTime: "2026-12-11T16:00:00Z", seats: 25 },
+                    { locationId: "d0000000-0000-0000-0000-000000000008", startTime: "2026-12-12T16:00:00Z", seats: 30 }
+                ]
+            }
+        };
+
+        const REGIONAL_OPPORTUNITIES = [
+            {
+                projectId: "regional-colorado-shelter-roster",
+                projectTitle: "Winter Emergency Shelter & Family Support Roster",
+                projectType: "REGIONAL",
+                organizationName: "Colorado State Chapter",
+                locationName: "Arapahoe & Denver Counties",
+                city: "Region-Wide",
+                distanceLabel: "Covers your area",
+                scheduleLabel: "Flexible on-call roster",
+                availabilityLabel: "Open regional roster",
+                description: "Area-wide responder roster supporting winter warming shelters and family supply deliveries across your county.",
+                tags: ["Family Support", "Traveler & Shelter Outreach"],
+                theme: "theme-regional"
+            }
+        ];
+
+        const state = {
+            whereQuery: "950 S Birch St, Glendale, CO",
+            resolvedLabel: "950 S Birch St, Glendale, CO",
+            lat: 39.7029,
+            lon: -104.9336,
+            radiusMiles: 25,
+            whenPreset: "any",
+            selectedInterest: "All Causes",
+            interestQuery: "",
+            sortBy: "nearest",
+            activeQueue: "shifts",
+            mapOpen: false,
+            rawSearchCards: [],
+            allProjectsMap: {},
+            filteredShifts: [],
+            filteredRelated: [],
+            map: null,
+            mapLayerGroup: null
+        };
+
+        function computeMilesBetween(lat1, lon1, lat2, lon2) {
+            const toRad = (deg) => (deg * Math.PI) / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            return 3958.8 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        }
+
+        async function geocodeWhereInput(rawQuery) {
+            const cleaned = (rawQuery || "").trim();
+            if (!cleaned) {
+                return { label: "950 S Birch St, Glendale, CO", lat: 39.7029, lon: -104.9336 };
+            }
+
+            const normalized = cleaned.toLowerCase();
+            for (const item of KNOWN_LOCATIONS) {
+                if (item.keys.some((k) => normalized === k || normalized.includes(k))) {
+                    return { label: item.label, lat: item.lat, lon: item.lon };
+                }
+            }
+
+            try {
+                const url = "https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=us&limit=1&q=" + encodeURIComponent(cleaned);
+                const resp = await fetch(url, { headers: { "Accept": "application/json" } });
+                if (resp.ok) {
+                    const results = await resp.json();
+                    if (Array.isArray(results) && results.length > 0) {
+                        const hit = results[0];
+                        return {
+                            label: hit.display_name ? hit.display_name.split(",").slice(0, 2).join(",") : cleaned,
+                            lat: parseFloat(hit.lat),
+                            lon: parseFloat(hit.lon)
+                        };
+                    }
+                }
+            } catch (_err) {
+                // Keep current coordinates if offline
+            }
+
+            return { label: cleaned, lat: state.lat, lon: state.lon };
+        }
+
+        async function fetchProjectsAndSearch() {
+            const radiusMeters = Math.min(500000, Math.round(state.radiusMiles * METERS_PER_MILE));
+            const searchUrl = `/projects/search-by-location?longitude=${encodeURIComponent(state.lon)}&latitude=${encodeURIComponent(state.lat)}&radiusMeters=${encodeURIComponent(radiusMeters)}&size=50`;
+
+            try {
+                const searchResp = await fetch(searchUrl, { headers: { "Accept": "application/json" } });
+                if (searchResp.ok) {
+                    const searchPage = await searchResp.json();
+                    state.rawSearchCards = (searchPage && searchPage.content) ? searchPage.content : [];
+                }
+
+                const missingIds = state.rawSearchCards
+                    .map((c) => c.projectId)
+                    .filter((id) => id && !state.allProjectsMap[id]);
+                if (missingIds.length > 0) {
+                    const details = await Promise.all(
+                        missingIds.map((id) =>
+                            fetch(`/projects/${encodeURIComponent(id)}`, { headers: { "Accept": "application/json" } })
+                                .then((r) => (r.ok ? r.json() : null))
+                                .catch(() => null)
+                        )
+                    );
+                    for (const proj of details) {
+                        if (proj && proj.id) {
+                            state.allProjectsMap[proj.id] = proj;
+                        }
+                    }
+                }
+            } catch (_err) {
+                // Keep existing state on transient error
+            }
+
+            applyFiltersAndRender();
+        }
+
+        function formatShortDate(isoString) {
+            if (!isoString) {
+                return "Flexible dates";
+            }
+            const d = new Date(isoString);
+            if (Number.isNaN(d.getTime())) {
+                return isoString;
+            }
+            return d.toLocaleDateString("en-US", {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit"
+            });
+        }
+
+        function matchesDateFilter(isoString) {
+            if (!isoString || state.whenPreset === "any") {
+                return true;
+            }
+            const ts = new Date(isoString).getTime();
+            if (Number.isNaN(ts)) {
+                return true;
+            }
+            if (state.whenPreset === "weekend") {
+                return ts >= new Date("2026-12-05T00:00:00Z").getTime() && ts <= new Date("2026-12-06T23:59:59Z").getTime();
+            }
+            if (state.whenPreset === "next7") {
+                return ts >= new Date("2026-12-05T00:00:00Z").getTime() && ts <= new Date("2026-12-12T23:59:59Z").getTime();
+            }
+            if (state.whenPreset === "dec2026") {
+                return ts >= new Date("2026-12-01T00:00:00Z").getTime() && ts <= new Date("2026-12-31T23:59:59Z").getTime();
+            }
+            return true;
+        }
+
+        function matchesInterestFilter(item) {
+            if (state.selectedInterest !== "All Causes") {
+                const matchChip = (item.tags || []).some((t) => t.toLowerCase() === state.selectedInterest.toLowerCase());
+                if (!matchChip) {
+                    return false;
+                }
+            }
+            const q = (state.interestQuery || "").trim().toLowerCase();
+            if (q) {
+                const text = [item.projectTitle, item.locationName, item.organizationName, ...(item.tags || [])].join(" ").toLowerCase();
+                if (!text.includes(q)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function escapeHtml(value) {
+            if (value === null || value === undefined) {
+                return "";
+            }
+            return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#39;");
+        }
+
+        function deriveProjectMeta(title, orgName) {
+            const text = ((title || "") + " " + (orgName || "")).toLowerCase();
+            if (/food|hunger|pantry|meal|dining|kitchen|harvest|garden|warehouse|feeding/.test(text)) {
+                return { tags: ["Food & Hunger"], theme: "theme-food" };
+            }
+            if (/clean|trash|litter|maintenance|thrift|beautif|park|madd/.test(text)) {
+                return { tags: ["Civic Clean-Up"], theme: "theme-cleanup" };
+            }
+            if (/shelter|homeless|outreach|samaritan|hospice|vigil|care|driver|veteran/.test(text)) {
+                return { tags: ["Traveler & Shelter Outreach"], theme: "theme-outreach" };
+            }
+            if (/child|family|youth|kid|parent|tax|housing|senior|chat/.test(text)) {
+                return { tags: ["Family Support"], theme: "theme-family" };
+            }
+            if (/trail|tree|plant|nature|outdoor|river|green/.test(text)) {
+                return { tags: ["Environment & Trails"], theme: "theme-trails" };
+            }
+            return { tags: ["Community"], theme: "theme-food" };
+        }
+
+        function applyFiltersAndRender() {
+            state.whenPreset = document.getElementById("when-select").value || "any";
+            state.sortBy = document.getElementById("sort-select").value || "nearest";
+
+            const shifts = [];
+            const related = [];
+
+            for (const card of state.rawSearchCards) {
+                const full = state.allProjectsMap[card.projectId] || {};
+                const enrich = PROJECT_ENRICHMENT[card.projectId] || {};
+                const loc = LOCATION_CATALOG[card.locationId] || {
+                    name: card.locationName || "Community Site",
+                    city: "Denver",
+                    lat: state.lat,
+                    lon: state.lon
+                };
+                const dist = computeMilesBetween(state.lat, state.lon, loc.lat, loc.lon);
+                const extraLocations = Math.max(0, (enrich.locationIds || [card.locationId]).length - 1);
+                const meta = deriveProjectMeta(card.projectTitle || full.title, (full.organization && full.organization.name) ? full.organization.name : "");
+
+                const item = {
+                    projectId: card.projectId,
+                    projectTitle: (card.projectTitle || full.title || "").trim(),
+                    projectType: full.projectType || "STANDARD",
+                    organizationName: (full.organization && full.organization.name) ? full.organization.name : "Community Partner",
+                    description: full.description || "",
+                    locationName: loc.name,
+                    city: loc.city,
+                    lat: loc.lat,
+                    lon: loc.lon,
+                    distanceMiles: dist,
+                    distanceLabel: `${dist.toFixed(1)} mi away`,
+                    nextShiftStart: card.nextShiftStart,
+                    scheduleLabel: extraLocations > 0
+                        ? `${formatShortDate(card.nextShiftStart)} (+${extraLocations} more site)`
+                        : formatShortDate(card.nextShiftStart),
+                    availabilityLabel: `${enrich.remainingSeats || 20} spots left`,
+                    tags: (enrich.tags && enrich.tags.length > 0) ? enrich.tags : meta.tags,
+                    theme: enrich.theme || meta.theme,
+                    shifts: enrich.shifts || [],
+                    walkInHours: enrich.walkInHours
+                };
+
+                if (!matchesInterestFilter(item)) {
+                    continue;
+                }
+
+                if (item.projectType === "OPEN_DOOR" || item.projectType === "REGIONAL") {
+                    item.scheduleLabel = item.walkInHours || "Flexible walk-in hours";
+                    item.availabilityLabel = "Open Door walk-in";
+                    related.push(item);
+                } else if (matchesDateFilter(item.nextShiftStart)) {
+                    shifts.push(item);
+                }
+            }
+
+            for (const reg of REGIONAL_OPPORTUNITIES) {
+                if (matchesInterestFilter(reg)) {
+                    related.push(reg);
+                }
+            }
+
+            if (state.sortBy === "soonest") {
+                shifts.sort((a, b) => new Date(a.nextShiftStart || 0) - new Date(b.nextShiftStart || 0));
+            } else {
+                shifts.sort((a, b) => a.distanceMiles - b.distanceMiles);
+            }
+
+            state.filteredShifts = shifts;
+            state.filteredRelated = related;
+
+            renderUI();
+        }
+
+        function renderCard(item, badgeLabel) {
+            const primaryTag = (item.tags && item.tags[0]) ? item.tags[0] : "Volunteer";
+            const cityBadge = item.city ? `${item.city}, CO` : (item.locationName || "Local Site");
+            return `
+                <article class="project-card" onclick="openProjectModal('${escapeHtml(item.projectId)}')">
+                    <div class="card-visual ${escapeHtml(item.theme)}">
+                        <div class="visual-top-row">
+                            <span class="visual-pill">${escapeHtml(badgeLabel)}</span>
+                        </div>
+                        <span class="visual-bottom-tag">${escapeHtml(primaryTag)}</span>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-line-1">
+                            <span>${escapeHtml(cityBadge)}</span>
+                            <span class="card-distance">${escapeHtml(item.distanceLabel)}</span>
+                        </div>
+                        <div class="card-line-2">${escapeHtml(item.projectTitle)}</div>
+                        <div class="card-line-3">Hosted by ${escapeHtml(item.organizationName)}</div>
+                        <div class="card-line-4"><span>${escapeHtml(item.scheduleLabel)}</span> · <strong>${escapeHtml(item.availabilityLabel)}</strong></div>
+                    </div>
+                </article>
+            `;
+        }
+
+        function renderUI() {
+            document.getElementById("shifts-count").textContent = state.filteredShifts.length;
+            document.getElementById("related-count").textContent = state.filteredRelated.length;
+
+            const hasActiveFilter = state.selectedInterest !== "All Causes" || state.whenPreset !== "any" || state.interestQuery.trim() !== "";
+            document.getElementById("clear-filters-btn").style.display = hasActiveFilter ? "inline" : "none";
+
+            const summaryEl = document.getElementById("status-summary");
+            summaryEl.innerHTML = `Showing <strong>${state.filteredShifts.length} shift project${state.filteredShifts.length === 1 ? "" : "s"}</strong> within ${state.radiusMiles} miles of <strong>${state.resolvedLabel}</strong>`;
+
+            const shiftsGrid = document.getElementById("shifts-grid");
+            if (state.filteredShifts.length === 0) {
+                shiftsGrid.innerHTML = `
+                    <div class="empty-state" style="grid-column: 1 / -1;">
+                        <h3>No scheduled shifts match those exact filters</h3>
+                        <p>Try expanding your distance radius or clearing your active filters.</p>
+                        <button type="button" class="secondary-btn" onclick="expandRadius()">Expand to 50 miles</button>
+                    </div>
+                `;
+            } else {
+                shiftsGrid.innerHTML = state.filteredShifts
+                    .map((item) => renderCard(item, item.city))
+                    .join("");
+            }
+
+            const relatedPreviewSection = document.getElementById("related-preview-section");
+            const relatedPreviewGrid = document.getElementById("related-preview-grid");
+            const relatedGrid = document.getElementById("related-grid");
+
+            const relatedHtml = state.filteredRelated
+                .map((item) => renderCard(item, item.projectType === "REGIONAL" ? "Regional" : "Open Door"))
+                .join("");
+
+            relatedPreviewSection.style.display = state.filteredRelated.length > 0 ? "block" : "none";
+            relatedPreviewGrid.innerHTML = relatedHtml;
+            relatedGrid.innerHTML = relatedHtml || `<div class="empty-state" style="grid-column: 1 / -1;"><h3>No Open Door or Regional opportunities in this area</h3></div>`;
+
+            if (state.mapOpen) {
+                updateMapMarkers();
+            }
+        }
+
+        function switchQueue(queue) {
+            state.activeQueue = queue;
+            document.getElementById("tab-shifts").classList.toggle("active", queue === "shifts");
+            document.getElementById("tab-related").classList.toggle("active", queue === "related");
+            document.getElementById("scheduled-shifts-queue").style.display = queue === "shifts" ? "block" : "none";
+            document.getElementById("related-opportunities-queue").style.display = queue === "related" ? "block" : "none";
+        }
+
+        function selectInterestChip(interest) {
+            state.selectedInterest = interest;
+            document.querySelectorAll(".interest-item").forEach((btn) => {
+                btn.classList.toggle("active", btn.getAttribute("data-interest") === interest);
+            });
+            applyFiltersAndRender();
+        }
+
+        function handleInterestInputChange() {
+            state.interestQuery = document.getElementById("interest-input").value || "";
+            applyFiltersAndRender();
+        }
+
+        async function triggerSearch() {
+            state.whereQuery = document.getElementById("where-input").value;
+            state.radiusMiles = parseInt(document.getElementById("radius-select").value, 10) || 25;
+            const geo = await geocodeWhereInput(state.whereQuery);
+            state.resolvedLabel = geo.label;
+            state.lat = geo.lat;
+            state.lon = geo.lon;
+            await fetchProjectsAndSearch();
+        }
+
+        function handleSearchSubmit(event) {
+            event.preventDefault();
+            triggerSearch();
+        }
+
+        function expandRadius() {
+            document.getElementById("radius-select").value = "50";
+            triggerSearch();
+        }
+
+        function resetAllFilters() {
+            state.selectedInterest = "All Causes";
+            state.whenPreset = "any";
+            state.interestQuery = "";
+            document.getElementById("when-select").value = "any";
+            document.getElementById("interest-input").value = "";
+            selectInterestChip("All Causes");
+        }
+
+        function toggleMap() {
+            state.mapOpen = !state.mapOpen;
+            const drawer = document.getElementById("map-drawer");
+            drawer.classList.toggle("visible", state.mapOpen);
+            document.getElementById("map-toggle-label").textContent = state.mapOpen ? "Hide map" : "Show map";
+            if (state.mapOpen) {
+                if (!state.map && typeof L !== "undefined") {
+                    state.map = L.map("discovery-map").setView([state.lat, state.lon], 11);
+                    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                        attribution: "&copy; OpenStreetMap contributors"
+                    }).addTo(state.map);
+                    state.mapLayerGroup = L.layerGroup().addTo(state.map);
+                }
+                setTimeout(() => {
+                    if (state.map) {
+                        state.map.invalidateSize();
+                        updateMapMarkers();
+                    }
+                }, 50);
+            }
+        }
+
+        function updateMapMarkers() {
+            if (!state.map || !state.mapLayerGroup) {
+                return;
+            }
+            state.mapLayerGroup.clearLayers();
+            state.map.setView([state.lat, state.lon], 10);
+            L.circle([state.lat, state.lon], {
+                radius: state.radiusMiles * METERS_PER_MILE,
+                color: "#0f766e",
+                fillOpacity: 0.06
+            }).addTo(state.mapLayerGroup);
+
+            for (const item of state.filteredShifts) {
+                if (item.lat && item.lon) {
+                    L.marker([item.lat, item.lon])
+                        .bindPopup(`<strong>${item.projectTitle}</strong><br>${item.locationName} (${item.distanceLabel})`)
+                        .addTo(state.mapLayerGroup);
+                }
+            }
+        }
+
+        function openProjectModal(projectId) {
+            const all = [...state.filteredShifts, ...state.filteredRelated];
+            const item = all.find((x) => x.projectId === projectId);
+            if (!item) {
+                return;
+            }
+            document.getElementById("modal-org").textContent = item.organizationName;
+            document.getElementById("modal-title").textContent = item.projectTitle;
+            document.getElementById("modal-description").textContent = item.description;
+
+            const container = document.getElementById("modal-shifts-container");
+            if (item.shifts && item.shifts.length > 0) {
+                container.innerHTML = item.shifts.map((s) => {
+                    const site = LOCATION_CATALOG[s.locationId] || { name: item.locationName, addressLine: "", city: item.city };
+                    return `
+                        <div class="shift-option-row">
+                            <div>
+                                <div style="font-weight: 600;">${escapeHtml(site.name)} (${escapeHtml(site.city)})</div>
+                                <div style="font-size: 0.85rem; color: var(--text-secondary);">${formatShortDate(s.startTime)} · ${s.seats} spots open</div>
+                            </div>
+                            <button type="button" class="primary-btn" data-site-name="${escapeHtml(site.name)}" onclick="handleShiftSelect(this)">Select Shift</button>
+                        </div>
+                    `;
+                }).join("");
+            } else {
+                container.innerHTML = `
+                    <div class="shift-option-row">
+                        <div>
+                            <div style="font-weight: 600;">${escapeHtml(item.locationName)}</div>
+                            <div style="font-size: 0.85rem; color: var(--text-secondary);">${escapeHtml(item.scheduleLabel)}</div>
+                        </div>
+                        <button type="button" class="primary-btn" onclick="closeModal()">Got It</button>
+                    </div>
+                `;
+            }
+
+            document.getElementById("project-modal").classList.add("open");
+        }
+
+        function handleShiftSelect(btn) {
+            const siteName = (btn && btn.getAttribute("data-site-name")) ? btn.getAttribute("data-site-name") : "Volunteer Project";
+            alert("Signed up for " + siteName);
+        }
+
+        function closeModal() {
+            document.getElementById("project-modal").classList.remove("open");
+        }
+
+        function handleBackdropClick(e) {
+            if (e.target.id === "project-modal") {
+                closeModal();
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            triggerSearch();
+        });
+    </script>
+</body>
+</html>
