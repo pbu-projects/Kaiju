@@ -49,7 +49,7 @@ public class DiscoveryViewController {
                 throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Discovery view template not found");
             }
             return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException ex) {
+        } catch (IOException _) {
             throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to read discovery view template");
         }
     }
