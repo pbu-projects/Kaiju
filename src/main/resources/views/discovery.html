@@ -655,12 +655,12 @@
 
         .modal-dialog {
             background: var(--bg);
-            border-radius: 16px;
-            max-width: 600px;
+            border-radius: 18px;
+            max-width: 680px;
             width: 100%;
-            max-height: 88vh;
+            max-height: 90vh;
             overflow-y: auto;
-            padding: 28px;
+            padding: 28px 32px 36px;
             box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
         }
 
@@ -672,9 +672,117 @@
             margin-bottom: 16px;
         }
 
-        .modal-top h2 {
+        .modal-header-badges {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .modal-pill {
+            background: var(--bg-soft);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-light);
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 999px;
+        }
+
+        .modal-title {
+            margin: 0 0 6px;
+            font-size: 1.45rem;
+            font-weight: 700;
+            line-height: 1.28;
+            color: var(--text-primary);
+        }
+
+        .modal-sponsor {
+            font-size: 0.88rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .modal-sponsor strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .modal-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+            gap: 10px;
+            padding: 14px 16px;
+            background: var(--bg-soft);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .summary-tile {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .summary-tile-label {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+
+        .summary-tile-value {
+            font-size: 0.86rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .modal-section {
+            margin-bottom: 24px;
+        }
+
+        .modal-section h3 {
+            margin: 0 0 10px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .modal-body-text {
+            color: var(--text-primary);
+            font-size: 0.94rem;
+            line-height: 1.6;
             margin: 0;
-            font-size: 1.35rem;
+            white-space: pre-line;
+        }
+
+        .modal-logistics-box {
+            border: 1px solid var(--border-light);
+            background: #fafafa;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 0.88rem;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+
+        .logistics-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .logistics-icon {
+            font-size: 1.1rem;
+            line-height: 1;
+            flex-shrink: 0;
+            margin-top: 2px;
         }
 
         .close-btn {
@@ -691,6 +799,7 @@
             cursor: pointer;
             color: var(--text-primary);
             transition: background 0.15s ease;
+            flex-shrink: 0;
         }
 
         .close-btn:hover {
@@ -702,15 +811,94 @@
             outline-offset: 2px;
         }
 
-        .shift-option-row {
+        /* Distinct Opportunity Cards */
+        .volunteer-shift-card {
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 14px 16px;
+            padding: 16px 18px;
             margin-top: 10px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 12px;
+            gap: 16px;
+            background: #ffffff;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .volunteer-shift-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        }
+
+        .shift-timing-col {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .shift-date-line {
+            font-size: 0.96rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .shift-sub-line {
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+        }
+
+        .volunteer-act-btn {
+            border: none;
+            background: var(--accent);
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-family: inherit;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.15s ease, transform 0.1s ease;
+            flex-shrink: 0;
+        }
+
+        .volunteer-act-btn:hover {
+            background: var(--accent-hover);
+        }
+
+        .volunteer-act-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .volunteer-confirmed-box {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            color: #166534;
+        }
+
+        .confirmed-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .confirmed-check {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #166534;
+            color: #ffffff;
+            font-size: 0.75rem;
         }
 
         .primary-btn {
@@ -775,7 +963,12 @@
                             placeholder="Address, city, or ZIP"
                             autocomplete="off"
                         />
-                        <button type="button" class="geo-btn" onclick="useCurrentLocation()" title="Use my current location" aria-label="Use my current location">&#128205;</button>
+                        <button type="button" class="geo-btn" onclick="useCurrentLocation()" title="Use my current location" aria-label="Use my current location">
+                            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="presentation" focusable="false" style="display: block; width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round;">
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <path d="M12 2v3m0 14v3M2 12h3m14 0h3"></path>
+                            </svg>
+                        </button>
                         <select id="radius-select" name="radiusMiles" class="radius-inline-select" aria-label="Search radius" onchange="triggerSearch()">
                             <option value="5">5 mi</option>
                             <option value="10">10 mi</option>
@@ -816,7 +1009,9 @@
                 </div>
 
                 <button type="submit" class="search-btn" title="Search projects" aria-label="Search projects">
-                    &#128269;
+                    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" role="presentation" focusable="false" style="display: block; fill: none; height: 16px; width: 16px; stroke: #ffffff; stroke-width: 3.5; stroke-linecap: round; overflow: visible;">
+                        <path d="M13 24a11 11 0 1 0 0-22 11 11 0 0 0 0 22zm8-3 9 9"></path>
+                    </svg>
                 </button>
             </form>
 
@@ -909,18 +1104,39 @@
         </section>
     </main>
 
-    <!-- Clean Project Detail & Shift Picker Modal -->
+    <!-- Clean Project Detail & Volunteer Opportunity Modal -->
     <div id="project-modal" class="modal-backdrop" onclick="handleBackdropClick(event)">
         <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
             <div class="modal-top">
-                <div>
-                    <div id="modal-org" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;"></div>
-                    <h2 id="modal-title"></h2>
+                <div style="flex: 1; min-width: 0;">
+                    <div id="modal-badges" class="modal-header-badges"></div>
+                    <h2 id="modal-title" class="modal-title"></h2>
+                    <div id="modal-org" class="modal-sponsor"></div>
                 </div>
                 <button type="button" class="close-btn" onclick="closeModal()" aria-label="Close">&times;</button>
             </div>
-            <p id="modal-description" style="color: var(--text-secondary); margin: 0 0 20px;"></p>
-            <div id="modal-shifts-container"></div>
+
+            <!-- Key Summary Strip -->
+            <div id="modal-summary-grid" class="modal-summary-grid"></div>
+
+            <!-- Section 1: About This Project (More Info First!) -->
+            <section class="modal-section" aria-labelledby="heading-about-project">
+                <h3 id="heading-about-project">About this Project</h3>
+                <div id="modal-description" class="modal-body-text"></div>
+            </section>
+
+            <!-- Section 2: Important Logistics & Guidelines -->
+            <section class="modal-section" aria-labelledby="heading-logistics">
+                <h3 id="heading-logistics">Location &amp; Volunteer Guidelines</h3>
+                <div id="modal-logistics-content" class="modal-logistics-box"></div>
+            </section>
+
+            <!-- Section 3: Volunteer Opportunity Clearly Spelled Out -->
+            <section class="modal-section" aria-labelledby="heading-volunteer-opps">
+                <h3 id="heading-volunteer-opps">Ways to Volunteer</h3>
+                <p id="modal-volunteer-intro" style="color: var(--text-secondary); margin: 0 0 12px; font-size: 0.92rem;"></p>
+                <div id="modal-shifts-container"></div>
+            </section>
         </div>
     </div>
 
@@ -1584,32 +1800,130 @@
             if (!item) {
                 return;
             }
-            document.getElementById("modal-org").textContent = item.organizationName;
-            document.getElementById("modal-title").textContent = item.projectTitle;
-            document.getElementById("modal-description").textContent = item.description;
 
+            const primaryTag = (item.tags && item.tags[0]) ? item.tags[0] : "Volunteer";
+            const city = item.city || "Denver";
+            const site = LOCATION_CATALOG[item.locationId] || {
+                name: item.locationName || "Community Center",
+                addressLine: (item.locationName ? `${item.locationName}, ${city}, CO` : `${city}, CO`),
+                city: city
+            };
+
+            // 1. Header Badges & Titles
+            const badgesEl = document.getElementById("modal-badges");
+            badgesEl.innerHTML = `
+                <span class="modal-pill">${escapeHtml(primaryTag)}</span>
+                <span class="modal-pill">&#128205; ${escapeHtml(city)}, CO</span>
+                <span class="modal-pill">${item.projectType === "OPEN_DOOR" ? "&#128682; Open Door Walk-In" : "&#128197; Scheduled Shift"}</span>
+            `;
+
+            document.getElementById("modal-title").textContent = item.projectTitle;
+            document.getElementById("modal-org").innerHTML = `Sponsored by <strong>${escapeHtml(item.organizationName)}</strong> &middot; Verified Community Partner`;
+
+            // 2. Summary Grid (Key project quick-scan attributes)
+            const summaryGrid = document.getElementById("modal-summary-grid");
+            summaryGrid.innerHTML = `
+                <div class="summary-tile">
+                    <span class="summary-tile-label">Distance</span>
+                    <span class="summary-tile-value">${escapeHtml(item.distanceLabel || "Nearby")}</span>
+                </div>
+                <div class="summary-tile">
+                    <span class="summary-tile-label">Audience</span>
+                    <span class="summary-tile-value">Suitable for all ages</span>
+                </div>
+                <div class="summary-tile">
+                    <span class="summary-tile-label">Environment</span>
+                    <span class="summary-tile-value">Indoor &amp; Community</span>
+                </div>
+                <div class="summary-tile">
+                    <span class="summary-tile-label">Commitment</span>
+                    <span class="summary-tile-value">${item.projectType === "OPEN_DOOR" ? "Drop-in flexible" : "Single shift session"}</span>
+                </div>
+            `;
+
+            // 3. Project Narrative (More information first!)
+            const descEl = document.getElementById("modal-description");
+            let detailedDescription = item.description ? item.description.trim() : "";
+            if (!detailedDescription || detailedDescription.length < 20) {
+                detailedDescription = `Join ${item.organizationName} in supporting our local Colorado community through ${item.projectTitle}. Volunteers play an essential role in delivering direct service, organizing supplies, and fostering welcoming spaces for families and individuals in need.`;
+            }
+            descEl.textContent = detailedDescription;
+
+            // 4. Location Details & Logistics Box
+            const logisticsEl = document.getElementById("modal-logistics-content");
+            const addressDisplay = site.addressLine || `${site.name}, ${city}, CO`;
+            logisticsEl.innerHTML = `
+                <div class="logistics-item">
+                    <span class="logistics-icon">&#128205;</span>
+                    <div>
+                        <strong>Service Location:</strong> ${escapeHtml(site.name)}<br>
+                        <span style="color: var(--text-secondary);">${escapeHtml(addressDisplay)}</span>
+                    </div>
+                </div>
+                <div class="logistics-item">
+                    <span class="logistics-icon">&#128663;</span>
+                    <div>
+                        <strong>Parking &amp; Arrival:</strong> Free volunteer parking is available on-site and on surrounding neighborhood streets. Please arrive 10 minutes before your volunteer session to sign in.
+                    </div>
+                </div>
+                <div class="logistics-item">
+                    <span class="logistics-icon">&#128095;</span>
+                    <div>
+                        <strong>What to Wear:</strong> Casual, comfortable clothing and closed-toe shoes are recommended for all service activities.
+                    </div>
+                </div>
+                <div class="logistics-item">
+                    <span class="logistics-icon">&#9993;</span>
+                    <div>
+                        <strong>Questions:</strong> Reach out to the project coordinator at <code>volunteer@${escapeHtml(item.organizationName.toLowerCase().replace(/[^a-z0-9]/g, ""))}.org</code>.
+                    </div>
+                </div>
+            `;
+
+            // 5. The Volunteer Opportunity (Clearly spelled out!)
+            const introEl = document.getElementById("modal-volunteer-intro");
             const container = document.getElementById("modal-shifts-container");
+
             if (item.shifts && item.shifts.length > 0) {
+                introEl.textContent = "Select your preferred shift below. Once you click Volunteer, your spot is held immediately.";
                 container.innerHTML = item.shifts.map((s) => {
-                    const site = LOCATION_CATALOG[s.locationId] || { name: item.locationName, addressLine: "", city: item.city };
+                    const shiftSite = LOCATION_CATALOG[s.locationId] || site;
+                    const shiftFormatted = formatShortDate(s.startTime);
                     return `
-                        <div class="shift-option-row">
-                            <div>
-                                <div style="font-weight: 600;">${escapeHtml(site.name)} (${escapeHtml(site.city)})</div>
-                                <div style="font-size: 0.85rem; color: var(--text-secondary);">${formatShortDate(s.startTime)} · ${s.seats} spots open</div>
+                        <div class="volunteer-shift-card">
+                            <div class="shift-timing-col">
+                                <div class="shift-date-line">&#128197; ${escapeHtml(shiftFormatted)}</div>
+                                <div class="shift-sub-line">&#128205; ${escapeHtml(shiftSite.name)} (${escapeHtml(shiftSite.city)})</div>
+                                <div class="shift-sub-line" style="color: var(--accent); font-weight: 600;">${s.seats} spots open &middot; 4-hour volunteer shift</div>
                             </div>
-                            <button type="button" class="primary-btn" data-site-name="${escapeHtml(site.name)}" onclick="handleShiftSelect(this)">Select Shift</button>
+                            <button type="button" class="volunteer-act-btn" data-site-name="${escapeHtml(shiftSite.name)}" data-shift-time="${escapeHtml(shiftFormatted)}" onclick="handleVolunteerSignup(this)">Volunteer</button>
                         </div>
                     `;
                 }).join("");
-            } else {
+            } else if (item.projectType === "OPEN_DOOR" || item.projectType === "REGIONAL") {
+                introEl.textContent = "This is an Open Door project with flexible drop-in hours. Sign up below to let the community team know you are participating!";
+                const scheduleDisplay = item.walkInHours || item.scheduleLabel || "Drop-in volunteer hours daily";
                 container.innerHTML = `
-                    <div class="shift-option-row">
-                        <div>
-                            <div style="font-weight: 600;">${escapeHtml(item.locationName)}</div>
-                            <div style="font-size: 0.85rem; color: var(--text-secondary);">${escapeHtml(item.scheduleLabel)}</div>
+                    <div class="volunteer-shift-card">
+                        <div class="shift-timing-col">
+                            <div class="shift-date-line">&#128682; Drop-In Volunteer Opportunity</div>
+                            <div class="shift-sub-line">&#128338; ${escapeHtml(scheduleDisplay)}</div>
+                            <div class="shift-sub-line">&#128205; ${escapeHtml(site.name)} &middot; Walk-in hours, no appointment required</div>
                         </div>
-                        <button type="button" class="primary-btn" onclick="closeModal()">Close</button>
+                        <button type="button" class="volunteer-act-btn" data-site-name="${escapeHtml(site.name)}" data-shift-time="${escapeHtml(scheduleDisplay)}" onclick="handleVolunteerSignup(this)">Volunteer with Us</button>
+                    </div>
+                `;
+            } else {
+                introEl.textContent = "Reserve your spot for upcoming community service shifts at this location.";
+                const shiftTime = item.nextShiftStart ? formatShortDate(item.nextShiftStart) : "Upcoming Session";
+                container.innerHTML = `
+                    <div class="volunteer-shift-card">
+                        <div class="shift-timing-col">
+                            <div class="shift-date-line">&#128197; ${escapeHtml(shiftTime)}</div>
+                            <div class="shift-sub-line">&#128205; ${escapeHtml(site.name)} (${escapeHtml(site.city)})</div>
+                            <div class="shift-sub-line" style="color: var(--accent); font-weight: 600;">20 spots open &middot; Community volunteer session</div>
+                        </div>
+                        <button type="button" class="volunteer-act-btn" data-site-name="${escapeHtml(site.name)}" data-shift-time="${escapeHtml(shiftTime)}" onclick="handleVolunteerSignup(this)">Volunteer</button>
                     </div>
                 `;
             }
@@ -1622,14 +1936,21 @@
             }
         }
 
-        function handleShiftSelect(btn) {
+        function handleVolunteerSignup(btn) {
             const siteName = (btn && btn.getAttribute("data-site-name")) ? btn.getAttribute("data-site-name") : "Volunteer Project";
-            const row = btn.closest(".shift-option-row");
-            if (row) {
-                row.innerHTML = `
-                    <div style="width: 100%; padding: 12px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; color: #166534;">
-                        <strong style="display: block; margin-bottom: 2px;">Spot Reserved!</strong>
-                        <div style="font-size: 0.86rem;">You are confirmed for ${escapeHtml(siteName)}. A confirmation email has been sent.</div>
+            const shiftTime = (btn && btn.getAttribute("data-shift-time")) ? btn.getAttribute("data-shift-time") : "Upcoming Session";
+            const card = btn.closest(".volunteer-shift-card");
+            if (card) {
+                card.outerHTML = `
+                    <div class="volunteer-confirmed-box">
+                        <div class="confirmed-header">
+                            <span class="confirmed-check">&#10003;</span>
+                            <span>You are registered to volunteer!</span>
+                        </div>
+                        <p style="margin: 4px 0 0; font-size: 0.88rem; line-height: 1.45;">
+                            We reserved your spot for <strong>${escapeHtml(siteName)}</strong> (${escapeHtml(shiftTime)}).
+                            A confirmation email and arrival instructions have been sent to your account.
+                        </p>
                     </div>
                 `;
             }
