@@ -15,6 +15,8 @@ import io.swagger.v3.oas.annotations.Hidden;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 
@@ -26,24 +28,33 @@ public class DiscoveryViewController {
 
     static final String DEFAULT_VIEW_PATH = "/views/discovery.html";
 
-    private final String discoveryHtml;
+    private final String templatePath;
 
     public DiscoveryViewController() {
         this(DEFAULT_VIEW_PATH);
     }
 
     DiscoveryViewController(String templatePath) {
-        this.discoveryHtml = loadTemplate(templatePath);
+        this.templatePath = templatePath;
+        loadTemplate(templatePath);
     }
 
     @Hidden
     @Get
     @Produces(MediaType.TEXT_HTML)
     public HttpResponse<String> index() {
-        return HttpResponse.ok(discoveryHtml).contentType(MediaType.TEXT_HTML_TYPE);
+        return HttpResponse.ok(loadTemplate(templatePath)).contentType(MediaType.TEXT_HTML_TYPE);
     }
 
     private static String loadTemplate(String path) {
+        Path localPath = Path.of("src/main/resources" + (path.startsWith("/") ? path : "/" + path));
+        if (Files.isRegularFile(localPath)) {
+            try {
+                return Files.readString(localPath, StandardCharsets.UTF_8);
+            } catch (IOException _) {
+                // fallback to classpath
+            }
+        }
         try (InputStream inputStream = DiscoveryViewController.class.getResourceAsStream(path)) {
             if (inputStream == null) {
                 throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Discovery view template not found");
