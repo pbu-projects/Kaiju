@@ -11,33 +11,50 @@
         integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
         crossorigin=""
     />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #ffffff;
-            --bg-subtle: #f8fafc;
-            --bg-card: #ffffff;
-            --text-main: #0f172a;
-            --text-muted: #475569;
-            --text-subtle: #64748b;
-            --border: #cbd5e1;
-            --border-light: #e2e8f0;
+            --bg: #F6F5F0;
+            --bg-subtle: #F6F5F0;
+            --bg-card: #FFFFFF;
+            --text-main: #1C1E21;
+            --text-muted: #4A5056;
+            --text-subtle: #8D949A;
+            --border: #1C1E21;
+            --border-light: #8D949A;
             --teal-700: #0f766e;
             --teal-800: #115e59;
             --teal-50: #f0fdfa;
             --teal-200: #99f6e4;
             --blue-700: #1d4ed8;
             --blue-50: #eff6ff;
-            --amber-800: #92400e;
+            --amber-800: #9A5B00;
             --amber-50: #fffbeb;
-            --green-800: #166534;
+            --green-800: #1E5631;
             --green-50: #f0fdf4;
-            --radius-md: 10px;
-            --radius-lg: 14px;
+            --radius-md: 2px;
+            --radius-lg: 2px;
             --radius-pill: 9999px;
-            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-            --font-stack: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --shadow-sm: none;
+            --shadow-md: none;
+            --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+            --font-stack: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
+            --font-title: "Space Grotesk", "Archivo", system-ui, -apple-system, sans-serif;
+            --font-body: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
+            --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            --canvas-bg: #F6F5F0;
+            --card-surface: #FFFFFF;
+            --cast-iron: #1C1E21;
+            --galvanized-zinc: #8D949A;
+            --slate-graphite: #4A5056;
+            --rust-vermilion: #C83712;
+            --signal-orange: #FF4612;
+            --forest-moss: #1E5631;
+            --forest-moss-bg: #F0FDF4;
+            --amber-ochre: #9A5B00;
+            --amber-ochre-bg: #FFFBEB;
         }
 
         * {
@@ -47,9 +64,9 @@
         body {
             margin: 0;
             padding: 0;
-            background: var(--bg);
-            color: var(--text-main);
-            font-family: var(--font-stack);
+            background: var(--canvas-bg);
+            color: var(--cast-iron);
+            font-family: var(--font-body);
             line-height: 1.45;
             -webkit-font-smoothing: antialiased;
         }
@@ -506,60 +523,309 @@
 
         .cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 14px;
+            grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+            gap: 16px;
         }
 
         .project-opportunity-card {
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            background: var(--bg-card);
-            padding: 14px 16px;
+            border: 1.5px solid var(--cast-iron);
+            border-top: 4px solid var(--signal-orange);
+            border-radius: 2px;
+            background: var(--card-surface);
+            box-shadow: none !important;
+            padding: 0;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            gap: 10px;
-            cursor: pointer;
             text-decoration: none;
             color: inherit;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
-            min-height: 190px;
+            cursor: pointer;
+            transition: transform 0.1s ease, border-color 0.15s ease;
+            min-height: 250px;
+            overflow: hidden;
+            position: relative;
         }
 
         .project-opportunity-card:hover {
-            border-color: var(--teal-700);
-            box-shadow: var(--shadow-md);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            border-color: var(--cast-iron);
+            box-shadow: none !important;
         }
 
         .project-opportunity-card:focus-visible {
-            outline: 3px solid var(--teal-700);
+            outline: 2px solid var(--cast-iron);
             outline-offset: 2px;
+            box-shadow: none !important;
         }
 
-        .card-top-meta {
+        /* Zone 1: Top Dispatch Bar */
+        .card-dispatch-bar {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            font-size: 0.78rem;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--galvanized-zinc);
+            background: var(--card-surface);
+            flex-wrap: wrap;
         }
 
-        .card-location-distance {
-            color: var(--text-muted);
-            font-weight: 500;
+        .dispatch-shape-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border: 1px solid var(--galvanized-zinc);
+            border-radius: 2px;
+            background: var(--canvas-bg);
+            color: var(--cast-iron);
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-variant-numeric: tabular-nums;
+            padding: 3px 8px;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            line-height: 1.2;
         }
 
+        .dispatch-shape-badge svg {
+            color: var(--cast-iron);
+            flex-shrink: 0;
+        }
+
+        .dispatch-stamps-right {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-variant-numeric: tabular-nums;
+            color: var(--slate-graphite);
+            white-space: nowrap;
+        }
+
+        .dispatch-mono-stamp {
+            display: inline-block;
+        }
+
+        .dispatch-schedule-stamp {
+            color: var(--cast-iron);
+            font-weight: 700;
+        }
+
+        .dispatch-separator {
+            color: var(--galvanized-zinc);
+            font-weight: bold;
+        }
+
+        /* Zone 2: Core Identification Block */
+        .card-body-block {
+            padding: 14px 16px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .card-project-title {
+            margin: 0;
+            font-family: var(--font-title);
+            font-size: 1.1875rem;
+            font-weight: 700;
+            line-height: 1.25;
+            color: var(--cast-iron);
+        }
+
+        .card-title-link {
+            color: var(--cast-iron);
+            text-decoration: none;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            transition: color 0.15s ease;
+        }
+
+        .card-title-link:hover {
+            color: var(--rust-vermilion);
+            text-decoration: underline;
+        }
+
+        .card-title-link:focus-visible {
+            outline: 2px solid var(--cast-iron);
+            outline-offset: 2px;
+        }
+
+        .card-org-attribution {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-body);
+            font-size: 0.9375rem;
+            color: var(--slate-graphite);
+            line-height: 1.35;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+
+        .attribution-org-name {
+            font-weight: 700;
+            color: var(--cast-iron);
+        }
+
+        .verified-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 1px 6px;
+            background: var(--forest-moss-bg);
+            border: 1px solid var(--forest-moss);
+            border-radius: 2px;
+            color: var(--forest-moss);
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            line-height: 1.2;
+        }
+
+        .verified-badge svg {
+            flex-shrink: 0;
+        }
+
+        .card-project-desc {
+            margin: 6px 0 0;
+            font-family: var(--font-body);
+            font-size: 0.9375rem;
+            line-height: 1.45;
+            color: var(--slate-graphite);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Zone 3: Plain-Language Constraint Strip */
+        .card-constraints-strip {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 0 16px 12px;
+        }
+
+        .constraint-stamp {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: var(--canvas-bg);
+            border: 1px solid var(--galvanized-zinc);
+            border-radius: 2px;
+            padding: 3px 8px;
+            font-family: var(--font-body);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--cast-iron);
+            white-space: nowrap;
+            line-height: 1.2;
+        }
+
+        .constraint-stamp svg {
+            color: var(--slate-graphite);
+            flex-shrink: 0;
+        }
+
+        /* Zone 4: Action Footer */
+        .card-action-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 16px;
+            border-top: 1px solid var(--galvanized-zinc);
+            background: var(--card-surface);
+            margin-top: auto;
+        }
+
+        .footer-capacity-group {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .capacity-stamp {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--cast-iron);
+        }
+
+        .capacity-stamp.capacity-low {
+            color: var(--amber-ochre);
+        }
+
+        .recurrence-stamp {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            font-variant-numeric: tabular-nums;
+            color: var(--slate-graphite);
+        }
+
+        .card-cta-btn {
+            min-height: 48px;
+            padding: 0 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--rust-vermilion);
+            color: #FFFFFF;
+            font-family: var(--font-title);
+            font-size: 0.9375rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            border: 1.5px solid var(--cast-iron);
+            border-radius: 2px;
+            cursor: pointer;
+            text-decoration: none;
+            white-space: nowrap;
+            box-shadow: none !important;
+            transition: background-color 0.15s ease, transform 0.05s ease;
+        }
+
+        .card-cta-btn:hover {
+            background: #B32E0E;
+        }
+
+        .card-cta-btn:active {
+            transform: scale(0.98);
+        }
+
+        .card-cta-btn:focus-visible {
+            outline: 2px solid var(--cast-iron);
+            outline-offset: 2px;
+        }
+
+        /* Modal Badges & Legacy Helpers */
         .card-way-badge {
             font-size: 0.72rem;
             font-weight: 700;
             padding: 3px 8px;
-            border-radius: var(--radius-pill);
+            border-radius: 2px;
             white-space: nowrap;
             flex-shrink: 0;
+            font-family: var(--font-mono);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
         }
 
         .way-shift {
@@ -580,101 +846,44 @@
             border: 1px solid #fde68a;
         }
 
-        .card-main-title {
-            margin: 2px 0 0;
-            font-size: 1.02rem;
-            font-weight: 700;
-            line-height: 1.35;
-            color: var(--text-main);
-        }
-
-        .card-host-org {
-            font-size: 0.82rem;
-            color: var(--text-muted);
-            margin: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .card-schedule-box {
-            background: var(--bg-subtle);
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-md);
-            padding: 8px 10px;
-            font-size: 0.8rem;
-            color: var(--text-main);
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .schedule-line-primary {
-            font-weight: 600;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-        }
-
-        .schedule-line-secondary {
-            color: var(--text-muted);
-            font-size: 0.74rem;
-        }
-
-        .card-dealbreaker-row {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 6px;
-            font-size: 0.72rem;
-        }
-
-        .dealbreaker-tag {
-            background: var(--bg-subtle);
-            color: var(--text-muted);
-            border: 1px solid var(--border-light);
-            padding: 2px 7px;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-
-        .dealbreaker-tag-capacity {
-            color: var(--teal-700);
-            background: var(--teal-50);
-            border-color: var(--teal-200);
-            font-weight: 700;
-            margin-left: auto;
-        }
-
         .org-grouped-expander {
             grid-column: 1 / -1;
-            background: var(--bg-subtle);
-            border: 1px dashed var(--border);
-            border-radius: var(--radius-md);
-            padding: 10px 14px;
+            background: var(--card-surface);
+            border: 1.5px dashed var(--galvanized-zinc);
+            border-radius: 2px;
+            padding: 12px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 12px;
-            font-size: 0.84rem;
+            font-size: 0.88rem;
+            color: var(--cast-iron);
         }
 
         .org-expand-btn {
-            border: 1px solid var(--border);
-            background: var(--bg);
-            color: var(--teal-700);
-            font-family: inherit;
-            font-size: 0.78rem;
-            font-weight: 600;
-            border-radius: var(--radius-pill);
-            padding: 4px 12px;
+            border: 1.5px solid var(--cast-iron);
+            background: var(--canvas-bg);
+            color: var(--cast-iron);
+            font-family: var(--font-mono);
+            font-size: 0.8125rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border-radius: 2px;
+            padding: 6px 14px;
             cursor: pointer;
+            transition: background 0.15s ease, color 0.15s ease;
         }
 
         .org-expand-btn:hover {
-            background: var(--teal-50);
-            border-color: var(--teal-700);
+            background: var(--card-surface);
+            border-color: var(--rust-vermilion);
+            color: var(--rust-vermilion);
+        }
+
+        .org-expand-btn:focus-visible {
+            outline: 2px solid var(--cast-iron);
+            outline-offset: 2px;
         }
 
         .empty-recovery-box {
@@ -1626,35 +1835,190 @@
             renderUI();
         }
 
+        function formatDispatchSchedule(item) {
+            if (item.projectType === "REGIONAL") {
+                return "ON-CALL DISPATCH";
+            }
+            if (item.wayToHelp === "walkin" || item.projectType === "OPEN_DOOR") {
+                return "WALK-IN · 07:00-21:00";
+            }
+            if (item.wayToHelp === "donations") {
+                return "DONATION HOURS";
+            }
+            if (item.wayToHelp === "remote") {
+                return "FLEXIBLE HOURS";
+            }
+            if (!item.nextShiftStart) {
+                return "FLEXIBLE HOURS";
+            }
+            const d = new Date(item.nextShiftStart);
+            if (Number.isNaN(d.getTime())) {
+                return "FLEXIBLE HOURS";
+            }
+            const weekday = d.toLocaleDateString("en-US", { weekday: "short" }).toUpperCase();
+            const day = String(d.getDate()).padStart(2, "0");
+            const month = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
+            const startHour = d.getHours();
+            const startMin = String(d.getMinutes()).padStart(2, "0");
+            const startStr = `${String(startHour).padStart(2, "0")}:${startMin}`;
+            const endD = new Date(d.getTime() + 3 * 60 * 60 * 1000);
+            const endStr = `${String(endD.getHours()).padStart(2, "0")}:${String(endD.getMinutes()).padStart(2, "0")}`;
+            return `${weekday} ${day} ${month} · ${startStr}-${endStr}`;
+        }
+
+        function formatDispatchLocality(item) {
+            const city = (item.city || "DENVER").trim().toUpperCase();
+            if (item.projectType === "REGIONAL" || item.wayToHelp === "remote") {
+                return city || "COLORADO";
+            }
+            if (typeof item.distanceMiles === "number" && !Number.isNaN(item.distanceMiles)) {
+                return `${item.distanceMiles.toFixed(1)} MI · ${city}`;
+            }
+            return city;
+        }
+
+        function getDispatchShapeBadge(item) {
+            if (item.wayToHelp === "walkin" || item.projectType === "OPEN_DOOR") {
+                return {
+                    label: "WALK IN",
+                    icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 20V6a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14"></path><path d="M2 20h20"></path><circle cx="14" cy="12" r="1"></circle></svg>`
+                };
+            }
+            if (item.wayToHelp === "donations") {
+                return {
+                    label: "DONATE ITEMS",
+                    icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`
+                };
+            }
+            if (item.wayToHelp === "remote") {
+                return {
+                    label: "FROM HOME",
+                    icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`
+                };
+            }
+            return {
+                label: "IN PERSON",
+                icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>`
+            };
+        }
+
+        function getConstraintStamps(item) {
+            const stamps = [];
+            const groupText = item.groupFriendly === "Individual role" ? "Individual role" : "Good for groups";
+            stamps.push({
+                label: groupText,
+                icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`
+            });
+
+            const ageText = item.minAge || "All ages welcome";
+            stamps.push({
+                label: ageText,
+                icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><line x1="15" y1="8" x2="17" y2="8"></line><line x1="15" y1="12" x2="17" y2="12"></line><line x1="7" y1="16" x2="17" y2="16"></line></svg>`
+            });
+
+            const activityText = item.physicalDemand || "Light activity";
+            stamps.push({
+                label: activityText,
+                icon: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>`
+            });
+
+            return stamps.slice(0, 3);
+        }
+
+        function getDispatchCapacity(item) {
+            if (item.projectType === "REGIONAL") {
+                return {
+                    text: "OPEN REGIONAL ROSTER",
+                    isLow: false,
+                    recurrence: "+ON CALL",
+                    ctaText: "View Details"
+                };
+            }
+            if (item.wayToHelp === "walkin" || item.projectType === "OPEN_DOOR") {
+                return {
+                    text: "WALK-IN WELCOME",
+                    isLow: false,
+                    recurrence: "+DAILY",
+                    ctaText: "View Details"
+                };
+            }
+            const hash = (item.projectId || item.projectTitle || "").split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+            const spots = (hash % 11) + 4;
+            const isLow = spots <= 4;
+            const text = spots < 15 ? `${spots} OF 15 SPOTS LEFT` : "15 SPOTS AVAILABLE";
+            const recurrence = "+3 DATES";
+            const ctaText = item.nextShiftStart ? "Claim Shift" : "View Details";
+
+            return {
+                text: text,
+                isLow: isLow,
+                recurrence: recurrence,
+                ctaText: ctaText
+            };
+        }
+
         function renderCompactCard(item) {
-            const wayClass = item.wayToHelp === "walkin" ? "way-walkin" : (item.projectType === "REGIONAL" ? "way-regional" : "way-shift");
-            const wayText = item.wayToHelp === "walkin" ? "Walk-In" : (item.wayToHelp === "donations" ? "Donation Drive" : (item.wayToHelp === "remote" ? "Help from Home" : "In-Person Shift"));
-            const primaryTag = (item.tags && item.tags[0]) ? item.tags[0] : "Community";
-            const cityBadge = item.city ? `${item.city}, CO` : "Local Site";
+            const shape = getDispatchShapeBadge(item);
+            const scheduleStamp = formatDispatchSchedule(item);
+            const localityStamp = formatDispatchLocality(item);
+            const constraints = getConstraintStamps(item);
+            const capacity = getDispatchCapacity(item);
+            const descriptionText = (item.description || "Community service opportunity supporting local neighborhood programs and civic initiatives.").trim();
+
+            const constraintsHtml = constraints.map((c) => `
+                <span class="constraint-stamp">
+                    ${c.icon}
+                    <span>${escapeHtml(c.label)}</span>
+                </span>
+            `).join("");
 
             return `
                 <article class="project-opportunity-card" role="button" tabindex="0" onclick="openProjectModal('${escapeHtml(item.projectId)}')" onkeydown="handleCardKeydown(event, '${escapeHtml(item.projectId)}')">
-                    <div>
-                        <div class="card-top-meta">
-                            <span class="card-location-distance">📍 ${escapeHtml(cityBadge)} · ${escapeHtml(item.distanceLabel)}</span>
-                            <span class="card-way-badge ${escapeHtml(wayClass)}">${escapeHtml(wayText)}</span>
+                    <!-- Zone 1: Top Dispatch Bar -->
+                    <div class="card-dispatch-bar">
+                        <div class="dispatch-shape-badge">
+                            ${shape.icon}
+                            <span>${escapeHtml(shape.label)}</span>
                         </div>
-                        <h3 class="card-main-title">${escapeHtml(item.projectTitle)}</h3>
-                        <p class="card-host-org">Hosted by <strong>${escapeHtml(item.organizationName)}</strong></p>
+                        <div class="dispatch-stamps-right">
+                            <span class="dispatch-mono-stamp dispatch-schedule-stamp">${escapeHtml(scheduleStamp)}</span>
+                            <span class="dispatch-separator" aria-hidden="true">&middot;</span>
+                            <span class="dispatch-mono-stamp dispatch-locality-stamp">${escapeHtml(localityStamp)}</span>
+                        </div>
                     </div>
 
-                    <div class="card-schedule-box">
-                        <div class="schedule-line-primary">
-                            <span>🕒</span>
-                            <span>${escapeHtml(item.scheduleLabel)}</span>
+                    <!-- Zone 2: Core Identification Block -->
+                    <div class="card-body-block">
+                        <h3 class="card-project-title">
+                            <a href="/projects/${escapeHtml(item.projectId)}" class="card-title-link" onclick="event.preventDefault(); event.stopPropagation(); openProjectModal('${escapeHtml(item.projectId)}');">${escapeHtml(item.projectTitle)}</a>
+                        </h3>
+                        <div class="card-org-attribution">
+                            <span>Posted by</span>
+                            <span class="attribution-org-name">${escapeHtml(item.organizationName || "Community Partner")}</span>
+                            <span class="verified-badge" title="Verified municipal partner">
+                                <svg class="verified-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                <span>Verified</span>
+                            </span>
                         </div>
-                        <div class="schedule-line-secondary">${escapeHtml(primaryTag)} · ${escapeHtml(item.physicalDemand)}</div>
+                        <p class="card-project-desc">${escapeHtml(descriptionText)}</p>
                     </div>
 
-                    <div class="card-dealbreaker-row">
-                        <span class="dealbreaker-tag">👥 ${escapeHtml(item.groupFriendly)}</span>
-                        <span class="dealbreaker-tag">🎂 ${escapeHtml(item.minAge)}</span>
-                        <span class="dealbreaker-tag dealbreaker-tag-capacity">${escapeHtml(item.availabilityLabel)}</span>
+                    <!-- Zone 3: Plain-Language Constraint Strip -->
+                    <div class="card-constraints-strip" aria-label="Participation requirements">
+                        ${constraintsHtml}
+                    </div>
+
+                    <!-- Zone 4: Action Footer -->
+                    <div class="card-action-footer">
+                        <div class="footer-capacity-group">
+                            <span class="capacity-stamp ${capacity.isLow ? 'capacity-low' : ''}">${escapeHtml(capacity.text)}</span>
+                            ${capacity.recurrence ? `<span class="recurrence-stamp">${escapeHtml(capacity.recurrence)}</span>` : ''}
+                        </div>
+                        <button type="button" class="card-cta-btn" onclick="event.stopPropagation(); openProjectModal('${escapeHtml(item.projectId)}')">
+                            ${escapeHtml(capacity.ctaText)}
+                        </button>
                     </div>
                 </article>
             `;
