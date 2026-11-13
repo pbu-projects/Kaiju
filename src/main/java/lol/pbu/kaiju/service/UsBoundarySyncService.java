@@ -73,7 +73,7 @@ public class UsBoundarySyncService {
             JdbcOperations jdbcOperations,
             ObjectMapper objectMapper,
             @Value("${kaiju.tigerweb.base-url:https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer}") String baseUrl,
-            @Value("${kaiju.tigerweb.layers.states:84}") int statesLayerId,
+            @Value("${kaiju.tigerweb.layers.states:80}") int statesLayerId,
             @Value("${kaiju.tigerweb.layers.counties:82}") int countiesLayerId,
             @Value("${kaiju.tigerweb.layers.places:28}") int placesLayerId,
             @Value("${kaiju.tigerweb.layers.cdps:30}") int cdpsLayerId
@@ -98,7 +98,7 @@ public class UsBoundarySyncService {
                 jdbcOperations,
                 objectMapper,
                 "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer",
-                84,
+                80,
                 82,
                 28,
                 30

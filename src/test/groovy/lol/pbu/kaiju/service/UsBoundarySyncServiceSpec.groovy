@@ -181,7 +181,7 @@ class UsBoundarySyncServiceSpec extends Specification {
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             String uri = req.uri().toString()
             String body
-            if (uri.contains("/84/query")) {
+            if (uri.contains("/80/query")) {
                 body = statePayload
             } else if (uri.contains("resultOffset=0")) {
                 body = page1
@@ -273,7 +273,7 @@ class UsBoundarySyncServiceSpec extends Specification {
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             String uri = req.uri().toString()
             String body
-            if (uri.contains("/84/query")) {
+            if (uri.contains("/80/query")) {
                 body = statePayload
             } else if (uri.contains("/82/query")) {
                 body = countiesPayload
@@ -337,7 +337,7 @@ class UsBoundarySyncServiceSpec extends Specification {
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             String uri = req.uri().toString()
             String body
-            if (uri.contains("/84/query")) {
+            if (uri.contains("/80/query")) {
                 body = statePayload
             } else if (uri.contains("/30/query")) {
                 body = cdpPayload
@@ -448,7 +448,7 @@ class UsBoundarySyncServiceSpec extends Specification {
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             String uri = req.uri().toString()
             String body
-            if (uri.contains("/84/query")) {
+            if (uri.contains("/80/query")) {
                 body = statePayload
             } else if (uri.contains("/82/query")) {
                 body = countiesPayload
