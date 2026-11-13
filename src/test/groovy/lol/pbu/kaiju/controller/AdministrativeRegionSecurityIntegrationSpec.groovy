@@ -402,4 +402,34 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.NOT_FOUND
     }
+
+    def "Security | should reject unauthenticated and non-admin callers on US sync endpoints"() {
+        when: "an unauthenticated caller attempts to sync US states"
+        client.exchange(HttpRequest.POST("/administrative-regions/sync/us/states", [:]).accept(MediaType.APPLICATION_JSON_TYPE))
+
+        then:
+        def e1 = thrown(HttpClientResponseException)
+        e1.status == HttpStatus.UNAUTHORIZED
+
+        when: "a standard volunteer attempts to sync US states"
+        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/sync/us/states", [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
+
+        then:
+        def e2 = thrown(HttpClientResponseException)
+        e2.status == HttpStatus.FORBIDDEN
+
+        when: "a standard volunteer attempts to sync US counties"
+        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/sync/us/states/CO/counties", [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
+
+        then:
+        def e3 = thrown(HttpClientResponseException)
+        e3.status == HttpStatus.FORBIDDEN
+
+        when: "a standard volunteer attempts to sync US places"
+        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/sync/us/states/CO/places", [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
+
+        then:
+        def e4 = thrown(HttpClientResponseException)
+        e4.status == HttpStatus.FORBIDDEN
+    }
 }

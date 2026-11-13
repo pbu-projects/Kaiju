@@ -44,10 +44,13 @@ public record AdministrativeRegion(
         String stateCode,
 
         @Nullable
-        String timeZone
+        String timeZone,
+
+        @Nullable
+        String geoid
 ) {
     public AdministrativeRegion(UUID id, String name, UUID parentRegionId, Geometry geom) {
-        this(id, name, parentRegionId, geom, null, null, null, null);
+        this(id, name, parentRegionId, geom, null, null, null, null, null);
     }
 
     @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
@@ -65,7 +68,8 @@ public record AdministrativeRegion(
                 this.level(),
                 this.countryCode(),
                 this.stateCode(),
-                this.timeZone()
+                this.timeZone(),
+                this.geoid()
         );
     }
 }

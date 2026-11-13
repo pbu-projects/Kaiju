@@ -148,8 +148,54 @@ class BoundaryIngestionServiceSpec extends Specification {
                 "https://tigerweb.geo.census.gov",
                 "//tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query",
                 "https:/arcgis/rest/services/TIGERweb/query",
-                "ht!tp://invalid syntax url"
+                "ht!tp://invalid syntax url",
+                "https://user@tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query",
+                "https://user:pass@tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query"
         ]
+    }
+
+    def "should clamp tiny antimeridian longitude overshoot and ingest successfully"() {
+        given: "a GeoJSON polygon with tiny 180.0000001 and -180.0000001 overshoot"
+        String geoJsonWithOvershoot = '''{
+            "type": "Polygon",
+            "coordinates": [[
+                [179.5, 51.5],
+                [180.0000001, 51.5],
+                [180.0000001, 52.0],
+                [179.5, 52.0],
+                [179.5, 51.5]
+            ]]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(geoJsonWithOvershoot.getBytes("UTF-8")))
+        })
+        UUID testRegionId = UUID.randomUUID()
+        executeSql("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Adak Test Region', ST_GeographyFromText('POLYGON((179.5 51.5, 180.0 51.5, 180.0 52.0, 179.5 52.0, 179.5 51.5))'))", testRegionId)
+
+        BoundaryIngestionService customService = new BoundaryIngestionService(
+                service.jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when:
+        IngestBoundaryResponse response = customService.ingestBoundary(
+                testRegionId,
+                new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001)
+        )
+
+        then:
+        verifyAll(response) {
+            it != null
+            regionId() == testRegionId
+            name() == "Adak Test Region"
+            valid()
+        }
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
     }
 
     def "should permit valid query parameters containing words like description"() {

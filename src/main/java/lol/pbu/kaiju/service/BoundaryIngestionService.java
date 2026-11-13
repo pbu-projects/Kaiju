@@ -49,6 +49,94 @@ public class BoundaryIngestionService {
     public static final int MAX_PAYLOAD_BYTES = 15 * 1024 * 1024; // 15MB
 
     private static final String GEOMETRY_FIELD = "geometry";
+    private static final String SIMPLIFY_SQL_EXPR =
+            "ST_Multi(ST_CollectionExtract(ST_MakeValid(ST_SimplifyPreserveTopology(ST_MakeValid(ST_SetSRID(ST_GeomFromGeoJSON(?), 4326)), ?)), 3))";
+    private static final String TIMEZONE_SUBQUERY = """
+            (
+                SELECT tb.tzid
+                FROM timezone_boundaries tb
+                WHERE ST_Intersects(tb.geom, ST_PointOnSurface(s.geom::geometry))
+                ORDER BY ST_Area(tb.geom::geography) ASC
+                LIMIT 1
+            )
+            """;
+    private static final String UPSERT_REGION_BY_GEOID_SQL = """
+        WITH simplified AS (
+            SELECT %s AS geom
+        )
+        INSERT INTO administrative_regions (
+            name, parent_region_id, geom, level, country_code, state_code, geoid, area_sq_m, time_zone
+        )
+        SELECT
+            ?,
+            ?,
+            s.geom,
+            ?,
+            ?,
+            ?,
+            ?,
+            ST_Area(s.geom),
+            %s
+        FROM simplified s
+        WHERE ST_IsValid(s.geom::geometry)
+          AND NOT ST_IsEmpty(s.geom::geometry)
+        ON CONFLICT (geoid) WHERE geoid IS NOT NULL DO UPDATE SET
+            geom = EXCLUDED.geom,
+            area_sq_m = EXCLUDED.area_sq_m,
+            level = EXCLUDED.level,
+            country_code = EXCLUDED.country_code,
+            state_code = EXCLUDED.state_code,
+            parent_region_id = COALESCE(EXCLUDED.parent_region_id, administrative_regions.parent_region_id),
+            time_zone = COALESCE(EXCLUDED.time_zone, administrative_regions.time_zone)
+        RETURNING (xmax = 0) AS inserted
+    """.formatted(SIMPLIFY_SQL_EXPR, TIMEZONE_SUBQUERY);
+
+    private static final String UPSERT_PLACE_BY_GEOID_SQL = """
+        WITH simplified AS (
+            SELECT %s AS geom
+        ),
+        parent_match AS (
+            SELECT COALESCE(
+                (
+                    SELECT c.id
+                    FROM administrative_regions c, simplified s
+                    WHERE c.level = 2
+                      AND c.state_code = ?
+                      AND ST_Intersects(c.geom::geometry, s.geom::geometry)
+                    ORDER BY ST_Area(ST_Intersection(s.geom::geometry, c.geom::geometry)) DESC
+                    LIMIT 1
+                ),
+                ?
+            ) AS parent_id
+        )
+        INSERT INTO administrative_regions (
+            name, parent_region_id, geom, level, country_code, state_code, geoid, area_sq_m, time_zone
+        )
+        SELECT
+            ?,
+            pm.parent_id,
+            s.geom,
+            3,
+            'US',
+            ?,
+            ?,
+            ST_Area(s.geom),
+            %s
+        FROM simplified s
+        CROSS JOIN parent_match pm
+        WHERE ST_IsValid(s.geom::geometry)
+          AND NOT ST_IsEmpty(s.geom::geometry)
+        ON CONFLICT (geoid) WHERE geoid IS NOT NULL DO UPDATE SET
+            geom = EXCLUDED.geom,
+            area_sq_m = EXCLUDED.area_sq_m,
+            level = EXCLUDED.level,
+            country_code = EXCLUDED.country_code,
+            state_code = EXCLUDED.state_code,
+            parent_region_id = EXCLUDED.parent_region_id,
+            time_zone = COALESCE(EXCLUDED.time_zone, administrative_regions.time_zone)
+        RETURNING (xmax = 0) AS inserted
+    """.formatted(SIMPLIFY_SQL_EXPR, TIMEZONE_SUBQUERY);
+
     private static final String UPDATE_SQL = """
         WITH raw_geom AS (
             SELECT ST_SetSRID(ST_GeomFromGeoJSON(?), 4326) AS g
@@ -60,7 +148,8 @@ public class BoundaryIngestionService {
             FROM raw_geom
         )
         UPDATE administrative_regions r
-        SET geom = s.geom
+        SET geom = s.geom,
+            area_sq_m = ST_Area(s.geom)
         FROM simplified s
         WHERE r.id = ?
           AND ST_IsValid(s.geom::geometry)
@@ -163,14 +252,9 @@ public class BoundaryIngestionService {
 
         JsonNode geomNode = extractGeometryNodeFromPayload(payload);
 
-        validateAndDeserializeGeometry(geomNode);
+        Geometry geometry = validateAndDeserializeGeometry(geomNode);
 
-        String geomJson;
-        try {
-            geomJson = objectMapper.writeValueAsString(geomNode);
-        } catch (IOException e) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Failed to serialize geometry: " + e.getMessage());
-        }
+        String geomJson = serializeGeometry(geometry);
 
         if (administrativeRegionService != null && actorUserId != null) {
             return administrativeRegionService.applyIngestedBoundary(regionId, geomJson, tolerance, command.sourceUrl(), actorUserId);
@@ -194,6 +278,10 @@ public class BoundaryIngestionService {
         String scheme = uri.getScheme();
         if (scheme == null || !scheme.equalsIgnoreCase("https")) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Source URL must use the https scheme.");
+        }
+
+        if (uri.getUserInfo() != null || uri.getRawUserInfo() != null) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Source URL must not contain userinfo.");
         }
 
         String host = uri.getHost();
@@ -269,6 +357,44 @@ public class BoundaryIngestionService {
         }
     }
 
+    public JsonNode fetchAndParseJson(String sourceUrl) {
+        if (sourceUrl == null || sourceUrl.isBlank()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Source URL must not be blank.");
+        }
+        URI validatedUri = validateSourceUrl(sourceUrl);
+        byte[] payload = fetchPayload(validatedUri);
+        JsonNode root;
+        try {
+            root = objectMapper.readValue(payload, JsonNode.class);
+        } catch (IOException e) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Response payload is not valid JSON: " + e.getMessage());
+        }
+        if (root == null || !root.isObject()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload must be a JSON object.");
+        }
+        return root;
+    }
+
+    public String parseAndValidateFeatureGeometry(JsonNode featureNode) {
+        if (featureNode == null || !featureNode.isObject()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Feature must be a JSON object.");
+        }
+        JsonNode geomNode = featureNode.get(GEOMETRY_FIELD);
+        if (geomNode == null || geomNode.isNull()) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "GeoJSON payload does not contain a valid geometry object.");
+        }
+        Geometry geometry = validateAndDeserializeGeometry(geomNode);
+        return serializeGeometry(geometry);
+    }
+
+    private String serializeGeometry(Geometry geometry) {
+        try {
+            return objectMapper.writeValueAsString(geometry);
+        } catch (IOException e) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Failed to serialize geometry: " + e.getMessage());
+        }
+    }
+
     private JsonNode extractGeometryNodeFromPayload(byte[] payload) {
         JsonNode root;
         try {
@@ -333,19 +459,30 @@ public class BoundaryIngestionService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Geometry type must be Polygon or MultiPolygon, found: " + geometry.getGeometryType());
         }
 
-        if (!geometry.isValid()) {
-            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
-        }
-
+        boolean[] adjusted = {false};
         geometry.apply((CoordinateFilter) coord -> {
             if (Double.isNaN(coord.getX()) || Double.isNaN(coord.getY()) || Double.isInfinite(coord.getX()) || Double.isInfinite(coord.getY())) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Coordinates must contain valid finite numbers.");
+            }
+            if (coord.getX() > 180.0 && coord.getX() <= 180.001) {
+                coord.setX(180.0);
+                adjusted[0] = true;
+            } else if (coord.getX() < -180.0 && coord.getX() >= -180.001) {
+                coord.setX(-180.0);
+                adjusted[0] = true;
             }
             if (coord.getX() < -180.0 || coord.getX() > 180.0 || coord.getY() < -90.0 || coord.getY() > 90.0) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST,
                         String.format(Locale.ROOT, "Coordinates out of valid WGS84 bounds (-180..180 lon, -90..90 lat): lon=%.6f, lat=%.6f", coord.getX(), coord.getY()));
             }
         });
+        if (adjusted[0]) {
+            geometry.geometryChanged();
+        }
+
+        if (!geometry.isValid()) {
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid");
+        }
 
         return geometry;
     }
@@ -368,19 +505,15 @@ public class BoundaryIngestionService {
     }
 
     private void validatePolygonRings(JsonNode coords) {
-        for (JsonNode ring : coords.values()) {
-            checkRingClosure(ring);
-        }
+        coords.values().forEach(this::checkRingClosure);
     }
 
     private void validateMultiPolygonRings(JsonNode coords) {
-        for (JsonNode poly : coords.values()) {
+        coords.values().forEach(poly -> {
             if (poly.isArray()) {
-                for (JsonNode ring : poly.values()) {
-                    checkRingClosure(ring);
-                }
+                poly.values().forEach(this::checkRingClosure);
             }
-        }
+        });
     }
 
     private void checkRingClosure(JsonNode ring) {
@@ -474,5 +607,68 @@ public class BoundaryIngestionService {
 
     private IngestBoundaryResponse updateRegionBoundary(UUID regionId, String geomJson, double tolerance) {
         return executeBoundaryUpdate(jdbcOperations, regionId, geomJson, tolerance);
+    }
+
+    public boolean upsertRegionByGeoid(
+            String geoid,
+            String name,
+            @Nullable UUID parentRegionId,
+            int level,
+            String countryCode,
+            String stateCode,
+            String geomJson,
+            double tolerance
+    ) {
+        return jdbcOperations.execute(connection -> {
+            try (PreparedStatement stmt = connection.prepareStatement(UPSERT_REGION_BY_GEOID_SQL)) {
+                stmt.setString(1, geomJson);
+                stmt.setDouble(2, tolerance);
+                stmt.setString(3, name);
+                stmt.setObject(4, parentRegionId);
+                stmt.setInt(5, level);
+                stmt.setString(6, countryCode);
+                stmt.setString(7, stateCode);
+                stmt.setString(8, geoid);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getBoolean("inserted");
+                    }
+                }
+            } catch (SQLException e) {
+                LOG.error("Failed upserting region with GEOID {}: {}", geoid, e.getMessage(), e);
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error upserting region: " + e.getMessage());
+            }
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid for GEOID " + geoid);
+        });
+    }
+
+    public boolean upsertPlaceByGeoid(
+            String geoid,
+            String name,
+            UUID fallbackStateId,
+            String stateCode,
+            String geomJson,
+            double tolerance
+    ) {
+        return jdbcOperations.execute(connection -> {
+            try (PreparedStatement stmt = connection.prepareStatement(UPSERT_PLACE_BY_GEOID_SQL)) {
+                stmt.setString(1, geomJson);
+                stmt.setDouble(2, tolerance);
+                stmt.setString(3, stateCode);
+                stmt.setObject(4, fallbackStateId);
+                stmt.setString(5, name);
+                stmt.setString(6, stateCode);
+                stmt.setString(7, geoid);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getBoolean("inserted");
+                    }
+                }
+            } catch (SQLException e) {
+                LOG.error("Failed upserting place with GEOID {}: {}", geoid, e.getMessage(), e);
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Database error upserting place: " + e.getMessage());
+            }
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Resulting geometry is topologically invalid for GEOID " + geoid);
+        });
     }
 }
