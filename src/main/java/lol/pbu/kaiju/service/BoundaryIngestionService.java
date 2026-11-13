@@ -75,7 +75,7 @@ public class BoundaryIngestionService {
             ?,
             ?,
             ?,
-            ST_Area(s.geom),
+            ST_Area(s.geom::geography),
             %s
         FROM simplified s
         WHERE ST_IsValid(s.geom::geometry)
@@ -103,6 +103,7 @@ public class BoundaryIngestionService {
                     WHERE c.level = 2
                       AND c.state_code = ?
                       AND ST_Intersects(c.geom::geometry, s.geom::geometry)
+                      AND NOT ST_Touches(c.geom::geometry, s.geom::geometry)
                     ORDER BY ST_Area(ST_Intersection(s.geom::geometry, c.geom::geometry)) DESC
                     LIMIT 1
                 ),
@@ -120,7 +121,7 @@ public class BoundaryIngestionService {
             'US',
             ?,
             ?,
-            ST_Area(s.geom),
+            ST_Area(s.geom::geography),
             %s
         FROM simplified s
         CROSS JOIN parent_match pm
@@ -149,7 +150,7 @@ public class BoundaryIngestionService {
         )
         UPDATE administrative_regions r
         SET geom = s.geom,
-            area_sq_m = ST_Area(s.geom)
+            area_sq_m = ST_Area(s.geom::geography)
         FROM simplified s
         WHERE r.id = ?
           AND ST_IsValid(s.geom::geometry)

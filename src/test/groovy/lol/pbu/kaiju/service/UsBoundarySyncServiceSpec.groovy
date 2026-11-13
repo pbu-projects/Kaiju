@@ -86,6 +86,20 @@ class UsBoundarySyncServiceSpec extends Specification {
         }
     }
 
+    private Double queryDouble(String sql, Object... params) {
+        return jdbcOperations.execute { status ->
+            Connection conn = status instanceof Connection ? (Connection) status : (Connection) status.getConnection()
+            conn.prepareStatement(sql).withCloseable { stmt ->
+                params.eachWithIndex { param, idx ->
+                    stmt.setObject(idx + 1, param)
+                }
+                stmt.executeQuery().withCloseable { rs ->
+                    return rs.next() ? rs.getDouble(1) : null
+                }
+            }
+        }
+    }
+
     def "should sync states and preserve existing Colorado seed name on geoid conflict"() {
         given: "a TIGERweb state payload for Colorado and Hawaii"
         String originalColoradoName = queryString("SELECT name FROM administrative_regions WHERE geoid = '08'")
@@ -301,6 +315,9 @@ class UsBoundarySyncServiceSpec extends Specification {
         verifyAll {
             queryUuid("SELECT parent_region_id FROM administrative_regions WHERE geoid = '5690001'") == eastCountyId
             queryUuid("SELECT parent_region_id FROM administrative_regions WHERE geoid = '5690002'") == wyId
+            queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '56012'") > 1_000_000.0d
+            queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '5690001'") > 1_000_000.0d
+            queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '5690002'") > 1_000_000.0d
         }
 
         cleanup:
@@ -475,6 +492,75 @@ class UsBoundarySyncServiceSpec extends Specification {
         cleanup:
         executeSql("DELETE FROM administrative_regions WHERE geoid = '5690003'")
         executeSql("DELETE FROM administrative_regions WHERE geoid IN ('56011', '56012')")
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
+    }
+
+    def "should fall back to state when independent city touches county border without interior overlap"() {
+        given: "Wyoming, West County, and an independent city sharing only West County's eastern border"
+        String statePayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "56", "NAME": "Wyoming", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-111.0, 41.0], [-104.0, 41.0], [-104.0, 45.0], [-111.0, 45.0], [-111.0, 41.0]]]
+                }
+            }]
+        }'''
+        String countiesPayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "56011", "NAME": "West County", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-106.0, 41.0], [-105.0, 41.0], [-105.0, 42.0], [-106.0, 42.0], [-106.0, 41.0]]]
+                }
+            }]
+        }'''
+        String placesPayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "5690004", "NAME": "Touching Independent City", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-105.0, 41.2], [-104.7, 41.2], [-104.7, 41.8], [-105.0, 41.8], [-105.0, 41.2]]]
+                }
+            }]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            String uri = req.uri().toString()
+            String body
+            if (uri.contains("/80/query")) {
+                body = statePayload
+            } else if (uri.contains("/82/query")) {
+                body = countiesPayload
+            } else {
+                body = placesPayload
+            }
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+        syncService.syncStates(null)
+        syncService.syncStateCounties("WY", null)
+
+        when: "syncStatePlaces runs for WY"
+        UsSyncResult result = syncService.syncStatePlaces("WY", false, null)
+
+        then: "Touching Independent City falls back to Wyoming and stores area in square meters"
+        UUID wyId = queryUuid("SELECT id FROM administrative_regions WHERE geoid = '56'")
+        verifyAll {
+            result.created() == 1
+            result.failed() == 0
+            queryUuid("SELECT parent_region_id FROM administrative_regions WHERE geoid = '5690004'") == wyId
+            queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '5690004'") > 1_000_000.0d
+        }
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '5690004'")
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '56011'")
         executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
     }
 }
