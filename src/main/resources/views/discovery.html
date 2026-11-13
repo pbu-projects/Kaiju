@@ -13,17 +13,32 @@
     />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Public+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
+            --canvas-bg: #F6F5F0;
             --bg: #F6F5F0;
             --bg-subtle: #F6F5F0;
-            --bg-card: #FFFFFF;
+            --card-surface: #FFFFFF;
+            --card-border: #D5D2C8;
+            --card-border-subtle: #E2DFD6;
             --text-main: #1C1E21;
             --text-muted: #4A5056;
             --text-subtle: #8D949A;
-            --border: #1C1E21;
-            --border-light: #8D949A;
+            --border: #D5D2C8;
+            --border-light: #E2DFD6;
+            --cast-iron: #1C1E21;
+            --galvanized-zinc: #8D949A;
+            --slate-graphite: #4A5056;
+            --rust-vermilion: #C83712;
+            --rust-vermilion-hover: #B32E0E;
+            --rust-vermilion-tint: #FFF5F2;
+            --forest-moss: #1E5631;
+            --forest-moss-bg: #F0FDF4;
+            --amber-ochre: #9A5B00;
+            --amber-ochre-bg: #FFFBEB;
+            --warm-chalk-chip: #EFECE4;
+            --warm-chalk-text: #2C3034;
             --teal-700: #0f766e;
             --teal-800: #115e59;
             --teal-50: #f0fdfa;
@@ -31,30 +46,21 @@
             --blue-700: #1d4ed8;
             --blue-50: #eff6ff;
             --amber-800: #9A5B00;
-            --amber-50: #fffbeb;
+            --amber-50: #FFFBEB;
             --green-800: #1E5631;
-            --green-50: #f0fdf4;
-            --radius-md: 2px;
-            --radius-lg: 2px;
+            --green-50: #F0FDF4;
+            --radius-sm: 4px;
+            --radius-md: 6px;
+            --radius-lg: 8px;
+            --radius-card: 8px;
             --radius-pill: 9999px;
             --shadow-sm: none;
             --shadow-md: none;
-            --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+            --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.12);
             --font-stack: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
-            --font-title: "Space Grotesk", "Archivo", system-ui, -apple-system, sans-serif;
+            --font-title: "Plus Jakarta Sans", "Fraunces", system-ui, -apple-system, sans-serif;
             --font-body: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
             --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            --canvas-bg: #F6F5F0;
-            --card-surface: #FFFFFF;
-            --cast-iron: #1C1E21;
-            --galvanized-zinc: #8D949A;
-            --slate-graphite: #4A5056;
-            --rust-vermilion: #C83712;
-            --signal-orange: #FF4612;
-            --forest-moss: #1E5631;
-            --forest-moss-bg: #F0FDF4;
-            --amber-ochre: #9A5B00;
-            --amber-ochre-bg: #FFFBEB;
         }
 
         * {
@@ -528,11 +534,11 @@
         }
 
         .project-opportunity-card {
-            border: 1.5px solid var(--cast-iron);
-            border-top: 4px solid var(--signal-orange);
-            border-radius: 2px;
+            border: 1.5px solid var(--card-border);
+            border-bottom: 3px solid var(--card-border);
+            border-radius: var(--radius-card);
             background: var(--card-surface);
-            box-shadow: none !important;
+            box-shadow: 0 1px 3px rgba(28, 30, 33, 0.04);
             padding: 0;
             display: flex;
             flex-direction: column;
@@ -540,7 +546,7 @@
             text-decoration: none;
             color: inherit;
             cursor: pointer;
-            transition: transform 0.1s ease, border-color 0.15s ease;
+            transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
             min-height: 250px;
             overflow: hidden;
             position: relative;
@@ -548,14 +554,14 @@
 
         .project-opportunity-card:hover {
             transform: translateY(-2px);
-            border-color: var(--cast-iron);
-            box-shadow: none !important;
+            border-color: #B8B3A8;
+            border-bottom-color: #A39D90;
+            box-shadow: 0 4px 12px rgba(28, 30, 33, 0.08);
         }
 
         .project-opportunity-card:focus-visible {
             outline: 2px solid var(--cast-iron);
             outline-offset: 2px;
-            box-shadow: none !important;
         }
 
         /* Zone 1: Top Dispatch Bar */
@@ -564,9 +570,9 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--galvanized-zinc);
-            background: var(--card-surface);
+            padding: 11px 14px;
+            border-bottom: 1px solid var(--card-border-subtle);
+            background: #FCFBF9;
             flex-wrap: wrap;
         }
 
@@ -574,10 +580,10 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            border: 1px solid var(--galvanized-zinc);
-            border-radius: 2px;
-            background: var(--canvas-bg);
-            color: var(--cast-iron);
+            border: 1.5px solid var(--rust-vermilion);
+            border-radius: 4px;
+            background: var(--rust-vermilion-tint);
+            color: var(--rust-vermilion);
             font-family: var(--font-mono);
             font-size: 0.72rem;
             font-weight: 700;
@@ -590,7 +596,7 @@
         }
 
         .dispatch-shape-badge svg {
-            color: var(--cast-iron);
+            color: var(--rust-vermilion);
             flex-shrink: 0;
         }
 
@@ -633,9 +639,10 @@
         .card-project-title {
             margin: 0;
             font-family: var(--font-title);
-            font-size: 1.1875rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            line-height: 1.25;
+            letter-spacing: -0.015em;
+            line-height: 1.28;
             color: var(--cast-iron);
         }
 
@@ -683,7 +690,7 @@
             padding: 1px 6px;
             background: var(--forest-moss-bg);
             border: 1px solid var(--forest-moss);
-            border-radius: 2px;
+            border-radius: 4px;
             color: var(--forest-moss);
             font-family: var(--font-mono);
             font-size: 0.6875rem;
@@ -722,20 +729,20 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            background: var(--canvas-bg);
-            border: 1px solid var(--galvanized-zinc);
-            border-radius: 2px;
-            padding: 3px 8px;
+            background: var(--warm-chalk-chip);
+            border: none;
+            border-radius: 6px;
+            padding: 4px 9px;
             font-family: var(--font-body);
             font-size: 0.8125rem;
-            font-weight: 600;
-            color: var(--cast-iron);
+            font-weight: 500;
+            color: var(--warm-chalk-text);
             white-space: nowrap;
             line-height: 1.2;
         }
 
         .constraint-stamp svg {
-            color: var(--slate-graphite);
+            color: #5C6268;
             flex-shrink: 0;
         }
 
@@ -746,8 +753,8 @@
             justify-content: space-between;
             gap: 12px;
             padding: 10px 16px;
-            border-top: 1px solid var(--galvanized-zinc);
-            background: var(--card-surface);
+            border-top: 1px solid var(--card-border-subtle);
+            background: #FCFBF9;
             margin-top: auto;
         }
 
@@ -783,7 +790,7 @@
 
         .card-cta-btn {
             min-height: 48px;
-            padding: 0 18px;
+            padding: 0 20px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -792,18 +799,19 @@
             font-family: var(--font-title);
             font-size: 0.9375rem;
             font-weight: 700;
-            letter-spacing: 0.02em;
-            border: 1.5px solid var(--cast-iron);
-            border-radius: 2px;
+            letter-spacing: 0.01em;
+            border: 1.5px solid #A82C0E;
+            border-radius: 6px;
             cursor: pointer;
             text-decoration: none;
             white-space: nowrap;
-            box-shadow: none !important;
-            transition: background-color 0.15s ease, transform 0.05s ease;
+            box-shadow: 0 1px 2px rgba(200, 55, 18, 0.2);
+            transition: background-color 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
         }
 
         .card-cta-btn:hover {
-            background: #B32E0E;
+            background: var(--rust-vermilion-hover);
+            box-shadow: 0 2px 5px rgba(200, 55, 18, 0.3);
         }
 
         .card-cta-btn:active {
@@ -812,6 +820,8 @@
 
         .card-cta-btn:focus-visible {
             outline: 2px solid var(--cast-iron);
+            outline-offset: 2px;
+        }
             outline-offset: 2px;
         }
 
@@ -849,8 +859,8 @@
         .org-grouped-expander {
             grid-column: 1 / -1;
             background: var(--card-surface);
-            border: 1.5px dashed var(--galvanized-zinc);
-            border-radius: 2px;
+            border: 1.5px dashed var(--card-border);
+            border-radius: 6px;
             padding: 12px 16px;
             display: flex;
             align-items: center;
@@ -861,7 +871,7 @@
         }
 
         .org-expand-btn {
-            border: 1.5px solid var(--cast-iron);
+            border: 1.5px solid var(--card-border);
             background: var(--canvas-bg);
             color: var(--cast-iron);
             font-family: var(--font-mono);
@@ -869,10 +879,10 @@
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            border-radius: 2px;
+            border-radius: 6px;
             padding: 6px 14px;
             cursor: pointer;
-            transition: background 0.15s ease, color 0.15s ease;
+            transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
         }
 
         .org-expand-btn:hover {
