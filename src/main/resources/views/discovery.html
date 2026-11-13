@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>volunteer.monster: Volunteer Project Discovery</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌟</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%234A2545'/><text x='50' y='65' font-family='system-ui,sans-serif' font-weight='800' font-size='44' fill='white' text-anchor='middle'>VM</text></svg>">
     <link
         rel="stylesheet"
         href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -1728,7 +1728,7 @@
                         autocomplete="off"
                     />
                     <button type="button" class="chip-button" onclick="useCurrentLocation()" title="Use my current location">
-                        📍 Near me
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="margin-right: 4px;"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>Near me
                     </button>
                     <select id="radius-select" name="radiusMiles" class="select-box-styled" aria-label="Search radius in miles">
                         <option value="5">5 mi</option>
@@ -1757,19 +1757,19 @@
                 <span class="tray-section-title">Way to Help</span>
                 <div class="tray-row" role="group" aria-label="Ways to help">
                     <button type="button" class="chip-button active" data-way="all" onclick="selectWayToHelp('all')">
-                        ✨ All Ways
+                        All Ways
                     </button>
                     <button type="button" class="chip-button" data-way="shifts" onclick="selectWayToHelp('shifts')">
-                        📅 In-Person Shifts
+                        In-Person Shifts
                     </button>
                     <button type="button" class="chip-button" data-way="walkin" onclick="selectWayToHelp('walkin')">
-                        🚪 Walk-In &amp; Flexible
+                        Walk-In &amp; Flexible
                     </button>
                     <button type="button" class="chip-button" data-way="donations" onclick="selectWayToHelp('donations')">
-                        📦 Donation Drives
+                        Donation Drives
                     </button>
                     <button type="button" class="chip-button" data-way="remote" onclick="selectWayToHelp('remote')">
-                        💻 Help from Home
+                        Help from Home
                     </button>
                 </div>
             </div>
@@ -1779,22 +1779,22 @@
                 <span class="tray-section-title">Cause</span>
                 <div id="interest-tag-strip" class="tray-row" role="group" aria-label="Causes">
                     <button type="button" class="chip-button active interest-item" data-interest="All Causes" onclick="selectInterestChip('All Causes')">
-                        ✨ All Causes
+                        All Causes
                     </button>
                     <button type="button" class="chip-button interest-item" data-interest="Food & Hunger" onclick="selectInterestChip('Food & Hunger')">
-                        🥗 Food &amp; Hunger
+                        Food &amp; Hunger
                     </button>
                     <button type="button" class="chip-button interest-item" data-interest="Civic Clean-Up" onclick="selectInterestChip('Civic Clean-Up')">
-                        🧹 Civic Clean-Up
+                        Civic Clean-Up
                     </button>
                     <button type="button" class="chip-button interest-item" data-interest="Traveler & Shelter Outreach" onclick="selectInterestChip('Traveler & Shelter Outreach')">
-                        🤝 Traveler &amp; Shelter Outreach
+                        Traveler &amp; Shelter Outreach
                     </button>
                     <button type="button" class="chip-button interest-item" data-interest="Environment & Trails" onclick="selectInterestChip('Environment & Trails')">
-                        🌲 Environment &amp; Trails
+                        Environment &amp; Trails
                     </button>
                     <button type="button" class="chip-button interest-item" data-interest="Family Support" onclick="selectInterestChip('Family Support')">
-                        🏠 Family Support
+                        Family Support
                     </button>
                 </div>
             </div>
