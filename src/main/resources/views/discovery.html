@@ -17,73 +17,83 @@
     <style>
         :root {
             /* 1. Base Canvas & Surfaces (85%) */
-            --canvas-bg: #F6F4EE;            /* Park Map Parchment */
-            --bg: #F6F4EE;
-            --bg-subtle: #F6F4EE;
+            --canvas-bg: #F6F3EE;            /* Warm Map Parchment */
+            --bg: #F6F3EE;
+            --bg-subtle: #F6F3EE;
             --card-surface: #FFFFFF;         /* Field Card White */
-            --footer-surface: #FAF8F3;       /* Subtle Warm Footer Tint */
+            --footer-surface: #F9F7F3;       /* Soft Parchment Tint */
 
             /* 2. Inks & Typography */
-            --cast-iron: #1B2420;            /* Deep Pine Charcoal (15.6:1 contrast) */
-            --text-main: #1B2420;
-            --title-espresso: #1B2420;
-            --text-muted: #535E57;           /* Muted Pine Graphite */
-            --text-subtle: #7E8A83;
+            --cast-iron: #221B24;            /* Deep Aubergine-Charcoal (15.4:1 contrast) */
+            --text-main: #221B24;
+            --title-espresso: #221B24;
+            --text-muted: #524856;           /* Warm Plum-Slate (7.8:1 contrast) */
+            --text-subtle: #796E7E;
+            --slate-graphite: #524856;
 
             /* 3. Boundaries & Dividing Inks */
-            --border: #DCD7CB;               /* Warm Stone Border */
-            --border-light: #E8E4DA;
-            --card-border: #DCD7CB;
-            --card-border-subtle: #E8E4DA;
-            --galvanized-zinc: #8A968F;
+            --border: #DBD3CA;               /* Warm Stone Rule */
+            --border-light: #EBE4DC;
+            --card-border: #DBD3CA;
+            --card-border-subtle: #EBE4DC;
+            --galvanized-zinc: #8C847E;
 
-            /* 4. Primary Action (10%) */
-            --action-ranger-green: #1F543E;  /* Ranger Forest Green (8.6:1 contrast) */
-            --action-ranger-hover: #174230;
-            --action-ranger-active: #113426;
-            --action-ranger-tint: #EEF4F0;
-            --action-ranger-border: #9DC0B0;
-            --teal-700: #1F543E;
-            --teal-800: #174230;
-            --teal-50: #EEF4F0;
-            --teal-200: #9DC0B0;
+            /* 4. Primary Brand Action (10%) */
+            --action-primary: #4A2545;       /* Civic Aubergine (Plum, 11.8:1 contrast) */
+            --action-primary-hover: #361932; /* Deepened Plum */
+            --action-primary-active: #291126;
+            --action-primary-tint: #F3EDF5;  /* Soft Plum Tint */
+            --action-primary-border: #C8B9CC;
+            --action-ranger-green: #4A2545;  /* Aliases for semantic mapping */
+            --action-ranger-hover: #361932;
+            --action-ranger-active: #291126;
+            --action-ranger-tint: #F3EDF5;
+            --action-ranger-border: #C8B9CC;
+            --teal-700: #4A2545;
+            --teal-800: #361932;
+            --teal-50: #F3EDF5;
+            --teal-200: #C8B9CC;
 
-            /* 5. Signature Accent (5%) */
-            --accent-canyon: #B83A1A;        /* Canyon Terracotta (5.1:1 contrast) */
-            --accent-canyon-hover: #9E3014;
-            --accent-canyon-tint: #FCF3F0;
-            --accent-canyon-border: #E8B4A7;
-            --rust-vermilion: #B83A1A;
-            --rust-vermilion-hover: #9E3014;
-            --rust-vermilion-tint: #FCF3F0;
+            /* 5. Signature Stamps & Scarcity (10% & 5%) */
+            --stamp-amber-ink: #965300;      /* Sunlit Amber-Gold (5.3:1 contrast) */
+            --stamp-amber-fill: #FDF6EC;     /* Warm Marigold Tint */
+            --accent-canyon: #965300;
+            --accent-canyon-hover: #7E4500;
+            --accent-canyon-tint: #FDF6EC;
+            --accent-canyon-border: #E8C89A;
+            --rust-vermilion: #965300;
+            --rust-vermilion-hover: #7E4500;
+            --rust-vermilion-tint: #FDF6EC;
 
-            /* 6. Secondary Chips & Stamps */
-            --chip-trailhead-sand: #ECE8DD;  /* Trailhead Sand */
-            --chip-trailhead-text: #232B26;
-            --warm-chalk-chip: #ECE8DD;
-            --warm-chalk-text: #232B26;
+            /* 6. Secondary Chips */
+            --chip-trailhead-sand: #ECE6DF;  /* Warm Stone Sand */
+            --chip-trailhead-text: #221B24;
+            --warm-chalk-chip: #ECE6DF;
+            --warm-chalk-text: #221B24;
 
             /* 7. Status Indicators */
-            --forest-moss: #1F543E;
-            --forest-moss-bg: #EEF4F0;
-            --amber-ochre: #9A5B00;
-            --amber-ochre-bg: #FFFBEB;
-            --blue-700: #1d4ed8;
-            --blue-50: #eff6ff;
-            --amber-800: #9A5B00;
-            --amber-50: #FFFBEB;
-            --green-800: #1F543E;
-            --green-50: #EEF4F0;
+            --verified-ink: #4A2545;         /* Civic Aubergine */
+            --verified-fill: #F3EDF5;        /* Soft Plum Tint */
+            --forest-moss: #4A2545;
+            --forest-moss-bg: #F3EDF5;
+            --amber-ochre: #965300;          /* Amber-Ochre Scarcity */
+            --amber-ochre-bg: #FDF6EC;
+            --blue-700: #254A6E;
+            --blue-50: #EEF4F8;
+            --amber-800: #965300;
+            --amber-50: #FDF6EC;
+            --green-800: #4A2545;
+            --green-50: #F3EDF5;
 
-            /* 8. Radii, Shadows & Fonts */
+            /* 8. Radii, Shadows & Focus Ring */
             --radius-sm: 4px;
             --radius-md: 6px;
             --radius-lg: 8px;
             --radius-card: 12px;
             --radius-pill: 9999px;
-            --shadow-sm: 0 1px 2px rgba(27, 36, 32, 0.04);
-            --shadow-md: 0 2px 6px rgba(27, 36, 32, 0.06);
-            --shadow-lg: 0 6px 16px rgba(27, 36, 32, 0.10);
+            --shadow-sm: 0 1px 2px rgba(34, 27, 36, 0.04);
+            --shadow-md: 0 2px 6px rgba(34, 27, 36, 0.06);
+            --shadow-lg: 0 8px 24px rgba(34, 27, 36, 0.12);
             --font-stack: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
             --font-title: "Fraunces", "Plus Jakarta Sans", Georgia, serif;
             --font-body: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
@@ -97,7 +107,14 @@
         body {
             margin: 0;
             padding: 0;
-            background: var(--canvas-bg);
+            background-color: var(--canvas-bg);
+            background-image: repeating-linear-gradient(
+                -45deg,
+                rgba(34, 27, 36, 0.035) 0px,
+                rgba(34, 27, 36, 0.035) 1px,
+                transparent 1px,
+                transparent 7px
+            );
             color: var(--cast-iron);
             font-family: var(--font-body);
             line-height: 1.45;
@@ -173,7 +190,7 @@
         }
 
         .search-capsule-trigger:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -234,7 +251,7 @@
         }
 
         .filter-open-btn:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -272,7 +289,7 @@
         }
 
         .map-toggle-btn:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -433,7 +450,7 @@
         }
 
         .tray-close-btn:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -470,7 +487,7 @@
 
         .input-box-styled:focus {
             border-color: var(--action-ranger-green);
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
         }
 
         .select-box-styled {
@@ -487,7 +504,7 @@
 
         .select-box-styled:focus {
             border-color: var(--action-ranger-green);
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
         }
 
         .chip-button {
@@ -522,7 +539,7 @@
         }
 
         .chip-button:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -557,7 +574,7 @@
         }
 
         .apply-btn:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -635,7 +652,7 @@
         }
 
         .project-opportunity-card:focus-visible {
-            outline: 2px solid var(--cast-iron);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -655,10 +672,10 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            border: 1.5px solid var(--accent-canyon);
+            border: 1.25px solid var(--stamp-amber-ink);
             border-radius: 4px;
-            background: var(--accent-canyon-tint);
-            color: var(--accent-canyon);
+            background: var(--stamp-amber-fill);
+            color: var(--stamp-amber-ink);
             font-family: var(--font-mono);
             font-size: 0.72rem;
             font-weight: 700;
@@ -671,7 +688,7 @@
         }
 
         .dispatch-shape-badge svg {
-            color: var(--accent-canyon);
+            color: var(--stamp-amber-ink);
             flex-shrink: 0;
         }
 
@@ -734,7 +751,7 @@
         }
 
         .card-title-link:focus-visible {
-            outline: 2px solid var(--cast-iron);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -760,16 +777,20 @@
             align-items: center;
             gap: 3px;
             padding: 1px 6px;
-            background: var(--forest-moss-bg);
-            border: 1px solid var(--forest-moss);
+            background: var(--verified-fill);
+            border: 1px solid var(--action-primary-border);
             border-radius: 4px;
-            color: var(--forest-moss);
+            color: var(--verified-ink);
             font-family: var(--font-mono);
             font-size: 0.6875rem;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
             line-height: 1.2;
+        }
+
+        .verified-icon {
+            color: var(--verified-ink);
         }
 
         .verified-badge svg {
@@ -863,24 +884,24 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: var(--action-ranger-green);
+            background: var(--action-primary);
             color: #FFFFFF;
             font-family: var(--font-body);
             font-size: 0.9375rem;
             font-weight: 700;
             letter-spacing: 0.01em;
-            border: 1px solid var(--action-ranger-hover);
+            border: 1px solid var(--action-primary-hover);
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             white-space: nowrap;
-            box-shadow: 0 1px 3px rgba(31, 84, 62, 0.2);
+            box-shadow: 0 1px 3px rgba(74, 37, 69, 0.22);
             transition: background-color 140ms ease, transform 90ms cubic-bezier(0.2, 0, 0, 1), box-shadow 140ms ease;
         }
 
         .card-cta-btn:hover {
-            background: var(--action-ranger-hover);
-            box-shadow: 0 2px 5px rgba(31, 84, 62, 0.3);
+            background: var(--action-primary-hover);
+            box-shadow: 0 2px 6px rgba(74, 37, 69, 0.3);
         }
 
         .card-cta-btn:active {
@@ -888,7 +909,7 @@
         }
 
         .card-cta-btn:focus-visible {
-            outline: 2px solid var(--cast-iron);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -959,7 +980,7 @@
         }
 
         .org-expand-btn:focus-visible {
-            outline: 2px solid var(--cast-iron);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
@@ -1035,20 +1056,20 @@
         .modal-card {
             background: var(--card-surface);
             border-radius: var(--radius-card);
-            border: 1.5px solid var(--card-border);
+            border: 1.5px solid var(--cast-iron);
             max-width: 660px;
             width: 100%;
             max-height: 90vh;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 12px 36px rgba(27, 36, 32, 0.22);
+            box-shadow: 0 16px 40px rgba(27, 36, 32, 0.28);
             position: relative;
             animation: trayFadeSlide 200ms cubic-bezier(0.2, 0, 0, 1);
             will-change: transform, opacity;
             overflow: hidden;
         }
 
-        /* 1977 NPS Unigrid Trail-Blaze Header Bar */
+        /* 1977 NPS Unigrid Header Bar */
         .unigrid-header-bar {
             background: var(--cast-iron);
             color: #FFFFFF;
@@ -1057,14 +1078,8 @@
             flex-shrink: 0;
         }
 
-        .unigrid-trail-blaze-strip {
-            height: 4px;
-            width: 100%;
-            background: var(--accent-canyon);
-        }
-
         .unigrid-header-inner {
-            padding: 16px 22px 18px;
+            padding: 18px 22px;
         }
 
         .unigrid-agency-row {
@@ -1137,7 +1152,7 @@
 
         .unigrid-badge-strip .card-way-badge {
             background: rgba(255, 255, 255, 0.12);
-            color: #F6F4EE;
+            color: var(--canvas-bg);
             border: 1px solid rgba(255, 255, 255, 0.25);
             font-family: var(--font-mono);
             font-size: 0.7rem;
@@ -1146,7 +1161,7 @@
             border-radius: 3px;
         }
 
-        /* Unigrid Scrollable Body */
+        /* Unigrid Scrollable Body (Field Card White Surface) */
         .unigrid-body {
             padding: 20px 24px;
             overflow-y: auto;
@@ -1333,143 +1348,270 @@
         }
 
         .unigrid-footer-close-btn:focus-visible {
-            outline: 2px solid var(--cast-iron);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
         .shift-action-card {
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
-            padding: 12px;
+            padding: 14px 16px;
             margin-top: 8px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 14px;
             background: #ffffff;
+            box-shadow: 0 1px 3px rgba(27, 36, 32, 0.04);
         }
 
         .primary-action-btn {
+            min-height: 40px;
             border: none;
             background: var(--action-ranger-green);
             color: #ffffff;
             border-radius: 6px;
-            padding: 8px 16px;
-            font-family: inherit;
-            font-size: 0.84rem;
-            font-weight: 600;
+            padding: 8px 18px;
+            font-family: var(--font-body);
+            font-size: 0.86rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
             cursor: pointer;
             white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(31, 84, 62, 0.2);
+            transition: background-color 140ms ease, transform 90ms cubic-bezier(0.2, 0, 0, 1), box-shadow 140ms ease;
         }
 
         .primary-action-btn:hover {
             background: var(--action-ranger-hover);
+            box-shadow: 0 2px 5px rgba(31, 84, 62, 0.28);
+        }
+
+        .primary-action-btn:active {
+            transform: scale(0.96);
         }
 
         .primary-action-btn:focus-visible {
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
 
+        @keyframes drawerSlideSettle {
+            from {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes confirmSettle {
+            from {
+                opacity: 0;
+                transform: scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
         .signup-drawer {
-            margin-top: 12px;
-            padding: 14px;
-            background: var(--action-ranger-tint);
-            border: 1px solid var(--action-ranger-border);
+            margin-top: 10px;
+            padding: 16px;
+            background: var(--footer-surface);
+            border: 1px solid var(--border);
             border-radius: var(--radius-md);
+            animation: drawerSlideSettle 160ms cubic-bezier(0.2, 0, 0, 1);
+            will-change: transform, opacity;
+        }
+
+        .signup-drawer-title {
+            margin: 0 0 3px;
+            font-family: var(--font-title);
+            font-size: 0.96rem;
+            font-weight: 700;
+            color: var(--cast-iron);
+        }
+
+        .signup-drawer-desc {
+            margin: 0 0 12px;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.4;
         }
 
         .signup-form-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 10px;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        @media (max-width: 500px) {
+            .signup-form-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .signup-input-group label {
             display: block;
-            font-size: 0.72rem;
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
             font-weight: 700;
-            color: var(--action-ranger-hover);
-            margin-bottom: 2px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 3px;
         }
 
         .signup-input {
             width: 100%;
-            padding: 6px 10px;
+            padding: 8px 10px;
+            background: #FFFFFF;
             border: 1px solid var(--border);
             border-radius: 6px;
             font-family: inherit;
-            font-size: 0.82rem;
+            font-size: 0.84rem;
+            color: var(--cast-iron);
             outline: none;
+            transition: border-color 140ms ease, box-shadow 140ms ease;
         }
 
         .signup-input:focus {
             border-color: var(--action-ranger-green);
-            outline: 2px solid var(--action-ranger-green);
+            outline: 2.5px solid var(--cast-iron);
+            outline-offset: 1px;
         }
 
         .signup-submit-btn {
             border: none;
             background: var(--action-ranger-green);
-            color: #ffffff;
+            color: #FFFFFF;
             border-radius: 6px;
-            padding: 8px 16px;
-            font-family: inherit;
-            font-size: 0.82rem;
-            font-weight: 600;
+            padding: 9px 18px;
+            font-family: var(--font-body);
+            font-size: 0.86rem;
+            font-weight: 700;
+            letter-spacing: 0.01em;
             cursor: pointer;
+            box-shadow: 0 1px 3px rgba(31, 84, 62, 0.2);
+            transition: background-color 140ms ease, transform 90ms cubic-bezier(0.2, 0, 0, 1);
+        }
+
+        .signup-submit-btn:hover {
+            background: var(--action-ranger-hover);
+        }
+
+        .signup-submit-btn:active {
+            transform: scale(0.97);
+        }
+
+        .signup-submit-btn:focus-visible {
+            outline: 2.5px solid var(--cast-iron);
+            outline-offset: 2px;
         }
 
         .genuine-confirmed-box {
-            padding: 14px;
-            background: var(--action-ranger-tint);
-            border: 1.5px solid var(--action-ranger-border);
+            padding: 16px 18px;
+            background: #FFFFFF;
+            border: 1.5px solid var(--border);
+            border-left: 4px solid var(--action-ranger-green);
             border-radius: var(--radius-md);
-            color: var(--action-ranger-hover);
-            font-size: 0.84rem;
+            box-shadow: 0 2px 6px rgba(27, 36, 32, 0.05);
+            animation: confirmSettle 180ms cubic-bezier(0.2, 0, 0, 1);
+            will-change: transform, opacity;
+        }
+
+        .confirmed-header-line {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: var(--font-title);
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--cast-iron);
+            margin-bottom: 6px;
+        }
+
+        .confirmed-header-icon {
+            color: var(--action-ranger-green);
+            flex-shrink: 0;
+        }
+
+        .confirmed-details-body {
+            margin: 0;
+            font-size: 0.86rem;
+            line-height: 1.5;
+            color: var(--cast-iron);
         }
 
         .confirmed-actions-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-            margin-top: 8px;
+            gap: 10px;
+            margin-top: 12px;
             flex-wrap: wrap;
         }
 
         .confirmed-link-btn {
             border: 1px solid var(--action-ranger-green);
-            background: #ffffff;
-            color: var(--action-ranger-green);
+            background: var(--action-ranger-green);
+            color: #FFFFFF;
             border-radius: 6px;
-            padding: 5px 10px;
-            font-size: 0.76rem;
-            font-weight: 600;
+            padding: 7px 14px;
+            font-size: 0.8rem;
+            font-weight: 700;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
+            box-shadow: 0 1px 3px rgba(31, 84, 62, 0.2);
+            transition: background-color 140ms ease, transform 90ms ease;
         }
 
         .confirmed-link-btn:hover {
-            background: var(--action-ranger-tint);
+            background: var(--action-ranger-hover);
+            border-color: var(--action-ranger-hover);
+        }
+
+        .confirmed-link-btn:active {
+            transform: scale(0.97);
+        }
+
+        .confirmed-link-btn:focus-visible {
+            outline: 2.5px solid var(--cast-iron);
+            outline-offset: 2px;
         }
 
         .unvolunteer-btn {
-            border: 1px solid var(--accent-canyon);
-            background: #ffffff;
-            color: var(--accent-canyon);
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-muted);
             border-radius: 6px;
-            padding: 5px 10px;
-            font-size: 0.76rem;
+            padding: 7px 12px;
+            font-family: inherit;
+            font-size: 0.78rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 140ms ease;
+            transition: background-color 140ms ease, color 140ms ease, border-color 140ms ease, transform 90ms ease;
         }
 
         .unvolunteer-btn:hover {
-            background: var(--accent-canyon-tint);
+            background: var(--border-light);
+            color: var(--cast-iron);
+            border-color: var(--cast-iron);
+        }
+
+        .unvolunteer-btn:active {
+            transform: scale(0.97);
+        }
+
+        .unvolunteer-btn:focus-visible {
+            outline: 2.5px solid var(--cast-iron);
+            outline-offset: 2px;
         }
         }
 
@@ -1696,13 +1838,12 @@
     <!-- Project Detail & Honest Commitment Modal Dialog (1977 NPS Unigrid System) -->
     <div id="project-modal" class="modal-overlay" onclick="handleModalBackdropClick(event)">
         <div class="modal-card unigrid-card" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
-            <!-- 1977 NPS Unigrid Trail-Blaze Header Bar -->
+            <!-- 1977 NPS Unigrid Header Bar -->
             <div class="unigrid-header-bar">
-                <div class="unigrid-trail-blaze-strip"></div>
                 <div class="unigrid-header-inner">
                     <div class="unigrid-agency-row">
                         <div class="unigrid-agency-line">
-                            <span class="unigrid-agency-tag">NATIONAL PARK &amp; CIVIC DISPATCH</span>
+                            <span class="unigrid-agency-tag">VOLUNTEER.MONSTER</span>
                             <span class="unigrid-bullet" aria-hidden="true">&middot;</span>
                             <span id="modal-org-subtitle" class="unigrid-authority-tag">COMMUNITY PARTNER</span>
                         </div>
@@ -1753,7 +1894,7 @@
             <div class="unigrid-hatched-footer">
                 <div class="unigrid-hatch-pattern" aria-hidden="true"></div>
                 <div class="unigrid-footer-inner">
-                    <span class="unigrid-footer-stamp">MUNICIPAL VOLUNTEER DISPATCH &middot; FORM 1977-NPS</span>
+                    <span class="unigrid-footer-stamp">VOLUNTEER.MONSTER</span>
                     <button type="button" class="unigrid-footer-close-btn" onclick="closeModal()">Close</button>
                 </div>
             </div>
@@ -2734,19 +2875,20 @@
                 introEl.textContent = "Your commitment for this opportunity is active:";
                 container.innerHTML = `
                     <div class="genuine-confirmed-box">
-                        <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; color: var(--action-ranger-hover);">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        <div class="confirmed-header-line">
+                            <svg class="confirmed-header-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
                             <span>Volunteer Commitment Confirmed</span>
                         </div>
-                        <p style="margin: 4px 0 0;">
+                        <p class="confirmed-details-body">
                             Reserved for <strong>${escapeHtml(existingComm.name)}</strong> (${escapeHtml(existingComm.email)})<br>
                             Session: <strong>${escapeHtml(existingComm.shiftTime)}</strong> at <strong>${escapeHtml(existingComm.siteName)}</strong>
                         </p>
                         <div class="confirmed-actions-row">
                             <a class="confirmed-link-btn" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(item.projectTitle)}&details=${encodeURIComponent(item.description)}&location=${encodeURIComponent(site.name)}" target="_blank" rel="noopener noreferrer">
-                                Add to Google Calendar
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span>Add to Google Calendar</span>
                             </a>
-                            <button type="button" class="unvolunteer-btn" onclick="handleUnvolunteer('${escapeHtml(item.projectId)}')">Cancel Sign-up (Unvolunteer)</button>
+                            <button type="button" class="unvolunteer-btn" onclick="handleUnvolunteer('${escapeHtml(item.projectId)}')">Cancel Sign-up</button>
                         </div>
                     </div>
                 `;
@@ -2779,8 +2921,8 @@
             if (!target) return;
             target.innerHTML = `
                 <div class="signup-drawer">
-                    <h5 style="margin: 0 0 4px; font-size: 0.94rem; color: var(--action-ranger-hover);">Confirm Spot: ${escapeHtml(siteName)}</h5>
-                    <p style="margin: 0 0 10px; font-size: 0.82rem; color: var(--action-ranger-hover);">Enter your contact details so the coordinator has an accurate roster:</p>
+                    <h5 class="signup-drawer-title">Confirm Spot: ${escapeHtml(siteName)}</h5>
+                    <p class="signup-drawer-desc">Enter your contact details so the coordinator has an accurate roster:</p>
                     <form onsubmit="handleSignupSubmit(event, '${escapeHtml(projectId)}', '${escapeHtml(siteName)}', '${escapeHtml(shiftTime)}')">
                         <div class="signup-form-grid">
                             <div class="signup-input-group">
