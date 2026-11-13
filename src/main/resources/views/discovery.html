@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Kaiju - Volunteer Project Discovery</title>
+    <title>volunteer.monster: Volunteer Project Discovery</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌟</text></svg>">
     <link
         rel="stylesheet"
@@ -108,13 +108,23 @@
             margin: 0;
             padding: 0;
             background-color: var(--canvas-bg);
-            background-image: repeating-linear-gradient(
-                -45deg,
-                rgba(34, 27, 36, 0.035) 0px,
-                rgba(34, 27, 36, 0.035) 1px,
-                transparent 1px,
-                transparent 7px
-            );
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(34, 27, 36, 0.02) 0px,
+                    rgba(34, 27, 36, 0.02) 1px,
+                    transparent 1px,
+                    transparent 3px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(34, 27, 36, 0.02) 0px,
+                    rgba(34, 27, 36, 0.02) 1px,
+                    transparent 1px,
+                    transparent 4px
+                ),
+                radial-gradient(rgba(34, 27, 36, 0.03) 1px, transparent 0);
+            background-size: 100% 100%, 100% 100%, 16px 16px;
             color: var(--cast-iron);
             font-family: var(--font-body);
             line-height: 1.45;
@@ -126,8 +136,25 @@
             position: sticky;
             top: 0;
             z-index: 200;
-            background: var(--bg);
-            border-bottom: 1px solid var(--border-light);
+            background-color: var(--canvas-bg);
+            background-image: 
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(34, 27, 36, 0.02) 0px,
+                    rgba(34, 27, 36, 0.02) 1px,
+                    transparent 1px,
+                    transparent 3px
+                ),
+                repeating-linear-gradient(
+                    90deg,
+                    rgba(34, 27, 36, 0.02) 0px,
+                    rgba(34, 27, 36, 0.02) 1px,
+                    transparent 1px,
+                    transparent 4px
+                ),
+                radial-gradient(rgba(34, 27, 36, 0.03) 1px, transparent 0);
+            background-size: 100% 100%, 100% 100%, 16px 16px;
+            border-bottom: none;
             padding: 10px 16px;
         }
 
@@ -153,16 +180,18 @@
         }
 
         .brand-badge {
-            width: 28px;
+            min-width: 28px;
             height: 28px;
+            padding: 0 5px;
             border-radius: 7px;
-            background: var(--action-ranger-green);
+            background: var(--action-primary);
             color: #ffffff;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.88rem;
+            font-size: 0.78rem;
             font-weight: 800;
+            letter-spacing: -0.02em;
         }
 
         /* Calm Resting Search Capsule (Tap to Expand on Mobile) */
@@ -295,9 +324,9 @@
 
         /* 2. Sleek Active Filters Strip (Under 38px, Calm at Rest) */
         .active-filter-strip {
-            background: var(--bg-subtle);
-            border-bottom: 1px solid var(--border-light);
-            padding: 6px 16px;
+            background: transparent;
+            border-bottom: none;
+            padding: 4px 16px 10px;
         }
 
         .active-filter-inner {
@@ -1631,9 +1660,9 @@
     <!-- 1. Sleek Resting Header (Under 60px Height on Mobile) -->
     <header class="site-header">
         <div class="header-content">
-            <a href="/" class="brand-link" aria-label="Kaiju Volunteer Discovery">
-                <span class="brand-badge">K</span>
-                <span>kaiju</span>
+            <a href="/" class="brand-link" aria-label="Volunteer Monster Project Discovery">
+                <span class="brand-badge">VM</span>
+                <span>volunteer.monster</span>
             </a>
 
             <!-- Tap Capsule to Open Refinement Tray -->
@@ -2853,17 +2882,20 @@
 
         function getStoredCommitment(projectId) {
             try {
-                const raw = localStorage.getItem(`kaiju_comm_${projectId}`);
+                const raw = localStorage.getItem(`vm_comm_${projectId}`) || localStorage.getItem(`kaiju_comm_${projectId}`);
                 return raw ? JSON.parse(raw) : null;
             } catch (_) { return null; }
         }
 
         function saveStoredCommitment(projectId, comm) {
-            try { localStorage.setItem(`kaiju_comm_${projectId}`, JSON.stringify(comm)); } catch (_) {}
+            try { localStorage.setItem(`vm_comm_${projectId}`, JSON.stringify(comm)); } catch (_) {}
         }
 
         function removeStoredCommitment(projectId) {
-            try { localStorage.removeItem(`kaiju_comm_${projectId}`); } catch (_) {}
+            try {
+                localStorage.removeItem(`vm_comm_${projectId}`);
+                localStorage.removeItem(`kaiju_comm_${projectId}`);
+            } catch (_) {}
         }
 
         function renderVolunteerActions(item, site) {

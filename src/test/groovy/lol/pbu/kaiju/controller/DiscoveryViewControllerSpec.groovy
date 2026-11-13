@@ -54,4 +54,17 @@ class DiscoveryViewControllerSpec extends BaseControllerSpec {
             message.contains("Discovery view template not found")
         }
     }
+
+    def "loads template from classpath fallback when local file is not on disk"() {
+        when: "controller loads a classpath resource that does not exist in src/main/resources"
+        DiscoveryViewController controller = new DiscoveryViewController("/application-test.yml")
+        HttpResponse<String> response = controller.index()
+
+        then: "the template content is read from the classpath stream"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body() != null
+            response.body().contains("volunteer_monster")
+        }
+    }
 }
