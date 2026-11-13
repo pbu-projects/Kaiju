@@ -16,48 +16,74 @@
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --canvas-bg: #F6F5F0;
-            --bg: #F6F5F0;
-            --bg-subtle: #F6F5F0;
-            --card-surface: #FFFFFF;
-            --card-border: #DFDBD2;
-            --card-border-subtle: #EFECE6;
-            --title-espresso: #23211E;
-            --text-main: #23211E;
-            --text-muted: #565B60;
-            --text-subtle: #8D949A;
-            --border: #DFDBD2;
-            --border-light: #EFECE6;
-            --cast-iron: #23211E;
-            --galvanized-zinc: #8D949A;
-            --slate-graphite: #565B60;
-            --rust-vermilion: #C83712;
-            --rust-vermilion-hover: #B32E0E;
-            --rust-vermilion-tint: #FFF5F2;
-            --forest-moss: #1E5631;
-            --forest-moss-bg: #F0FDF4;
+            /* 1. Base Canvas & Surfaces (85%) */
+            --canvas-bg: #F6F4EE;            /* Park Map Parchment */
+            --bg: #F6F4EE;
+            --bg-subtle: #F6F4EE;
+            --card-surface: #FFFFFF;         /* Field Card White */
+            --footer-surface: #FAF8F3;       /* Subtle Warm Footer Tint */
+
+            /* 2. Inks & Typography */
+            --cast-iron: #1B2420;            /* Deep Pine Charcoal (15.6:1 contrast) */
+            --text-main: #1B2420;
+            --title-espresso: #1B2420;
+            --text-muted: #535E57;           /* Muted Pine Graphite */
+            --text-subtle: #7E8A83;
+
+            /* 3. Boundaries & Dividing Inks */
+            --border: #DCD7CB;               /* Warm Stone Border */
+            --border-light: #E8E4DA;
+            --card-border: #DCD7CB;
+            --card-border-subtle: #E8E4DA;
+            --galvanized-zinc: #8A968F;
+
+            /* 4. Primary Action (10%) */
+            --action-ranger-green: #1F543E;  /* Ranger Forest Green (8.6:1 contrast) */
+            --action-ranger-hover: #174230;
+            --action-ranger-active: #113426;
+            --action-ranger-tint: #EEF4F0;
+            --action-ranger-border: #9DC0B0;
+            --teal-700: #1F543E;
+            --teal-800: #174230;
+            --teal-50: #EEF4F0;
+            --teal-200: #9DC0B0;
+
+            /* 5. Signature Accent (5%) */
+            --accent-canyon: #B83A1A;        /* Canyon Terracotta (5.1:1 contrast) */
+            --accent-canyon-hover: #9E3014;
+            --accent-canyon-tint: #FCF3F0;
+            --accent-canyon-border: #E8B4A7;
+            --rust-vermilion: #B83A1A;
+            --rust-vermilion-hover: #9E3014;
+            --rust-vermilion-tint: #FCF3F0;
+
+            /* 6. Secondary Chips & Stamps */
+            --chip-trailhead-sand: #ECE8DD;  /* Trailhead Sand */
+            --chip-trailhead-text: #232B26;
+            --warm-chalk-chip: #ECE8DD;
+            --warm-chalk-text: #232B26;
+
+            /* 7. Status Indicators */
+            --forest-moss: #1F543E;
+            --forest-moss-bg: #EEF4F0;
             --amber-ochre: #9A5B00;
             --amber-ochre-bg: #FFFBEB;
-            --warm-chalk-chip: #EFECE4;
-            --warm-chalk-text: #2C3034;
-            --teal-700: #0f766e;
-            --teal-800: #115e59;
-            --teal-50: #f0fdfa;
-            --teal-200: #99f6e4;
             --blue-700: #1d4ed8;
             --blue-50: #eff6ff;
             --amber-800: #9A5B00;
             --amber-50: #FFFBEB;
-            --green-800: #1E5631;
-            --green-50: #F0FDF4;
+            --green-800: #1F543E;
+            --green-50: #EEF4F0;
+
+            /* 8. Radii, Shadows & Fonts */
             --radius-sm: 4px;
             --radius-md: 6px;
             --radius-lg: 8px;
             --radius-card: 12px;
             --radius-pill: 9999px;
-            --shadow-sm: none;
-            --shadow-md: none;
-            --shadow-lg: 0 4px 12px rgba(35, 33, 30, 0.12);
+            --shadow-sm: 0 1px 2px rgba(27, 36, 32, 0.04);
+            --shadow-md: 0 2px 6px rgba(27, 36, 32, 0.06);
+            --shadow-lg: 0 6px 16px rgba(27, 36, 32, 0.10);
             --font-stack: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
             --font-title: "Fraunces", "Plus Jakarta Sans", Georgia, serif;
             --font-body: "Public Sans", "Inter", system-ui, -apple-system, sans-serif;
@@ -102,7 +128,7 @@
             align-items: center;
             gap: 7px;
             text-decoration: none;
-            color: var(--teal-700);
+            color: var(--action-ranger-green);
             font-weight: 700;
             font-size: 1.15rem;
             letter-spacing: -0.02em;
@@ -113,7 +139,7 @@
             width: 28px;
             height: 28px;
             border-radius: 7px;
-            background: var(--teal-700);
+            background: var(--action-ranger-green);
             color: #ffffff;
             display: inline-flex;
             align-items: center;
@@ -142,12 +168,12 @@
         }
 
         .search-capsule-trigger:hover {
-            border-color: var(--teal-700);
+            border-color: var(--action-ranger-green);
             box-shadow: var(--shadow-md);
         }
 
         .search-capsule-trigger:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
@@ -172,7 +198,7 @@
             width: 28px;
             height: 28px;
             border-radius: 50%;
-            background: var(--teal-700);
+            background: var(--action-ranger-green);
             color: #ffffff;
             display: inline-flex;
             align-items: center;
@@ -208,12 +234,12 @@
         }
 
         .filter-open-btn:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
         .filter-count-badge {
-            background: var(--teal-700);
+            background: var(--accent-canyon);
             color: #ffffff;
             font-size: 0.7rem;
             font-weight: 700;
@@ -246,7 +272,7 @@
         }
 
         .map-toggle-btn:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
@@ -298,7 +324,7 @@
 
         .dismiss-pill {
             background: #ffffff;
-            color: var(--teal-700);
+            color: var(--action-ranger-green);
             border: 1px solid var(--border-light);
             font-size: 0.72rem;
             font-weight: 600;
@@ -325,7 +351,7 @@
         .reset-link-text {
             border: none;
             background: none;
-            color: var(--teal-700);
+            color: var(--action-ranger-green);
             text-decoration: underline;
             font-family: inherit;
             font-size: 0.76rem;
@@ -407,7 +433,7 @@
         }
 
         .tray-close-btn:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
@@ -443,8 +469,8 @@
         }
 
         .input-box-styled:focus {
-            border-color: var(--teal-700);
-            outline: 2px solid var(--teal-700);
+            border-color: var(--action-ranger-green);
+            outline: 2px solid var(--action-ranger-green);
         }
 
         .select-box-styled {
@@ -460,8 +486,8 @@
         }
 
         .select-box-styled:focus {
-            border-color: var(--teal-700);
-            outline: 2px solid var(--teal-700);
+            border-color: var(--action-ranger-green);
+            outline: 2px solid var(--action-ranger-green);
         }
 
         .chip-button {
@@ -490,13 +516,13 @@
         }
 
         .chip-button.active {
-            background: var(--teal-700);
-            border-color: var(--teal-700);
+            background: var(--action-ranger-green);
+            border-color: var(--action-ranger-green);
             color: #ffffff;
         }
 
         .chip-button:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
@@ -511,7 +537,7 @@
 
         .apply-btn {
             border: none;
-            background: var(--teal-700);
+            background: var(--action-ranger-green);
             color: #ffffff;
             border-radius: 8px;
             padding: 10px 20px;
@@ -523,7 +549,7 @@
         }
 
         .apply-btn:hover {
-            background: var(--teal-800);
+            background: var(--action-ranger-hover);
         }
 
         .apply-btn:active {
@@ -531,7 +557,7 @@
         }
 
         .apply-btn:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
@@ -629,10 +655,10 @@
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            border: 1.5px solid var(--rust-vermilion);
+            border: 1.5px solid var(--accent-canyon);
             border-radius: 4px;
-            background: var(--rust-vermilion-tint);
-            color: var(--rust-vermilion);
+            background: var(--accent-canyon-tint);
+            color: var(--accent-canyon);
             font-family: var(--font-mono);
             font-size: 0.72rem;
             font-weight: 700;
@@ -645,7 +671,7 @@
         }
 
         .dispatch-shape-badge svg {
-            color: var(--rust-vermilion);
+            color: var(--accent-canyon);
             flex-shrink: 0;
         }
 
@@ -703,7 +729,7 @@
         }
 
         .card-title-link:hover {
-            color: var(--rust-vermilion);
+            color: var(--action-ranger-green);
             text-decoration: underline;
         }
 
@@ -800,7 +826,7 @@
             gap: 12px;
             padding: 12px 18px 16px;
             border-top: none;
-            background: #FAF8F5;
+            background: var(--footer-surface);
             border-radius: 0 0 12px 12px;
             margin-top: auto;
         }
@@ -837,24 +863,24 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            background: var(--rust-vermilion);
+            background: var(--action-ranger-green);
             color: #FFFFFF;
             font-family: var(--font-body);
             font-size: 0.9375rem;
             font-weight: 700;
             letter-spacing: 0.01em;
-            border: 1px solid #A82C0E;
+            border: 1px solid var(--action-ranger-hover);
             border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
             white-space: nowrap;
-            box-shadow: 0 1px 3px rgba(200, 55, 18, 0.2);
+            box-shadow: 0 1px 3px rgba(31, 84, 62, 0.2);
             transition: background-color 140ms ease, transform 90ms cubic-bezier(0.2, 0, 0, 1), box-shadow 140ms ease;
         }
 
         .card-cta-btn:hover {
-            background: var(--rust-vermilion-hover);
-            box-shadow: 0 2px 5px rgba(200, 55, 18, 0.3);
+            background: var(--action-ranger-hover);
+            box-shadow: 0 2px 5px rgba(31, 84, 62, 0.3);
         }
 
         .card-cta-btn:active {
@@ -863,8 +889,6 @@
 
         .card-cta-btn:focus-visible {
             outline: 2px solid var(--cast-iron);
-            outline-offset: 2px;
-        }
             outline-offset: 2px;
         }
 
@@ -882,9 +906,9 @@
         }
 
         .way-shift {
-            background: var(--teal-50);
-            color: var(--teal-700);
-            border: 1px solid var(--teal-200);
+            background: var(--action-ranger-tint);
+            color: var(--action-ranger-green);
+            border: 1px solid var(--action-ranger-border);
         }
 
         .way-walkin {
@@ -930,8 +954,8 @@
 
         .org-expand-btn:hover {
             background: var(--card-surface);
-            border-color: var(--rust-vermilion);
-            color: var(--rust-vermilion);
+            border-color: var(--action-ranger-green);
+            color: var(--action-ranger-green);
         }
 
         .org-expand-btn:focus-visible {
@@ -975,9 +999,9 @@
         }
 
         .action-pill-btn {
-            border: 1px solid var(--teal-700);
-            background: var(--teal-50);
-            color: var(--teal-700);
+            border: 1px solid var(--action-ranger-green);
+            background: var(--action-ranger-tint);
+            color: var(--action-ranger-green);
             border-radius: var(--radius-pill);
             padding: 7px 14px;
             font-family: inherit;
@@ -987,7 +1011,7 @@
         }
 
         .action-pill-btn:hover {
-            background: var(--teal-700);
+            background: var(--action-ranger-green);
             color: #ffffff;
         }
 
@@ -1009,92 +1033,308 @@
         }
 
         .modal-card {
-            background: var(--bg);
-            border-radius: var(--radius-lg);
-            max-width: 640px;
+            background: var(--card-surface);
+            border-radius: var(--radius-card);
+            border: 1.5px solid var(--card-border);
+            max-width: 660px;
             width: 100%;
             max-height: 90vh;
-            overflow-y: auto;
-            padding: 22px 26px;
-            box-shadow: var(--shadow-lg);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 12px 36px rgba(27, 36, 32, 0.22);
             position: relative;
             animation: trayFadeSlide 200ms cubic-bezier(0.2, 0, 0, 1);
             will-change: transform, opacity;
+            overflow: hidden;
         }
 
-        .modal-top-bar {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
-            gap: 14px;
-            margin-bottom: 12px;
-        }
-
-        .modal-dismiss-btn {
-            border: none;
-            background: var(--bg-subtle);
-            color: var(--text-main);
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            cursor: pointer;
+        /* 1977 NPS Unigrid Trail-Blaze Header Bar */
+        .unigrid-header-bar {
+            background: var(--cast-iron);
+            color: #FFFFFF;
+            padding: 0;
+            position: relative;
             flex-shrink: 0;
         }
 
-        .modal-dismiss-btn:focus-visible {
-            outline: 2px solid var(--teal-700);
+        .unigrid-trail-blaze-strip {
+            height: 4px;
+            width: 100%;
+            background: var(--accent-canyon);
+        }
+
+        .unigrid-header-inner {
+            padding: 16px 22px 18px;
+        }
+
+        .unigrid-agency-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .unigrid-agency-line {
+            font-family: var(--font-mono);
+            font-size: 0.6875rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            font-weight: 700;
+            color: #DCD7CB;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .unigrid-title {
+            margin: 0;
+            font-family: var(--font-title);
+            font-size: 1.35rem;
+            font-weight: 700;
+            line-height: 1.25;
+            color: #FFFFFF;
+            letter-spacing: -0.015em;
+        }
+
+        .unigrid-dismiss-btn {
+            border: 1px solid rgba(220, 215, 203, 0.35);
+            background: rgba(255, 255, 255, 0.08);
+            color: #FFFFFF;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: background-color 140ms ease, border-color 140ms ease, transform 90ms ease;
+        }
+
+        .unigrid-dismiss-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #FFFFFF;
+        }
+
+        .unigrid-dismiss-btn:active {
+            transform: scale(0.95);
+        }
+
+        .unigrid-dismiss-btn:focus-visible {
+            outline: 2px solid #FFFFFF;
             outline-offset: 2px;
         }
 
-        .modal-summary-matrix {
+        .unigrid-badge-strip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .unigrid-badge-strip .card-way-badge {
+            background: rgba(255, 255, 255, 0.12);
+            color: #F6F4EE;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.04em;
+            padding: 3px 8px;
+            border-radius: 3px;
+        }
+
+        /* Unigrid Scrollable Body */
+        .unigrid-body {
+            padding: 20px 24px;
+            overflow-y: auto;
+            flex: 1;
+            background: var(--card-surface);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .unigrid-summary-matrix {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 8px;
-            padding: 10px;
-            background: var(--bg-subtle);
-            border: 1px solid var(--border-light);
-            border-radius: var(--radius-md);
-            margin-bottom: 16px;
+            grid-template-columns: repeat(4, 1fr);
+            border-top: 1.5px solid var(--cast-iron);
+            border-bottom: 1.5px solid var(--cast-iron);
+            background: var(--card-surface);
+        }
+
+        @media (max-width: 580px) {
+            .unigrid-summary-matrix {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .matrix-tile {
+            padding: 10px 12px;
+            border-right: 1px solid var(--border);
             display: flex;
             flex-direction: column;
-            gap: 2px;
+            gap: 3px;
+        }
+
+        .matrix-tile:last-child {
+            border-right: none;
+        }
+
+        @media (max-width: 580px) {
+            .matrix-tile:nth-child(2) {
+                border-right: none;
+            }
+            .matrix-tile:nth-child(-n+2) {
+                border-bottom: 1px solid var(--border);
+            }
         }
 
         .matrix-tile-label {
-            font-size: 0.68rem;
+            font-family: var(--font-mono);
+            font-size: 0.65rem;
             text-transform: uppercase;
             font-weight: 700;
-            color: var(--text-subtle);
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
         }
 
         .matrix-tile-val {
-            font-size: 0.82rem;
-            font-weight: 600;
-            color: var(--text-main);
+            font-family: var(--font-body);
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--cast-iron);
         }
 
-        .guidelines-box {
-            border: 1px solid var(--border-light);
-            background: var(--bg-subtle);
-            border-radius: var(--radius-md);
-            padding: 12px;
+        .unigrid-section {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            font-size: 0.82rem;
+        }
+
+        .unigrid-section-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 4px;
+        }
+
+        .unigrid-section-index {
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--accent-canyon);
+            letter-spacing: 0.04em;
+        }
+
+        .unigrid-section-heading {
+            margin: 0;
+            font-family: var(--font-title);
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--cast-iron);
+            letter-spacing: -0.01em;
+        }
+
+        .unigrid-prose {
+            margin: 0;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--cast-iron);
+            white-space: pre-line;
+        }
+
+        .unigrid-guidelines-box {
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--footer-surface);
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
 
         .guidelines-row {
             display: flex;
             align-items: flex-start;
-            gap: 8px;
+            gap: 10px;
+            font-size: 0.85rem;
+            line-height: 1.45;
+        }
+
+        .guidelines-icon {
+            color: var(--action-ranger-green);
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .unigrid-volunteer-intro {
+            margin: 0;
+            font-size: 0.86rem;
+            color: var(--text-muted);
+        }
+
+        /* 1977 NPS Unigrid Hatched Footer */
+        .unigrid-hatched-footer {
+            border-top: 1px solid var(--border);
+            background: var(--footer-surface);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        .unigrid-hatch-pattern {
+            height: 14px;
+            width: 100%;
+            background: repeating-linear-gradient(
+                -45deg,
+                var(--cast-iron) 0px,
+                var(--cast-iron) 1.5px,
+                transparent 1.5px,
+                transparent 7px
+            );
+            opacity: 0.28;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .unigrid-footer-inner {
+            padding: 10px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .unigrid-footer-close-btn {
+            border: 1px solid var(--border);
+            background: var(--card-surface);
+            color: var(--cast-iron);
+            border-radius: 4px;
+            padding: 4px 12px;
+            font-family: var(--font-mono);
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background-color 140ms ease, border-color 140ms ease;
+        }
+
+        .unigrid-footer-close-btn:hover {
+            background: var(--border-light);
+            border-color: var(--cast-iron);
+        }
+
+        .unigrid-footer-close-btn:focus-visible {
+            outline: 2px solid var(--cast-iron);
+            outline-offset: 2px;
         }
 
         .shift-action-card {
@@ -1111,7 +1351,7 @@
 
         .primary-action-btn {
             border: none;
-            background: var(--teal-700);
+            background: var(--action-ranger-green);
             color: #ffffff;
             border-radius: 6px;
             padding: 8px 16px;
@@ -1123,19 +1363,19 @@
         }
 
         .primary-action-btn:hover {
-            background: var(--teal-800);
+            background: var(--action-ranger-hover);
         }
 
         .primary-action-btn:focus-visible {
-            outline: 2px solid var(--teal-700);
+            outline: 2px solid var(--action-ranger-green);
             outline-offset: 2px;
         }
 
         .signup-drawer {
             margin-top: 12px;
             padding: 14px;
-            background: var(--teal-50);
-            border: 1px solid var(--teal-200);
+            background: var(--action-ranger-tint);
+            border: 1px solid var(--action-ranger-border);
             border-radius: var(--radius-md);
         }
 
@@ -1150,7 +1390,7 @@
             display: block;
             font-size: 0.72rem;
             font-weight: 700;
-            color: var(--teal-800);
+            color: var(--action-ranger-hover);
             margin-bottom: 2px;
         }
 
@@ -1165,13 +1405,13 @@
         }
 
         .signup-input:focus {
-            border-color: var(--teal-700);
-            outline: 2px solid var(--teal-700);
+            border-color: var(--action-ranger-green);
+            outline: 2px solid var(--action-ranger-green);
         }
 
         .signup-submit-btn {
             border: none;
-            background: var(--teal-700);
+            background: var(--action-ranger-green);
             color: #ffffff;
             border-radius: 6px;
             padding: 8px 16px;
@@ -1183,10 +1423,10 @@
 
         .genuine-confirmed-box {
             padding: 14px;
-            background: var(--green-50);
-            border: 1px solid #bbf7d0;
+            background: var(--action-ranger-tint);
+            border: 1.5px solid var(--action-ranger-border);
             border-radius: var(--radius-md);
-            color: var(--green-800);
+            color: var(--action-ranger-hover);
             font-size: 0.84rem;
         }
 
@@ -1199,25 +1439,38 @@
         }
 
         .confirmed-link-btn {
-            border: 1px solid var(--green-800);
+            border: 1px solid var(--action-ranger-green);
             background: #ffffff;
-            color: var(--green-800);
+            color: var(--action-ranger-green);
             border-radius: 6px;
             padding: 5px 10px;
             font-size: 0.76rem;
             font-weight: 600;
             text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .confirmed-link-btn:hover {
+            background: var(--action-ranger-tint);
         }
 
         .unvolunteer-btn {
-            border: 1px solid #ef4444;
+            border: 1px solid var(--accent-canyon);
             background: #ffffff;
-            color: #b91c1c;
+            color: var(--accent-canyon);
             border-radius: 6px;
             padding: 5px 10px;
             font-size: 0.76rem;
             font-weight: 600;
             cursor: pointer;
+            transition: background-color 140ms ease;
+        }
+
+        .unvolunteer-btn:hover {
+            background: var(--accent-canyon-tint);
+        }
         }
 
         /* 5. Perceptual UI Micro-Transitions & Accessibility Continuity */
@@ -1440,36 +1693,70 @@
         </section>
     </main>
 
-    <!-- Project Detail & Honest Commitment Modal Dialog -->
+    <!-- Project Detail & Honest Commitment Modal Dialog (1977 NPS Unigrid System) -->
     <div id="project-modal" class="modal-overlay" onclick="handleModalBackdropClick(event)">
-        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
-            <div class="modal-top-bar">
-                <div style="flex: 1; min-width: 0;">
-                    <div id="modal-badges" style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px;"></div>
-                    <h3 id="modal-title" style="margin: 0 0 4px; font-size: 1.3rem; font-weight: 700;"></h3>
-                    <div id="modal-org" style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 12px;"></div>
+        <div class="modal-card unigrid-card" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-description">
+            <!-- 1977 NPS Unigrid Trail-Blaze Header Bar -->
+            <div class="unigrid-header-bar">
+                <div class="unigrid-trail-blaze-strip"></div>
+                <div class="unigrid-header-inner">
+                    <div class="unigrid-agency-row">
+                        <div class="unigrid-agency-line">
+                            <span class="unigrid-agency-tag">NATIONAL PARK &amp; CIVIC DISPATCH</span>
+                            <span class="unigrid-bullet" aria-hidden="true">&middot;</span>
+                            <span id="modal-org-subtitle" class="unigrid-authority-tag">COMMUNITY PARTNER</span>
+                        </div>
+                        <button type="button" class="unigrid-dismiss-btn" onclick="closeModal()" aria-label="Close dialog">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <h3 id="modal-title" class="unigrid-title"></h3>
+                    <div id="modal-badges" class="unigrid-badge-strip"></div>
                 </div>
-                <button type="button" class="modal-dismiss-btn" onclick="closeModal()" aria-label="Close dialog">&times;</button>
             </div>
 
-            <!-- Quick-Scan Key Attributes (P2 & P3) -->
-            <div id="modal-summary-grid" class="modal-summary-matrix"></div>
+            <!-- Scrollable Content Body on Field Card White -->
+            <div class="unigrid-body">
+                <!-- Modular Unigrid Matrix (Key Participation Constraints) -->
+                <div id="modal-summary-grid" class="unigrid-summary-matrix"></div>
 
-            <section style="margin-bottom: 18px;" aria-labelledby="heading-about-project">
-                <h4 id="heading-about-project" style="margin: 0 0 6px; font-size: 0.96rem; font-weight: 700;">About this Project</h4>
-                <p id="modal-description" style="margin: 0; font-size: 0.88rem; line-height: 1.55; white-space: pre-line;"></p>
-            </section>
+                <section class="unigrid-section" aria-labelledby="heading-about-project">
+                    <div class="unigrid-section-header">
+                        <span class="unigrid-section-index">01</span>
+                        <h4 id="heading-about-project" class="unigrid-section-heading">About this Project</h4>
+                    </div>
+                    <p id="modal-description" class="unigrid-prose"></p>
+                </section>
 
-            <section style="margin-bottom: 18px;" aria-labelledby="heading-logistics">
-                <h4 id="heading-logistics" style="margin: 0 0 6px; font-size: 0.96rem; font-weight: 700;">Location &amp; Guidelines</h4>
-                <div id="modal-logistics-content" class="guidelines-box"></div>
-            </section>
+                <section class="unigrid-section" aria-labelledby="heading-logistics">
+                    <div class="unigrid-section-header">
+                        <span class="unigrid-section-index">02</span>
+                        <h4 id="heading-logistics" class="unigrid-section-heading">Location &amp; Field Guidelines</h4>
+                    </div>
+                    <div id="modal-logistics-content" class="unigrid-guidelines-box"></div>
+                </section>
 
-            <section aria-labelledby="heading-volunteer-opps">
-                <h4 id="heading-volunteer-opps" style="margin: 0 0 6px; font-size: 0.96rem; font-weight: 700;">Ways to Volunteer</h4>
-                <p id="modal-volunteer-intro" style="color: var(--text-muted); margin: 0 0 8px; font-size: 0.84rem;"></p>
-                <div id="modal-shifts-container"></div>
-            </section>
+                <section class="unigrid-section" aria-labelledby="heading-volunteer-opps">
+                    <div class="unigrid-section-header">
+                        <span class="unigrid-section-index">03</span>
+                        <h4 id="heading-volunteer-opps" class="unigrid-section-heading">Ways to Volunteer</h4>
+                    </div>
+                    <p id="modal-volunteer-intro" class="unigrid-volunteer-intro"></p>
+                    <div id="modal-shifts-container"></div>
+                </section>
+            </div>
+
+            <!-- 1977 NPS Unigrid Hatched Footer -->
+            <div class="unigrid-hatched-footer">
+                <div class="unigrid-hatch-pattern" aria-hidden="true"></div>
+                <div class="unigrid-footer-inner">
+                    <span class="unigrid-footer-stamp">MUNICIPAL VOLUNTEER DISPATCH &middot; FORM 1977-NPS</span>
+                    <button type="button" class="unigrid-footer-close-btn" onclick="closeModal()">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2366,13 +2653,16 @@
 
             const badgesEl = document.getElementById("modal-badges");
             badgesEl.innerHTML = `
-                <span class="card-way-badge way-shift">${escapeHtml(item.wayToHelp === "walkin" ? "Walk-In Pantry / Center" : "Scheduled Shift")}</span>
-                <span class="card-way-badge" style="background: var(--bg-subtle); color: var(--text-main); border: 1px solid var(--border-light);">📍 ${escapeHtml(city)}, CO</span>
-                <span class="card-way-badge" style="background: var(--bg-subtle); color: var(--text-main); border: 1px solid var(--border-light);">${escapeHtml(item.tags[0] || "Community")}</span>
+                <span class="card-way-badge way-shift">${escapeHtml(item.wayToHelp === "walkin" ? "WALK-IN PANTRY / CENTER" : "SCHEDULED SHIFT")}</span>
+                <span class="card-way-badge">${escapeHtml(city.toUpperCase())}, CO</span>
+                <span class="card-way-badge">${escapeHtml((item.tags[0] || "Community").toUpperCase())}</span>
             `;
 
             document.getElementById("modal-title").textContent = item.projectTitle;
-            document.getElementById("modal-org").innerHTML = `Hosted by <strong>${escapeHtml(item.organizationName)}</strong> &middot; Verified Partner`;
+            const orgSubtitle = document.getElementById("modal-org-subtitle");
+            if (orgSubtitle) {
+                orgSubtitle.textContent = (item.organizationName || "Community Partner").toUpperCase();
+            }
 
             const summaryGrid = document.getElementById("modal-summary-grid");
             summaryGrid.innerHTML = `
@@ -2399,15 +2689,15 @@
             const addressDisplay = site.addressLine || `${site.name}, ${city}, CO`;
             document.getElementById("modal-logistics-content").innerHTML = `
                 <div class="guidelines-row">
-                    <span>📍</span>
+                    <svg class="guidelines-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                     <div><strong>Service Location:</strong> ${escapeHtml(site.name)}<br><span style="color: var(--text-muted);">${escapeHtml(addressDisplay)}</span></div>
                 </div>
                 <div class="guidelines-row">
-                    <span>🚗</span>
+                    <svg class="guidelines-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="8" rx="2"></rect><circle cx="7" cy="19" r="2"></circle><circle cx="17" cy="19" r="2"></circle><path d="M5 11l2-5h10l2 5"></path></svg>
                     <div><strong>Parking &amp; Arrival:</strong> Free parking is available on-site or adjacent streets. Please arrive 10 minutes before your start time.</div>
                 </div>
                 <div class="guidelines-row">
-                    <span>👟</span>
+                    <svg class="guidelines-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
                     <div><strong>What to Wear:</strong> Casual clothing and sturdy closed-toe shoes.</div>
                 </div>
             `;
@@ -2416,7 +2706,7 @@
 
             const modal = document.getElementById("project-modal");
             modal.classList.add("open");
-            const closeBtn = modal.querySelector(".modal-dismiss-btn");
+            const closeBtn = modal.querySelector(".unigrid-dismiss-btn");
             if (closeBtn) closeBtn.focus();
         }
 
@@ -2444,14 +2734,17 @@
                 introEl.textContent = "Your commitment for this opportunity is active:";
                 container.innerHTML = `
                     <div class="genuine-confirmed-box">
-                        <div style="font-weight: 700; margin-bottom: 4px;">✅ You are confirmed to volunteer!</div>
+                        <div style="font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; color: var(--action-ranger-hover);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            <span>Volunteer Commitment Confirmed</span>
+                        </div>
                         <p style="margin: 4px 0 0;">
                             Reserved for <strong>${escapeHtml(existingComm.name)}</strong> (${escapeHtml(existingComm.email)})<br>
                             Session: <strong>${escapeHtml(existingComm.shiftTime)}</strong> at <strong>${escapeHtml(existingComm.siteName)}</strong>
                         </p>
                         <div class="confirmed-actions-row">
                             <a class="confirmed-link-btn" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(item.projectTitle)}&details=${encodeURIComponent(item.description)}&location=${encodeURIComponent(site.name)}" target="_blank" rel="noopener noreferrer">
-                                📅 Add to Google Calendar
+                                Add to Google Calendar
                             </a>
                             <button type="button" class="unvolunteer-btn" onclick="handleUnvolunteer('${escapeHtml(item.projectId)}')">Cancel Sign-up (Unvolunteer)</button>
                         </div>
@@ -2465,9 +2758,15 @@
             container.innerHTML = `
                 <div class="shift-action-card">
                     <div>
-                        <div style="font-weight: 700; font-size: 0.94rem;">📅 ${escapeHtml(shiftTime)}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">📍 ${escapeHtml(site.name)} (${escapeHtml(site.city)})</div>
-                        <div style="font-size: 0.78rem; color: var(--teal-700); font-weight: 600; margin-top: 2px;">${escapeHtml(item.availabilityLabel)}</div>
+                        <div style="font-weight: 700; font-size: 0.94rem; display: flex; align-items: center; gap: 6px;">
+                            <svg class="guidelines-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            <span>${escapeHtml(shiftTime)}</span>
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 5px;">
+                            <svg class="guidelines-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            <span>${escapeHtml(site.name)} (${escapeHtml(site.city)})</span>
+                        </div>
+                        <div style="font-size: 0.78rem; color: var(--action-ranger-green); font-weight: 600; margin-top: 4px;">${escapeHtml(item.availabilityLabel)}</div>
                     </div>
                     <button type="button" class="primary-action-btn" onclick="openSignupDrawer('${escapeHtml(item.projectId)}', '${escapeHtml(site.name)}', '${escapeHtml(shiftTime)}')">Volunteer</button>
                 </div>
@@ -2480,8 +2779,8 @@
             if (!target) return;
             target.innerHTML = `
                 <div class="signup-drawer">
-                    <h5 style="margin: 0 0 4px; font-size: 0.94rem; color: var(--teal-800);">Confirm Spot: ${escapeHtml(siteName)}</h5>
-                    <p style="margin: 0 0 10px; font-size: 0.82rem; color: var(--teal-800);">Enter your contact details so the coordinator has an accurate roster:</p>
+                    <h5 style="margin: 0 0 4px; font-size: 0.94rem; color: var(--action-ranger-hover);">Confirm Spot: ${escapeHtml(siteName)}</h5>
+                    <p style="margin: 0 0 10px; font-size: 0.82rem; color: var(--action-ranger-hover);">Enter your contact details so the coordinator has an accurate roster:</p>
                     <form onsubmit="handleSignupSubmit(event, '${escapeHtml(projectId)}', '${escapeHtml(siteName)}', '${escapeHtml(shiftTime)}')">
                         <div class="signup-form-grid">
                             <div class="signup-input-group">
