@@ -563,4 +563,163 @@ class UsBoundarySyncServiceSpec extends Specification {
         executeSql("DELETE FROM administrative_regions WHERE geoid = '56011'")
         executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
     }
+
+    def "should handle state sync fallback, skipped unknown FIPS, nested transfer limit, and invalid geometry"() {
+        given: "a state payload with STATE fallback, unknown FIPS, invalid geometry, and nested transfer limit"
+        String payload = '''{
+            "type": "FeatureCollection",
+            "properties": { "exceededTransferLimit": false },
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": { "STATE": "08", "NAME": "Colorado" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[
+                            [-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]
+                        ]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "99", "NAME": "Unknown Territory" },
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "15", "NAME": "Hawaii" },
+                    "geometry": null
+                }
+            ]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "Colorado updates via STATE fallback, unknown FIPS is skipped, and Hawaii failure is recorded"
+        verifyAll(result) {
+            stateCode() == "US"
+            level() == 1
+            updated() == 1
+            skipped() == 1
+            failed() == 1
+            errors().size() == 1
+            errors()[0].startsWith("HI:")
+        }
+    }
+
+    def "should skip incomplete features, record geometry errors, and support includeCdps for any state"() {
+        given: "Wyoming state and county/place payloads with malformed features plus a layer 30 CDP"
+        String statePayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "56", "NAME": "Wyoming", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-111.0, 41.0], [-104.0, 41.0], [-104.0, 45.0], [-111.0, 45.0], [-111.0, 41.0]]]
+                }
+            }]
+        }'''
+        String countiesPayload = '''{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "56099" },
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "56098", "NAME": "Broken County" },
+                    "geometry": null
+                }
+            ]
+        }'''
+        String placesPayload = '''{
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": 12345, "NAME": "Numeric Geoid" },
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "5699999", "NAME": "Broken Place" },
+                    "geometry": null
+                }
+            ]
+        }'''
+        String cdpPayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "5690010", "NAME": "Test Wyoming CDP", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-106.5, 42.2], [-106.3, 42.2], [-106.3, 42.4], [-106.5, 42.4], [-106.5, 42.2]]]
+                }
+            }]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            String uri = req.uri().toString()
+            String body
+            if (uri.contains("/80/query")) {
+                body = statePayload
+            } else if (uri.contains("/82/query")) {
+                body = countiesPayload
+            } else if (uri.contains("/30/query")) {
+                body = cdpPayload
+            } else {
+                body = placesPayload
+            }
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+        syncService.syncStates(null)
+
+        when: "syncStateCounties and syncStatePlaces with includeCdps=true run for WY"
+        UsSyncResult countyResult = syncService.syncStateCounties("WY", null)
+        UsSyncResult placeResult = syncService.syncStatePlaces("WY", true, null)
+
+        then: "incomplete features are skipped, geometry errors are counted, and the CDP is created"
+        verifyAll(countyResult) {
+            created() == 0
+            skipped() == 1
+            failed() == 1
+            errors().size() == 1
+            errors()[0].startsWith("56098:")
+        }
+        verifyAll(placeResult) {
+            created() == 1
+            skipped() == 2
+            failed() == 1
+            errors().size() == 1
+            errors()[0].startsWith("5699999:")
+        }
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE geoid IN ('5690010', '56')")
+    }
+
+    def "should throw 404 when state region is not synced before county sync"() {
+        given:
+        UsBoundarySyncService syncService = buildSyncService(new StubHttpClient())
+
+        when:
+        syncService.syncStateCounties("AK", null)
+
+        then:
+        def ex = thrown(HttpStatusException)
+        ex.status == HttpStatus.NOT_FOUND
+    }
 }

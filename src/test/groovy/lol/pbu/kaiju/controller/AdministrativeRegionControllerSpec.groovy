@@ -3,13 +3,16 @@ package lol.pbu.kaiju.controller
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.dto.CoordinateDto
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand
+import lol.pbu.kaiju.dto.UsSyncResult
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
+import lol.pbu.kaiju.service.UsBoundarySyncService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.Geometry
@@ -25,6 +28,43 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
 
     @Inject
     AdministrativeRegionRepository administrativeRegionRepository
+
+    @Shared
+    StubUsBoundarySyncService syncStub = new StubUsBoundarySyncService()
+
+    @MockBean(UsBoundarySyncService)
+    UsBoundarySyncService usBoundarySyncServiceMock() {
+        return syncStub
+    }
+
+    static class StubUsBoundarySyncService extends UsBoundarySyncService {
+        Closure<UsSyncResult> syncStatesHandler
+        Closure<UsSyncResult> syncCountiesHandler
+        Closure<UsSyncResult> syncPlacesHandler
+        int callCount = 0
+
+        StubUsBoundarySyncService() {
+            super(null, null, null)
+        }
+
+        @Override
+        UsSyncResult syncStates(UUID actorUserId) {
+            callCount++
+            return syncStatesHandler.call(actorUserId)
+        }
+
+        @Override
+        UsSyncResult syncStateCounties(String stateCode, UUID actorUserId) {
+            callCount++
+            return syncCountiesHandler.call(stateCode, actorUserId)
+        }
+
+        @Override
+        UsSyncResult syncStatePlaces(String stateCode, boolean includeCdps, UUID actorUserId) {
+            callCount++
+            return syncPlacesHandler.call(stateCode, includeCdps, actorUserId)
+        }
+    }
 
     @Shared
     Faker faker = new Faker()
@@ -288,5 +328,108 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNAUTHORIZED
+    }
+
+    /********** US SYNC Tests **********/
+
+    def "SYNC | global admin can sync US states"() {
+        given: "a stubbed sync result"
+        def expected = new UsSyncResult("US", 1, 50, 6, 0, 0, [])
+        UUID capturedActor = null
+        syncStub.syncStatesHandler = { UUID actorId ->
+            capturedActor = actorId
+            return expected
+        }
+
+        when: "a global admin triggers US state sync"
+        def response = client.exchange(
+                asGlobalAdmin(HttpRequest.POST("/administrative-regions/sync/us/states", "")),
+                UsSyncResult
+        )
+
+        then: "the sync service is called and 200 OK is returned"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body() == expected
+            capturedActor != null
+        }
+    }
+
+    def "SYNC | global admin can sync US counties for a state"() {
+        given: "a stubbed county sync result"
+        def expected = new UsSyncResult("CO", 2, 64, 0, 0, 0, [])
+        String capturedState = null
+        syncStub.syncCountiesHandler = { String stateCode, UUID actorId ->
+            capturedState = stateCode
+            return expected
+        }
+
+        when: "a global admin triggers county sync for CO"
+        def response = client.exchange(
+                asGlobalAdmin(HttpRequest.POST("/administrative-regions/sync/us/states/CO/counties", "")),
+                UsSyncResult
+        )
+
+        then: "the sync service is called and 200 OK is returned"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body() == expected
+            capturedState == "CO"
+        }
+    }
+
+    def "SYNC | global admin can sync US places with and without includeCdps"() {
+        given: "stubbed place sync results"
+        def defaultResult = new UsSyncResult("CO", 3, 270, 0, 0, 0, [])
+        def cdpResult = new UsSyncResult("CO", 3, 270, 200, 0, 0, [])
+        Boolean capturedIncludeCdps = null
+        syncStub.syncPlacesHandler = { String stateCode, boolean includeCdps, UUID actorId ->
+            capturedIncludeCdps = includeCdps
+            return includeCdps ? cdpResult : defaultResult
+        }
+
+        when: "a global admin triggers place sync without includeCdps"
+        def defaultResponse = client.exchange(
+                asGlobalAdmin(HttpRequest.POST("/administrative-regions/sync/us/states/CO/places", "")),
+                UsSyncResult
+        )
+
+        then: "includeCdps defaults to false"
+        verifyAll(defaultResponse) {
+            status == HttpStatus.OK
+            body() == defaultResult
+            capturedIncludeCdps == false
+        }
+
+        when: "a global admin triggers place sync with includeCdps=true"
+        def cdpResponse = client.exchange(
+                asGlobalAdmin(HttpRequest.POST("/administrative-regions/sync/us/states/CO/places?includeCdps=true", "")),
+                UsSyncResult
+        )
+
+        then: "includeCdps is passed as true"
+        verifyAll(cdpResponse) {
+            status == HttpStatus.OK
+            body() == cdpResult
+            capturedIncludeCdps == true
+        }
+    }
+
+    def "SYNC | non-admin cannot trigger US boundary sync"() {
+        given: "a reset stub call counter"
+        syncStub.callCount = 0
+
+        when: "a standard user attempts to trigger US state sync"
+        client.exchange(
+                asStandardUser(HttpRequest.POST("/administrative-regions/sync/us/states", "")),
+                UsSyncResult
+        )
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        verifyAll {
+            e.status == HttpStatus.FORBIDDEN
+            syncStub.callCount == 0
+        }
     }
 }
