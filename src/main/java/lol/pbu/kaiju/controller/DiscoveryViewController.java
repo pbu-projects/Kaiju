@@ -17,6 +17,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 import static io.micronaut.security.rules.SecurityRule.IS_ANONYMOUS;
 
@@ -47,7 +48,9 @@ public class DiscoveryViewController {
     }
 
     private static String loadTemplate(String path) {
-        Path localPath = Path.of("src/main/resources" + (path.startsWith("/") ? path : "/" + path));
+        Path localPath = Arrays.stream(path.split("/"))
+                .filter(segment -> !segment.isEmpty())
+                .reduce(Path.of("src", "main", "resources"), Path::resolve, (first, second) -> second);
         if (Files.isRegularFile(localPath)) {
             try {
                 return Files.readString(localPath, StandardCharsets.UTF_8);
