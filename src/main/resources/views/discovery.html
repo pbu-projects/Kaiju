@@ -1201,6 +1201,49 @@
             gap: 20px;
         }
 
+        @media (min-width: 860px) {
+            .modal-card {
+                max-width: 1040px;
+            }
+
+            .unigrid-body {
+                display: grid;
+                grid-template-columns: minmax(0, 1.15fr) minmax(300px, 1fr);
+                gap: 18px 24px;
+                align-items: start;
+            }
+
+            .unigrid-summary-matrix {
+                grid-column: 1 / -1;
+            }
+
+            .unigrid-section--about {
+                grid-column: 1;
+                grid-row: 2 / span 2;
+            }
+
+            .unigrid-section--logistics {
+                grid-column: 2;
+                grid-row: 2;
+                background: var(--footer-surface);
+                border: 1px solid var(--border);
+                border-radius: var(--radius-md);
+                padding: 14px 16px;
+            }
+
+            .unigrid-section--logistics .unigrid-guidelines-box {
+                border: none;
+                background: transparent;
+                padding: 4px 0 0;
+                gap: 8px;
+            }
+
+            .unigrid-section--shifts {
+                grid-column: 2;
+                grid-row: 3;
+            }
+        }
+
         .unigrid-summary-matrix {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -1893,7 +1936,7 @@
                 <!-- Modular Unigrid Matrix (Key Participation Constraints) -->
                 <div id="modal-summary-grid" class="unigrid-summary-matrix"></div>
 
-                <section class="unigrid-section" aria-labelledby="heading-about-project">
+                <section class="unigrid-section unigrid-section--about" aria-labelledby="heading-about-project">
                     <div class="unigrid-section-header">
                         <span class="unigrid-section-index">01</span>
                         <h4 id="heading-about-project" class="unigrid-section-heading">About this Project</h4>
@@ -1901,7 +1944,7 @@
                     <p id="modal-description" class="unigrid-prose"></p>
                 </section>
 
-                <section class="unigrid-section" aria-labelledby="heading-logistics">
+                <section class="unigrid-section unigrid-section--logistics" aria-labelledby="heading-logistics">
                     <div class="unigrid-section-header">
                         <span class="unigrid-section-index">02</span>
                         <h4 id="heading-logistics" class="unigrid-section-heading">Location &amp; Field Guidelines</h4>
@@ -1909,7 +1952,7 @@
                     <div id="modal-logistics-content" class="unigrid-guidelines-box"></div>
                 </section>
 
-                <section class="unigrid-section" aria-labelledby="heading-volunteer-opps">
+                <section class="unigrid-section unigrid-section--shifts" aria-labelledby="heading-volunteer-opps">
                     <div class="unigrid-section-header">
                         <span class="unigrid-section-index">03</span>
                         <h4 id="heading-volunteer-opps" class="unigrid-section-heading">Ways to Volunteer</h4>
@@ -2942,10 +2985,14 @@
                         </div>
                         <div style="font-size: 0.78rem; color: var(--action-ranger-green); font-weight: 600; margin-top: 4px;">${escapeHtml(item.availabilityLabel)}</div>
                     </div>
-                    <button type="button" class="primary-action-btn" onclick="openSignupDrawer('${escapeHtml(item.projectId)}', '${escapeHtml(site.name)}', '${escapeHtml(shiftTime)}')">Volunteer</button>
+                    <button type="button" class="primary-action-btn" data-project-id="${escapeHtml(item.projectId)}" data-site-name="${escapeHtml(site.name)}" data-shift-time="${escapeHtml(shiftTime)}" onclick="openSignupDrawerFromBtn(this)">Volunteer</button>
                 </div>
                 <div id="signup-drawer-target"></div>
             `;
+        }
+
+        function openSignupDrawerFromBtn(btn) {
+            openSignupDrawer(btn.dataset.projectId, btn.dataset.siteName, btn.dataset.shiftTime);
         }
 
         function openSignupDrawer(projectId, siteName, shiftTime) {
@@ -2955,7 +3002,7 @@
                 <div class="signup-drawer">
                     <h5 class="signup-drawer-title">Confirm Spot: ${escapeHtml(siteName)}</h5>
                     <p class="signup-drawer-desc">Enter your contact details so the coordinator has an accurate roster:</p>
-                    <form onsubmit="handleSignupSubmit(event, '${escapeHtml(projectId)}', '${escapeHtml(siteName)}', '${escapeHtml(shiftTime)}')">
+                    <form data-project-id="${escapeHtml(projectId)}" data-site-name="${escapeHtml(siteName)}" data-shift-time="${escapeHtml(shiftTime)}" onsubmit="handleSignupSubmitFromForm(event, this)">
                         <div class="signup-form-grid">
                             <div class="signup-input-group">
                                 <label for="volunteer-name">Full Name *</label>
@@ -2972,6 +3019,10 @@
             `;
             const nameInput = document.getElementById("volunteer-name");
             if (nameInput) nameInput.focus();
+        }
+
+        function handleSignupSubmitFromForm(e, form) {
+            handleSignupSubmit(e, form.dataset.projectId, form.dataset.siteName, form.dataset.shiftTime);
         }
 
         function handleSignupSubmit(e, projectId, siteName, shiftTime) {
