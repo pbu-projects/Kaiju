@@ -10,6 +10,7 @@ import io.micronaut.serde.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.dto.UsSyncResult;
+import lol.pbu.kaiju.service.BoundaryIngestionService.RegionUpsert;
 import lol.pbu.kaiju.service.UsStateCatalog.UsStateEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +28,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -41,6 +43,8 @@ public class UsBoundarySyncService {
     private static final double DETAIL_TOLERANCE = 0.0002;
     private static final int STATE_PAGE_SIZE = 10;
     private static final int DETAIL_PAGE_SIZE = 100;
+    private static final String FEATURES_FIELD = "features";
+    private static final String GEOID_FIELD = "GEOID";
     private static final UUID US_AUDIT_REGION_ID = UUID.nameUUIDFromBytes("US-STATES-SYNC".getBytes(StandardCharsets.UTF_8));
 
     private static final String FIND_STATE_ID_SQL = """
@@ -111,23 +115,13 @@ public class UsBoundarySyncService {
     public UsSyncResult syncStates(@Nullable UUID actorUserId) {
         return withConcurrencyGuard(() -> {
             SyncCounts counts = new SyncCounts();
-            int offset = 0;
-
-            while (true) {
-                String url = buildQueryUrl(statesLayerId, "1=1", offset, STATE_PAGE_SIZE, STATE_TOLERANCE);
-                JsonNode root = boundaryIngestionService.fetchAndParseJson(url);
-                JsonNode features = root.get("features");
-                if (features == null || !features.isArray() || features.size() == 0) {
-                    break;
-                }
-
-                features.values().forEach(feature -> processStateFeature(feature, counts));
-
-                if (!isExceededTransferLimit(root)) {
-                    break;
-                }
-                offset += features.size();
-            }
+            fetchAllPages(
+                    statesLayerId,
+                    "1=1",
+                    STATE_PAGE_SIZE,
+                    STATE_TOLERANCE,
+                    feature -> processStateFeature(feature, counts)
+            );
 
             UsSyncResult result = counts.toResult("US", 1);
             recordAuditLog(US_AUDIT_REGION_ID, actorUserId, result);
@@ -144,23 +138,13 @@ public class UsBoundarySyncService {
             UUID stateId = requireStateRegionId(entry);
             SyncCounts counts = new SyncCounts();
             String where = "STATE='" + entry.fipsCode() + "'";
-            int offset = 0;
-
-            while (true) {
-                String url = buildQueryUrl(countiesLayerId, where, offset, DETAIL_PAGE_SIZE, null);
-                JsonNode root = boundaryIngestionService.fetchAndParseJson(url);
-                JsonNode features = root.get("features");
-                if (features == null || !features.isArray() || features.size() == 0) {
-                    break;
-                }
-
-                features.values().forEach(feature -> processCountyFeature(feature, entry, stateId, counts));
-
-                if (!isExceededTransferLimit(root)) {
-                    break;
-                }
-                offset += features.size();
-            }
+            fetchAllPages(
+                    countiesLayerId,
+                    where,
+                    DETAIL_PAGE_SIZE,
+                    null,
+                    feature -> processCountyFeature(feature, entry, stateId, counts)
+            );
 
             UsSyncResult result = counts.toResult(entry.stateCode(), 2);
             recordAuditLog(stateId, actorUserId, result);
@@ -178,9 +162,21 @@ public class UsBoundarySyncService {
             SyncCounts counts = new SyncCounts();
             String where = "STATE='" + entry.fipsCode() + "'";
 
-            syncPlacesLayer(placesLayerId, where, entry, stateId, counts);
+            fetchAllPages(
+                    placesLayerId,
+                    where,
+                    DETAIL_PAGE_SIZE,
+                    null,
+                    feature -> processPlaceFeature(feature, entry, stateId, counts)
+            );
             if (includeCdps || entry.cdpOnlyForPlaces()) {
-                syncPlacesLayer(cdpsLayerId, where, entry, stateId, counts);
+                fetchAllPages(
+                        cdpsLayerId,
+                        where,
+                        DETAIL_PAGE_SIZE,
+                        null,
+                        feature -> processPlaceFeature(feature, entry, stateId, counts)
+                );
             }
 
             UsSyncResult result = counts.toResult(entry.stateCode(), 3);
@@ -189,27 +185,30 @@ public class UsBoundarySyncService {
         });
     }
 
-    private void syncPlacesLayer(int layerId, String where, UsStateEntry entry, UUID stateId, SyncCounts counts) {
+    private void fetchAllPages(
+            int layerId,
+            String where,
+            int pageSize,
+            @Nullable Double tolerance,
+            Consumer<JsonNode> featureHandler
+    ) {
         int offset = 0;
-        while (true) {
-            String url = buildQueryUrl(layerId, where, offset, DETAIL_PAGE_SIZE, null);
+        boolean hasMore = true;
+        while (hasMore) {
+            String url = buildQueryUrl(layerId, where, offset, pageSize, tolerance);
             JsonNode root = boundaryIngestionService.fetchAndParseJson(url);
-            JsonNode features = root.get("features");
+            JsonNode features = root.get(FEATURES_FIELD);
             if (features == null || !features.isArray() || features.size() == 0) {
                 break;
             }
-
-            features.values().forEach(feature -> processPlaceFeature(feature, entry, stateId, counts));
-
-            if (!isExceededTransferLimit(root)) {
-                break;
-            }
+            features.values().forEach(featureHandler);
+            hasMore = isExceededTransferLimit(root);
             offset += features.size();
         }
     }
 
     private void processStateFeature(JsonNode feature, SyncCounts counts) {
-        String geoid = readProperty(feature, "GEOID");
+        String geoid = readProperty(feature, GEOID_FIELD);
         if (geoid == null) {
             geoid = readProperty(feature, "STATE");
         }
@@ -223,7 +222,7 @@ public class UsBoundarySyncService {
 
         try {
             String geomJson = boundaryIngestionService.parseAndValidateFeatureGeometry(feature);
-            boolean inserted = boundaryIngestionService.upsertRegionByGeoid(
+            boolean inserted = boundaryIngestionService.upsertRegionByGeoid(new RegionUpsert(
                     entry.fipsCode(),
                     name,
                     null,
@@ -232,7 +231,7 @@ public class UsBoundarySyncService {
                     entry.stateCode(),
                     geomJson,
                     STATE_TOLERANCE
-            );
+            ));
             counts.recordUpsert(inserted);
         } catch (Exception e) {
             LOG.warn("Failed syncing state {} ({}): {}", entry.stateCode(), entry.fipsCode(), e.getMessage());
@@ -242,7 +241,7 @@ public class UsBoundarySyncService {
     }
 
     private void processCountyFeature(JsonNode feature, UsStateEntry entry, UUID stateId, SyncCounts counts) {
-        String geoid = readProperty(feature, "GEOID");
+        String geoid = readProperty(feature, GEOID_FIELD);
         String name = readProperty(feature, "NAME");
         if (geoid == null || name == null) {
             counts.skipped++;
@@ -251,7 +250,7 @@ public class UsBoundarySyncService {
 
         try {
             String geomJson = boundaryIngestionService.parseAndValidateFeatureGeometry(feature);
-            boolean inserted = boundaryIngestionService.upsertRegionByGeoid(
+            boolean inserted = boundaryIngestionService.upsertRegionByGeoid(new RegionUpsert(
                     geoid,
                     name,
                     stateId,
@@ -260,7 +259,7 @@ public class UsBoundarySyncService {
                     entry.stateCode(),
                     geomJson,
                     DETAIL_TOLERANCE
-            );
+            ));
             counts.recordUpsert(inserted);
         } catch (Exception e) {
             LOG.warn("Failed syncing county {} ({}): {}", name, geoid, e.getMessage());
@@ -270,7 +269,7 @@ public class UsBoundarySyncService {
     }
 
     private void processPlaceFeature(JsonNode feature, UsStateEntry entry, UUID stateId, SyncCounts counts) {
-        String geoid = readProperty(feature, "GEOID");
+        String geoid = readProperty(feature, GEOID_FIELD);
         String name = readProperty(feature, "NAME");
         if (geoid == null || name == null) {
             counts.skipped++;
@@ -304,29 +303,26 @@ public class UsBoundarySyncService {
     }
 
     private UUID requireStateRegionId(UsStateEntry entry) {
-        UUID stateId = jdbcOperations.execute(connection -> {
+        Optional<UUID> stateId = jdbcOperations.execute(connection -> {
             try (PreparedStatement stmt = connection.prepareStatement(FIND_STATE_ID_SQL)) {
                 stmt.setString(1, entry.fipsCode());
                 stmt.setString(2, entry.stateCode());
                 stmt.setString(3, entry.fipsCode());
                 try (ResultSet rs = stmt.executeQuery()) {
                     if (rs.next()) {
-                        return rs.getObject("id", UUID.class);
+                        return Optional.ofNullable(rs.getObject("id", UUID.class));
                     }
                 }
             } catch (SQLException e) {
                 throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed looking up state region: " + e.getMessage());
             }
-            return null;
+            return Optional.empty();
         });
 
-        if (stateId == null) {
-            throw new HttpStatusException(
-                    HttpStatus.NOT_FOUND,
-                    "State region not found for " + entry.stateCode() + ". Run state sync first."
-            );
-        }
-        return stateId;
+        return stateId.orElseThrow(() -> new HttpStatusException(
+                HttpStatus.NOT_FOUND,
+                "State region not found for " + entry.stateCode() + ". Run state sync first."
+        ));
     }
 
     private String buildQueryUrl(int layerId, String where, int offset, int recordCount, @Nullable Double maxAllowableOffset) {
@@ -366,11 +362,11 @@ public class UsBoundarySyncService {
             return null;
         }
         JsonNode value = props.get(key);
-        if (value == null || value.isNull()) {
+        if (value == null || !value.isString()) {
             return null;
         }
         String text = value.getStringValue();
-        return text == null || text.isBlank() ? null : text.trim();
+        return text.isBlank() ? null : text.trim();
     }
 
     private void recordAuditLog(UUID regionId, @Nullable UUID actorUserId, UsSyncResult result) {
@@ -384,7 +380,7 @@ public class UsBoundarySyncService {
                     "skipped", result.skipped(),
                     "failed", result.failed()
             ));
-        } catch (IOException e) {
+        } catch (IOException _) {
             metadataJson = "{}";
         }
 
