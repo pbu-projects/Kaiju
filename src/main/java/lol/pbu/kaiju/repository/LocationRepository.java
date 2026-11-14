@@ -28,7 +28,7 @@ public interface LocationRepository extends PageableRepository<Location, UUID> {
         SELECT tb.tzid
         FROM timezone_boundaries tb
         WHERE ST_Intersects(tb.geom, CAST(:point AS geometry))
-        ORDER BY ST_Area(tb.geom) ASC
+        ORDER BY ST_Area(tb.geom::geography) ASC
         LIMIT 1
     """, nativeQuery = true)
     Optional<String> findTimezoneByPoint(

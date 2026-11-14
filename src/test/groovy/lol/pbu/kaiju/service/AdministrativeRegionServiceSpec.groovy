@@ -69,7 +69,8 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
                 level,
                 "US",
                 stateCode,
-                timeZone
+                timeZone,
+                null
         )
         AdministrativeRegion saved = regionRepository.save(region)
         track(saved)
@@ -112,6 +113,7 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             countryCode() == null
             stateCode() == null
             timeZone() == null
+            geoid() == null
         }
     }
 
@@ -773,6 +775,157 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         then: "empty list is returned"
         verifyAll {
             noCities.isEmpty()
+        }
+    }
+
+    def "GEOID | should find backfilled Colorado seed regions by geoid and leave downtown cores null"() {
+        when: "looking up Colorado state, counties, and cities by geoid"
+        Optional<AdministrativeRegion> colorado = regionRepository.findByGeoid("08")
+        Optional<AdministrativeRegion> denverCounty = regionRepository.findByGeoid("08031")
+        Optional<AdministrativeRegion> elPasoCounty = regionRepository.findByGeoid("08041")
+        Optional<AdministrativeRegion> arapahoeCounty = regionRepository.findByGeoid("08005")
+        Optional<AdministrativeRegion> denverCity = regionRepository.findByGeoid("0820000")
+        Optional<AdministrativeRegion> downtownCore = regionRepository.findById(UUID.fromString("a0000000-0000-0000-0000-000000000004"))
+
+        then: "expected seed rows have matching geoids and downtown core stays null"
+        verifyAll {
+            colorado.isPresent()
+            colorado.get().name() == "Colorado State Region"
+            denverCounty.isPresent()
+            denverCounty.get().name() == "Denver County Region"
+            elPasoCounty.isPresent()
+            elPasoCounty.get().name() == "El Paso County Region"
+            arapahoeCounty.isPresent()
+            arapahoeCounty.get().name() == "Arapahoe County Region"
+            denverCity.isPresent()
+            denverCity.get().name() == "Denver City"
+            downtownCore.isPresent()
+            downtownCore.get().geoid() == null
+        }
+    }
+
+    def "HIERARCHY | should exclude level 3 independent cities from getCounties"() {
+        given: "a state and a level 3 independent city whose parentRegionId points directly to the state"
+        AdministrativeRegion state = createRegionWithMetadata("Virginia State", 1, "VA", "America/New_York", -79.0, 36.5, -75.0, 39.5)
+        Polygon countyPoly = spatialMappingService.toPolygon([
+                new CoordinateDto(-78.0, 37.0),
+                new CoordinateDto(-77.5, 37.0),
+                new CoordinateDto(-77.5, 37.5),
+                new CoordinateDto(-78.0, 37.5),
+                new CoordinateDto(-78.0, 37.0)
+        ])
+        AdministrativeRegion realCounty = regionRepository.save(new AdministrativeRegion(
+                null, "Henrico County", state.id(), countyPoly, 2, "US", "VA", "America/New_York", "51087"
+        ))
+        track(realCounty)
+
+        Polygon cityPoly = spatialMappingService.toPolygon([
+                new CoordinateDto(-77.6, 37.4),
+                new CoordinateDto(-77.4, 37.4),
+                new CoordinateDto(-77.4, 37.6),
+                new CoordinateDto(-77.6, 37.6),
+                new CoordinateDto(-77.6, 37.4)
+        ])
+        AdministrativeRegion independentCity = regionRepository.save(new AdministrativeRegion(
+                null, "Richmond City", state.id(), cityPoly, 3, "US", "VA", "America/New_York", "5167000"
+        ))
+        track(independentCity)
+
+        when: "querying counties for the state"
+        List<AdministrativeRegion> counties = regionService.getCounties("VA")
+
+        then: "only the level 2 county is returned and the level 3 independent city is excluded"
+        verifyAll {
+            counties.size() == 1
+            counties[0].id() == realCounty.id()
+            counties.every { it.level() == 2 }
+            !counties.any { it.id() == independentCity.id() }
+        }
+    }
+
+    def "HIERARCHY | should return multi-county city for every overlapping county"() {
+        given: "a state with two adjacent counties"
+        AdministrativeRegion state = createRegionWithMetadata("Test Multi County State", 1, "MC", "America/Denver", -106.0, 38.0, -104.0, 40.0)
+        Polygon countyAPoly = spatialMappingService.toPolygon([
+                new CoordinateDto(-105.5, 39.0),
+                new CoordinateDto(-105.0, 39.0),
+                new CoordinateDto(-105.0, 39.5),
+                new CoordinateDto(-105.5, 39.5),
+                new CoordinateDto(-105.5, 39.0)
+        ])
+        AdministrativeRegion countyA = regionRepository.save(new AdministrativeRegion(
+                null, "Alpha County", state.id(), countyAPoly, 2, "US", "MC", "America/Denver", "99001"
+        ))
+        track(countyA)
+
+        Polygon countyBPoly = spatialMappingService.toPolygon([
+                new CoordinateDto(-105.0, 39.0),
+                new CoordinateDto(-104.5, 39.0),
+                new CoordinateDto(-104.5, 39.5),
+                new CoordinateDto(-105.0, 39.5),
+                new CoordinateDto(-105.0, 39.0)
+        ])
+        AdministrativeRegion countyB = regionRepository.save(new AdministrativeRegion(
+                null, "Beta County", state.id(), countyBPoly, 2, "US", "MC", "America/Denver", "99003"
+        ))
+        track(countyB)
+
+        and: "a city whose parentRegionId is Alpha County but whose geometry spans both Alpha and Beta"
+        Polygon cityPoly = spatialMappingService.toPolygon([
+                new CoordinateDto(-105.2, 39.1),
+                new CoordinateDto(-104.8, 39.1),
+                new CoordinateDto(-104.8, 39.3),
+                new CoordinateDto(-105.2, 39.3),
+                new CoordinateDto(-105.2, 39.1)
+        ])
+        AdministrativeRegion sharedCity = regionRepository.save(new AdministrativeRegion(
+                null, "Splitville City", countyA.id(), cityPoly, 3, "US", "MC", "America/Denver", "9950000"
+        ))
+        track(sharedCity)
+
+        when: "querying cities in Alpha County and Beta County"
+        List<AdministrativeRegion> alphaCities = regionService.getCities("MC", "Alpha County")
+        List<AdministrativeRegion> betaCities = regionService.getCities("MC", "Beta County")
+
+        then: "Splitville City is returned for both counties"
+        verifyAll {
+            alphaCities.any { it.id() == sharedCity.id() }
+            betaCities.any { it.id() == sharedCity.id() }
+        }
+    }
+
+    def "HIERARCHY | should resolve District of Columbia and US territories by code and name"() {
+        given: "DC and US territory level 1 regions"
+        createRegionWithMetadata("District of Columbia", 1, "DC", "America/New_York", -77.1, 38.8, -76.9, 39.0)
+        createRegionWithMetadata("Puerto Rico", 1, "PR", "America/Puerto_Rico", -67.3, 17.9, -65.2, 18.5)
+        createRegionWithMetadata("United States Virgin Islands", 1, "VI", "America/St_Thomas", -65.1, 17.6, -64.5, 18.4)
+        createRegionWithMetadata("Guam", 1, "GU", "Pacific/Guam", 144.6, 13.2, 145.0, 13.7)
+        createRegionWithMetadata("American Samoa", 1, "AS", "Pacific/Pago_Pago", -170.9, -14.4, -170.5, -14.2)
+        createRegionWithMetadata("Commonwealth of the Northern Mariana Islands", 1, "MP", "Pacific/Saipan", 145.1, 14.1, 145.8, 15.3)
+
+        expect: "findState resolves each by both code and name"
+        verifyAll {
+            regionService.findState("DC").map { it.stateCode() }.orElse(null) == "DC"
+            regionService.findState("District of Columbia").map { it.stateCode() }.orElse(null) == "DC"
+            regionService.findState("PR").map { it.stateCode() }.orElse(null) == "PR"
+            regionService.findState("Puerto Rico").map { it.stateCode() }.orElse(null) == "PR"
+            regionService.findState("VI").map { it.stateCode() }.orElse(null) == "VI"
+            regionService.findState("Virgin Islands").map { it.stateCode() }.orElse(null) == "VI"
+            regionService.findState("United States Virgin Islands").map { it.stateCode() }.orElse(null) == "VI"
+            regionService.findState("GU").map { it.stateCode() }.orElse(null) == "GU"
+            regionService.findState("Guam").map { it.stateCode() }.orElse(null) == "GU"
+            regionService.findState("AS").map { it.stateCode() }.orElse(null) == "AS"
+            regionService.findState("American Samoa").map { it.stateCode() }.orElse(null) == "AS"
+            regionService.findState("MP").map { it.stateCode() }.orElse(null) == "MP"
+            regionService.findState("Northern Mariana Islands").map { it.stateCode() }.orElse(null) == "MP"
+        }
+
+        and: "resolveCoordinates resolves territory state codes when stateCode is null"
+        createRegionWithMetadata("Puerto Rico", 1, null, "America/Puerto_Rico", -60.0, 10.0, -59.0, 11.0)
+        Optional<RegionCoordinateResolution> prRes = regionService.resolveCoordinates(10.5d, -59.5d)
+        verifyAll {
+            prRes.isPresent()
+            prRes.get().state() == "PR"
         }
     }
 }

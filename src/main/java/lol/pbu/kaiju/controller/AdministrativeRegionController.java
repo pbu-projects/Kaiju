@@ -10,6 +10,7 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -20,8 +21,10 @@ import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.UsSyncResult;
 import lol.pbu.kaiju.service.AdministrativeRegionService;
 import lol.pbu.kaiju.service.BoundaryIngestionService;
+import lol.pbu.kaiju.service.UsBoundarySyncService;
 import lol.pbu.kaiju.util.PageableUtils;
 import org.jspecify.annotations.NonNull;
 
@@ -47,13 +50,16 @@ public class AdministrativeRegionController {
 
     private final AdministrativeRegionService administrativeRegionService;
     private final BoundaryIngestionService boundaryIngestionService;
+    private final UsBoundarySyncService usBoundarySyncService;
 
     public AdministrativeRegionController(
             AdministrativeRegionService administrativeRegionService,
-            BoundaryIngestionService boundaryIngestionService
+            BoundaryIngestionService boundaryIngestionService,
+            UsBoundarySyncService usBoundarySyncService
     ) {
         this.administrativeRegionService = administrativeRegionService;
         this.boundaryIngestionService = boundaryIngestionService;
+        this.usBoundarySyncService = usBoundarySyncService;
     }
 
     /**
@@ -154,5 +160,57 @@ public class AdministrativeRegionController {
     ) {
         UUID actorUserId = UUID.fromString(authentication.getName());
         return boundaryIngestionService.ingestBoundary(id, command, actorUserId);
+    }
+
+    /**
+     * Syncs all US state and territory boundaries from US Census Bureau TIGERweb.
+     * Restricted strictly to platform administrators.
+     *
+     * @param authentication the authenticated user making the request
+     * @return the sync summary response
+     */
+    @Secured(SYSTEM_ADMIN_CLAIM)
+    @Post("/sync/us/states")
+    public UsSyncResult syncUsStates(@NonNull Authentication authentication) {
+        UUID actorUserId = UUID.fromString(authentication.getName());
+        return usBoundarySyncService.syncStates(actorUserId);
+    }
+
+    /**
+     * Syncs county boundaries for a US state or territory from US Census Bureau TIGERweb.
+     * Restricted strictly to platform administrators.
+     *
+     * @param stateCode      the two-letter USPS state or territory code
+     * @param authentication the authenticated user making the request
+     * @return the sync summary response
+     */
+    @Secured(SYSTEM_ADMIN_CLAIM)
+    @Post("/sync/us/states/{stateCode}/counties")
+    public UsSyncResult syncUsCounties(
+            @PathVariable String stateCode,
+            @NonNull Authentication authentication
+    ) {
+        UUID actorUserId = UUID.fromString(authentication.getName());
+        return usBoundarySyncService.syncStateCounties(stateCode, actorUserId);
+    }
+
+    /**
+     * Syncs place boundaries for a US state or territory from US Census Bureau TIGERweb.
+     * Restricted strictly to platform administrators.
+     *
+     * @param stateCode      the two-letter USPS state or territory code
+     * @param includeCdps    whether to include Census Designated Places in addition to incorporated places
+     * @param authentication the authenticated user making the request
+     * @return the sync summary response
+     */
+    @Secured(SYSTEM_ADMIN_CLAIM)
+    @Post("/sync/us/states/{stateCode}/places")
+    public UsSyncResult syncUsPlaces(
+            @PathVariable String stateCode,
+            @Nullable @QueryValue Boolean includeCdps,
+            @NonNull Authentication authentication
+    ) {
+        UUID actorUserId = UUID.fromString(authentication.getName());
+        return usBoundarySyncService.syncStatePlaces(stateCode, Boolean.TRUE.equals(includeCdps), actorUserId);
     }
 }

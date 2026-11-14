@@ -27,7 +27,7 @@ public interface AdministrativeRegionRepository extends PageableRepository<Admin
         SELECT id, name, level, country_code, state_code, time_zone
         FROM administrative_regions
         WHERE ST_Covers(geom, ST_SetSRID(ST_Point(:lon, :lat), 4326)::geography)
-        ORDER BY level DESC NULLS LAST, ST_Area(geom) ASC
+        ORDER BY level DESC NULLS LAST, COALESCE(area_sq_m, ST_Area(geom)) ASC
     """, nativeQuery = true)
     List<CoveringRegionDto> findCoveringRegions(double lat, double lon);
 
@@ -35,7 +35,20 @@ public interface AdministrativeRegionRepository extends PageableRepository<Admin
 
     List<AdministrativeRegion> findByParentRegionIdOrderByNameAsc(UUID parentRegionId);
 
+    List<AdministrativeRegion> findByLevelAndParentRegionIdOrderByNameAsc(Integer level, UUID parentRegionId);
+
     List<AdministrativeRegion> findByLevelAndStateCodeIgnoreCaseOrderByNameAsc(int level, String stateCode);
 
     Optional<AdministrativeRegion> findFirstByLevelAndStateCodeIgnoreCase(int level, String stateCode);
+
+    Optional<AdministrativeRegion> findByGeoid(String geoid);
+
+    @Query(value = """
+        SELECT r.id, r.name, r.parent_region_id, r.geom, r.level, r.country_code, r.state_code, r.time_zone, r.geoid
+        FROM administrative_regions r
+        JOIN administrative_regions c ON c.id = :countyId
+        WHERE r.level = 3 AND ST_Intersects(c.geom, r.geom) AND NOT ST_Touches(c.geom::geometry, r.geom::geometry)
+        ORDER BY r.name ASC
+    """, nativeQuery = true)
+    List<AdministrativeRegion> findCitiesInCounty(UUID countyId);
 }

@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -100,7 +101,16 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             Map.entry("washington", "WA"),
             Map.entry("west virginia", "WV"),
             Map.entry("wisconsin", "WI"),
-            Map.entry("wyoming", "WY")
+            Map.entry("wyoming", "WY"),
+            Map.entry("district of columbia", "DC"),
+            Map.entry("puerto rico", "PR"),
+            Map.entry("united states virgin islands", "VI"),
+            Map.entry("u.s. virgin islands", "VI"),
+            Map.entry("virgin islands", "VI"),
+            Map.entry("guam", "GU"),
+            Map.entry("american samoa", "AS"),
+            Map.entry("commonwealth of the northern mariana islands", "MP"),
+            Map.entry("northern mariana islands", "MP")
     );
 
     private final AdministrativeRegionRepository regionRepository;
@@ -171,7 +181,8 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
                 level,
                 countryCode,
                 stateCode,
-                timeZone
+                timeZone,
+                null
         );
         AdministrativeRegion saved = regionRepository.save(region);
 
@@ -214,7 +225,8 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
                 existing.level(),
                 existing.countryCode(),
                 existing.stateCode(),
-                existing.timeZone()
+                existing.timeZone(),
+                existing.geoid()
         );
         AdministrativeRegion saved = regionRepository.update(updated);
 
@@ -341,9 +353,9 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
         }
         String stripped = STATE_SUFFIX_PATTERN.matcher(region.name()).replaceAll("").trim();
         if (stripped.length() == 2) {
-            return stripped.toUpperCase();
+            return stripped.toUpperCase(Locale.ROOT);
         }
-        String lookup = STATE_NAME_TO_CODE.get(stripped.toLowerCase());
+        String lookup = STATE_NAME_TO_CODE.get(stripped.toLowerCase(Locale.ROOT));
         return lookup != null ? lookup : stripped;
     }
 
@@ -360,8 +372,9 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             return Optional.empty();
         }
         String term = state.trim();
-        if (term.length() == 2) {
-            Optional<AdministrativeRegion> byCode = regionRepository.findFirstByLevelAndStateCodeIgnoreCase(1, term);
+        String code = term.length() == 2 ? term : STATE_NAME_TO_CODE.get(term.toLowerCase(Locale.ROOT));
+        if (code != null) {
+            Optional<AdministrativeRegion> byCode = regionRepository.findFirstByLevelAndStateCodeIgnoreCase(1, code);
             if (byCode.isPresent()) {
                 return byCode;
             }
@@ -369,7 +382,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
         return getStates().stream()
                 .filter(r -> term.equalsIgnoreCase(r.stateCode())
                         || term.equalsIgnoreCase(r.name())
-                        || (r.name() != null && r.name().toLowerCase().startsWith(term.toLowerCase())))
+                        || (r.name() != null && r.name().toLowerCase(Locale.ROOT).startsWith(term.toLowerCase(Locale.ROOT))))
                 .findFirst();
     }
 
@@ -380,7 +393,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             return regionRepository.findByLevelOrderByNameAsc(2);
         }
         return findState(state)
-                .map(s -> regionRepository.findByParentRegionIdOrderByNameAsc(s.id()))
+                .map(s -> regionRepository.findByLevelAndParentRegionIdOrderByNameAsc(2, s.id()))
                 .orElseGet(List::of);
     }
 
@@ -396,7 +409,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             return candidateCounties.stream()
                     .filter(c -> matchesCounty(c, trimmedCounty))
                     .findFirst()
-                    .map(c -> regionRepository.findByParentRegionIdOrderByNameAsc(c.id()))
+                    .map(c -> regionRepository.findCitiesInCounty(c.id()))
                     .orElseGet(List::of);
         }
         if (state != null && !state.isBlank()) {
@@ -428,8 +441,8 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
         if (normalizedCand != null && normalizedCand.equalsIgnoreCase(queryCounty)) {
             return true;
         }
-        return candName.toLowerCase().startsWith(queryCounty.toLowerCase())
-                || (normalizedCand != null && normalizedCand.toLowerCase().startsWith(queryCounty.toLowerCase()));
+        return candName.toLowerCase(Locale.ROOT).startsWith(queryCounty.toLowerCase(Locale.ROOT))
+                || (normalizedCand != null && normalizedCand.toLowerCase(Locale.ROOT).startsWith(queryCounty.toLowerCase(Locale.ROOT)));
     }
 
     private User resolveActor(UUID actorUserId) {

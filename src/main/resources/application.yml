@@ -49,7 +49,7 @@ flyway:
     default:
       enabled: true
       locations:
-        - filesystem:database/init
+        - classpath:db/migration
       sql-migration-prefix: ""
       sql-migration-separator: "-"
 micrometer:

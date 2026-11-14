@@ -142,6 +142,12 @@ sourceSets {
             exclude("**/lol/pbu/kaiju/client/**")
         }
     }
+    // Named nativeSmokeTest to avoid colliding with GraalVM plugin's nativeImageTestCompileOnly configuration
+    create("nativeSmokeTest") {
+        groovy.srcDir("src/nativeImageTest/groovy")
+        compileClasspath += sourceSets.test.get().compileClasspath
+        runtimeClasspath += sourceSets.test.get().runtimeClasspath
+    }
 }
 
 val isGeneratingClient = gradle.startParameter.taskNames.any { it.contains("generateApiClient") }
@@ -198,6 +204,12 @@ tasks.register<Copy>("generateOpenApiSpec") {
     }
     into(layout.projectDirectory.dir("src/docs"))
 }
+tasks.named<ProcessResources>("processResources") {
+    from("database/init") {
+        into("db/migration")
+    }
+}
+
 // https://docs.gradle.org/current/userguide/upgrading_major_version_9.html#test_task_fails_when_no_tests_are_discovered
 tasks.withType<AbstractTestTask>().configureEach {
     failOnNoDiscoveredTests = false
@@ -278,6 +290,23 @@ tasks.named<Test>("test") {
             }
         }
     })
+}
+
+tasks.register<Test>("nativeImageTest") {
+    group = "verification"
+    description = "Compiles the GraalVM native image and runs black-box tests against the running binary."
+    dependsOn(tasks.named("nativeCompile"))
+    testClassesDirs = sourceSets["nativeSmokeTest"].output.classesDirs
+    classpath = sourceSets["nativeSmokeTest"].runtimeClasspath
+    useJUnitPlatform()
+    systemProperty("kaiju.native.binary", layout.buildDirectory.file("native/nativeCompile/kaiju").get().asFile.absolutePath)
+    testLogging {
+        events("failed", "standardError", "standardOut")
+        exceptionFormat = TestExceptionFormat.FULL
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+    }
 }
 
 tasks.register("validateMarkdown") {
