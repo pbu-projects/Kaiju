@@ -3,8 +3,10 @@
 US organizations, locations, projects, project_locations, and shifts into volunteer_db.
 """
 
+import html
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -105,6 +107,14 @@ def fetch_page(page: int, retries: int = 4) -> dict:
             print(f"  Page {page} retry {attempt + 1} after {exc}; sleeping {wait}s", file=sys.stderr)
             time.sleep(wait)
     raise RuntimeError("Unreachable")
+
+
+def clean_html(raw: str) -> str:
+    text = re.sub(r"(?i)</(?:p|div|li|h[1-6])>|<br\s*/?>", "\n", raw)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text).replace("\xa0", " ")
+    lines = [re.sub(r"[ \t]+", " ", line).strip() for line in text.splitlines()]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
 def sql_str(val: str | None, max_len: int | None = None) -> str:
@@ -220,7 +230,7 @@ def build_batch_sql(projects: list[dict]) -> tuple[str, int, int, int, int]:
             )
             loc_count += 1
 
-        desc = (p.get("longDescription") or p.get("shortDescription") or title).strip()
+        desc = clean_html(p.get("longDescription") or p.get("shortDescription") or "") or title
         ptype = map_project_type(p.get("locationType"))
         pstatus = map_status(p.get("statusId"))
 
@@ -236,7 +246,7 @@ def build_batch_sql(projects: list[dict]) -> tuple[str, int, int, int, int]:
         stmts.append(
             f"INSERT INTO projects (id, organization_id, managing_region_id, title, description, project_type, status) "
             f"VALUES ({sql_str(pid)}::uuid, {sql_str(org_id)}::uuid, {region_expr}, {sql_str(title, 255)}, {sql_str(desc)}, {sql_str(ptype)}, {sql_str(pstatus)}) "
-            f"ON CONFLICT (id) DO NOTHING;"
+            f"ON CONFLICT (id) DO UPDATE SET description = EXCLUDED.description;"
         )
         proj_count += 1
 
