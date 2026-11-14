@@ -140,6 +140,20 @@ When volunteers search for opportunities, the platform resolves results through 
 
 For the architectural decision record behind this strategy, see ADR 0003: Dual-Track Geospatial Strategy and the [Locations, Regional Boundaries, and Geocoding Guide](../src/docs/asciidoc/architecture/location-and-boundaries.adoc).
 
+## Local Development Data & Extra US Test Projects
+
+When you start the local database with `docker compose -f database/compose.yml up -d --wait db` and run `./gradlew run`, Flyway applies all migrations in `database/init/` automatically. Those migrations include a small set of Colorado and international seed projects so tests stay fast.
+
+If you want thousands of US test projects for local browsing and demos, run the unauthenticated import script after Kaiju has started once (so the tables already exist):
+
+```bash
+python3 database/scripts/import_justserve_beta.py
+```
+
+- **No token required**: The script queries the public `https://beta.justserve.org/graphql` endpoint and loads US organizations, locations, projects, and shifts into the running `volunteer_db` container.
+- **Data persistence**: The `pg_data` Docker volume keeps all imported data across `docker compose stop`, `docker compose down`, and restarts. Only `docker compose down -v` or removing the volume clears it.
+- **Custom settings**: Set `DB_CONTAINER`, `DB_USERNAME`, or `DB_NAME` in your shell if your local database uses different values from `volunteer_db`, `jimmy`, and `volunteer_monster`.
+
 [4326]: https://epsg.io/4326
 
 [PostGIS Geography Type]: https://postgis.net/workshops/postgis-intro/geography.html
