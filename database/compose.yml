@@ -15,8 +15,6 @@ services:
       - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-      # :Z updates SELinux permissions for the bind mount
-      - ./init:/docker-entrypoint-initdb.d:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d volunteer_monster -U ${DB_USERNAME:-jimmy}"]
       interval: 30s
