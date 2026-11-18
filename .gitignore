@@ -27,6 +27,7 @@ out/
 
 # Python
 *.py
+!database/scripts/*.py
 __pycache__/
 *.py[cod]
 bin/
