@@ -55,6 +55,27 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         ]
     }
 
+    private Polygon createDenverPolygon() {
+        Coordinate[] coords = [
+                new Coordinate(-105.00, 39.73),
+                new Coordinate(-104.98, 39.73),
+                new Coordinate(-104.98, 39.75),
+                new Coordinate(-105.00, 39.75),
+                new Coordinate(-105.00, 39.73)
+        ]
+        geometryFactory.createPolygon(coords)
+    }
+
+    private List<CoordinateDto> createDenverCoordinateDtos() {
+        [
+                new CoordinateDto(-105.00, 39.73),
+                new CoordinateDto(-104.98, 39.73),
+                new CoordinateDto(-104.98, 39.75),
+                new CoordinateDto(-105.00, 39.75),
+                new CoordinateDto(-105.00, 39.73)
+        ]
+    }
+
     def setup() {
         Coordinate[] coordsB = [
                 new Coordinate(0, 0),
@@ -96,9 +117,9 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should allow regional director with region:manage claim to create a boundary"() {
-        given: "a new valid boundary command"
+        given: "a new valid boundary command within Denver County"
         String name = "Director Boundary ${faker.address().city()}"
-        def command = new CreateBoundaryCommand(name, createCoordinateDtos())
+        def command = new CreateBoundaryCommand(name, createDenverCoordinateDtos())
 
         when: "the boundary is added by a regional director via HTTP POST"
         def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Boundary)
@@ -285,11 +306,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing boundary"() {
-        given: "an existing boundary"
-        def boundary = dataBuilder.boundary().withName("Test Boundary Director Update").withGeometry(createPolygon()).persist()
+        given: "an existing boundary within Denver County"
+        def boundary = dataBuilder.boundary().withName("Test Boundary Director Update").withGeometry(createDenverPolygon()).persist()
         UUID id = boundary.id()
         def newName = "Director Boundary Update ${faker.address().city()}"
-        def updateCommand = new UpdateBoundaryCommand(newName, createCoordinateDtos())
+        def updateCommand = new UpdateBoundaryCommand(newName, createDenverCoordinateDtos())
 
         when: "the boundary is updated by a regional director via HTTP PUT"
         def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
@@ -379,8 +400,8 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing boundary"() {
-        given: "a new boundary to be deleted"
-        def saved = dataBuilder.boundary().withName("Temporary Boundary Director Delete").withGeometry(createPolygon()).persist()
+        given: "a new boundary within Denver County to be deleted"
+        def saved = dataBuilder.boundary().withName("Temporary Boundary Director Delete").withGeometry(createDenverPolygon()).persist()
         UUID id = saved.id()
         assert boundaryRepository.existsById(id)
 

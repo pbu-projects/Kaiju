@@ -9,6 +9,7 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.ShiftRepository;
@@ -16,6 +17,7 @@ import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
 import org.jspecify.annotations.NonNull;
 
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,7 +47,14 @@ public class ShiftServiceImpl implements ShiftService {
     @Transactional(readOnly = true)
     @NonNull
     public CursoredPage<Shift> getShifts(@NonNull CursoredPageable pageable) {
-        return shiftRepository.findAll(pageable);
+        return shiftRepository.findByProjectDeletedAtIsNull(pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public CursoredPage<Shift> getActiveShifts(@NonNull CursoredPageable pageable) {
+        return shiftRepository.findByProjectStatusAndProjectDeletedAtIsNull(ProjectStatus.ACTIVE, pageable);
     }
 
     @Override
@@ -65,9 +74,10 @@ public class ShiftServiceImpl implements ShiftService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Project is required");
         }
 
-        Project project = projectRepository.findById(shift.project().id())
+        Project project = projectRepository.findByIdAndDeletedAtIsNull(shift.project().id())
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
+        validateProjectForShift(project, shift);
         verifyShiftAuthority(actorUserId, project);
 
         Shift toSave = new Shift(
@@ -91,6 +101,7 @@ public class ShiftServiceImpl implements ShiftService {
         Shift existing = shiftRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, SHIFT_NOT_FOUND));
 
+        validateProjectForShift(existing.project(), shift);
         verifyShiftAuthority(actorUserId, existing.project());
 
         Shift safeUpdate = new Shift(
@@ -128,6 +139,22 @@ public class ShiftServiceImpl implements ShiftService {
         }
         if (shift.startTime() != null && shift.endTime() != null && !shift.startTime().isBefore(shift.endTime())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shift start time must be before end time");
+        }
+    }
+
+    private void validateProjectForShift(Project project, Shift shift) {
+        if (project == null || project.deletedAt() != null) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found");
+        }
+        if (project.status() != ProjectStatus.ACTIVE) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shifts can only be managed for ACTIVE projects");
+        }
+        if (shift.location() != null && project.locations() != null && !project.locations().isEmpty()) {
+            boolean matchesProjectLocation = project.locations().stream()
+                    .anyMatch(loc -> Objects.equals(loc.id(), shift.location().id()));
+            if (!matchesProjectLocation) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shift location must belong to the project's locations");
+            }
         }
     }
 

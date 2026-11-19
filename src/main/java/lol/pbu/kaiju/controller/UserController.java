@@ -69,13 +69,11 @@ public class UserController {
         return userService.getUserById(id);
     }
 
+    @Secured(SYSTEM_USER_MANAGE_CLAIM)
     @Post
     public User addUser(@Valid @Body CreateUserCommand command, Principal principal) {
-        UserRole targetRole = UserRole.STANDARD_USER;
-        if (command.role() != null && command.role() != UserRole.STANDARD_USER) {
-            verifyAdmin(principal);
-            targetRole = command.role();
-        }
+        verifyAdmin(principal);
+        UserRole targetRole = command.role() != null ? command.role() : UserRole.STANDARD_USER;
         User safeUser = new User(
                 null,
                 command.email(),

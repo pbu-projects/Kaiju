@@ -32,6 +32,8 @@ import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.security.Permission.ORG_MANAGE_USERS_CLAIM;
+import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 @ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
@@ -54,13 +56,22 @@ public class OrganizationUserController {
         this.userRepository = userRepository;
     }
 
+    @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<OrganizationUser> getOrganizationUsers(@Nullable @Valid CursoredPageable pageable) {
         return organizationUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{userId}/{organizationId}")
-    public Optional<OrganizationUser> getOrganizationUser(@PathVariable UUID userId, @PathVariable UUID organizationId) {
+    public Optional<OrganizationUser> getOrganizationUser(
+            @PathVariable UUID userId,
+            @PathVariable UUID organizationId,
+            Principal principal
+    ) {
+        UUID actorId = UUID.fromString(principal.getName());
+        if (!actorId.equals(userId)) {
+            verifyOrgAdminAuthority(principal, organizationId);
+        }
         return organizationUserRepository.findById(new OrganizationUserId(userId, organizationId));
     }
 

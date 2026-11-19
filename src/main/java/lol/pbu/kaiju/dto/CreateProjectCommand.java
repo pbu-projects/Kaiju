@@ -36,11 +36,13 @@ public record CreateProjectCommand(
         ProjectStatus status,
 
         @Nullable
+        @Size(max = 50, message = "Project cannot have more than 50 locations.")
         @Valid
         List<ProjectLocationCommand> locations,
 
         @NotNull(message = "Project boundaries are required.")
         @NotEmpty(message = "Project boundaries must not be empty.")
+        @Size(max = 50, message = "Project cannot have more than 50 boundaries.")
         @Valid
         List<ProjectBoundaryCommand> boundaries
 ) {}

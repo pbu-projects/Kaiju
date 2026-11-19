@@ -3,7 +3,6 @@ package lol.pbu.kaiju.controller;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -21,26 +20,23 @@ import lol.pbu.kaiju.domain.RegionUserId;
 import lol.pbu.kaiju.dto.CreateRegionUserCommand;
 import lol.pbu.kaiju.dto.UpdateRegionUserCommand;
 import lol.pbu.kaiju.repository.RegionUserRepository;
+import lol.pbu.kaiju.repository.SecurityQueryRepository;
+import lol.pbu.kaiju.repository.UserRepository;
 import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.util.PageableUtils;
 
+import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
+import static io.micronaut.http.HttpStatus.FORBIDDEN;
+import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 /**
  * REST controller for managing regional user associations and role assignments.
- *
- * <p>Enforces a two-tier security model: read operations require general authentication
- * ({@link SecurityRule#IS_AUTHENTICATED}), while mutating operations are restricted to
- * platform administrators and regional managers ({@link Permission#SYSTEM_ADMIN_CLAIM}, {@link Permission#REGION_MANAGE_CLAIM}).</p>
- *
- * @see Permission#SYSTEM_ADMIN_CLAIM
- * @see Permission#REGION_MANAGE_CLAIM
- * @see RegionUserRepository
  */
 @ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
@@ -50,9 +46,17 @@ public class RegionUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final RegionUserRepository regionUserRepository;
+    private final UserRepository userRepository;
+    private final SecurityQueryRepository securityQueryRepository;
 
-    public RegionUserController(RegionUserRepository regionUserRepository) {
+    public RegionUserController(
+            RegionUserRepository regionUserRepository,
+            UserRepository userRepository,
+            SecurityQueryRepository securityQueryRepository
+    ) {
         this.regionUserRepository = regionUserRepository;
+        this.userRepository = userRepository;
+        this.securityQueryRepository = securityQueryRepository;
     }
 
     /**
@@ -61,6 +65,7 @@ public class RegionUserController {
      * @param pageable pagination and sorting parameters
      * @return a cursored page of {@link RegionUser} records
      */
+    @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<RegionUser> getRegionUsers(@Nullable @Valid CursoredPageable pageable) {
         return regionUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
@@ -69,71 +74,104 @@ public class RegionUserController {
     /**
      * Retrieves a specific region-user association by composite identifier.
      *
-     * @param userId   the unique identifier of the user
-     * @param regionId the unique identifier of the region
+     * @param userId    the unique identifier of the user
+     * @param regionId  the unique identifier of the region
+     * @param principal the authenticated caller
      * @return an optional containing the {@link RegionUser} if found
      */
     @Get("/{userId}/{regionId}")
-    public Optional<RegionUser> getRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId) {
+    public Optional<RegionUser> getRegionUser(
+            @PathVariable UUID userId,
+            @PathVariable UUID regionId,
+            Principal principal
+    ) {
+        UUID actorId = UUID.fromString(principal.getName());
+        if (!actorId.equals(userId)) {
+            verifyRegionDirectorAuthority(principal, regionId);
+        }
         return regionUserRepository.findById(new RegionUserId(userId, regionId));
     }
 
     /**
      * Associates a user with an administrative region under a designated role.
-     * Restricted to platform administrators ({@code system:admin}) and regional managers ({@code region:manage}).
+     * Restricted to platform administrators and directors of the target region.
      *
-     * @param command the payload containing the target user ID, region ID, and role
+     * @param command   the payload containing the target user ID, region ID, and role
+     * @param principal the authenticated caller
      * @return the persisted {@link RegionUser} relationship
-     * @see Permission#SYSTEM_ADMIN_CLAIM
-     * @see Permission#REGION_MANAGE_CLAIM
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
-    public RegionUser addRegionUser(@Valid @Body CreateRegionUserCommand command) {
+    public RegionUser addRegionUser(@Valid @Body CreateRegionUserCommand command, Principal principal) {
+        verifyRegionDirectorAuthority(principal, command.regionId());
         RegionUserId id = new RegionUserId(command.userId(), command.regionId());
         return regionUserRepository.save(new RegionUser(id, command.role()));
     }
 
     /**
      * Updates an existing user role assignment within an administrative region.
-     * Restricted to platform administrators ({@code system:admin}) and regional managers ({@code region:manage}).
+     * Restricted to platform administrators and directors of the target region.
      *
-     * @param userId   the unique identifier of the user
-     * @param regionId the unique identifier of the region
-     * @param command  the payload containing the new role assignment
+     * @param userId    the unique identifier of the user
+     * @param regionId  the unique identifier of the region
+     * @param command   the payload containing the new role assignment
+     * @param principal the authenticated caller
      * @return the updated {@link RegionUser} relationship
-     * @see Permission#SYSTEM_ADMIN_CLAIM
-     * @see Permission#REGION_MANAGE_CLAIM
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{userId}/{regionId}")
     public RegionUser updateRegionUser(
             @PathVariable UUID userId,
             @PathVariable UUID regionId,
-            @Valid @Body UpdateRegionUserCommand command
+            @Valid @Body UpdateRegionUserCommand command,
+            Principal principal
     ) {
+        verifyRegionDirectorAuthority(principal, regionId);
         RegionUserId id = new RegionUserId(userId, regionId);
         regionUserRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Region user not found"));
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Region user not found"));
         return regionUserRepository.update(new RegionUser(id, command.role()));
     }
 
     /**
      * Removes a user role assignment from an administrative region.
-     * Restricted to platform administrators ({@code system:admin}) and regional managers ({@code region:manage}).
+     * Restricted to platform administrators and directors of the target region.
      *
-     * @param userId   the unique identifier of the user to remove
-     * @param regionId the unique identifier of the region
-     * @see Permission#SYSTEM_ADMIN_CLAIM
-     * @see Permission#REGION_MANAGE_CLAIM
+     * @param userId    the unique identifier of the user to remove
+     * @param regionId  the unique identifier of the region
+     * @param principal the authenticated caller
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Delete("/{userId}/{regionId}")
-    public void deleteRegionUser(@PathVariable UUID userId, @PathVariable UUID regionId) {
+    public void deleteRegionUser(
+            @PathVariable UUID userId,
+            @PathVariable UUID regionId,
+            Principal principal
+    ) {
+        verifyRegionDirectorAuthority(principal, regionId);
         RegionUserId id = new RegionUserId(userId, regionId);
         long deletedCount = regionUserRepository.removeById(id);
         if (deletedCount == 0) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Region user not found");
+            throw new HttpStatusException(NOT_FOUND, "Region user not found");
         }
+    }
+
+    private void verifyRegionDirectorAuthority(Principal principal, UUID regionId) {
+        UUID actorId = UUID.fromString(principal.getName());
+        if (hasPermission(actorId, Permission.SYSTEM_ADMIN)) {
+            return;
+        }
+        if (!securityQueryRepository.isRegionDirector(actorId, regionId)) {
+            throw new HttpStatusException(
+                    FORBIDDEN,
+                    "Forbidden: Only system admins or region directors of this region may manage region members"
+            );
+        }
+    }
+
+    private boolean hasPermission(UUID userId, Permission permission) {
+        return userRepository.findById(userId)
+                .map(user -> user.role().hasPermission(permission))
+                .orElse(false);
     }
 }

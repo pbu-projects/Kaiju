@@ -20,7 +20,7 @@ public record UpdateAdministrativeRegionCommand(
         UUID parentRegionId,
 
         @NotNull(message = "Region coordinates are required.")
-        @Size(min = 3, message = "A region polygon must contain at least 3 coordinates.")
+        @Size(min = 3, max = 5000, message = "A region polygon must contain between 3 and 5000 coordinates.")
         @Valid
         List<CoordinateDto> coordinates
 ) {}

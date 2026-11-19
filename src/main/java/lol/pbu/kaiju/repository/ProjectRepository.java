@@ -14,6 +14,7 @@ import io.micronaut.data.repository.PageableRepository;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.model.JtsPointConverter;
 import lol.pbu.kaiju.model.ProjectSearchCard;
+import lol.pbu.kaiju.model.ProjectStatus;
 import org.jspecify.annotations.NonNull;
 import org.locationtech.jts.geom.Point;
 
@@ -32,12 +33,37 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
     @NonNull
     Optional<Project> findById(@NonNull UUID id);
 
+    @Join("organization")
+    @Join(value = "managingRegion", type = LEFT_FETCH)
+    @NonNull
+    Optional<Project> findByIdAndDeletedAtIsNull(@NonNull UUID id);
+
     @NonNull
     @Join("organization")
     CursoredPage<Project> findAll(@NonNull CursoredPageable pageable);
 
+    @NonNull
+    @Join("organization")
+    CursoredPage<Project> findByDeletedAtIsNull(@NonNull CursoredPageable pageable);
+
+    long countByDeletedAtIsNull();
+
+    @NonNull
+    @Join("organization")
+    CursoredPage<Project> findByStatusAndDeletedAtIsNull(@NonNull ProjectStatus status, @NonNull CursoredPageable pageable);
+
     @Join("organization")
     CursoredPage<Project> findByTitle(@Nullable String title, CursoredPageable pageable);
+
+    @Join("organization")
+    CursoredPage<Project> findByTitleAndDeletedAtIsNull(@Nullable String title, @NonNull CursoredPageable pageable);
+
+    @Join("organization")
+    CursoredPage<Project> findByTitleAndStatusAndDeletedAtIsNull(
+            @Nullable String title,
+            @NonNull ProjectStatus status,
+            @NonNull CursoredPageable pageable
+    );
 
     @Query(value = """
                 SELECT project_.id AS project_id,
@@ -56,8 +82,13 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
                     FROM locations l
                     INNER JOIN project_locations pl ON l.id = pl.location_id
                     INNER JOIN projects p ON pl.project_id = p.id
+                    INNER JOIN organizations o ON p.organization_id = o.id
                     INNER JOIN shifts s ON (s.project_id = p.id AND s.location_id = l.id)
                     WHERE p.status = 'ACTIVE'
+                      AND p.deleted_at IS NULL
+                      AND o.is_public = TRUE
+                      AND o.verification_status = 'VERIFIED'
+                      AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
                       AND s.start_time >= NOW()
                       AND ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
                     ORDER BY p.id, ST_Distance(l.geom, CAST(:point AS geography)) ASC, s.start_time ASC
@@ -68,8 +99,13 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
                 FROM locations l
                 INNER JOIN project_locations pl ON l.id = pl.location_id
                 INNER JOIN projects p ON pl.project_id = p.id
+                INNER JOIN organizations o ON p.organization_id = o.id
                 INNER JOIN shifts s ON (s.project_id = p.id AND s.location_id = l.id)
                 WHERE p.status = 'ACTIVE'
+                  AND p.deleted_at IS NULL
+                  AND o.is_public = TRUE
+                  AND o.verification_status = 'VERIFIED'
+                  AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
                   AND s.start_time >= NOW()
                   AND ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
             """)

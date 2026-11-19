@@ -44,39 +44,52 @@ public class ProjectSecurityService {
      */
     @NonNull
     public ProjectStatus evaluateProjectCreationByUser(@NonNull UUID userId, @NonNull Project project) {
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, USER_NOT_FOUND));
+
+        UUID organizationId = project.organization() != null ? project.organization().id() : null;
+        boolean isGlobalAdmin = user.role().hasPermission(Permission.SYSTEM_ADMIN);
+        boolean isOrgMember = organizationId != null && queryRepository.isAnyOrgMember(userId, organizationId);
+        boolean isRegionalAdmin = user.role().hasPermission(Permission.PROJECT_APPROVE)
+                || user.role().hasPermission(Permission.REGION_MANAGE);
+
+        boolean hasLocations = project.locations() != null && !project.locations().isEmpty();
+        boolean inAssignedRegion = hasLocations
+                ? areAllLocationsInAssignedRegion(project, userId)
+                : project.managingRegion() != null
+                        && project.managingRegion().id() != null
+                        && queryRepository.isUserInRegion(userId, project.managingRegion().id());
+        boolean isAuthorizedRegionalAdmin = isRegionalAdmin && inAssignedRegion;
+
+        if (!isGlobalAdmin && !isOrgMember && !isAuthorizedRegionalAdmin) {
+            throw new HttpStatusException(FORBIDDEN, "User is not authorized to create a project for this organization");
+        }
+
         if (project.status() == ProjectStatus.DRAFT) {
             return ProjectStatus.DRAFT;
         }
 
-        UUID organizationId = project.organization() != null ? project.organization().id() : null;
-        if (organizationId == null) {
+        if (organizationId == null || !hasLocations) {
             return PENDING;
         }
 
-        // Check if project has no locations
-        if (project.locations() == null || project.locations().isEmpty()) {
-            return PENDING; // Manual queue if no geographic bounds provided
-        }
-
         // 1. Check Org Manager permissions first
-        if (queryRepository.isOrgVerified(organizationId) &&
-                queryRepository.isOrgManager(userId, organizationId) &&
-                areAllLocationsInOrgRegion(project, organizationId)) {
-            return ACTIVE; // AUTO_APPROVED
+        if (queryRepository.isOrgVerified(organizationId)
+                && queryRepository.isOrgManager(userId, organizationId)
+                && areAllLocationsInOrgRegion(project, organizationId)) {
+            return ACTIVE;
         }
 
-        // 2. Check if user is a REGION_AGENT
-        boolean isRegionAgent = queryRepository.isRegionAgent(userId);
-        if (isRegionAgent) {
-            if (areAllLocationsInAssignedRegion(project, userId)) {
-                return ACTIVE; // AUTO_APPROVED
+        // 2. Check if user is a REGION_AGENT or REGION_DIRECTOR with jurisdiction
+        if (!isGlobalAdmin && isRegionalAdmin) {
+            if (inAssignedRegion) {
+                return ACTIVE;
             }
-            // A Region Agent posting outside their boundary (and not as a valid Org Manager) is strictly forbidden
             throw new HttpStatusException(FORBIDDEN, "Region Agents cannot post outside their boundaries without Org Manager privileges");
         }
 
-        // 3. Fallback to manual queue for Standard Users or Org Managers outside their bounds
-        return PENDING; // REQUIRES_REGIONAL_APPROVAL
+        // 3. Fallback to manual queue for Global Admins or Org Members outside auto-approval bounds
+        return PENDING;
     }
 
     public boolean areAllLocationsInOrgRegion(@NonNull Project project, @NonNull UUID organizationId) {
@@ -110,7 +123,7 @@ public class ProjectSecurityService {
 
     public boolean areAllLocationsInRegion(@NonNull Project project, @NonNull UUID regionId) {
         if (project.locations() == null || project.locations().isEmpty()) {
-            return true;
+            return false;
         }
         byte[] wkb = buildMultiPointWkb(project.locations());
         if (wkb.length == 0) {
@@ -147,7 +160,10 @@ public class ProjectSecurityService {
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
-        if (queryRepository.isUserInRegion(userId, regionId)) {
+        boolean hasRegionalPermission = user.role().hasPermission(Permission.PROJECT_REASSIGN)
+                || user.role().hasPermission(Permission.REGION_MANAGE)
+                || user.role().hasPermission(Permission.PROJECT_APPROVE);
+        if (hasRegionalPermission && queryRepository.isUserInRegion(userId, regionId)) {
             return true;
         }
         return queryRepository.isOrgManager(userId, organizationId) && queryRepository.isOrgInRegion(organizationId, regionId);
@@ -167,7 +183,7 @@ public class ProjectSecurityService {
         if (canRegionalAdminModifyProject(user, project.id())) {
             return true;
         }
-        if (project.organization() == null) {
+        if (project.organization() == null || project.organization().id() == null) {
             return false;
         }
         return queryRepository.isOrgManager(userId, project.organization().id());

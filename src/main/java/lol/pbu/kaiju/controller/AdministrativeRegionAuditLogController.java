@@ -18,10 +18,10 @@ import lol.pbu.kaiju.util.PageableUtils;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
+import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 @ExecuteOn(TaskExecutors.VIRTUAL)
-@Secured(IS_AUTHENTICATED)
+@Secured(SYSTEM_ADMIN_CLAIM)
 @Controller("/administrative-region-audit-logs")
 public class AdministrativeRegionAuditLogController {
 

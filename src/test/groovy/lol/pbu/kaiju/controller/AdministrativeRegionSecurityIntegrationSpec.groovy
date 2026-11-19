@@ -187,7 +187,7 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         response.status == HttpStatus.OK
     }
 
-    def "Security | should allow regional manager with region:manage claim to execute POST /administrative-regions"() {
+    def "Security | should reject regional director attempting POST /administrative-regions with 403 FORBIDDEN"() {
         given: "a valid creation payload"
         Map payload = [
                 name       : "Regional Created Region",
@@ -200,24 +200,17 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
                 ]
         ]
 
-        when: "a user with region:manage creates a region"
-        def response = client.exchange(
+        when: "a regional director attempts to create a region"
+        client.exchange(
                 asRegionDirector(
                         HttpRequest.POST("/administrative-regions", payload).accept(MediaType.APPLICATION_JSON_TYPE)
                 ),
                 Map
         )
 
-        then: "the region is created with 200 OK"
-        verifyAll(response) {
-            status == HttpStatus.OK
-            body().id != null
-            body().name == "Regional Created Region"
-        }
-
-        and: "the region is persisted in the database"
-        UUID createdId = UUID.fromString(response.body().id.toString())
-        administrativeRegionRepository.findById(createdId).isPresent()
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "Round-trip | should allow authorized POST with full GeoJSON payload, persisting and serializing back"() {
@@ -262,6 +255,35 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         }
     }
 
+    def "Security | should reject regional director attempting PUT /administrative-regions/{id} with 403 FORBIDDEN"() {
+        given: "an existing persisted region"
+        def region = createPersistedRegion("Director Update Target")
+
+        and: "an update payload"
+        Map updatePayload = [
+                name       : "Unauthorized Regional Update",
+                coordinates: [
+                        [longitude: -106.0, latitude: 38.0],
+                        [longitude: -103.0, latitude: 38.0],
+                        [longitude: -103.0, latitude: 41.0],
+                        [longitude: -106.0, latitude: 41.0],
+                        [longitude: -106.0, latitude: 38.0]
+                ]
+        ]
+
+        when: "a regional director attempts to update the region"
+        client.exchange(
+                asRegionDirector(
+                        HttpRequest.PUT("/administrative-regions/${region.id()}", updatePayload).accept(MediaType.APPLICATION_JSON_TYPE)
+                ),
+                Map
+        )
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     def "Round-trip | should allow authorized PUT with full GeoJSON payload to update existing region"() {
         given: "an existing persisted region"
         def region = createPersistedRegion("Original Region")
@@ -278,9 +300,9 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
                 ]
         ]
 
-        when: "a user with region:manage updates the region"
+        when: "a platform admin updates the region"
         def response = client.exchange(
-                asRegionDirector(
+                asGlobalAdmin(
                         HttpRequest.PUT("/administrative-regions/${region.id()}", updatePayload).accept(MediaType.APPLICATION_JSON_TYPE)
                 ),
                 Map
@@ -304,22 +326,23 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         }
     }
 
-    def "Security | should allow regional manager with region:manage claim to delete region"() {
+    def "Security | should reject regional director attempting DELETE /administrative-regions/{id} with 403 FORBIDDEN"() {
         given: "an existing region to delete"
         def region = createPersistedRegion("Regional Delete Target")
 
-        when: "a regional manager deletes the region"
-        def response = client.exchange(
+        when: "a regional director attempts to delete the region"
+        client.exchange(
                 asRegionDirector(
                         HttpRequest.DELETE("/administrative-regions/${region.id()}").accept(MediaType.APPLICATION_JSON_TYPE)
                 )
         )
 
-        then: "the deletion succeeds with 200 OK and region is removed from the database"
-        verifyAll {
-            response.status == HttpStatus.OK
-            !administrativeRegionRepository.findById(region.id()).isPresent()
-        }
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+
+        and: "the region still exists in the database"
+        administrativeRegionRepository.findById(region.id()).isPresent()
     }
 
     def "Security | should allow global admin with system:admin claim to delete region"() {

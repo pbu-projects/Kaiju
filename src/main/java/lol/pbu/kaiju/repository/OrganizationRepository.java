@@ -29,6 +29,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         WHERE LOWER(TRIM(o.name)) = LOWER(TRIM(:searchTerm))
           AND o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
         ORDER BY o.name ASC
     """, countQuery = """
         SELECT COUNT(*)
@@ -36,6 +37,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         WHERE LOWER(TRIM(o.name)) = LOWER(TRIM(:searchTerm))
           AND o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
     """)
     Page<Organization> searchByNameExact(@NonNull String searchTerm, @NonNull Pageable pageable);
 
@@ -44,6 +46,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         FROM organizations o
         WHERE o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
           AND (
               LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedTerm, '%')) ESCAPE '\\'
               OR LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedCanonical, '%')) ESCAPE '\\'
@@ -68,6 +71,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         FROM organizations o
         WHERE o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
           AND (
               LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedTerm, '%')) ESCAPE '\\'
               OR LOWER(o.name) LIKE LOWER(CONCAT('%', :escapedCanonical, '%')) ESCAPE '\\'
@@ -86,6 +90,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         FROM organizations o
         WHERE o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
           AND (
               similarity(LOWER(o.name), LOWER(:searchTerm)) >= 0.3
               OR similarity(LOWER(o.name), LOWER(:canonicalTerm)) >= 0.3
@@ -99,6 +104,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         FROM organizations o
         WHERE o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
           AND (
               similarity(LOWER(o.name), LOWER(:searchTerm)) >= 0.3
               OR similarity(LOWER(o.name), LOWER(:canonicalTerm)) >= 0.3
@@ -122,6 +128,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
             WHERE ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
               AND o.is_public = TRUE
               AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
             ORDER BY o.id, ST_Distance(l.geom, CAST(:point AS geography)) ASC
         ) o
         ORDER BY o.distance ASC
@@ -133,6 +140,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         WHERE ST_DWithin(l.geom, CAST(:point AS geography), :radiusMeters)
           AND o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
     """)
     Page<Organization> searchByLocation(
             @NonNull @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class) Point point,
@@ -147,6 +155,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         WHERE org_r.region_id = :regionId
           AND o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
         ORDER BY o.name ASC
     """, countQuery = """
         SELECT COUNT(*)
@@ -155,6 +164,7 @@ public interface OrganizationRepository extends PageableRepository<Organization,
         WHERE org_r.region_id = :regionId
           AND o.is_public = TRUE
           AND o.verification_status = 'VERIFIED'
+          AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
     """)
     Page<Organization> searchByRegion(@NonNull UUID regionId, @NonNull Pageable pageable);
 

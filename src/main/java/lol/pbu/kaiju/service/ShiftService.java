@@ -14,6 +14,9 @@ public interface ShiftService {
     CursoredPage<Shift> getShifts(@NonNull CursoredPageable pageable);
 
     @NonNull
+    CursoredPage<Shift> getActiveShifts(@NonNull CursoredPageable pageable);
+
+    @NonNull
     Optional<Shift> getShiftById(@NonNull UUID id);
 
     @NonNull

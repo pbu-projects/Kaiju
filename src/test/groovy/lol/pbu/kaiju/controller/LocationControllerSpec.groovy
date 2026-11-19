@@ -602,8 +602,8 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing location"() {
-        given: "an existing location"
-        def location = dataBuilder.location().withName("Original Location Director").withAddress("123 Main St", "Original City", "CO", "80202", "US").withGeometry(createPoint()).persist()
+        given: "an existing location in Denver County"
+        def location = dataBuilder.location().withName("Original Location Director").withAddress("123 Main St", "Denver", "CO", "80202", "US").withGeometry(createPoint(-104.9903, 39.7392)).persist()
         UUID id = location.id()
         def newName = "Director Location Update ${faker.company().name()}"
         def updateCommand = new UpdateLocationCommand(newName, "456 Update Ave", "Denver", "CO", "80202", "US", -104.99, 39.74)
@@ -698,8 +698,8 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing location"() {
-        given: "a new location to be deleted"
-        def saved = dataBuilder.location().withName("Director Delete Location").withAddress("123 Delete St", "Denver", "CO", "80202", "US").withGeometry(createPoint()).persist()
+        given: "a new location in Denver County to be deleted"
+        def saved = dataBuilder.location().withName("Director Delete Location").withAddress("123 Delete St", "Denver", "CO", "80202", "US").withGeometry(createPoint(-104.9903, 39.7392)).persist()
         UUID id = saved.id()
         assert locationRepository.existsById(id)
 

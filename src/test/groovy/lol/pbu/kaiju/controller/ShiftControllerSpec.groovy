@@ -14,6 +14,7 @@ import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.UpdateShiftCommand
 import lol.pbu.kaiju.fixtures.TestPersonas
+import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.repository.LocationRepository
 import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.ShiftRepository
@@ -55,17 +56,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
                     .atPoint(-104.9903d, 39.7392d)
                     .persist()
         }
-        UUID projectId
-        if (projectRepository.count() == 0) {
-            def project = dataBuilder.project()
-                    .withTitle("Shift Test Proj")
-                    .withDescription("Test project description exceeding 20 chars")
-                    .persist()
-            projectId = project.id()
-        } else {
-            projectId = projectRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content.first().id()
-        }
-        if (shiftRepository.count() == 0) {
+        UUID projectId = getRandomProject().id()
+        if (shiftRepository.countByProjectStatusAndProjectDeletedAtIsNull(ProjectStatus.ACTIVE) == 0) {
             dataBuilder.shift()
                     .forProject(projectId)
                     .asVirtual()
@@ -74,11 +66,15 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     private Project getRandomProject() {
-        def projects = projectRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content
+        def projects = projectRepository.findByStatusAndDeletedAtIsNull(
+                ProjectStatus.ACTIVE,
+                CursoredPageable.from(1, Sort.UNSORTED)
+        ).content
         if (projects.isEmpty()) {
             return dataBuilder.project()
                     .withTitle("Shift Test Proj")
                     .withDescription("Test project description exceeding 20 chars")
+                    .withStatus(ProjectStatus.ACTIVE)
                     .persist()
         }
         return projects.first()
@@ -101,7 +97,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     private UUID getAnyShiftId() {
-        def shifts = shiftRepository.findAll(CursoredPageable.from(1, Sort.UNSORTED)).content
+        def shifts = shiftRepository.findByProjectStatusAndProjectDeletedAtIsNull(
+                ProjectStatus.ACTIVE,
+                CursoredPageable.from(1, Sort.UNSORTED)
+        ).content
         if (shifts.isEmpty()) {
             def shift = dataBuilder.shift()
                     .forProject(getRandomProject())
@@ -443,7 +442,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
     def "LIST | should fully drain all shifts sequentially using cursors"() {
         setup:
         UUID projectId = getRandomProject().id()
-        while (shiftRepository.count() < 2) {
+        while (shiftRepository.countByProjectStatusAndProjectDeletedAtIsNull(ProjectStatus.ACTIVE) < 2) {
             dataBuilder.shift().forProject(projectId).asVirtual().persist()
         }
         Set<Shift> allShifts = new LinkedHashSet<>()
@@ -457,11 +456,48 @@ class ShiftControllerSpec extends BaseControllerSpec {
             pageable = page.hasNext() ? page.nextPageable() : null
         }
 
-        then: "the collected set contains all shifts from the database"
-        def totalCount = shiftRepository.count()
+        then: "the collected set contains all active non-deleted project shifts from the database"
+        def totalCount = shiftRepository.countByProjectStatusAndProjectDeletedAtIsNull(ProjectStatus.ACTIVE)
         verifyAll {
             allShifts.size() == totalCount
             allShifts.size() >= 2
+        }
+    }
+
+    def "LIST | should drain all non-deleted project shifts for global admin and exclude draft shifts for standard users"() {
+        setup:
+        def draftProj = dataBuilder.project()
+                .withTitle("Draft Shift Visibility Proj")
+                .withDescription("Draft project used to test shift cursor filtering.")
+                .withStatus(ProjectStatus.DRAFT)
+                .persist()
+        def draftShift = dataBuilder.shift().forProject(draftProj).asVirtual().persist()
+        def adminPrincipal = createPrincipal(TestPersonas.SARAH_ADMIN.id)
+        def volunteerPrincipal = createPrincipal(TestPersonas.VICTOR_VOLUNTEER.id)
+
+        when: "draining shifts as global admin and as standard user"
+        Set<UUID> adminShiftIds = [] as LinkedHashSet
+        def adminPageable = CursoredPageable.from(20, Sort.of(Sort.Order.asc("id")))
+        while (adminPageable != null) {
+            CursoredPage<Shift> page = shiftController.getShifts(adminPageable, adminPrincipal)
+            adminShiftIds.addAll(page.content*.id())
+            adminPageable = page.hasNext() ? page.nextPageable() : null
+        }
+
+        Set<UUID> volunteerShiftIds = [] as LinkedHashSet
+        def volPageable = CursoredPageable.from(20, Sort.of(Sort.Order.asc("id")))
+        while (volPageable != null) {
+            CursoredPage<Shift> page = shiftController.getShifts(volPageable, volunteerPrincipal)
+            volunteerShiftIds.addAll(page.content*.id())
+            volPageable = page.hasNext() ? page.nextPageable() : null
+        }
+
+        then: "global admin sees all non-deleted project shifts including draft, while standard user only sees active ones"
+        verifyAll {
+            adminShiftIds.size() == shiftRepository.countByProjectDeletedAtIsNull()
+            adminShiftIds.contains(draftShift.id())
+            volunteerShiftIds.size() == shiftRepository.countByProjectStatusAndProjectDeletedAtIsNull(ProjectStatus.ACTIVE)
+            !volunteerShiftIds.contains(draftShift.id())
         }
     }
 

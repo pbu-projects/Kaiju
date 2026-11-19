@@ -36,6 +36,8 @@ import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -73,7 +75,7 @@ public class OrganizationController {
 
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
-    public CursoredPage<Organization> getOrganizations(@Nullable CursoredPageable pageable) {
+    public CursoredPage<Organization> getOrganizations(@Nullable @Valid CursoredPageable pageable) {
         return organizationService.getOrganizations(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
@@ -182,8 +184,9 @@ public class OrganizationController {
         if (pageable == null || pageable.isUnpaged()) {
             return Pageable.from(0, PageableUtils.DEFAULT_PAGE_SIZE);
         }
-        if (!pageable.getSort().getOrderBy().isEmpty()) {
-            return Pageable.from(pageable.getNumber(), pageable.getSize());
+        int cappedSize = Math.min(pageable.getSize(), PageableUtils.MAX_PAGE_SIZE);
+        if (!pageable.getSort().getOrderBy().isEmpty() || cappedSize != pageable.getSize()) {
+            return Pageable.from(pageable.getNumber(), cappedSize);
         }
         return pageable;
     }
@@ -199,8 +202,19 @@ public class OrganizationController {
     }
 
     @Get("/{id}")
-    public Optional<Organization> getOrganization(@PathVariable UUID id) {
-        return organizationService.getOrganizationById(id);
+    public Optional<Organization> getOrganization(@PathVariable UUID id, Principal principal) {
+        Optional<Organization> orgOpt = organizationService.getOrganizationById(id);
+        if (orgOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        Organization org = orgOpt.get();
+        if (!isPubliclyVisible(org)) {
+            UUID callerId = UUID.fromString(principal.getName());
+            if (!isSystemAdmin(callerId) && !queryRepository.isAnyOrgMember(callerId, id)) {
+                throw new HttpStatusException(FORBIDDEN, "Forbidden: You do not have permission to view this organization");
+            }
+        }
+        return Optional.of(org);
     }
 
     @Post
@@ -260,14 +274,25 @@ public class OrganizationController {
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
         UUID callerId = UUID.fromString(principal.getName());
-        boolean isSysAdmin = userRepository.findById(callerId)
-                .map(u -> u.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-        if (isSysAdmin) {
+        if (isSystemAdmin(callerId)) {
             return;
         }
         if (!queryRepository.isOrgAdmin(callerId, organizationId)) {
             throw new HttpStatusException(FORBIDDEN, "Forbidden: Only organization admins or system administrators may modify this organization");
         }
+    }
+
+    private boolean isSystemAdmin(UUID callerId) {
+        return userRepository.findById(callerId)
+                .map(u -> u.role().hasPermission(Permission.SYSTEM_ADMIN))
+                .orElse(false);
+    }
+
+    private boolean isPubliclyVisible(Organization org) {
+        boolean notExpired = org.verificationExpiresAt() == null
+                || org.verificationExpiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC));
+        return Boolean.TRUE.equals(org.isPublic())
+                && org.verificationStatus() == VerificationStatus.VERIFIED
+                && notExpired;
     }
 }

@@ -1,3 +1,30 @@
+@param String query
+@param String location
+@param String type
+@param boolean partial
+
+@if(partial)
+        <div id="discovery-results-shell">
+            <!-- Scheduled Shifts Queue -->
+            <section id="scheduled-shifts-queue" aria-label="Scheduled Shift Opportunities">
+                <div id="shifts-grid" class="cards-grid"></div>
+
+                <!-- Related Opportunities Preview Section -->
+                <div id="related-preview-section" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                    <div style="margin-bottom: 12px;">
+                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Also in your area: Walk-in &amp; Regional ways to help</h2>
+                        <p style="margin: 2px 0 0; font-size: 0.82rem; color: var(--text-muted);">Drop-in pantries and flexible responder rosters.</p>
+                    </div>
+                    <div id="related-preview-grid" class="cards-grid"></div>
+                </div>
+            </section>
+
+            <!-- Dedicated Open Door Queue -->
+            <section id="related-opportunities-queue" style="display: none;" aria-label="Open Door and Regional Opportunities">
+                <div id="related-grid" class="cards-grid"></div>
+            </section>
+        </div>
+@else
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -14,6 +41,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/volunteer-monster.css" />
     <style>
         :root {
             /* 1. Base Canvas & Surfaces (85%) */
@@ -198,6 +226,7 @@
         .search-capsule-trigger {
             flex: 1;
             max-width: 580px;
+            min-height: 44px;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -264,6 +293,7 @@
             background: var(--bg-subtle);
             color: var(--text-main);
             border-radius: var(--radius-pill);
+            min-height: 44px;
             padding: 6px 12px;
             font-family: inherit;
             font-size: 0.8rem;
@@ -302,6 +332,7 @@
             background: var(--bg);
             color: var(--text-main);
             border-radius: var(--radius-pill);
+            min-height: 44px;
             padding: 6px 12px;
             font-family: inherit;
             font-size: 0.8rem;
@@ -374,7 +405,8 @@
             border: 1px solid var(--border-light);
             font-size: 0.72rem;
             font-weight: 600;
-            padding: 2px 8px;
+            min-height: 44px;
+            padding: 2px 12px;
             border-radius: var(--radius-pill);
             display: inline-flex;
             align-items: center;
@@ -468,8 +500,10 @@
         .tray-close-btn {
             border: none;
             background: var(--bg-subtle);
-            width: 32px;
-            height: 32px;
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            min-height: 44px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -541,6 +575,7 @@
             background: var(--bg-subtle);
             color: var(--text-muted);
             border-radius: var(--radius-pill);
+            min-height: 44px;
             padding: 5px 12px;
             font-family: inherit;
             font-size: 0.8rem;
@@ -1642,7 +1677,6 @@
             outline: 2.5px solid var(--cast-iron);
             outline-offset: 2px;
         }
-        }
 
         /* 5. Perceptual UI Micro-Transitions & Accessibility Continuity */
         @media (prefers-reduced-motion: reduce) {
@@ -1656,13 +1690,14 @@
     </style>
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
 
     <!-- 1. Sleek Resting Header (Under 60px Height on Mobile) -->
     <header class="site-header">
         <div class="header-content">
-            <a href="/" class="brand-link" aria-label="Volunteer Monster Project Discovery">
+            <a href="/" class="brand-link" aria-label="Volunteer Monster Home">
                 <span class="brand-badge">VM</span>
-                <span>volunteer.monster</span>
+                <span>Volunteer Monster</span>
             </a>
 
             <!-- Tap Capsule to Open Refinement Tray -->
@@ -1838,30 +1873,32 @@
     </div>
 
     <!-- 4. Results Area (Cards Start Immediately Above the Fold) -->
-    <main class="main-container">
+    <main id="main-content" class="main-container" data-server-query="${query != null ? query : ""}" data-server-location="${location != null ? location : ""}" data-server-type="${type != null ? type : ""}">
         <!-- Interactive Map Drawer -->
         <div id="map-drawer" class="map-drawer-panel">
             <div id="discovery-map"></div>
         </div>
 
-        <!-- Scheduled Shifts Queue -->
-        <section id="scheduled-shifts-queue" aria-label="Scheduled Shift Opportunities">
-            <div id="shifts-grid" class="cards-grid"></div>
+        <div id="discovery-results-shell">
+            <!-- Scheduled Shifts Queue -->
+            <section id="scheduled-shifts-queue" aria-label="Scheduled Shift Opportunities">
+                <div id="shifts-grid" class="cards-grid"></div>
 
-            <!-- Related Opportunities Preview Section -->
-            <div id="related-preview-section" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-light);">
-                <div style="margin-bottom: 12px;">
-                    <h2 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Also in your area: Walk-in &amp; Regional ways to help</h2>
-                    <p style="margin: 2px 0 0; font-size: 0.82rem; color: var(--text-muted);">Drop-in pantries and flexible responder rosters.</p>
+                <!-- Related Opportunities Preview Section -->
+                <div id="related-preview-section" style="margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border-light);">
+                    <div style="margin-bottom: 12px;">
+                        <h2 style="margin: 0; font-size: 1.1rem; font-weight: 700;">Also in your area: Walk-in &amp; Regional ways to help</h2>
+                        <p style="margin: 2px 0 0; font-size: 0.82rem; color: var(--text-muted);">Drop-in pantries and flexible responder rosters.</p>
+                    </div>
+                    <div id="related-preview-grid" class="cards-grid"></div>
                 </div>
-                <div id="related-preview-grid" class="cards-grid"></div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Dedicated Open Door Queue -->
-        <section id="related-opportunities-queue" style="display: none;" aria-label="Open Door and Regional Opportunities">
-            <div id="related-grid" class="cards-grid"></div>
-        </section>
+            <!-- Dedicated Open Door Queue -->
+            <section id="related-opportunities-queue" style="display: none;" aria-label="Open Door and Regional Opportunities">
+                <div id="related-grid" class="cards-grid"></div>
+            </section>
+        </div>
     </main>
 
     <!-- Project Detail & Honest Commitment Modal Dialog (1977 NPS Unigrid System) -->
@@ -1936,6 +1973,7 @@
         crossorigin=""
     ></script>
     <script>
+        @raw
         const METERS_PER_MILE = 1609.344;
 
         const KNOWN_LOCATIONS = [
@@ -3032,13 +3070,48 @@
             }
         });
 
+        @endraw
         document.addEventListener("DOMContentLoaded", () => {
             const urlParams = new URLSearchParams(window.location.search);
+            const mainEl = document.getElementById("main-content");
+            const serverQuery = mainEl?.dataset.serverQuery || "";
+            const serverLocation = mainEl?.dataset.serverLocation || "";
+            const serverType = mainEl?.dataset.serverType || "";
+
+            const qParam = urlParams.has("q") ? urlParams.get("q") : serverQuery;
+            if (qParam && qParam.trim() !== "") {
+                state.interestQuery = qParam.trim();
+                document.getElementById("interest-input").value = qParam.trim();
+            }
+
             if (urlParams.has("where")) {
                 const w = urlParams.get("where");
                 state.whereQuery = w;
                 document.getElementById("where-input").value = w;
             }
+
+            const locParam = urlParams.has("location") ? urlParams.get("location") : serverLocation;
+            if (locParam && locParam.trim() !== "") {
+                if (locParam.trim().toLowerCase() === "remote") {
+                    selectWayToHelp("remote");
+                } else {
+                    state.whereQuery = locParam.trim();
+                    document.getElementById("where-input").value = locParam.trim();
+                }
+            }
+
+            const typeParam = urlParams.has("type") ? urlParams.get("type") : serverType;
+            if (typeParam && typeParam.trim() !== "") {
+                const normalizedType = typeParam.trim().toUpperCase();
+                if (normalizedType === "IN_PERSON") {
+                    selectWayToHelp("shifts");
+                } else if (normalizedType === "DONATE") {
+                    selectWayToHelp("donations");
+                } else if (normalizedType === "REMOTE") {
+                    selectWayToHelp("remote");
+                }
+            }
+
             if (urlParams.has("radius")) {
                 const r = urlParams.get("radius");
                 document.getElementById("radius-select").value = r;
@@ -3063,3 +3136,5 @@
     </script>
 </body>
 </html>
+
+@endif

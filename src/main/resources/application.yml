@@ -1,6 +1,15 @@
 micronaut:
   application:
     name: kaiju
+  views:
+    jte:
+      enabled: true
+  router:
+    static-resources:
+      default:
+        enabled: true
+        mapping: /**
+        paths: classpath:public
   server:
     thread-selection: AUTO
   executors:
@@ -17,9 +26,16 @@ micronaut:
     enabled: true
   security:
     authentication: idtoken
+    intercept-url-map:
+      - pattern: /css/**
+        access:
+          - isAnonymous()
+      - pattern: /views/**
+        access:
+          - isAnonymous()
     endpoints:
       logout:
-        get-allowed: true
+        get-allowed: false
     token:
       jwt:
         enabled: true
@@ -32,9 +48,15 @@ micronaut:
       clients:
         authentik:
           client-id: ${OAUTH_CLIENT_ID:kaiju-client}
-          client-secret: ${OAUTH_CLIENT_SECRET:kaiju-secret}
+          client-secret: ${OAUTH_CLIENT_SECRET}
           openid:
-            issuer: ${OAUTH_ISSUER:`http://localhost:9000/application/o/kaiju/`}
+            issuer: ${OAUTH_ISSUER}
+endpoints:
+  all:
+    sensitive: true
+  health:
+    sensitive: false
+    details-visible: AUTHENTICATED
 datasources:
   default:
     url: jdbc:postgresql://localhost:5432/volunteer_monster

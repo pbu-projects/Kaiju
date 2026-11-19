@@ -263,7 +263,10 @@ public class BoundaryIngestionService {
 
         String geomJson = serializeGeometry(geometry);
 
-        if (administrativeRegionService != null && actorUserId != null) {
+        if (administrativeRegionService != null) {
+            if (actorUserId == null) {
+                throw new IllegalArgumentException("actorUserId must not be null when applying an audited boundary ingestion.");
+            }
             return administrativeRegionService.applyIngestedBoundary(regionId, geomJson, tolerance, command.sourceUrl(), actorUserId);
         }
 

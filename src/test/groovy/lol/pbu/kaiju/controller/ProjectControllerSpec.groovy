@@ -706,11 +706,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         when: "the project is deleted via HTTP DELETE"
         def response = client.exchange(asGlobalAdmin(HttpRequest.DELETE("/projects/${id}")))
 
-        then: "the project no longer exists in the repository or database"
+        then: "the project is soft-deleted in the database and excluded from active lookups"
+        def deleted = projectRepository.findById(id).orElse(null)
         verifyAll {
             response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-            !projectRepository.findById(id).isPresent()
-            !projectRepository.existsById(id)
+            deleted != null
+            deleted.deletedAt() != null
+            projectRepository.findByIdAndDeletedAtIsNull(id).isEmpty()
         }
     }
 
@@ -1646,11 +1648,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
         when: "the Org Manager deletes the project via HTTP DELETE"
         def response = client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${saved.id()}")))
 
-        then: "the project is deleted from the database"
+        then: "the project is soft-deleted in the database and excluded from active lookups"
+        def deleted = projectRepository.findById(saved.id()).orElse(null)
         verifyAll {
             response.status == HttpStatus.OK || response.status == HttpStatus.NO_CONTENT
-            !projectRepository.findById(saved.id()).isPresent()
-            !projectRepository.existsById(saved.id())
+            deleted != null
+            deleted.deletedAt() != null
+            projectRepository.findByIdAndDeletedAtIsNull(saved.id()).isEmpty()
         }
     }
 
@@ -1667,15 +1671,17 @@ class ProjectControllerSpec extends BaseControllerSpec {
         int pageSize = 5
         def pageable = CursoredPageable.from(pageSize, Sort.of(Sort.Order.asc("title")))
 
-        when: "iterating through pages until no more data remains using projectController.getProjects"
+        def adminPrincipal = createPrincipal(TestPersonas.SARAH_ADMIN.id)
+
+        when: "iterating through pages until no more data remains using projectController.getProjects as global admin"
         while (pageable != null) {
-            CursoredPage<Project> page = projectController.getProjects(null, pageable)
+            CursoredPage<Project> page = projectController.getProjects(null, pageable, adminPrincipal)
             allProjects.addAll(page.content)
             pageable = page.hasNext() ? page.nextPageable() : null
         }
 
-        then: "the collected set contains all projects from the database"
-        def totalCount = projectRepository.count()
+        then: "the collected set contains all non-deleted projects from the database"
+        def totalCount = projectRepository.countByDeletedAtIsNull()
         verifyAll {
             allProjects.size() == totalCount
             allProjects.size() >= 12
