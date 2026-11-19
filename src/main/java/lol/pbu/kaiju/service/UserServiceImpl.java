@@ -10,6 +10,7 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.postgresql.util.PSQLState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,10 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     @NonNull
-    public Optional<User> getUserByEmail(@NonNull String email) {
+    public Optional<User> getUserByEmail(@Nullable String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
         return userRepository.findByEmail(canonicalizeEmail(email));
     }
 

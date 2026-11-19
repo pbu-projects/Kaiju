@@ -178,7 +178,10 @@ sonar {
         property("sonar.projectKey", "PeanutButter-Unicorn_kaiju")
         property("sonar.organization", "peanutbutter-unicorn")
         property("sonar.host.url", "https://sonarcloud.io")
-        property("sonar.coverage.exclusions", "**/Application.java")
+        property(
+            "sonar.coverage.exclusions",
+            "**/Application.java,**/gg/jte/generated/**,**/*\$Introspection*,**/Serde*Deserializer.java,**/Serde*Serializer.java"
+        )
         property("sonar.coverage.jacoco.xmlReportPath", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.absolutePath)
         (System.getenv("SONAR_TOKEN") ?: System.getenv("sonar_token"))?.let { token ->
             if (token.isNotBlank()) {
@@ -510,6 +513,21 @@ tasks.jacocoTestReport {
     reports {
         xml.required.set(true)
     }
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(
+                        "lol/pbu/kaiju/Application.class",
+                        "gg/jte/generated/**",
+                        "**/*\$Introspection*",
+                        "**/Serde*Deserializer*",
+                        "**/Serde*Serializer*"
+                    )
+                }
+            }
+        )
+    )
 }
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)

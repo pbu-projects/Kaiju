@@ -5,6 +5,7 @@ import io.micronaut.data.model.CursoredPageable;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.UserRole;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -18,7 +19,7 @@ public interface UserService {
     Optional<User> getUserById(@NonNull UUID id);
 
     @NonNull
-    Optional<User> getUserByEmail(@NonNull String email);
+    Optional<User> getUserByEmail(@Nullable String email);
 
     @NonNull
     User createUser(@NonNull User user);
