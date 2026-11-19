@@ -13,6 +13,7 @@ import lol.pbu.kaiju.domain.RegionUserId
 import lol.pbu.kaiju.dto.CreateRegionUserCommand
 import lol.pbu.kaiju.dto.UpdateRegionUserCommand
 import lol.pbu.kaiju.model.RegionUserRole
+import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.RegionUserRepository
 import spock.lang.Unroll
 
@@ -110,12 +111,14 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should allow regional director with region:manage claim to save a region user"() {
-        given: "a target user, administrative region, and regional director"
+        given: "a target user, administrative region, and regional director assigned to that region"
         def targetUser = dataBuilder.user().asStandardUser().withEmail("director-create-user@example.com").persist()
         def targetRegion = dataBuilder.region().withName("Director Test Region Create").persist()
+        def director = dataBuilder.user().withRole(UserRole.REGION_DIRECTOR).withEmail("director-create-actor@example.com").persist()
         UUID targetUserId = targetUser.id()
         UUID targetRegionId = targetRegion.id()
-        UUID directorId = UUID.randomUUID()
+        UUID directorId = director.id()
+        dataBuilder.regionUser().asRegionDirector(directorId, targetRegionId).persist()
 
         def command = new CreateRegionUserCommand(targetUserId, targetRegionId, RegionUserRole.REGION_AGENT)
 
@@ -137,6 +140,24 @@ class RegionUserControllerSpec extends BaseControllerSpec {
             result != null
             role() == RegionUserRole.REGION_AGENT
         }
+    }
+
+    def "CREATE | should reject regional director assigned to a different region with 403 FORBIDDEN"() {
+        given: "a target user, target region, and director assigned to another region"
+        def targetUser = dataBuilder.user().asStandardUser().withEmail("cross-region-user@example.com").persist()
+        def targetRegion = dataBuilder.region().withName("Cross Region Target").persist()
+        def otherRegion = dataBuilder.region().withName("Director Assigned Region").persist()
+        def director = dataBuilder.user().withRole(UserRole.REGION_DIRECTOR).withEmail("cross-region-director@example.com").persist()
+        dataBuilder.regionUser().asRegionDirector(director.id(), otherRegion.id()).persist()
+
+        def command = new CreateRegionUserCommand(targetUser.id(), targetRegion.id(), RegionUserRole.REGION_AGENT)
+
+        when: "the director attempts to add a user to the unassigned target region"
+        client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command), director.id().toString()), RegionUser)
+
+        then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** READ Tests **********/
@@ -256,13 +277,15 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should allow regional director with region:manage claim to update an existing region user role"() {
-        given: "an existing region user association and regional director"
+        given: "an existing region user association and regional director assigned to that region"
         def targetUser = dataBuilder.user().asStandardUser().withEmail("director-update-user@example.com").persist()
         def targetRegion = dataBuilder.region().withName("Director Test Region Update").persist()
+        def director = dataBuilder.user().withRole(UserRole.REGION_DIRECTOR).withEmail("director-update-actor@example.com").persist()
         UUID targetUserId = targetUser.id()
         UUID targetRegionId = targetRegion.id()
-        UUID directorId = UUID.randomUUID()
+        UUID directorId = director.id()
         dataBuilder.regionUser().asRegionAgent(targetUserId, targetRegionId).persist()
+        dataBuilder.regionUser().asRegionDirector(directorId, targetRegionId).persist()
 
         def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
 
@@ -342,13 +365,15 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "DELETE | should allow regional director with region:manage claim to remove an existing region user"() {
-        given: "an existing region user association and regional director"
+        given: "an existing region user association and regional director assigned to that region"
         def targetUser = dataBuilder.user().asStandardUser().withEmail("director-del-user@example.com").persist()
         def targetRegion = dataBuilder.region().withName("Director Test Region Delete").persist()
+        def director = dataBuilder.user().withRole(UserRole.REGION_DIRECTOR).withEmail("director-del-actor@example.com").persist()
         UUID targetUserId = targetUser.id()
         UUID targetRegionId = targetRegion.id()
-        UUID directorId = UUID.randomUUID()
+        UUID directorId = director.id()
         dataBuilder.regionUser().asRegionAgent(targetUserId, targetRegionId).persist()
+        dataBuilder.regionUser().asRegionDirector(directorId, targetRegionId).persist()
 
         when: "the regional director deletes the region user via HTTP DELETE"
         def response = client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${targetUserId}/${targetRegionId}"), directorId.toString()))

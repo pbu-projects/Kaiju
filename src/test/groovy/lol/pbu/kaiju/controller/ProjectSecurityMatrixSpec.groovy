@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -40,6 +41,9 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         if (userRole == "REGION_AGENT") {
             return location == "INSIDE_BOUNDARY" ? ACTIVE : null // null means FORBIDDEN
         }
+        if (userRole == "STANDARD_USER") {
+            return null // Non-member standard user is FORBIDDEN
+        }
         return PENDING
     }
 
@@ -70,6 +74,9 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         if (userRole == "ORG_MANAGER") {
             dataBuilder.organizationUser().asOrgManager(user, org).persist()
         }
+        if (userRole == "ORG_MEMBER") {
+            dataBuilder.organizationUser().asOrgMember(user, org).persist()
+        }
         if (userRole == "REGION_AGENT") {
             dataBuilder.regionUser().asRegionAgent(user, region).persist()
         }
@@ -83,19 +90,26 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
 
         when: "the system evaluates the project creation request"
         def actualResult
+        HttpStatusException thrownException = null
         try {
             actualResult = projectSecurityService.evaluateProjectCreationByUser(userId, dummyProject)
         } catch (HttpStatusException e) {
             actualResult = null
+            thrownException = e
         }
 
         then: "the project is placed into the correct state via PostGIS logic"
-        actualResult == expectedApprovalState
+        verifyAll {
+            actualResult == expectedApprovalState
+            if (expectedApprovalState == null) {
+                thrownException?.status == HttpStatus.FORBIDDEN
+            }
+        }
 
         where:
         [orgStatus, userRole, location] << [
                 ["VERIFIED", "UNVERIFIED"],
-                ["ORG_MANAGER", "STANDARD_USER", "REGION_AGENT"],
+                ["ORG_MANAGER", "ORG_MEMBER", "STANDARD_USER", "REGION_AGENT"],
                 ["INSIDE_BOUNDARY", "OUTSIDE_BOUNDARY"]
         ].combinations()
         

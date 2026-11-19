@@ -23,6 +23,7 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.AuthentikTestDriver
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.fixtures.builder.KaijuDataBuilder
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
@@ -473,24 +474,25 @@ class AuthentikOidcIntegrationSpec extends Specification {
         }
     }
 
-    def "Rachel State Director (REGION_DIRECTOR) can manage regions but is denied system user management"() {
+    def "Rachel State Director (REGION_DIRECTOR) can manage her own region users but is denied system user management"() {
         given: "a live Authentik token for Rachel State Director"
         Map<String, String> tokens = authentikDriver.obtainLiveTokens("rachel.state.director1@kaiju.local")
-        UUID createdRegionId = null
+        User victor = userRepository.findByEmail("victor.volunteer1@kaiju.local").orElseThrow()
 
-        when: "Rachel calls POST /administrative-regions to create an administrative boundary"
-        def regionCommand = data.region().withName("Rachel Director Region " + UUID.randomUUID()).asCommand()
-        def regionResponse = client.exchange(
-                HttpRequest.POST("/administrative-regions", regionCommand)
-                        .header("Authorization", "Bearer ${tokens.idToken}"),
-                AdministrativeRegion
+        when: "Rachel calls POST /region-users to assign a user within Colorado State Region"
+        def regionUserResponse = client.exchange(
+                HttpRequest.POST("/region-users", [
+                        userId  : victor.id().toString(),
+                        regionId: TestPersonas.COLORADO_STATE_REGION_ID.toString(),
+                        role    : "REGION_AGENT"
+                ]).header("Authorization", "Bearer ${tokens.idToken}"),
+                Map
         )
-        createdRegionId = regionResponse.body().id()
 
-        then: "region creation is granted with 200 OK verifying region:manage permission"
+        then: "region user management is granted with 200 OK verifying region:manage permission"
         verifyAll {
-            regionResponse.status == HttpStatus.OK
-            createdRegionId != null
+            regionUserResponse.status == HttpStatus.OK
+            regionUserResponse.body().role == "REGION_AGENT"
         }
 
         when: "Rachel calls GET /users to attempt system user administration"
@@ -504,9 +506,10 @@ class AuthentikOidcIntegrationSpec extends Specification {
         ex.status == HttpStatus.FORBIDDEN
 
         cleanup:
-        if (createdRegionId != null) {
-            administrativeRegionRepository.deleteById(createdRegionId)
-        }
+        client.exchange(
+                HttpRequest.DELETE("/region-users/${victor.id()}/${TestPersonas.COLORADO_STATE_REGION_ID}")
+                        .header("Authorization", "Bearer ${tokens.idToken}")
+        )
     }
 
     def "Nathan National Admin (ORG_ADMIN / system STANDARD_USER) can access projects but is denied regional and system administration"() {
@@ -588,8 +591,8 @@ class AuthentikOidcIntegrationSpec extends Specification {
         HttpClientResponseException preEx = thrown()
         preEx.status == HttpStatus.FORBIDDEN
 
-        when: "Victor is dynamically promoted to REGION_DIRECTOR in the authoritative database"
-        userService.updateRole(victor.id(), UserRole.REGION_DIRECTOR)
+        when: "Victor is dynamically promoted to GLOBAL_ADMIN in the authoritative database"
+        userService.updateRole(victor.id(), UserRole.GLOBAL_ADMIN)
 
         and: "Victor presents the exact same live Authentik token to POST /administrative-regions"
         def promotedRegion = data.region().withName("Victor Promoted Region").asCommand()

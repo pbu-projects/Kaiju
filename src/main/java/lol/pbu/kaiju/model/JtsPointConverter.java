@@ -3,6 +3,7 @@ package lol.pbu.kaiju.model;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.data.model.runtime.convert.AttributeConverter;
 import jakarta.inject.Singleton;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
@@ -51,7 +52,12 @@ public class JtsPointConverter implements AttributeConverter<Point, PGobject> {
         try {
             WKBReader reader = new WKBReader();
             byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
-            Point point = (Point) reader.read(bytes);
+            Geometry geom = reader.read(bytes);
+            if (!(geom instanceof Point point)) {
+                throw new IllegalArgumentException(
+                        "Expected Point geometry from WKB, got: " + (geom != null ? geom.getGeometryType() : "null")
+                );
+            }
             if (point.getSRID() == 0) {
                 point.setSRID(4326);
             }

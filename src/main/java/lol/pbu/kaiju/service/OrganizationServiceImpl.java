@@ -10,12 +10,16 @@ import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
+import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.security.Permission;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Singleton
@@ -23,17 +27,46 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     private static final String ORGANIZATION_NOT_FOUND = "Organization not found";
 
+    private static final Map<VerificationStatus, Set<VerificationStatus>> VALID_STATUS_TRANSITIONS = Map.of(
+            VerificationStatus.UNVERIFIED, Set.of(
+                    VerificationStatus.PENDING_REVIEW,
+                    VerificationStatus.VERIFIED,
+                    VerificationStatus.SUSPENDED,
+                    VerificationStatus.REVOKED
+            ),
+            VerificationStatus.PENDING_REVIEW, Set.of(
+                    VerificationStatus.UNVERIFIED,
+                    VerificationStatus.VERIFIED,
+                    VerificationStatus.SUSPENDED,
+                    VerificationStatus.REVOKED
+            ),
+            VerificationStatus.VERIFIED, Set.of(
+                    VerificationStatus.PENDING_REVIEW,
+                    VerificationStatus.SUSPENDED,
+                    VerificationStatus.REVOKED
+            ),
+            VerificationStatus.SUSPENDED, Set.of(
+                    VerificationStatus.PENDING_REVIEW,
+                    VerificationStatus.VERIFIED,
+                    VerificationStatus.REVOKED
+            ),
+            VerificationStatus.REVOKED, Set.of()
+    );
+
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
+    private final SecurityQueryRepository securityQueryRepository;
     private final AuditService auditService;
 
     public OrganizationServiceImpl(
             OrganizationRepository organizationRepository,
             UserRepository userRepository,
+            SecurityQueryRepository securityQueryRepository,
             AuditService auditService
     ) {
         this.organizationRepository = organizationRepository;
         this.userRepository = userRepository;
+        this.securityQueryRepository = securityQueryRepository;
         this.auditService = auditService;
     }
 
@@ -58,6 +91,10 @@ public class OrganizationServiceImpl implements OrganizationService {
         userRepository.findById(creatorUserId)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Creator user not found"));
 
+        if (organization.parentId() != null && !organizationRepository.existsById(organization.parentId())) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Parent organization does not exist");
+        }
+
         Organization toSave = new Organization(
                 null,
                 organization.name(),
@@ -75,17 +112,32 @@ public class OrganizationServiceImpl implements OrganizationService {
     @Transactional
     @NonNull
     public Organization updateOrganization(@NonNull UUID id, @NonNull Organization organization, @NonNull UUID actorUserId) {
-        userRepository.findById(actorUserId)
+        User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+
+        boolean isGlobalAdmin = actor.role().hasPermission(Permission.SYSTEM_ADMIN);
+        if (!isGlobalAdmin && !securityQueryRepository.isOrgManager(actorUserId, id)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, "Only global admins or organization managers can update this organization");
+        }
 
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND));
+
+        UUID parentId = organization.parentId();
+        if (parentId != null) {
+            if (parentId.equals(id)) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "An organization cannot be its own parent");
+            }
+            if (!organizationRepository.existsById(parentId)) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Parent organization does not exist");
+            }
+        }
 
         Organization toUpdate = new Organization(
                 id,
                 organization.name(),
                 organization.websiteUrl(),
-                organization.parentId(),
+                parentId,
                 organization.isPublic(),
                 existing.verificationStatus(),
                 existing.verificationExpiresAt(),
@@ -115,12 +167,24 @@ public class OrganizationServiceImpl implements OrganizationService {
         User actor = userRepository.findById(actorUserId)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
 
+        if (!actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, "Only system admins can change organization verification status");
+        }
+
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND));
 
-        String previousStatus = existing.verificationStatus() != null
-                ? existing.verificationStatus().name()
-                : VerificationStatus.UNVERIFIED.name();
+        VerificationStatus currentStatus = existing.verificationStatus() != null
+                ? existing.verificationStatus()
+                : VerificationStatus.UNVERIFIED;
+
+        Set<VerificationStatus> allowedTargets = VALID_STATUS_TRANSITIONS.getOrDefault(currentStatus, Set.of());
+        if (!allowedTargets.contains(newStatus)) {
+            throw new HttpStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Invalid verification status transition from " + currentStatus + " to " + newStatus
+            );
+        }
 
         Organization updated = new Organization(
                 existing.id(),
@@ -133,7 +197,7 @@ public class OrganizationServiceImpl implements OrganizationService {
                 existing.locations()
         );
         Organization saved = organizationRepository.update(updated);
-        auditService.recordOrganizationAudit(saved, actor, previousStatus, newStatus.name(), reason);
+        auditService.recordOrganizationAudit(saved, actor, currentStatus.name(), newStatus.name(), reason);
         return saved;
     }
 }

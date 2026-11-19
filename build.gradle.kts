@@ -18,6 +18,7 @@ plugins {
     id("org.sonarqube") version "7.5.0.8588"
     id("jacoco")
     id("org.asciidoctor.jvm.pdf") version "4.0.2"
+    id("gg.jte.gradle") version "3.2.4"
 }
 
 version = project.properties["kaijuVersion"]!!
@@ -51,6 +52,7 @@ dependencies {
     implementation("io.micronaut.serde:micronaut-serde-jackson")
     implementation("io.micronaut.sql:micronaut-jdbc-hikari")
     implementation("io.micronaut.validation:micronaut-validation")
+    implementation("io.micronaut.views:micronaut-views-jte")
     implementation("jakarta.validation:jakarta.validation-api")
     implementation("org.locationtech.jts:jts-core:${project.properties["jtsVersion"]}")
     implementation("org.postgresql:postgresql")
@@ -84,6 +86,11 @@ java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(25))
     }
+}
+
+jte {
+    sourceDirectory.set(file("src/main/resources/views").toPath())
+    generate()
 }
 
 
@@ -171,7 +178,10 @@ sonar {
         property("sonar.projectKey", "PeanutButter-Unicorn_kaiju")
         property("sonar.organization", "peanutbutter-unicorn")
         property("sonar.host.url", "https://sonarcloud.io")
-        property("sonar.coverage.exclusions", "**/Application.java")
+        property(
+            "sonar.coverage.exclusions",
+            "**/Application.java,**/gg/jte/generated/**,**/*\$Introspection*,**/Serde*Deserializer.java,**/Serde*Serializer.java"
+        )
         property("sonar.coverage.jacoco.xmlReportPath", layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile.absolutePath)
         (System.getenv("SONAR_TOKEN") ?: System.getenv("sonar_token"))?.let { token ->
             if (token.isNotBlank()) {
@@ -503,6 +513,21 @@ tasks.jacocoTestReport {
     reports {
         xml.required.set(true)
     }
+    classDirectories.setFrom(
+        files(
+            classDirectories.files.map {
+                fileTree(it) {
+                    exclude(
+                        "lol/pbu/kaiju/Application.class",
+                        "gg/jte/generated/**",
+                        "**/*\$Introspection*",
+                        "**/Serde*Deserializer*",
+                        "**/Serde*Serializer*"
+                    )
+                }
+            }
+        )
+    )
 }
 tasks.test {
     finalizedBy(tasks.jacocoTestReport)

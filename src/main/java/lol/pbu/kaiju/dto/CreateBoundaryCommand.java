@@ -15,7 +15,7 @@ public record CreateBoundaryCommand(
         String name,
 
         @NotNull(message = "Boundary coordinates are required.")
-        @Size(min = 3, message = "A polygon boundary must contain at least 3 coordinates.")
+        @Size(min = 3, max = 5000, message = "A polygon boundary must contain between 3 and 5000 coordinates.")
         @Valid
         List<CoordinateDto> coordinates
 ) {}

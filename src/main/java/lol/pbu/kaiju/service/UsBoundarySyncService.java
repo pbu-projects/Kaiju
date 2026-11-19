@@ -69,7 +69,7 @@ public class UsBoundarySyncService {
     private final int countiesLayerId;
     private final int placesLayerId;
     private final int cdpsLayerId;
-    private final Semaphore syncSemaphore = new Semaphore(2);
+    private final Semaphore syncSemaphore = new Semaphore(1);
 
     @Inject
     public UsBoundarySyncService(
@@ -370,6 +370,10 @@ public class UsBoundarySyncService {
     }
 
     private void recordAuditLog(UUID regionId, @Nullable UUID actorUserId, UsSyncResult result) {
+        if (actorUserId == null) {
+            LOG.warn("Skipping boundary sync audit log for {} because actorUserId is null", regionId);
+            return;
+        }
         String metadataJson;
         try {
             metadataJson = objectMapper.writeValueAsString(Map.of(
@@ -392,7 +396,8 @@ public class UsBoundarySyncService {
                 stmt.setString(3, finalMetadataJson);
                 stmt.executeUpdate();
             } catch (SQLException e) {
-                LOG.warn("Failed recording boundary sync audit log for {}: {}", regionId, e.getMessage());
+                LOG.error("Failed recording boundary sync audit log for {}: {}", regionId, e.getMessage(), e);
+                throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed recording boundary sync audit log.");
             }
             return null;
         });

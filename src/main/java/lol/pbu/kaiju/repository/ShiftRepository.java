@@ -7,6 +7,7 @@ import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.repository.PageableRepository;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Shift;
+import lol.pbu.kaiju.model.ProjectStatus;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Optional;
@@ -22,6 +23,25 @@ public interface ShiftRepository extends PageableRepository<Shift, UUID> {
     @Join("project.organization")
     @Join(value = "location", type = Join.Type.LEFT_FETCH)
     CursoredPage<Shift> findAll(@NonNull @Valid CursoredPageable pageable);
+
+    @NonNull
+    @Join("project")
+    @Join("project.organization")
+    @Join(value = "location", type = Join.Type.LEFT_FETCH)
+    CursoredPage<Shift> findByProjectDeletedAtIsNull(@NonNull @Valid CursoredPageable pageable);
+
+    @NonNull
+    @Join("project")
+    @Join("project.organization")
+    @Join(value = "location", type = Join.Type.LEFT_FETCH)
+    CursoredPage<Shift> findByProjectStatusAndProjectDeletedAtIsNull(
+            @NonNull ProjectStatus status,
+            @NonNull @Valid CursoredPageable pageable
+    );
+
+    long countByProjectDeletedAtIsNull();
+
+    long countByProjectStatusAndProjectDeletedAtIsNull(@NonNull ProjectStatus status);
 
     @NonNull
     @Join("project")

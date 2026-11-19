@@ -37,6 +37,8 @@ import static io.micronaut.core.type.Argument.OBJECT_ARGUMENT;
 @Singleton
 public class JtsGeometrySerde implements Serde<Geometry> {
 
+    public static final int MAX_VERTICES = 10_000;
+
     private static final String TYPE_KEY = "type";
     private static final String COORDINATES_KEY = "coordinates";
 
@@ -149,10 +151,14 @@ public class JtsGeometrySerde implements Serde<Geometry> {
             @NonNull Argument<? super Geometry> type
     ) throws IOException {
         JsonNode node = decoder.decodeNode();
-        return deserializeFromNode(node);
+        return deserializeFromNode(node, true);
     }
 
     public Geometry deserializeFromNode(@Nullable JsonNode node) throws IOException {
+        return deserializeFromNode(node, false);
+    }
+
+    private Geometry deserializeFromNode(@Nullable JsonNode node, boolean strictLonBounds) throws IOException {
         if (node == null || node.isNull()) {
             return null;
         }
@@ -169,62 +175,72 @@ public class JtsGeometrySerde implements Serde<Geometry> {
             throw new SerdeException("Missing or invalid 'coordinates' field in GeoJSON geometry");
         }
 
+        int[] vertexCount = {0};
         return switch (geomType.toLowerCase()) {
-            case "polygon" -> parsePolygon(coordsNode);
-            case "multipolygon" -> parseMultiPolygon(coordsNode);
-            case "point" -> parsePoint(coordsNode);
+            case "polygon" -> parsePolygon(coordsNode, vertexCount, strictLonBounds);
+            case "multipolygon" -> parseMultiPolygon(coordsNode, vertexCount, strictLonBounds);
+            case "point" -> parsePoint(coordsNode, vertexCount, strictLonBounds);
             default -> throw new SerdeException("Unsupported geometry type: " + geomType);
         };
     }
 
-    private Point parsePoint(JsonNode coordsNode) throws IOException {
-        Coordinate coord = parseCoordinate(coordsNode);
+    private Point parsePoint(JsonNode coordsNode, int[] vertexCount, boolean strictLonBounds) throws IOException {
+        Coordinate coord = parseCoordinate(coordsNode, vertexCount, strictLonBounds);
         return geometryFactory.createPoint(coord);
     }
 
-    private Polygon parsePolygon(JsonNode coordsNode) throws IOException {
+    private Polygon parsePolygon(JsonNode coordsNode, int[] vertexCount, boolean strictLonBounds) throws IOException {
         if (coordsNode.size() == 0) {
             throw new SerdeException("Polygon coordinates array must not be empty");
         }
+        if (coordsNode.size() > MAX_VERTICES) {
+            throw new SerdeException("Polygon exceeds maximum allowed rings/vertices of " + MAX_VERTICES);
+        }
         JsonNode shellNode = coordsNode.get(0);
-        if (shellNode == null || !shellNode.isArray()) {
+        if (shellNode == null || shellNode.isNull() || !shellNode.isArray()) {
             throw new SerdeException("Polygon exterior ring must be an array of coordinates");
         }
-        LinearRing shell = parseLinearRing(shellNode);
+        LinearRing shell = parseLinearRing(shellNode, vertexCount, strictLonBounds);
         int numHoles = coordsNode.size() - 1;
         LinearRing[] holes = new LinearRing[numHoles];
         for (int i = 0; i < numHoles; i++) {
             JsonNode holeNode = coordsNode.get(i + 1);
-            if (holeNode == null || !holeNode.isArray()) {
+            if (holeNode == null || holeNode.isNull() || !holeNode.isArray()) {
                 throw new SerdeException("Polygon interior ring must be an array of coordinates");
             }
-            holes[i] = parseLinearRing(holeNode);
+            holes[i] = parseLinearRing(holeNode, vertexCount, strictLonBounds);
         }
         return geometryFactory.createPolygon(shell, holes);
     }
 
-    private MultiPolygon parseMultiPolygon(JsonNode coordsNode) throws IOException {
+    private MultiPolygon parseMultiPolygon(JsonNode coordsNode, int[] vertexCount, boolean strictLonBounds) throws IOException {
         int numPolys = coordsNode.size();
+        if (numPolys > MAX_VERTICES) {
+            throw new SerdeException("MultiPolygon exceeds maximum allowed polygons/vertices of " + MAX_VERTICES);
+        }
         Polygon[] polygons = new Polygon[numPolys];
         for (int i = 0; i < numPolys; i++) {
             JsonNode polyCoords = coordsNode.get(i);
-            if (polyCoords == null || !polyCoords.isArray()) {
+            if (polyCoords == null || polyCoords.isNull() || !polyCoords.isArray()) {
                 throw new SerdeException("MultiPolygon member must be an array of rings");
             }
-            polygons[i] = parsePolygon(polyCoords);
+            polygons[i] = parsePolygon(polyCoords, vertexCount, strictLonBounds);
         }
         return geometryFactory.createMultiPolygon(polygons);
     }
 
-    private LinearRing parseLinearRing(JsonNode ringNode) throws IOException {
+    private LinearRing parseLinearRing(JsonNode ringNode, int[] vertexCount, boolean strictLonBounds) throws IOException {
         int size = ringNode.size();
+        if (size > MAX_VERTICES) {
+            throw new SerdeException("Linear ring exceeds maximum allowed vertex count of " + MAX_VERTICES);
+        }
         List<Coordinate> coords = new ArrayList<>(size + 1);
         for (int i = 0; i < size; i++) {
             JsonNode coordNode = ringNode.get(i);
-            if (coordNode == null) {
+            if (coordNode == null || coordNode.isNull()) {
                 throw new SerdeException("Null coordinate in ring");
             }
-            coords.add(parseCoordinate(coordNode));
+            coords.add(parseCoordinate(coordNode, vertexCount, strictLonBounds));
         }
         if (!coords.isEmpty() && !coords.get(0).equals2D(coords.get(coords.size() - 1))) {
             coords.add(new Coordinate(coords.get(0)));
@@ -235,20 +251,42 @@ public class JtsGeometrySerde implements Serde<Geometry> {
         return geometryFactory.createLinearRing(coords.toArray(new Coordinate[0]));
     }
 
-    private Coordinate parseCoordinate(JsonNode coordNode) throws IOException {
+    private Coordinate parseCoordinate(JsonNode coordNode, int[] vertexCount, boolean strictLonBounds) throws IOException {
+        if (++vertexCount[0] > MAX_VERTICES) {
+            throw new SerdeException("Geometry exceeds maximum allowed vertex count of " + MAX_VERTICES);
+        }
         if (!coordNode.isArray() || coordNode.size() < 2) {
             throw new SerdeException("Coordinate must be an array of at least 2 numbers");
         }
-        JsonNode xNode = coordNode.get(0);
-        JsonNode yNode = coordNode.get(1);
-        if (xNode == null || !xNode.isNumber() || yNode == null || !yNode.isNumber()) {
-            throw new SerdeException("Coordinate elements must be numbers");
+        double x = readFiniteNumber(coordNode.get(0), "Coordinate elements must be numbers", "Coordinate elements must be finite numbers");
+        double y = readFiniteNumber(coordNode.get(1), "Coordinate elements must be numbers", "Coordinate elements must be finite numbers");
+        double maxLon = strictLonBounds ? 180.0 : 180.001;
+        if (x < -maxLon || x > maxLon || y < -90.0 || y > 90.0) {
+            throw new SerdeException("Coordinate out of WGS84 bounds: [" + x + ", " + y + "]");
         }
-        double x = xNode.getDoubleValue();
-        double y = yNode.getDoubleValue();
-        if (coordNode.size() >= 3 && coordNode.get(2) != null && coordNode.get(2).isNumber()) {
-            return new Coordinate(x, y, coordNode.get(2).getDoubleValue());
+        Double z = parseOptionalElevation(coordNode);
+        return z != null ? new Coordinate(x, y, z) : new Coordinate(x, y);
+    }
+
+    private Double parseOptionalElevation(JsonNode coordNode) throws SerdeException {
+        if (coordNode.size() < 3) {
+            return null;
         }
-        return new Coordinate(x, y);
+        JsonNode zNode = coordNode.get(2);
+        if (zNode == null || zNode.isNull()) {
+            return null;
+        }
+        return readFiniteNumber(zNode, "Coordinate elevation must be a number", "Coordinate elevation must be a finite number");
+    }
+
+    private double readFiniteNumber(JsonNode node, String nonNumberMsg, String nonFiniteMsg) throws SerdeException {
+        if (node == null || node.isNull() || !node.isNumber()) {
+            throw new SerdeException(nonNumberMsg);
+        }
+        double value = node.getDoubleValue();
+        if (!Double.isFinite(value)) {
+            throw new SerdeException(nonFiniteMsg);
+        }
+        return value;
     }
 }

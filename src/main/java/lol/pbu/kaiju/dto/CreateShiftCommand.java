@@ -4,12 +4,14 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Serdeable
+@ValidTimeRange
 public record CreateShiftCommand(
         @NotNull(message = "Shift project is required.")
         UUID projectId,
@@ -26,8 +28,9 @@ public record CreateShiftCommand(
         OffsetDateTime endTime,
 
         @Nullable
+        @Size(max = 50, message = "A shift cannot have more than 50 tags.")
         List<UUID> tagIds
-) {
+) implements ShiftTimeRange {
     @AssertTrue(message = "A shift must have a location if it is not virtual, and must not have a location if it is virtual.")
     public boolean isValidLocationLogic() {
         return (isVirtual && locationId == null) || (!isVirtual && locationId != null);

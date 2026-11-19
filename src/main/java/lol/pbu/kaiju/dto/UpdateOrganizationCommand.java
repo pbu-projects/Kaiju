@@ -4,6 +4,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.UUID;
@@ -16,6 +17,7 @@ public record UpdateOrganizationCommand(
 
         @Nullable
         @Size(min = 1, max = 255, message = "Organization website URL must be between 1 and 255 characters.")
+        @Pattern(regexp = "^https?://.+", message = "Organization website URL must start with http:// or https://.")
         String websiteUrl,
 
         @Nullable

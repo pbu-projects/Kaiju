@@ -6,6 +6,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Delete;
@@ -14,6 +15,7 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -26,12 +28,17 @@ import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
+import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.dto.CreateProjectCommand;
 import lol.pbu.kaiju.dto.ProjectBoundaryCommand;
 import lol.pbu.kaiju.dto.ProjectLocationCommand;
 import lol.pbu.kaiju.dto.UpdateProjectCommand;
 import lol.pbu.kaiju.model.ProjectSearchCard;
+import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
+import lol.pbu.kaiju.repository.SecurityQueryRepository;
+import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.service.ProjectService;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
@@ -56,31 +63,64 @@ public class ProjectController {
     private final ProjectService projectService;
     private final ProjectRepository projectRepository;
     private final SpatialMappingService spatialMappingService;
+    private final UserRepository userRepository;
+    private final SecurityQueryRepository queryRepository;
 
     public ProjectController(
             ProjectService projectService,
             ProjectRepository projectRepository,
-            SpatialMappingService spatialMappingService
+            SpatialMappingService spatialMappingService,
+            UserRepository userRepository,
+            SecurityQueryRepository queryRepository
     ) {
         this.projectService = projectService;
         this.projectRepository = projectRepository;
         this.spatialMappingService = spatialMappingService;
+        this.userRepository = userRepository;
+        this.queryRepository = queryRepository;
+    }
+
+    public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
+        return getProjects(title, pageable, null);
     }
 
     @Secured(IS_ANONYMOUS)
     @Get
-    public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
+    public CursoredPage<Project> getProjects(
+            @Nullable String title,
+            @Nullable @Valid CursoredPageable pageable,
+            @Nullable Principal principal
+    ) {
         CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
-        if (title == null || title.isBlank()) {
-            return projectService.getProjects(resolved);
+        boolean hasTitle = title != null && !title.isBlank();
+        if (isGlobalAdmin(principal)) {
+            return hasTitle
+                    ? projectRepository.findByTitleAndDeletedAtIsNull(title, resolved)
+                    : projectRepository.findByDeletedAtIsNull(resolved);
         }
-        return projectRepository.findByTitle(title, resolved);
+        return hasTitle
+                ? projectRepository.findByTitleAndStatusAndDeletedAtIsNull(title, ProjectStatus.ACTIVE, resolved)
+                : projectRepository.findByStatusAndDeletedAtIsNull(ProjectStatus.ACTIVE, resolved);
     }
 
     @Secured(IS_ANONYMOUS)
     @Get("/{id}")
-    public Optional<Project> getProject(@PathVariable UUID id) {
-        return projectService.getProjectById(id);
+    public Optional<Project> getProject(@PathVariable UUID id, @Nullable Principal principal) {
+        Optional<Project> projectOpt = projectRepository.findByIdAndDeletedAtIsNull(id);
+        if (projectOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        Project project = projectOpt.get();
+        if (project.status() == ProjectStatus.ACTIVE) {
+            return projectOpt;
+        }
+        if (principal == null) {
+            return Optional.empty();
+        }
+        if (!canViewNonActiveProject(project, principal)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to view this project");
+        }
+        return projectOpt;
     }
 
     @Post
@@ -189,6 +229,44 @@ public class ProjectController {
     public Project approveProject(@PathVariable @NonNull UUID id, @NonNull Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         return projectService.approveProject(id, regionalAdminId);
+    }
+
+    private boolean isGlobalAdmin(@Nullable Principal principal) {
+        if (principal == null) {
+            return false;
+        }
+        UUID userId = UUID.fromString(principal.getName());
+        return userRepository.findById(userId)
+                .map(user -> user.role().hasPermission(Permission.SYSTEM_ADMIN))
+                .orElse(false);
+    }
+
+    private boolean canViewNonActiveProject(Project project, Principal principal) {
+        UUID userId = UUID.fromString(principal.getName());
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return false;
+        }
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return true;
+        }
+        if (project.organization() != null
+                && project.organization().id() != null
+                && queryRepository.isAnyOrgMember(userId, project.organization().id())) {
+            return true;
+        }
+        boolean isRegionalAdmin = user.role().hasPermission(Permission.PROJECT_APPROVE)
+                || user.role().hasPermission(Permission.REGION_MANAGE);
+        if (!isRegionalAdmin) {
+            return false;
+        }
+        if (queryRepository.countProjectLocations(project.id()) == 0) {
+            return queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id())
+                    || (project.managingRegion() != null
+                    && project.managingRegion().id() != null
+                    && queryRepository.isUserInRegion(userId, project.managingRegion().id()));
+        }
+        return queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id());
     }
 
     private List<Location> mapLocations(List<ProjectLocationCommand> locations) {

@@ -10,6 +10,7 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.postgresql.util.PSQLState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,15 +52,18 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     @NonNull
-    public Optional<User> getUserByEmail(@NonNull String email) {
-        return userRepository.findByEmail(email);
+    public Optional<User> getUserByEmail(@Nullable String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        return userRepository.findByEmail(canonicalizeEmail(email));
     }
 
     @Override
     @Transactional
     @NonNull
     public User createUser(@NonNull User user) {
-        String canonicalEmail = user.email() != null ? user.email().toLowerCase(Locale.ROOT).trim() : null;
+        String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
         User toSave = new User(
                 null,
                 canonicalEmail,
@@ -76,7 +80,7 @@ public class UserServiceImpl implements UserService {
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
 
-        String canonicalEmail = user.email() != null ? user.email().toLowerCase(Locale.ROOT).trim() : null;
+        String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
         User safeUpdate = new User(
                 id,
                 canonicalEmail,
@@ -112,7 +116,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @NonNull
     public User provisionOrGetUser(@NonNull String email, @NonNull UserRole initialRole) {
-        String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
+        String canonicalEmail = canonicalizeEmail(email);
         return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
                 UserRole roleToAssign = initialRole != null ? initialRole : UserRole.STANDARD_USER;
@@ -131,6 +135,10 @@ public class UserServiceImpl implements UserService {
                 throw new IllegalStateException("Database error during user provisioning", ex);
             }
         });
+    }
+
+    private String canonicalizeEmail(@NonNull String email) {
+        return email.toLowerCase(Locale.ROOT).trim();
     }
 
     private boolean isUniqueConstraintViolation(Throwable throwable) {

@@ -32,14 +32,13 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
-import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 /**
  * REST controller for managing geographical administrative regions.
  *
  * Enforces a two-tier security model: read operations require general authentication,
- * while mutating operations are restricted to platform administrators and regional managers.
+ * while mutating operations are restricted to platform administrators.
  */
 @ExecuteOn(TaskExecutors.VIRTUAL)
 @Secured(IS_AUTHENTICATED)
@@ -70,7 +69,7 @@ public class AdministrativeRegionController {
      * @return a page containing administrative region entities and next cursor details
      */
     @Get
-    public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable CursoredPageable pageable) {
+    public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable @Valid CursoredPageable pageable) {
         return administrativeRegionService.getAdministrativeRegions(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
@@ -88,13 +87,13 @@ public class AdministrativeRegionController {
 
     /**
      * Creates and persists a new administrative region polygon.
-     * Restricted to platform administrators and regional managers.
+     * Restricted to platform administrators.
      *
      * @param command        the administrative region creation command
      * @param authentication the authenticated user making the request
      * @return the persisted administrative region
      */
-    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+    @Secured(SYSTEM_ADMIN_CLAIM)
     @Post
     public AdministrativeRegion addAdministrativeRegion(
             @Valid @Body CreateAdministrativeRegionCommand command,
@@ -106,14 +105,14 @@ public class AdministrativeRegionController {
 
     /**
      * Updates an existing administrative region by ID.
-     * Restricted to platform administrators and regional managers.
+     * Restricted to platform administrators.
      *
      * @param id             the unique UUID of the administrative region to update
      * @param command        the updated region command data
      * @param authentication the authenticated user making the request
      * @return the updated administrative region
      */
-    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+    @Secured(SYSTEM_ADMIN_CLAIM)
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(
             @PathVariable UUID id,
@@ -126,12 +125,12 @@ public class AdministrativeRegionController {
 
     /**
      * Deletes an administrative region by its unique identifier.
-     * Restricted to platform administrators and regional managers.
+     * Restricted to platform administrators.
      *
      * @param id             the unique UUID of the administrative region to delete
      * @param authentication the authenticated user making the request
      */
-    @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+    @Secured(SYSTEM_ADMIN_CLAIM)
     @Delete("/{id}")
     public void deleteAdministrativeRegion(
             @PathVariable UUID id,

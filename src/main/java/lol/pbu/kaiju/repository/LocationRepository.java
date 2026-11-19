@@ -34,4 +34,29 @@ public interface LocationRepository extends PageableRepository<Location, UUID> {
     Optional<String> findTimezoneByPoint(
             @NonNull @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class) Point point
     );
+
+    @Query(value = """
+        SELECT EXISTS (
+            SELECT 1 FROM locations l
+            JOIN region_users ru ON ru.user_id = :actorId AND ru.role = 'REGION_DIRECTOR'
+            JOIN administrative_regions r ON r.id = ru.region_id
+            WHERE l.id = :locationId
+              AND ST_Intersects(r.geom, l.geom)
+        )
+    """, nativeQuery = true)
+    boolean isLocationInDirectorRegion(@NonNull UUID actorId, @NonNull UUID locationId);
+
+    @Query(value = """
+        SELECT EXISTS (
+            SELECT 1 FROM administrative_regions r
+            JOIN region_users ru ON ru.region_id = r.id
+            WHERE ru.user_id = :actorId
+              AND ru.role = 'REGION_DIRECTOR'
+              AND ST_Intersects(r.geom, CAST(:point AS geography))
+        )
+    """, nativeQuery = true)
+    boolean isPointInDirectorRegion(
+            @NonNull UUID actorId,
+            @NonNull @TypeDef(type = DataType.OBJECT, converter = JtsPointConverter.class) Point point
+    );
 }

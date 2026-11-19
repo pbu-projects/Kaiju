@@ -4,6 +4,8 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.data.model.runtime.convert.AttributeConverter;
 import jakarta.inject.Singleton;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKBReader;
 import org.locationtech.jts.io.WKBWriter;
@@ -22,6 +24,11 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, PGobjec
     public PGobject convertToPersistedValue(Geometry entityValue, ConversionContext context) {
         if (entityValue == null) {
             return null;
+        }
+        if (!(entityValue instanceof Polygon || entityValue instanceof MultiPolygon)) {
+            throw new IllegalArgumentException(
+                    "Expected Polygon or MultiPolygon geometry, got: " + entityValue.getGeometryType()
+            );
         }
         try {
             // Include SRID in WKB
@@ -52,6 +59,12 @@ public class JtsPolygonConverter implements AttributeConverter<Geometry, PGobjec
             WKBReader reader = new WKBReader();
             byte[] bytes = WKBReader.hexToBytes(persistedValue.getValue());
             Geometry geom = reader.read(bytes);
+            if (!(geom instanceof Polygon || geom instanceof MultiPolygon)) {
+                throw new IllegalArgumentException(
+                        "Expected Polygon or MultiPolygon geometry from WKB, got: "
+                                + (geom != null ? geom.getGeometryType() : "null")
+                );
+            }
             if (geom.getSRID() == 0) {
                 geom.setSRID(4326);
             }

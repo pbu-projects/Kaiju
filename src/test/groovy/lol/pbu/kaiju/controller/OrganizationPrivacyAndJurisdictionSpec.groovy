@@ -43,12 +43,14 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     TestPersonas.Persona userA
     UUID locationAId
     UUID projectAId
+    UUID activeProjectAId
     UUID shiftAId
 
     UUID orgBId
     TestPersonas.Persona userB
     UUID locationBId
     UUID projectBId
+    UUID activeProjectBId
     UUID shiftBId
 
     UUID denverRegionId
@@ -89,10 +91,19 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
                 .persist()
         projectAId = projectA.id()
 
+        def activeProjectA = dataBuilder.project()
+                .forOrg(orgAId)
+                .withTitle("Active Project Alpha Denver")
+                .withDescription("Description for Active Project Alpha Denver with at least twenty characters.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(locA)
+                .persist()
+        activeProjectAId = activeProjectA.id()
+
         def startTimeA = OffsetDateTime.now().plusDays(1)
         def endTimeA = startTimeA.plusHours(2)
         def shiftA = dataBuilder.shift()
-                .forProject(projectA)
+                .forProject(activeProjectA)
                 .asVirtual()
                 .withStartTime(startTimeA)
                 .withEndTime(endTimeA)
@@ -124,10 +135,19 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
                 .persist()
         projectBId = projectB.id()
 
+        def activeProjectB = dataBuilder.project()
+                .forOrg(orgBId)
+                .withTitle("Active Project Beta Boulder")
+                .withDescription("Description for Active Project Beta Boulder with at least twenty characters.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(locB)
+                .persist()
+        activeProjectBId = activeProjectB.id()
+
         def startTimeB = OffsetDateTime.now().plusDays(2)
         def endTimeB = startTimeB.plusHours(2)
         def shiftB = dataBuilder.shift()
-                .forProject(projectB)
+                .forProject(activeProjectB)
                 .asVirtual()
                 .withStartTime(startTimeB)
                 .withEndTime(endTimeB)
@@ -234,8 +254,8 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to create a shift linked to Project B with 403 FORBIDDEN"() {
-        given: "a shift creation command linked to Project B"
-        def command = createShiftCommand(projectBId)
+        given: "a shift creation command linked to active Project B"
+        def command = createShiftCommand(activeProjectBId)
 
         when: "User A attempts to create a shift for Project B via HTTP POST"
         client.exchange(asOrgManager(
@@ -340,8 +360,8 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HAPPY PATH | should allow User A to successfully create a shift for Project A with 200 OK"() {
-        given: "a valid shift creation command for Project A"
-        def command = createShiftCommand(projectAId)
+        given: "a valid shift creation command for active Project A"
+        def command = createShiftCommand(activeProjectAId)
 
         when: "User A creates a shift for Project A via HTTP POST"
         def response = client.exchange(asOrgManager(
@@ -354,7 +374,7 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         verifyAll(response) {
             status == HttpStatus.OK
             body().id() != null
-            body().project().id() == projectAId
+            body().project().id() == activeProjectAId
         }
     }
 
