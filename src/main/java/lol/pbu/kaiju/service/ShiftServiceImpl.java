@@ -149,13 +149,21 @@ public class ShiftServiceImpl implements ShiftService {
         if (project.status() != ProjectStatus.ACTIVE) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shifts can only be managed for ACTIVE projects");
         }
-        if (shift.location() != null && project.locations() != null && !project.locations().isEmpty()) {
-            boolean matchesProjectLocation = project.locations().stream()
-                    .anyMatch(loc -> Objects.equals(loc.id(), shift.location().id()));
-            if (!matchesProjectLocation) {
-                throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shift location must belong to the project's locations");
-            }
+        if (shift.location() != null && !isLocationAllowedForProject(project, shift.location().id())) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shift location must belong to the project's locations");
         }
+    }
+
+    private boolean isLocationAllowedForProject(Project project, UUID locationId) {
+        if (locationId == null) {
+            return false;
+        }
+        if (project.locations() != null && !project.locations().isEmpty()) {
+            return project.locations().stream()
+                    .anyMatch(loc -> Objects.equals(loc.id(), locationId));
+        }
+        return !projectRepository.hasAnyProjectLocation(project.id())
+                || projectRepository.hasProjectLocation(project.id(), locationId);
     }
 
     private void verifyShiftAuthority(UUID actorUserId, Project project) {

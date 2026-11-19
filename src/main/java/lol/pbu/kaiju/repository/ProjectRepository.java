@@ -115,5 +115,11 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
             Pageable pageable
     );
 
+    @Query("SELECT EXISTS (SELECT 1 FROM project_locations WHERE project_id = :projectId)")
+    boolean hasAnyProjectLocation(@NonNull UUID projectId);
+
+    @Query("SELECT EXISTS (SELECT 1 FROM project_locations WHERE project_id = :projectId AND location_id = :locationId)")
+    boolean hasProjectLocation(@NonNull UUID projectId, @NonNull UUID locationId);
+
     long removeById(@NonNull UUID id);
 }

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Serdeable
+@ValidTimeRange
 public record UpdateShiftCommand(
         boolean isVirtual,
 
@@ -26,14 +27,9 @@ public record UpdateShiftCommand(
         @Nullable
         @Size(max = 50, message = "A shift cannot have more than 50 tags.")
         List<UUID> tagIds
-) {
+) implements ShiftTimeRange {
     @AssertTrue(message = "A shift must have a location if it is not virtual, and must not have a location if it is virtual.")
     public boolean isValidLocationLogic() {
         return (isVirtual && locationId == null) || (!isVirtual && locationId != null);
-    }
-
-    @AssertTrue(message = "Shift start time must be before end time.")
-    public boolean isValidTimeRange() {
-        return startTime == null || endTime == null || startTime.isBefore(endTime);
     }
 }

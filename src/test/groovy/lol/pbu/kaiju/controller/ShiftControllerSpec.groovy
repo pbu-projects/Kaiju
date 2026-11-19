@@ -146,8 +146,13 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should successfully save a valid physical shift when called by admin"() {
         given: "a new valid physical shift command"
-        def project = getRandomProject()
         def location = getRandomLocation()
+        def project = dataBuilder.project()
+                .withTitle("Physical Shift Test Proj")
+                .withDescription("Test project description exceeding 20 chars")
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(location)
+                .persist()
         def startTime = OffsetDateTime.now()
         def endTime = startTime.plusHours(2)
         def command = new CreateShiftCommand(project.id(), false, location.id(), startTime, endTime, null)
