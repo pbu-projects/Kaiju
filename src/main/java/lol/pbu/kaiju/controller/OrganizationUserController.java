@@ -32,7 +32,6 @@ import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
-import static lol.pbu.kaiju.security.Permission.ORG_MANAGE_USERS_CLAIM;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
 @ExecuteOn(TaskExecutors.VIRTUAL)

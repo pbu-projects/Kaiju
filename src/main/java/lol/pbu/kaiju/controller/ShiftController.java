@@ -19,7 +19,6 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.domain.Tag;
-import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.dto.CreateShiftCommand;
 import lol.pbu.kaiju.dto.UpdateShiftCommand;
 import lol.pbu.kaiju.model.ProjectStatus;

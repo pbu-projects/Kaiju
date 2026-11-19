@@ -1,7 +1,5 @@
 package lol.pbu.kaiju.security
 
-import io.micronaut.data.model.CursoredPageable
-import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType

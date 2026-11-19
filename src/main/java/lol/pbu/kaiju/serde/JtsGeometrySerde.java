@@ -258,34 +258,35 @@ public class JtsGeometrySerde implements Serde<Geometry> {
         if (!coordNode.isArray() || coordNode.size() < 2) {
             throw new SerdeException("Coordinate must be an array of at least 2 numbers");
         }
-        JsonNode xNode = coordNode.get(0);
-        JsonNode yNode = coordNode.get(1);
-        if (xNode == null || xNode.isNull() || !xNode.isNumber()
-                || yNode == null || yNode.isNull() || !yNode.isNumber()) {
-            throw new SerdeException("Coordinate elements must be numbers");
-        }
-        double x = xNode.getDoubleValue();
-        double y = yNode.getDoubleValue();
-        if (!Double.isFinite(x) || !Double.isFinite(y)) {
-            throw new SerdeException("Coordinate elements must be finite numbers");
-        }
+        double x = readFiniteNumber(coordNode.get(0), "Coordinate elements must be numbers", "Coordinate elements must be finite numbers");
+        double y = readFiniteNumber(coordNode.get(1), "Coordinate elements must be numbers", "Coordinate elements must be finite numbers");
         double maxLon = strictLonBounds ? 180.0 : 180.001;
         if (x < -maxLon || x > maxLon || y < -90.0 || y > 90.0) {
             throw new SerdeException("Coordinate out of WGS84 bounds: [" + x + ", " + y + "]");
         }
-        if (coordNode.size() >= 3) {
-            JsonNode zNode = coordNode.get(2);
-            if (zNode != null && !zNode.isNull()) {
-                if (!zNode.isNumber()) {
-                    throw new SerdeException("Coordinate elevation must be a number");
-                }
-                double z = zNode.getDoubleValue();
-                if (!Double.isFinite(z)) {
-                    throw new SerdeException("Coordinate elevation must be a finite number");
-                }
-                return new Coordinate(x, y, z);
-            }
+        Double z = parseOptionalElevation(coordNode);
+        return z != null ? new Coordinate(x, y, z) : new Coordinate(x, y);
+    }
+
+    private Double parseOptionalElevation(JsonNode coordNode) throws SerdeException {
+        if (coordNode.size() < 3) {
+            return null;
         }
-        return new Coordinate(x, y);
+        JsonNode zNode = coordNode.get(2);
+        if (zNode == null || zNode.isNull()) {
+            return null;
+        }
+        return readFiniteNumber(zNode, "Coordinate elevation must be a number", "Coordinate elevation must be a finite number");
+    }
+
+    private double readFiniteNumber(JsonNode node, String nonNumberMsg, String nonFiniteMsg) throws SerdeException {
+        if (node == null || node.isNull() || !node.isNumber()) {
+            throw new SerdeException(nonNumberMsg);
+        }
+        double value = node.getDoubleValue();
+        if (!Double.isFinite(value)) {
+            throw new SerdeException(nonFiniteMsg);
+        }
+        return value;
     }
 }

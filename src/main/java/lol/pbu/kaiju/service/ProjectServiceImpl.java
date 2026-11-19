@@ -37,6 +37,7 @@ public class ProjectServiceImpl implements ProjectService {
     private static final String UNAUTHORIZED_ASSIGN_REGION = "You do not have authority to assign this managing region";
     private static final String UNAUTHORIZED_UNASSIGN_REGION = "You do not have authority to unassign this managing region";
     private static final String ORGANIZATION_REQUIRED = "Organization is required";
+    private static final String ACTOR_USER_NOT_FOUND = "Actor user not found";
 
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
@@ -87,7 +88,7 @@ public class ProjectServiceImpl implements ProjectService {
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED));
 
         User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_USER_NOT_FOUND));
 
         AdministrativeRegion managingRegion = validateAndResolveManagingRegion(project, org.id(), actorUserId);
 
@@ -152,7 +153,7 @@ public class ProjectServiceImpl implements ProjectService {
     @NonNull
     public Project updateProject(@NonNull UUID id, @NonNull Project project, @NonNull UUID actorUserId) {
         User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_USER_NOT_FOUND));
 
         Project existing = projectRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
@@ -195,10 +196,6 @@ public class ProjectServiceImpl implements ProjectService {
                 actorUserId,
                 existing,
                 transientProject,
-                targetOrg,
-                existingOrgId,
-                domainLocations,
-                existingLocations,
                 project.status()
         );
 
@@ -277,10 +274,6 @@ public class ProjectServiceImpl implements ProjectService {
             UUID actorUserId,
             Project existing,
             Project transientProject,
-            Organization targetOrg,
-            UUID existingOrgId,
-            List<Location> domainLocations,
-            List<Location> existingLocations,
             ProjectStatus requestedStatus) {
         if (existing.status() == ProjectStatus.DRAFT
                 && requestedStatus != null
@@ -291,7 +284,10 @@ public class ProjectServiceImpl implements ProjectService {
             return securityService.evaluateProjectCreationByUser(actorUserId, transientProject);
         }
 
-        boolean locationsModified = !Objects.equals(domainLocations, existingLocations);
+        List<Location> existingLocations = existing.locations() != null ? existing.locations() : List.of();
+        UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
+        Organization targetOrg = transientProject.organization();
+        boolean locationsModified = !Objects.equals(transientProject.locations(), existingLocations);
         boolean reassigned = !Objects.equals(targetOrg != null ? targetOrg.id() : null, existingOrgId);
         if ((locationsModified || reassigned)
                 && existing.status() == ProjectStatus.ACTIVE
@@ -312,7 +308,7 @@ public class ProjectServiceImpl implements ProjectService {
         }
 
         User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_USER_NOT_FOUND));
 
         Project deleted = projectRepository.update(new Project(
                 existing.id(),

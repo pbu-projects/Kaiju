@@ -54,11 +54,7 @@ public class ProjectSecurityService {
                 || user.role().hasPermission(Permission.REGION_MANAGE);
 
         boolean hasLocations = project.locations() != null && !project.locations().isEmpty();
-        boolean inAssignedRegion = hasLocations
-                ? areAllLocationsInAssignedRegion(project, userId)
-                : project.managingRegion() != null
-                        && project.managingRegion().id() != null
-                        && queryRepository.isUserInRegion(userId, project.managingRegion().id());
+        boolean inAssignedRegion = isInAssignedRegion(project, userId, hasLocations);
         boolean isAuthorizedRegionalAdmin = isRegionalAdmin && inAssignedRegion;
 
         if (!isGlobalAdmin && !isOrgMember && !isAuthorizedRegionalAdmin) {
@@ -73,14 +69,10 @@ public class ProjectSecurityService {
             return PENDING;
         }
 
-        // 1. Check Org Manager permissions first
-        if (queryRepository.isOrgVerified(organizationId)
-                && queryRepository.isOrgManager(userId, organizationId)
-                && areAllLocationsInOrgRegion(project, organizationId)) {
+        if (isVerifiedOrgManagerInRegion(userId, organizationId, project)) {
             return ACTIVE;
         }
 
-        // 2. Check if user is a REGION_AGENT or REGION_DIRECTOR with jurisdiction
         if (!isGlobalAdmin && isRegionalAdmin) {
             if (inAssignedRegion) {
                 return ACTIVE;
@@ -88,8 +80,22 @@ public class ProjectSecurityService {
             throw new HttpStatusException(FORBIDDEN, "Region Agents cannot post outside their boundaries without Org Manager privileges");
         }
 
-        // 3. Fallback to manual queue for Global Admins or Org Members outside auto-approval bounds
         return PENDING;
+    }
+
+    private boolean isInAssignedRegion(Project project, UUID userId, boolean hasLocations) {
+        if (hasLocations) {
+            return areAllLocationsInAssignedRegion(project, userId);
+        }
+        return project.managingRegion() != null
+                && project.managingRegion().id() != null
+                && queryRepository.isUserInRegion(userId, project.managingRegion().id());
+    }
+
+    private boolean isVerifiedOrgManagerInRegion(UUID userId, UUID organizationId, Project project) {
+        return queryRepository.isOrgVerified(organizationId)
+                && queryRepository.isOrgManager(userId, organizationId)
+                && areAllLocationsInOrgRegion(project, organizationId);
     }
 
     public boolean areAllLocationsInOrgRegion(@NonNull Project project, @NonNull UUID organizationId) {
