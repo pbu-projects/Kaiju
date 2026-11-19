@@ -41,10 +41,11 @@ jobs:
           echo "Verified: tag ${TAG_NAME} (${COMMIT_SHA}) is on the main branch."
 
       - name: Set up GraalVM JDK
-        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.7.1
+        uses: graalvm/setup-graalvm@60e76998d25690099182b796e99b8804da582d90 # v1.6.10
         with:
-          java-version: '25'
-          distribution: 'graalvm'
+          version: '25.5'
+          distribution: 'graalvm-community'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@6cfc8b8e8bb586cc164bef1c478c1eea3a4d6a19 # v4.4.2
