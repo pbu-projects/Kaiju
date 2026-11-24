@@ -52,6 +52,7 @@ public class UpdateOrganizationCommand {
     private Boolean isPublic;
 
     @Nullable
+    @Pattern(regexp = "^https?://.+", message = "Organization website URL must start with http:// or https://.")
     @Size(min = 1, max = 255, message = "Organization website URL must be between 1 and 255 characters.")
     @JsonProperty(JSON_PROPERTY_WEBSITE_URL)
     @JsonInclude(JsonInclude.Include.USE_DEFAULTS)

@@ -11,7 +11,7 @@ import java.util.UUID;
 import static io.micronaut.data.model.query.builder.sql.Dialect.POSTGRES;
 
 @JdbcRepository(dialect = POSTGRES)
-public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
+public interface PermissionQueryRepository extends GenericRepository<User, UUID> {
 
     @Query("""
         SELECT EXISTS (

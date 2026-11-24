@@ -11,7 +11,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.model.RoleUpdateRequest;
+import lol.pbu.kaiju.dto.UpdateUserRoleCommand;
 import lol.pbu.kaiju.service.UserService;
 
 import java.util.UUID;
@@ -31,14 +31,14 @@ public class AdminUserController {
 
     /**
      * Explicit endpoint for role elevation.
-     * Prevents Mass Assignment by only accepting a RoleUpdateRequest.
+     * Prevents Mass Assignment by only accepting a UpdateUserRoleCommand.
      *
      * @param id      the ID of the user to promote/demote
      * @param request the requested role
      * @return the updated user
      */
     @Put("/{id}/role")
-    public User updateUserRole(@PathVariable UUID id, @Valid @Body RoleUpdateRequest request) {
+    public User updateUserRole(@PathVariable UUID id, @Valid @Body UpdateUserRoleCommand request) {
         userService.updateRole(id, request.role());
         return userService.getUserById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));

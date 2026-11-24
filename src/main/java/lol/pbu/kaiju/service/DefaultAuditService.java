@@ -21,13 +21,13 @@ import java.time.ZoneOffset;
 import java.util.UUID;
 
 @Singleton
-public class AuditServiceImpl implements AuditService {
+public class DefaultAuditService implements AuditService {
 
     private final ProjectAuditLogRepository projectAuditLogRepository;
     private final OrganizationAuditLogRepository organizationAuditLogRepository;
     private final AdministrativeRegionAuditLogRepository administrativeRegionAuditLogRepository;
 
-    public AuditServiceImpl(
+    public DefaultAuditService(
             ProjectAuditLogRepository projectAuditLogRepository,
             OrganizationAuditLogRepository organizationAuditLogRepository,
             AdministrativeRegionAuditLogRepository administrativeRegionAuditLogRepository

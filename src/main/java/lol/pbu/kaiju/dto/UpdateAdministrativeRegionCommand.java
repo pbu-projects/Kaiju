@@ -22,5 +22,5 @@ public record UpdateAdministrativeRegionCommand(
         @NotNull(message = "Region coordinates are required.")
         @Size(min = 3, max = 5000, message = "A region polygon must contain between 3 and 5000 coordinates.")
         @Valid
-        List<CoordinateDto> coordinates
+        List<Coordinates> coordinates
 ) {}

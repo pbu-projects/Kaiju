@@ -27,9 +27,9 @@ import lol.pbu.kaiju.dto.CreateOrganizationCommand;
 import lol.pbu.kaiju.dto.UpdateOrganizationCommand;
 import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.OrganizationService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -52,13 +52,13 @@ public class OrganizationController {
     private final OrganizationService organizationService;
     private final OrganizationRepository organizationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public OrganizationController(
             OrganizationService organizationService,
             OrganizationRepository organizationRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.organizationService = organizationService;
         this.organizationRepository = organizationRepository;
@@ -69,7 +69,7 @@ public class OrganizationController {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<Organization> getOrganizations(@Nullable @Valid CursoredPageable pageable) {
-        return organizationService.getOrganizations(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationService.getOrganizations(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -175,9 +175,9 @@ public class OrganizationController {
 
     private @NonNull Pageable normalizePageable(@Nullable Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
-            return Pageable.from(0, PageableUtils.DEFAULT_PAGE_SIZE);
+            return Pageable.from(0, PageRequests.DEFAULT_PAGE_SIZE);
         }
-        int cappedSize = Math.min(pageable.getSize(), PageableUtils.MAX_PAGE_SIZE);
+        int cappedSize = Math.min(pageable.getSize(), PageRequests.MAX_PAGE_SIZE);
         if (!pageable.getSort().getOrderBy().isEmpty() || cappedSize != pageable.getSize()) {
             return Pageable.from(pageable.getNumber(), cappedSize);
         }

@@ -7,7 +7,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.ProjectBoundaryCommand
 import lol.pbu.kaiju.dto.UpdateLocationCommand
@@ -172,11 +172,11 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
                 new ProjectBoundaryCommand(
                         "Denver Area Boundary",
                         [
-                                new CoordinateDto(-105.1099, 39.7891),
-                                new CoordinateDto(-104.7432, 39.7912),
-                                new CoordinateDto(-104.7528, 39.6158),
-                                new CoordinateDto(-105.0536, 39.6137),
-                                new CoordinateDto(-105.1099, 39.7891)
+                                new Coordinates(-105.1099, 39.7891),
+                                new Coordinates(-104.7432, 39.7912),
+                                new Coordinates(-104.7528, 39.6158),
+                                new Coordinates(-105.0536, 39.6137),
+                                new Coordinates(-105.1099, 39.7891)
                         ]
                 )
         ]

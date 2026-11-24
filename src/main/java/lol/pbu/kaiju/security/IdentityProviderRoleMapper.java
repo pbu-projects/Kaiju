@@ -20,7 +20,7 @@ import java.util.Map;
  * GLOBAL_ADMIN &gt; REGION_DIRECTOR &gt; REGION_AGENT &gt; STANDARD_USER.</p>
  */
 @Singleton
-public class IdpRoleMapper {
+public class IdentityProviderRoleMapper {
 
     public static final String GROUP_GLOBAL_ADMINS = "Kaiju Global Admins";
     public static final String GROUP_REGION_DIRECTORS = "Kaiju Region Directors";

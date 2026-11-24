@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 @Serdeable
-public record CoordinateDto(
+public record Coordinates(
         @NotNull(message = "Longitude is required.")
         @Min(value = -180, message = "Longitude must be greater than or equal to -180.")
         @Max(value = 180, message = "Longitude must be less than or equal to 180.")

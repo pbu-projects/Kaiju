@@ -13,7 +13,7 @@ import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.AdministrativeRegionAuditLog;
 import lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -38,7 +38,7 @@ public class AdministrativeRegionAuditLogController {
             @Nullable @QueryValue UUID regionId,
             @Nullable @Valid CursoredPageable pageable
     ) {
-        CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
+        CursoredPageable resolved = PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         if (regionId != null) {
             return auditLogRepository.findByRegionId(regionId, resolved);
         }

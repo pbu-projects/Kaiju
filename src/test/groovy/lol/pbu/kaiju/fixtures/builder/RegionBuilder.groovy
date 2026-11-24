@@ -1,7 +1,7 @@
 package lol.pbu.kaiju.fixtures.builder
 
 import lol.pbu.kaiju.domain.AdministrativeRegion
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import net.datafaker.Faker
@@ -80,8 +80,8 @@ class RegionBuilder {
     CreateAdministrativeRegionCommand asCommand() {
         AdministrativeRegion region = build()
         Coordinate[] coordinates = region.geom().getCoordinates()
-        List<CoordinateDto> dtos = coordinates.collect { c ->
-            new CoordinateDto(c.getX(), c.getY())
+        List<Coordinates> dtos = coordinates.collect { c ->
+            new Coordinates(c.getX(), c.getY())
         }
         return new CreateAdministrativeRegionCommand(region.name(), region.parentRegionId(), dtos)
     }

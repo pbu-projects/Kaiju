@@ -20,8 +20,8 @@ import lol.pbu.kaiju.domain.RegionUserId;
 import lol.pbu.kaiju.dto.CreateRegionUserCommand;
 import lol.pbu.kaiju.dto.UpdateRegionUserCommand;
 import lol.pbu.kaiju.repository.RegionUserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.util.Optional;
@@ -43,11 +43,11 @@ public class RegionUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final RegionUserRepository regionUserRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public RegionUserController(
             RegionUserRepository regionUserRepository,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.regionUserRepository = regionUserRepository;
         this.projectSecurityService = projectSecurityService;
@@ -62,7 +62,7 @@ public class RegionUserController {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<RegionUser> getRegionUsers(@Nullable @Valid CursoredPageable pageable) {
-        return regionUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return regionUserRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**

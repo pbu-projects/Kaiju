@@ -24,15 +24,15 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * CoordinateDto
+ * Coordinates
  */
 @JsonPropertyOrder({
-    CoordinateDto.JSON_PROPERTY_LONGITUDE,
-    CoordinateDto.JSON_PROPERTY_LATITUDE,
+    Coordinates.JSON_PROPERTY_LONGITUDE,
+    Coordinates.JSON_PROPERTY_LATITUDE,
 })
 @Serdeable
 @Generated("io.micronaut.openapi.generator.JavaMicronautClientCodegen")
-public class CoordinateDto {
+public class Coordinates {
 
     public static final String JSON_PROPERTY_LONGITUDE = "longitude";
     public static final String JSON_PROPERTY_LATITUDE = "latitude";
@@ -49,10 +49,10 @@ public class CoordinateDto {
     @JsonProperty(JSON_PROPERTY_LATITUDE)
     private Double latitude;
 
-    public CoordinateDto() {
+    public Coordinates() {
     }
 
-    public CoordinateDto(Double longitude, Double latitude) {
+    public Coordinates(Double longitude, Double latitude) {
         this.longitude = longitude;
         this.latitude = latitude;
     }
@@ -76,9 +76,9 @@ public class CoordinateDto {
     /**
      * Set longitude in a chainable fashion.
      *
-     * @return The same instance of CoordinateDto for chaining.
+     * @return The same instance of Coordinates for chaining.
      */
-    public CoordinateDto longitude(Double longitude) {
+    public Coordinates longitude(Double longitude) {
         this.longitude = longitude;
         return this;
     }
@@ -102,9 +102,9 @@ public class CoordinateDto {
     /**
      * Set latitude in a chainable fashion.
      *
-     * @return The same instance of CoordinateDto for chaining.
+     * @return The same instance of Coordinates for chaining.
      */
-    public CoordinateDto latitude(Double latitude) {
+    public Coordinates latitude(Double latitude) {
         this.latitude = latitude;
         return this;
     }
@@ -117,9 +117,9 @@ public class CoordinateDto {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var coordinateDto = (CoordinateDto) o;
-        return Objects.equals(this.longitude, coordinateDto.longitude)
-            && Objects.equals(this.latitude, coordinateDto.latitude);
+        var coordinates = (Coordinates) o;
+        return Objects.equals(this.longitude, coordinates.longitude)
+            && Objects.equals(this.latitude, coordinates.latitude);
     }
 
     @Override
@@ -129,7 +129,7 @@ public class CoordinateDto {
 
     @Override
     public String toString() {
-        return "CoordinateDto("
+        return "Coordinates("
             + "longitude: " + getLongitude() + ", "
             + "latitude: " + getLatitude()
             + ")";

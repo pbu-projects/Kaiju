@@ -18,7 +18,7 @@ import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import org.jspecify.annotations.NonNull;
 
 import java.time.OffsetDateTime;
@@ -29,7 +29,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Singleton
-public class ProjectServiceImpl implements ProjectService {
+public class DefaultProjectService implements ProjectService {
 
     private static final String PROJECT_NOT_FOUND = "Project not found";
     private static final String MANAGING_REGION_NOT_EXIST = "Managing region does not exist";
@@ -43,15 +43,15 @@ public class ProjectServiceImpl implements ProjectService {
     private final UserRepository userRepository;
     private final AdministrativeRegionRepository administrativeRegionRepository;
     private final OrganizationRepository organizationRepository;
-    private final ProjectSecurityService securityService;
+    private final AuthorizationService securityService;
     private final AuditService auditService;
 
-    public ProjectServiceImpl(
+    public DefaultProjectService(
             ProjectRepository projectRepository,
             UserRepository userRepository,
             AdministrativeRegionRepository administrativeRegionRepository,
             OrganizationRepository organizationRepository,
-            ProjectSecurityService securityService,
+            AuthorizationService securityService,
             AuditService auditService
     ) {
         this.projectRepository = projectRepository;

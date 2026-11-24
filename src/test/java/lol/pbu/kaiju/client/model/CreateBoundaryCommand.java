@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import lol.pbu.kaiju.client.model.CoordinateDto;
+import lol.pbu.kaiju.client.model.Coordinates;
 import com.fasterxml.jackson.annotation.*;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.*;
@@ -47,14 +47,14 @@ public class CreateBoundaryCommand {
     private String name;
 
     @NotNull(message = "Boundary coordinates are required.")
-    @Size(min = 3, message = "A polygon boundary must contain at least 3 coordinates.")
+    @Size(min = 3, max = 5000, message = "A polygon boundary must contain between 3 and 5000 coordinates.")
     @JsonProperty(JSON_PROPERTY_COORDINATES)
-    private List<@Valid CoordinateDto> coordinates = new ArrayList<>();
+    private List<@Valid Coordinates> coordinates = new ArrayList<>();
 
     public CreateBoundaryCommand() {
     }
 
-    public CreateBoundaryCommand(String name, List<@Valid CoordinateDto> coordinates) {
+    public CreateBoundaryCommand(String name, List<@Valid Coordinates> coordinates) {
         this.name = name;
         this.coordinates = coordinates;
     }
@@ -88,7 +88,7 @@ public class CreateBoundaryCommand {
     /**
      * @return the coordinates property value
      */
-    public List<@Valid CoordinateDto> getCoordinates() {
+    public List<@Valid Coordinates> getCoordinates() {
         return coordinates;
     }
 
@@ -97,7 +97,7 @@ public class CreateBoundaryCommand {
      *
      * @param coordinates property value to set
      */
-    public void setCoordinates(List<@Valid CoordinateDto> coordinates) {
+    public void setCoordinates(List<@Valid Coordinates> coordinates) {
         this.coordinates = coordinates;
     }
 
@@ -106,7 +106,7 @@ public class CreateBoundaryCommand {
      *
      * @return The same instance of CreateBoundaryCommand for chaining.
      */
-    public CreateBoundaryCommand coordinates(List<@Valid CoordinateDto> coordinates) {
+    public CreateBoundaryCommand coordinates(List<@Valid Coordinates> coordinates) {
         this.coordinates = coordinates;
         return this;
     }
@@ -116,7 +116,7 @@ public class CreateBoundaryCommand {
      *
      * @return The same instance of CreateBoundaryCommand for chaining.
      */
-    public CreateBoundaryCommand addCoordinatesItem(CoordinateDto coordinatesItem) {
+    public CreateBoundaryCommand addCoordinatesItem(Coordinates coordinatesItem) {
         coordinates.add(coordinatesItem);
         return this;
     }

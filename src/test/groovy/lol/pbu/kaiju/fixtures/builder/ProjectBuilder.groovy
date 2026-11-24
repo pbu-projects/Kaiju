@@ -6,7 +6,7 @@ import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateProjectCommand
 import lol.pbu.kaiju.dto.ProjectBoundaryCommand
 import lol.pbu.kaiju.dto.ProjectLocationCommand
@@ -362,10 +362,10 @@ class ProjectBuilder {
                 new ProjectBoundaryCommand(
                         "Default Boundary",
                         [
-                                new CoordinateDto(-105.0, 39.0),
-                                new CoordinateDto(-104.0, 39.0),
-                                new CoordinateDto(-104.0, 40.0),
-                                new CoordinateDto(-105.0, 39.0)
+                                new Coordinates(-105.0, 39.0),
+                                new Coordinates(-104.0, 39.0),
+                                new Coordinates(-104.0, 40.0),
+                                new Coordinates(-105.0, 39.0)
                         ]
                 )
         ]

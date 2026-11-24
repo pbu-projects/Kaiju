@@ -25,12 +25,12 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * RoleUpdateRequest
+ * UpdateUserRoleCommand
  */
-@JsonPropertyOrder(RoleUpdateRequest.JSON_PROPERTY_ROLE)
+@JsonPropertyOrder(UpdateUserRoleCommand.JSON_PROPERTY_ROLE)
 @Serdeable
 @Generated("io.micronaut.openapi.generator.JavaMicronautClientCodegen")
-public class RoleUpdateRequest {
+public class UpdateUserRoleCommand {
 
     public static final String JSON_PROPERTY_ROLE = "role";
 
@@ -38,10 +38,10 @@ public class RoleUpdateRequest {
     @JsonProperty(JSON_PROPERTY_ROLE)
     private UserRole role;
 
-    public RoleUpdateRequest() {
+    public UpdateUserRoleCommand() {
     }
 
-    public RoleUpdateRequest(UserRole role) {
+    public UpdateUserRoleCommand(UserRole role) {
         this.role = role;
     }
 
@@ -64,9 +64,9 @@ public class RoleUpdateRequest {
     /**
      * Set role in a chainable fashion.
      *
-     * @return The same instance of RoleUpdateRequest for chaining.
+     * @return The same instance of UpdateUserRoleCommand for chaining.
      */
-    public RoleUpdateRequest role(UserRole role) {
+    public UpdateUserRoleCommand role(UserRole role) {
         this.role = role;
         return this;
     }
@@ -79,8 +79,8 @@ public class RoleUpdateRequest {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        var roleUpdateRequest = (RoleUpdateRequest) o;
-        return Objects.equals(this.role, roleUpdateRequest.role);
+        var updateUserRoleCommand = (UpdateUserRoleCommand) o;
+        return Objects.equals(this.role, updateUserRoleCommand.role);
     }
 
     @Override
@@ -90,7 +90,7 @@ public class RoleUpdateRequest {
 
     @Override
     public String toString() {
-        return "RoleUpdateRequest("
+        return "UpdateUserRoleCommand("
             + "role: " + getRole()
             + ")";
     }

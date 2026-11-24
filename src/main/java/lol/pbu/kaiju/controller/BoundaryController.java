@@ -19,8 +19,8 @@ import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.dto.CreateBoundaryCommand;
 import lol.pbu.kaiju.dto.UpdateBoundaryCommand;
 import lol.pbu.kaiju.repository.BoundaryRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Geometry;
 
@@ -46,12 +46,12 @@ public class BoundaryController {
 
     private final BoundaryRepository boundaryRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public BoundaryController(
             BoundaryRepository boundaryRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.boundaryRepository = boundaryRepository;
         this.spatialMappingService = spatialMappingService;
@@ -66,7 +66,7 @@ public class BoundaryController {
      */
     @Get
     public CursoredPage<Boundary> getBoundaries(@Nullable @Valid CursoredPageable pageable) {
-        return boundaryRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return boundaryRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**

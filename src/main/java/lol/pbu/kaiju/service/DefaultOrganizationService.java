@@ -11,7 +11,7 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -22,7 +22,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Singleton
-public class OrganizationServiceImpl implements OrganizationService {
+public class DefaultOrganizationService implements OrganizationService {
 
     private static final String ORGANIZATION_NOT_FOUND = "Organization not found";
 
@@ -54,13 +54,13 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
     private final AuditService auditService;
 
-    public OrganizationServiceImpl(
+    public DefaultOrganizationService(
             OrganizationRepository organizationRepository,
             UserRepository userRepository,
-            ProjectSecurityService projectSecurityService,
+            AuthorizationService projectSecurityService,
             AuditService auditService
     ) {
         this.organizationRepository = organizationRepository;

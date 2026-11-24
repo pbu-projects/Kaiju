@@ -11,7 +11,7 @@ import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.ShiftRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
@@ -19,18 +19,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Singleton
-public class ShiftServiceImpl implements ShiftService {
+public class DefaultShiftService implements ShiftService {
 
     private static final String SHIFT_NOT_FOUND = "Shift not found";
 
     private final ShiftRepository shiftRepository;
     private final ProjectRepository projectRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
-    public ShiftServiceImpl(
+    public DefaultShiftService(
             ShiftRepository shiftRepository,
             ProjectRepository projectRepository,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.shiftRepository = shiftRepository;
         this.projectRepository = projectRepository;

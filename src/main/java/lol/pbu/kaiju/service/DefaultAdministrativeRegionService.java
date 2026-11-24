@@ -10,7 +10,7 @@ import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.dto.CoveringRegionDto;
+import lol.pbu.kaiju.dto.CoveringRegion;
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.dto.RegionCoordinateResolution;
@@ -35,9 +35,9 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Singleton
-public class AdministrativeRegionServiceImpl implements AdministrativeRegionService {
+public class DefaultAdministrativeRegionService implements AdministrativeRegionService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AdministrativeRegionServiceImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultAdministrativeRegionService.class);
 
     private static final String ACTOR_NOT_FOUND = "Actor user not found";
     private static final String REGION_NOT_FOUND = "Administrative region not found";
@@ -120,7 +120,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     private final JdbcOperations jdbcOperations;
     private final ObjectMapper objectMapper;
 
-    public AdministrativeRegionServiceImpl(
+    public DefaultAdministrativeRegionService(
             AdministrativeRegionRepository regionRepository,
             UserRepository userRepository,
             SpatialMappingService spatialMappingService,
@@ -290,14 +290,14 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             return Optional.empty();
         }
 
-        List<CoveringRegionDto> regions = regionRepository.findCoveringRegions(lat, lon);
+        List<CoveringRegion> regions = regionRepository.findCoveringRegions(lat, lon);
         if (regions == null || regions.isEmpty()) {
             return Optional.empty();
         }
 
         String city = regions.stream()
                 .filter(r -> r.level() != null && r.level() >= 3)
-                .map(CoveringRegionDto::name)
+                .map(CoveringRegion::name)
                 .map(this::normalizeCityName)
                 .filter(Objects::nonNull)
                 .findFirst()
@@ -305,7 +305,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
 
         String county = regions.stream()
                 .filter(r -> r.level() != null && r.level() == 2)
-                .map(CoveringRegionDto::name)
+                .map(CoveringRegion::name)
                 .map(this::normalizeCountyName)
                 .filter(Objects::nonNull)
                 .findFirst()
@@ -319,7 +319,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
                 .orElse(null);
 
         String timeZone = regions.stream()
-                .map(CoveringRegionDto::timeZone)
+                .map(CoveringRegion::timeZone)
                 .filter(tz -> tz != null && !tz.isBlank())
                 .findFirst()
                 .orElse(null);
@@ -344,7 +344,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
         return COUNTY_SUFFIX_PATTERN.matcher(name).replaceAll("").trim();
     }
 
-    private String normalizeState(CoveringRegionDto region) {
+    private String normalizeState(CoveringRegion region) {
         if (region.stateCode() != null && !region.stateCode().isBlank()) {
             return region.stateCode().trim();
         }

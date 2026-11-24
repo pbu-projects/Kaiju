@@ -29,12 +29,12 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
     private static final Logger LOG = LoggerFactory.getLogger(KaijuJwtAuthenticationFactory.class);
 
     private final UserService userService;
-    private final IdpRoleMapper idpRoleMapper;
+    private final IdentityProviderRoleMapper idpRoleMapper;
 
     public KaijuJwtAuthenticationFactory(@NonNull TokenConfiguration tokenConfiguration,
                                          @NonNull RolesFinder rolesFinder,
                                          @NonNull UserService userService,
-                                         @NonNull IdpRoleMapper idpRoleMapper) {
+                                         @NonNull IdentityProviderRoleMapper idpRoleMapper) {
         super(tokenConfiguration, rolesFinder);
         this.userService = userService;
         this.idpRoleMapper = idpRoleMapper;

@@ -9,7 +9,7 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.postgresql.util.PSQLState;
@@ -24,16 +24,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Singleton
-public class UserServiceImpl implements UserService {
+public class DefaultUserService implements UserService {
 
-    private static final Logger LOG = LoggerFactory.getLogger(UserServiceImpl.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultUserService.class);
     private static final String SQL_STATE_UNIQUE_VIOLATION = PSQLState.UNIQUE_VIOLATION.getState();
     private static final String USER_NOT_FOUND = "User not found";
 
     private final UserRepository userRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
-    public UserServiceImpl(UserRepository userRepository, ProjectSecurityService projectSecurityService) {
+    public DefaultUserService(UserRepository userRepository, AuthorizationService projectSecurityService) {
         this.userRepository = userRepository;
         this.projectSecurityService = projectSecurityService;
     }

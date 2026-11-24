@@ -25,7 +25,7 @@ import lol.pbu.kaiju.dto.UsSyncResult;
 import lol.pbu.kaiju.service.AdministrativeRegionService;
 import lol.pbu.kaiju.service.BoundaryIngestionService;
 import lol.pbu.kaiju.service.UsBoundarySyncService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Optional;
@@ -70,7 +70,7 @@ public class AdministrativeRegionController {
      */
     @Get
     public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable @Valid CursoredPageable pageable) {
-        return administrativeRegionService.getAdministrativeRegions(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return administrativeRegionService.getAdministrativeRegions(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**

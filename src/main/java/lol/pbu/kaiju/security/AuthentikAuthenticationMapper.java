@@ -29,9 +29,9 @@ import java.util.Map;
 public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper {
 
     private final UserService userService;
-    private final IdpRoleMapper idpRoleMapper;
+    private final IdentityProviderRoleMapper idpRoleMapper;
 
-    public AuthentikAuthenticationMapper(@NonNull UserService userService, @NonNull IdpRoleMapper idpRoleMapper) {
+    public AuthentikAuthenticationMapper(@NonNull UserService userService, @NonNull IdentityProviderRoleMapper idpRoleMapper) {
         this.userService = userService;
         this.idpRoleMapper = idpRoleMapper;
     }
@@ -56,7 +56,7 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
         }
 
         String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
-        Object groupsObj = openIdClaims.get(IdpRoleMapper.CLAIMS_GROUPS_KEY);
+        Object groupsObj = openIdClaims.get(IdentityProviderRoleMapper.CLAIMS_GROUPS_KEY);
         UserRole initialRole = idpRoleMapper.resolveRoleFromGroupObject(groupsObj);
         User user = userService.provisionOrGetUser(canonicalEmail, initialRole);
 

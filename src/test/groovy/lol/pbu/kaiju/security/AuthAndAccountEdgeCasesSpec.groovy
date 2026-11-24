@@ -9,7 +9,7 @@ import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
-import lol.pbu.kaiju.service.UserServiceImpl
+import lol.pbu.kaiju.service.DefaultUserService
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -20,7 +20,7 @@ class AuthAndAccountEdgeCasesSpec extends Specification {
     AuthentikAuthenticationMapper mapper
 
     @Inject
-    UserServiceImpl userService
+    DefaultUserService userService
 
     @Inject
     UserRepository userRepository
@@ -32,7 +32,7 @@ class AuthAndAccountEdgeCasesSpec extends Specification {
                     if (key == "email_verified") {
                         return emailVerified
                     }
-                    if (key == IdpRoleMapper.CLAIMS_GROUPS_KEY) {
+                    if (key == IdentityProviderRoleMapper.CLAIMS_GROUPS_KEY) {
                         return groups
                     }
                     return null

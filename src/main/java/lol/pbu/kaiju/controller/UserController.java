@@ -19,7 +19,7 @@ import lol.pbu.kaiju.dto.CreateUserCommand;
 import lol.pbu.kaiju.dto.UpdateUserCommand;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.service.UserService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
@@ -52,7 +52,7 @@ public class UserController {
     @Get
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     public CursoredPage<User> getUsers(@Nullable @Valid CursoredPageable pageable) {
-        return userService.getUsers(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return userService.getUsers(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")

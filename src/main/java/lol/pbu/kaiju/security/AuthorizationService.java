@@ -11,7 +11,7 @@ import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.BoundaryRepository;
 import lol.pbu.kaiju.repository.LocationRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
+import lol.pbu.kaiju.repository.PermissionQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -33,7 +33,7 @@ import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 
 @Singleton
-public class ProjectSecurityService {
+public class AuthorizationService {
 
     private static final String USER_NOT_FOUND = "User not found";
     private static final String ACTOR_NOT_FOUND = "Actor user not found";
@@ -42,14 +42,14 @@ public class ProjectSecurityService {
     private static final String OUTSIDE_BOUNDARY_REGION_ERROR =
             "Forbidden: Only system admins or region directors for this area may modify this boundary";
 
-    private final SecurityQueryRepository queryRepository;
+    private final PermissionQueryRepository queryRepository;
     private final UserRepository userRepository;
     private final LocationRepository locationRepository;
     private final BoundaryRepository boundaryRepository;
     private final GeometryFactory geometryFactory;
 
-    public ProjectSecurityService(
-            SecurityQueryRepository queryRepository,
+    public AuthorizationService(
+            PermissionQueryRepository queryRepository,
             UserRepository userRepository,
             LocationRepository locationRepository,
             BoundaryRepository boundaryRepository,

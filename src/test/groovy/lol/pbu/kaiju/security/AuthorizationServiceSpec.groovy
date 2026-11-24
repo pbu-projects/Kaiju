@@ -11,7 +11,7 @@ import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
-import lol.pbu.kaiju.repository.SecurityQueryRepository
+import lol.pbu.kaiju.repository.PermissionQueryRepository
 import lol.pbu.kaiju.service.ShiftService
 import lol.pbu.kaiju.service.UserService
 import org.locationtech.jts.geom.Coordinate
@@ -22,13 +22,13 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 @MicronautTest(transactional = false)
-class ProjectSecurityServiceSpec extends BaseControllerSpec {
+class AuthorizationServiceSpec extends BaseControllerSpec {
 
     @Inject
-    ProjectSecurityService service
+    AuthorizationService service
 
     @Inject
-    SecurityQueryRepository queryRepository
+    PermissionQueryRepository queryRepository
 
     @Inject
     ShiftService shiftService
@@ -915,7 +915,7 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "ShiftServiceImpl allows Regional Admins with jurisdiction and Project Sponsors while denying outsiders"() {
+    def "DefaultShiftService allows Regional Admins with jurisdiction and Project Sponsors while denying outsiders"() {
         given: "two regions, an active project in Region A, and various users"
         Coordinate[] coordsA = [
                 new Coordinate(-105.1, 39.8),
@@ -1049,7 +1049,7 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
         deleteEx.status == HttpStatus.FORBIDDEN
     }
 
-    def "ProjectSecurityService enforces org, region, location, and boundary authorization"() {
+    def "AuthorizationService enforces org, region, location, and boundary authorization"() {
         given: "regions, orgs, location, boundary, and users"
         Coordinate[] coords = [
                 new Coordinate(-105.1, 39.8),

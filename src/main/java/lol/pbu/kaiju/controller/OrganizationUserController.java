@@ -21,8 +21,8 @@ import lol.pbu.kaiju.domain.OrganizationUserId;
 import lol.pbu.kaiju.dto.CreateOrganizationUserCommand;
 import lol.pbu.kaiju.dto.UpdateOrganizationUserCommand;
 import lol.pbu.kaiju.repository.OrganizationUserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.util.Optional;
@@ -39,11 +39,11 @@ public class OrganizationUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final OrganizationUserRepository organizationUserRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public OrganizationUserController(
             OrganizationUserRepository organizationUserRepository,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.organizationUserRepository = organizationUserRepository;
         this.projectSecurityService = projectSecurityService;
@@ -52,7 +52,7 @@ public class OrganizationUserController {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<OrganizationUser> getOrganizationUsers(@Nullable @Valid CursoredPageable pageable) {
-        return organizationUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationUserRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{userId}/{organizationId}")

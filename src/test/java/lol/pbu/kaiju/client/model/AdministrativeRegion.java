@@ -32,6 +32,11 @@ import jakarta.annotation.Generated;
     AdministrativeRegion.JSON_PROPERTY_ID,
     AdministrativeRegion.JSON_PROPERTY_NAME,
     AdministrativeRegion.JSON_PROPERTY_PARENT_REGION_ID,
+    AdministrativeRegion.JSON_PROPERTY_LEVEL,
+    AdministrativeRegion.JSON_PROPERTY_COUNTRY_CODE,
+    AdministrativeRegion.JSON_PROPERTY_STATE_CODE,
+    AdministrativeRegion.JSON_PROPERTY_TIME_ZONE,
+    AdministrativeRegion.JSON_PROPERTY_GEOID,
 })
 @Serdeable
 @Generated("io.micronaut.openapi.generator.JavaMicronautClientCodegen")
@@ -41,6 +46,11 @@ public class AdministrativeRegion {
     public static final String JSON_PROPERTY_ID = "id";
     public static final String JSON_PROPERTY_NAME = "name";
     public static final String JSON_PROPERTY_PARENT_REGION_ID = "parentRegionId";
+    public static final String JSON_PROPERTY_LEVEL = "level";
+    public static final String JSON_PROPERTY_COUNTRY_CODE = "countryCode";
+    public static final String JSON_PROPERTY_STATE_CODE = "stateCode";
+    public static final String JSON_PROPERTY_TIME_ZONE = "timeZone";
+    public static final String JSON_PROPERTY_GEOID = "geoid";
 
     @NotNull
     @Valid
@@ -60,6 +70,31 @@ public class AdministrativeRegion {
     @JsonProperty(JSON_PROPERTY_PARENT_REGION_ID)
     @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
     private UUID parentRegionId;
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_LEVEL)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private Integer level;
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_COUNTRY_CODE)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String countryCode;
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_STATE_CODE)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String stateCode;
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_TIME_ZONE)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String timeZone;
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_GEOID)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String geoid;
 
     public AdministrativeRegion() {
     }
@@ -174,6 +209,136 @@ public class AdministrativeRegion {
         return this;
     }
 
+    /**
+     * @return the level property value
+     */
+    public Integer getLevel() {
+        return level;
+    }
+
+    /**
+     * Set the level property value
+     *
+     * @param level property value to set
+     */
+    public void setLevel(Integer level) {
+        this.level = level;
+    }
+
+    /**
+     * Set level in a chainable fashion.
+     *
+     * @return The same instance of AdministrativeRegion for chaining.
+     */
+    public AdministrativeRegion level(Integer level) {
+        this.level = level;
+        return this;
+    }
+
+    /**
+     * @return the countryCode property value
+     */
+    public String getCountryCode() {
+        return countryCode;
+    }
+
+    /**
+     * Set the countryCode property value
+     *
+     * @param countryCode property value to set
+     */
+    public void setCountryCode(String countryCode) {
+        this.countryCode = countryCode;
+    }
+
+    /**
+     * Set countryCode in a chainable fashion.
+     *
+     * @return The same instance of AdministrativeRegion for chaining.
+     */
+    public AdministrativeRegion countryCode(String countryCode) {
+        this.countryCode = countryCode;
+        return this;
+    }
+
+    /**
+     * @return the stateCode property value
+     */
+    public String getStateCode() {
+        return stateCode;
+    }
+
+    /**
+     * Set the stateCode property value
+     *
+     * @param stateCode property value to set
+     */
+    public void setStateCode(String stateCode) {
+        this.stateCode = stateCode;
+    }
+
+    /**
+     * Set stateCode in a chainable fashion.
+     *
+     * @return The same instance of AdministrativeRegion for chaining.
+     */
+    public AdministrativeRegion stateCode(String stateCode) {
+        this.stateCode = stateCode;
+        return this;
+    }
+
+    /**
+     * @return the timeZone property value
+     */
+    public String getTimeZone() {
+        return timeZone;
+    }
+
+    /**
+     * Set the timeZone property value
+     *
+     * @param timeZone property value to set
+     */
+    public void setTimeZone(String timeZone) {
+        this.timeZone = timeZone;
+    }
+
+    /**
+     * Set timeZone in a chainable fashion.
+     *
+     * @return The same instance of AdministrativeRegion for chaining.
+     */
+    public AdministrativeRegion timeZone(String timeZone) {
+        this.timeZone = timeZone;
+        return this;
+    }
+
+    /**
+     * @return the geoid property value
+     */
+    public String getGeoid() {
+        return geoid;
+    }
+
+    /**
+     * Set the geoid property value
+     *
+     * @param geoid property value to set
+     */
+    public void setGeoid(String geoid) {
+        this.geoid = geoid;
+    }
+
+    /**
+     * Set geoid in a chainable fashion.
+     *
+     * @return The same instance of AdministrativeRegion for chaining.
+     */
+    public AdministrativeRegion geoid(String geoid) {
+        this.geoid = geoid;
+        return this;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -186,12 +351,17 @@ public class AdministrativeRegion {
         return Objects.equals(this.geom, administrativeRegion.geom)
             && Objects.equals(this.id, administrativeRegion.id)
             && Objects.equals(this.name, administrativeRegion.name)
-            && Objects.equals(this.parentRegionId, administrativeRegion.parentRegionId);
+            && Objects.equals(this.parentRegionId, administrativeRegion.parentRegionId)
+            && Objects.equals(this.level, administrativeRegion.level)
+            && Objects.equals(this.countryCode, administrativeRegion.countryCode)
+            && Objects.equals(this.stateCode, administrativeRegion.stateCode)
+            && Objects.equals(this.timeZone, administrativeRegion.timeZone)
+            && Objects.equals(this.geoid, administrativeRegion.geoid);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(geom, id, name, parentRegionId);
+        return Objects.hash(geom, id, name, parentRegionId, level, countryCode, stateCode, timeZone, geoid);
     }
 
     @Override
@@ -200,7 +370,12 @@ public class AdministrativeRegion {
             + "geom: " + getGeom() + ", "
             + "id: " + getId() + ", "
             + "name: " + getName() + ", "
-            + "parentRegionId: " + getParentRegionId()
+            + "parentRegionId: " + getParentRegionId() + ", "
+            + "level: " + getLevel() + ", "
+            + "countryCode: " + getCountryCode() + ", "
+            + "stateCode: " + getStateCode() + ", "
+            + "timeZone: " + getTimeZone() + ", "
+            + "geoid: " + getGeoid()
             + ")";
     }
 

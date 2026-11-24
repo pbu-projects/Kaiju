@@ -12,7 +12,7 @@ import io.micronaut.serde.ObjectMapper
 import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.validation.validator.Validator as MicronautValidator
 import jakarta.validation.Validator
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateOrganizationCommand
 import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.IngestBoundaryCommand
@@ -57,15 +57,15 @@ class SpatialAndInputValidationSpec extends Specification {
     JtsPointConverter pointConverter = new JtsPointConverter()
     JtsPolygonConverter polygonConverter = new JtsPolygonConverter()
 
-    // --- PageableUtils tests ---
+    // --- PageRequests tests ---
 
     def "null pageable defaults to size 20 and sorts by given field"() {
         when:
-        CursoredPageable resolved = PageableUtils.resolvePageable(null, "name")
+        CursoredPageable resolved = PageRequests.resolvePageable(null, "name")
 
         then:
         verifyAll(resolved) {
-            size == PageableUtils.DEFAULT_PAGE_SIZE
+            size == PageRequests.DEFAULT_PAGE_SIZE
             size == 20
             sort.orderBy.size() == 1
             sort.orderBy[0].property == "name"
@@ -87,11 +87,11 @@ class SpatialAndInputValidationSpec extends Specification {
         )
 
         when:
-        CursoredPageable resolved = PageableUtils.resolvePageable(oversized, "name")
+        CursoredPageable resolved = PageRequests.resolvePageable(oversized, "name")
 
         then:
         verifyAll(resolved) {
-            size == PageableUtils.MAX_PAGE_SIZE
+            size == PageRequests.MAX_PAGE_SIZE
             size == 100
             number == 3
             mode == Pageable.Mode.CURSOR_NEXT
@@ -114,7 +114,7 @@ class SpatialAndInputValidationSpec extends Specification {
         )
 
         when:
-        CursoredPageable resolved = PageableUtils.resolvePageable(requested, "name")
+        CursoredPageable resolved = PageRequests.resolvePageable(requested, "name")
 
         then:
         verifyAll(resolved) {
@@ -244,10 +244,10 @@ class SpatialAndInputValidationSpec extends Specification {
 
     def "toPolygon rejects NaN, Infinity, and out-of-range WGS84 coordinates"() {
         given:
-        List<CoordinateDto> coords = [
-                new CoordinateDto(0.0d, 0.0d),
-                new CoordinateDto(1.0d, 0.0d),
-                new CoordinateDto(badLon, badLat)
+        List<Coordinates> coords = [
+                new Coordinates(0.0d, 0.0d),
+                new Coordinates(1.0d, 0.0d),
+                new Coordinates(badLon, badLat)
         ]
 
         when:
@@ -277,17 +277,17 @@ class SpatialAndInputValidationSpec extends Specification {
 
         where:
         coords << [
-                [new CoordinateDto(0.0d, 0.0d), null, new CoordinateDto(1.0d, 1.0d)],
-                [new CoordinateDto(0.0d, 0.0d), new CoordinateDto(null, 0.0d), new CoordinateDto(1.0d, 1.0d)],
-                [new CoordinateDto(0.0d, 0.0d), new CoordinateDto(1.0d, null), new CoordinateDto(1.0d, 1.0d)]
+                [new Coordinates(0.0d, 0.0d), null, new Coordinates(1.0d, 1.0d)],
+                [new Coordinates(0.0d, 0.0d), new Coordinates(null, 0.0d), new Coordinates(1.0d, 1.0d)],
+                [new Coordinates(0.0d, 0.0d), new Coordinates(1.0d, null), new Coordinates(1.0d, 1.0d)]
         ]
     }
 
     def "toPolygon rejects polygons with more than 10000 vertices"() {
         given:
-        List<CoordinateDto> coords = (0..<10_001).collect { int i ->
+        List<Coordinates> coords = (0..<10_001).collect { int i ->
             double angle = (2.0d * Math.PI * i) / 10_001.0d
-            new CoordinateDto(Math.cos(angle), Math.sin(angle))
+            new Coordinates(Math.cos(angle), Math.sin(angle))
         }
 
         when:

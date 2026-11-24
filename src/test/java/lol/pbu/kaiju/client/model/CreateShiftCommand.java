@@ -72,6 +72,7 @@ public class CreateShiftCommand {
     private UUID locationId;
 
     @Nullable
+    @Size(max = 50, message = "A shift cannot have more than 50 tags.")
     @JsonProperty(JSON_PROPERTY_TAG_IDS)
     @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
     private List<@NotNull UUID> tagIds;

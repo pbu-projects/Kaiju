@@ -20,7 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import lol.pbu.kaiju.client.model.CoordinateDto;
+import lol.pbu.kaiju.client.model.Coordinates;
 import com.fasterxml.jackson.annotation.*;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.*;
@@ -50,9 +50,9 @@ public class CreateAdministrativeRegionCommand {
     private String name;
 
     @NotNull(message = "Region coordinates are required.")
-    @Size(min = 3, message = "A region polygon must contain at least 3 coordinates.")
+    @Size(min = 3, max = 5000, message = "A region polygon must contain between 3 and 5000 coordinates.")
     @JsonProperty(JSON_PROPERTY_COORDINATES)
-    private List<@Valid CoordinateDto> coordinates = new ArrayList<>();
+    private List<@Valid Coordinates> coordinates = new ArrayList<>();
 
     @Nullable
     @JsonProperty(JSON_PROPERTY_PARENT_REGION_ID)
@@ -62,7 +62,7 @@ public class CreateAdministrativeRegionCommand {
     public CreateAdministrativeRegionCommand() {
     }
 
-    public CreateAdministrativeRegionCommand(String name, List<@Valid CoordinateDto> coordinates) {
+    public CreateAdministrativeRegionCommand(String name, List<@Valid Coordinates> coordinates) {
         this.name = name;
         this.coordinates = coordinates;
     }
@@ -96,7 +96,7 @@ public class CreateAdministrativeRegionCommand {
     /**
      * @return the coordinates property value
      */
-    public List<@Valid CoordinateDto> getCoordinates() {
+    public List<@Valid Coordinates> getCoordinates() {
         return coordinates;
     }
 
@@ -105,7 +105,7 @@ public class CreateAdministrativeRegionCommand {
      *
      * @param coordinates property value to set
      */
-    public void setCoordinates(List<@Valid CoordinateDto> coordinates) {
+    public void setCoordinates(List<@Valid Coordinates> coordinates) {
         this.coordinates = coordinates;
     }
 
@@ -114,7 +114,7 @@ public class CreateAdministrativeRegionCommand {
      *
      * @return The same instance of CreateAdministrativeRegionCommand for chaining.
      */
-    public CreateAdministrativeRegionCommand coordinates(List<@Valid CoordinateDto> coordinates) {
+    public CreateAdministrativeRegionCommand coordinates(List<@Valid Coordinates> coordinates) {
         this.coordinates = coordinates;
         return this;
     }
@@ -124,7 +124,7 @@ public class CreateAdministrativeRegionCommand {
      *
      * @return The same instance of CreateAdministrativeRegionCommand for chaining.
      */
-    public CreateAdministrativeRegionCommand addCoordinatesItem(CoordinateDto coordinatesItem) {
+    public CreateAdministrativeRegionCommand addCoordinatesItem(Coordinates coordinatesItem) {
         coordinates.add(coordinatesItem);
         return this;
     }

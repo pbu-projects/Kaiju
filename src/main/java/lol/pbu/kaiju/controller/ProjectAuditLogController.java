@@ -12,7 +12,7 @@ import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.ProjectAuditLog;
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -36,7 +36,7 @@ public class ProjectAuditLogController {
 
     @Get
     public CursoredPage<ProjectAuditLog> getProjectAuditLogs(@Nullable @Valid CursoredPageable pageable) {
-        return projectAuditLogRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return projectAuditLogRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")

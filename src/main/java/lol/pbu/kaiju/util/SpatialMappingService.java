@@ -1,7 +1,7 @@
 package lol.pbu.kaiju.util;
 
 import jakarta.inject.Singleton;
-import lol.pbu.kaiju.dto.CoordinateDto;
+import lol.pbu.kaiju.dto.Coordinates;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
@@ -30,7 +30,7 @@ public class SpatialMappingService {
         return geometryFactory.createPoint(new Coordinate(longitude, latitude));
     }
 
-    public Polygon toPolygon(List<CoordinateDto> dtos) {
+    public Polygon toPolygon(List<Coordinates> dtos) {
         if (dtos == null || dtos.size() < 3) {
             throw new IllegalArgumentException("A polygon requires at least 3 coordinates.");
         }
@@ -50,7 +50,7 @@ public class SpatialMappingService {
         return geometryFactory.createPolygon(ring);
     }
 
-    private Coordinate toValidatedCoordinate(CoordinateDto dto) {
+    private Coordinate toValidatedCoordinate(Coordinates dto) {
         if (dto == null || dto.longitude() == null || dto.latitude() == null) {
             throw new IllegalArgumentException("Polygon coordinates must not contain null elements.");
         }

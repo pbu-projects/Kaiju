@@ -28,7 +28,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     UserService userService
 
     @Inject
-    IdpRoleMapper idpRoleMapper
+    IdentityProviderRoleMapper idpRoleMapper
 
     @Inject
     UserRepository userRepository

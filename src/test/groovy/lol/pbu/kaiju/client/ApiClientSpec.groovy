@@ -21,7 +21,7 @@ import lol.pbu.kaiju.client.model.CursoredPageUser
 import lol.pbu.kaiju.client.model.Organization
 import lol.pbu.kaiju.client.model.OrganizationUser
 import lol.pbu.kaiju.client.model.RegionUser
-import lol.pbu.kaiju.client.model.RoleUpdateRequest
+import lol.pbu.kaiju.client.model.UpdateUserRoleCommand
 import lol.pbu.kaiju.client.model.Tag
 import lol.pbu.kaiju.client.model.UpdateTagCommand
 import lol.pbu.kaiju.client.model.User
@@ -139,7 +139,7 @@ class ApiClientSpec extends BaseControllerSpec {
         }
 
         when: "updating user role"
-        RoleUpdateRequest roleRequest = new RoleUpdateRequest(UserRole.REGION_AGENT)
+        UpdateUserRoleCommand roleRequest = new UpdateUserRoleCommand(UserRole.REGION_AGENT)
         User updatedUser = defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, roleRequest)
 
         then: "user role is updated"
@@ -149,7 +149,7 @@ class ApiClientSpec extends BaseControllerSpec {
         }
 
         cleanup:
-        defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, new RoleUpdateRequest(UserRole.STANDARD_USER))
+        defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, new UpdateUserRoleCommand(UserRole.STANDARD_USER))
     }
 
     def "can create update and delete tags"() {

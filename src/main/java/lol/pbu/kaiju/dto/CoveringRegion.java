@@ -8,7 +8,7 @@ import java.util.UUID;
 
 @Introspected
 @Serdeable
-public record CoveringRegionDto(
+public record CoveringRegion(
         UUID id,
         String name,
         @Nullable Integer level,

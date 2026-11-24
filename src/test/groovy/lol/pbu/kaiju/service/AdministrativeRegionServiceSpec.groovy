@@ -9,7 +9,7 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import lol.pbu.kaiju.dto.RegionCoordinateResolution
@@ -53,12 +53,12 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             double maxLon,
             double maxLat
     ) {
-        List<CoordinateDto> coords = [
-                new CoordinateDto(minLon, minLat),
-                new CoordinateDto(maxLon, minLat),
-                new CoordinateDto(maxLon, maxLat),
-                new CoordinateDto(minLon, maxLat),
-                new CoordinateDto(minLon, minLat)
+        List<Coordinates> coords = [
+                new Coordinates(minLon, minLat),
+                new Coordinates(maxLon, minLat),
+                new Coordinates(maxLon, maxLat),
+                new Coordinates(minLon, maxLat),
+                new Coordinates(minLon, minLat)
         ]
         Polygon polygon = spatialMappingService.toPolygon(coords)
         AdministrativeRegion region = new AdministrativeRegion(
@@ -77,24 +77,24 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         return saved
     }
 
-    private List<CoordinateDto> validCoordinates() {
+    private List<Coordinates> validCoordinates() {
         [
-                new CoordinateDto(-105.0, 39.0),
-                new CoordinateDto(-104.0, 39.0),
-                new CoordinateDto(-104.0, 40.0),
-                new CoordinateDto(-105.0, 40.0),
-                new CoordinateDto(-105.0, 39.0)
+                new Coordinates(-105.0, 39.0),
+                new Coordinates(-104.0, 39.0),
+                new Coordinates(-104.0, 40.0),
+                new Coordinates(-105.0, 40.0),
+                new Coordinates(-105.0, 39.0)
         ]
     }
 
-    private List<CoordinateDto> bowtieCoordinates() {
+    private List<Coordinates> bowtieCoordinates() {
         // Self-intersecting figure-8 bowtie polygon (topologically invalid)
         [
-                new CoordinateDto(0.0, 0.0),
-                new CoordinateDto(2.0, 2.0),
-                new CoordinateDto(2.0, 0.0),
-                new CoordinateDto(0.0, 2.0),
-                new CoordinateDto(0.0, 0.0)
+                new Coordinates(0.0, 0.0),
+                new Coordinates(2.0, 2.0),
+                new Coordinates(2.0, 0.0),
+                new Coordinates(0.0, 2.0),
+                new Coordinates(0.0, 0.0)
         ]
     }
 
@@ -808,11 +808,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         given: "a state and a level 3 independent city whose parentRegionId points directly to the state"
         AdministrativeRegion state = createRegionWithMetadata("Virginia State", 1, "VA", "America/New_York", -79.0, 36.5, -75.0, 39.5)
         Polygon countyPoly = spatialMappingService.toPolygon([
-                new CoordinateDto(-78.0, 37.0),
-                new CoordinateDto(-77.5, 37.0),
-                new CoordinateDto(-77.5, 37.5),
-                new CoordinateDto(-78.0, 37.5),
-                new CoordinateDto(-78.0, 37.0)
+                new Coordinates(-78.0, 37.0),
+                new Coordinates(-77.5, 37.0),
+                new Coordinates(-77.5, 37.5),
+                new Coordinates(-78.0, 37.5),
+                new Coordinates(-78.0, 37.0)
         ])
         AdministrativeRegion realCounty = regionRepository.save(new AdministrativeRegion(
                 null, "Henrico County", state.id(), countyPoly, 2, "US", "VA", "America/New_York", "51087"
@@ -820,11 +820,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         track(realCounty)
 
         Polygon cityPoly = spatialMappingService.toPolygon([
-                new CoordinateDto(-77.6, 37.4),
-                new CoordinateDto(-77.4, 37.4),
-                new CoordinateDto(-77.4, 37.6),
-                new CoordinateDto(-77.6, 37.6),
-                new CoordinateDto(-77.6, 37.4)
+                new Coordinates(-77.6, 37.4),
+                new Coordinates(-77.4, 37.4),
+                new Coordinates(-77.4, 37.6),
+                new Coordinates(-77.6, 37.6),
+                new Coordinates(-77.6, 37.4)
         ])
         AdministrativeRegion independentCity = regionRepository.save(new AdministrativeRegion(
                 null, "Richmond City", state.id(), cityPoly, 3, "US", "VA", "America/New_York", "5167000"
@@ -847,11 +847,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         given: "a state with two adjacent counties"
         AdministrativeRegion state = createRegionWithMetadata("Test Multi County State", 1, "MC", "America/Denver", -106.0, 38.0, -104.0, 40.0)
         Polygon countyAPoly = spatialMappingService.toPolygon([
-                new CoordinateDto(-105.5, 39.0),
-                new CoordinateDto(-105.0, 39.0),
-                new CoordinateDto(-105.0, 39.5),
-                new CoordinateDto(-105.5, 39.5),
-                new CoordinateDto(-105.5, 39.0)
+                new Coordinates(-105.5, 39.0),
+                new Coordinates(-105.0, 39.0),
+                new Coordinates(-105.0, 39.5),
+                new Coordinates(-105.5, 39.5),
+                new Coordinates(-105.5, 39.0)
         ])
         AdministrativeRegion countyA = regionRepository.save(new AdministrativeRegion(
                 null, "Alpha County", state.id(), countyAPoly, 2, "US", "MC", "America/Denver", "99001"
@@ -859,11 +859,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         track(countyA)
 
         Polygon countyBPoly = spatialMappingService.toPolygon([
-                new CoordinateDto(-105.0, 39.0),
-                new CoordinateDto(-104.5, 39.0),
-                new CoordinateDto(-104.5, 39.5),
-                new CoordinateDto(-105.0, 39.5),
-                new CoordinateDto(-105.0, 39.0)
+                new Coordinates(-105.0, 39.0),
+                new Coordinates(-104.5, 39.0),
+                new Coordinates(-104.5, 39.5),
+                new Coordinates(-105.0, 39.5),
+                new Coordinates(-105.0, 39.0)
         ])
         AdministrativeRegion countyB = regionRepository.save(new AdministrativeRegion(
                 null, "Beta County", state.id(), countyBPoly, 2, "US", "MC", "America/Denver", "99003"
@@ -872,11 +872,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
         and: "a city whose parentRegionId is Alpha County but whose geometry spans both Alpha and Beta"
         Polygon cityPoly = spatialMappingService.toPolygon([
-                new CoordinateDto(-105.2, 39.1),
-                new CoordinateDto(-104.8, 39.1),
-                new CoordinateDto(-104.8, 39.3),
-                new CoordinateDto(-105.2, 39.3),
-                new CoordinateDto(-105.2, 39.1)
+                new Coordinates(-105.2, 39.1),
+                new Coordinates(-104.8, 39.1),
+                new Coordinates(-104.8, 39.3),
+                new Coordinates(-105.2, 39.3),
+                new Coordinates(-105.2, 39.1)
         ])
         AdministrativeRegion sharedCity = regionRepository.save(new AdministrativeRegion(
                 null, "Splitville City", countyA.id(), cityPoly, 3, "US", "MC", "America/Denver", "9950000"

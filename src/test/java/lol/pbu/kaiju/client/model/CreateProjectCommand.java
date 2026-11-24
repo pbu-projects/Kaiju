@@ -76,7 +76,7 @@ public class CreateProjectCommand {
     private ProjectType projectType;
 
     @NotNull(message = "Project boundaries are required.")
-    @Size(min = 1, message = "Project boundaries must not be empty.")
+    @Size(min = 1, max = 50, message = "Project cannot have more than 50 boundaries.")
     @JsonProperty(JSON_PROPERTY_BOUNDARIES)
     private List<@Valid ProjectBoundaryCommand> boundaries = new ArrayList<>();
 
@@ -91,6 +91,7 @@ public class CreateProjectCommand {
     private ProjectStatus status;
 
     @Nullable
+    @Size(max = 50, message = "Project cannot have more than 50 locations.")
     @JsonProperty(JSON_PROPERTY_LOCATIONS)
     @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
     private List<@Valid ProjectLocationCommand> locations;

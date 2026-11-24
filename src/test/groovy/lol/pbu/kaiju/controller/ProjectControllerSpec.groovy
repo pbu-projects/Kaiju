@@ -12,7 +12,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateProjectCommand
 import lol.pbu.kaiju.dto.ProjectBoundaryCommand
 import lol.pbu.kaiju.dto.ProjectLocationCommand
@@ -26,7 +26,7 @@ import lol.pbu.kaiju.repository.OrganizationRepository
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.UserRepository
-import lol.pbu.kaiju.security.ProjectSecurityService
+import lol.pbu.kaiju.security.AuthorizationService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import spock.lang.Shared
@@ -52,7 +52,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     ProjectController projectController
 
     @Inject
-    ProjectSecurityService realProjectSecurityService
+    AuthorizationService realProjectSecurityService
 
     @Inject
     OrganizationRepository organizationRepository
@@ -81,10 +81,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 new ProjectBoundaryCommand(
                         name,
                         [
-                                new CoordinateDto(-105.0, 39.0),
-                                new CoordinateDto(-104.0, 39.0),
-                                new CoordinateDto(-104.0, 40.0),
-                                new CoordinateDto(-105.0, 39.0)
+                                new Coordinates(-105.0, 39.0),
+                                new Coordinates(-104.0, 39.0),
+                                new Coordinates(-104.0, 40.0),
+                                new Coordinates(-105.0, 39.0)
                         ]
                 )
         ]
@@ -179,10 +179,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def bndCmd = new ProjectBoundaryCommand(
                 "Mass Assign Bnd",
                 [
-                        new CoordinateDto(-105.0, 39.0),
-                        new CoordinateDto(-104.0, 39.0),
-                        new CoordinateDto(-104.0, 40.0),
-                        new CoordinateDto(-105.0, 39.0)
+                        new Coordinates(-105.0, 39.0),
+                        new Coordinates(-104.0, 39.0),
+                        new Coordinates(-104.0, 40.0),
+                        new Coordinates(-105.0, 39.0)
                 ]
         )
         def command = new CreateProjectCommand(

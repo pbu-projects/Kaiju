@@ -30,7 +30,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
     UserService userService
 
     @Inject
-    IdpRoleMapper idpRoleMapper
+    IdentityProviderRoleMapper idpRoleMapper
 
     @Inject
     AuthentikAuthenticationMapper mapper

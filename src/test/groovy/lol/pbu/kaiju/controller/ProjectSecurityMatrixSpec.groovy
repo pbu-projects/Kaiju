@@ -11,7 +11,7 @@ import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.model.VerificationStatus
-import lol.pbu.kaiju.security.ProjectSecurityService
+import lol.pbu.kaiju.security.AuthorizationService
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.Point
 import org.locationtech.jts.io.WKTReader
@@ -24,7 +24,7 @@ import static lol.pbu.kaiju.model.ProjectStatus.PENDING
 class ProjectSecurityMatrixSpec extends BaseControllerSpec {
 
     @Inject
-    ProjectSecurityService projectSecurityService
+    AuthorizationService projectSecurityService
 
     // Simplified polygon roughly tracing the civic boundary of Denver, Colorado
     static final String DENVER_WKT = "POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))"

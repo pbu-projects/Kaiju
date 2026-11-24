@@ -6,7 +6,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Boundary
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateBoundaryCommand
 import lol.pbu.kaiju.dto.UpdateBoundaryCommand
 import lol.pbu.kaiju.repository.BoundaryRepository
@@ -45,13 +45,13 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         geometryFactory.createPolygon(coords)
     }
 
-    private List<CoordinateDto> createCoordinateDtos() {
+    private List<Coordinates> createCoordinateDtos() {
         [
-                new CoordinateDto(0.0, 0.0),
-                new CoordinateDto(0.0, 1.0),
-                new CoordinateDto(1.0, 1.0),
-                new CoordinateDto(1.0, 0.0),
-                new CoordinateDto(0.0, 0.0)
+                new Coordinates(0.0, 0.0),
+                new Coordinates(0.0, 1.0),
+                new Coordinates(1.0, 1.0),
+                new Coordinates(1.0, 0.0),
+                new Coordinates(0.0, 0.0)
         ]
     }
 
@@ -66,13 +66,13 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         geometryFactory.createPolygon(coords)
     }
 
-    private List<CoordinateDto> createDenverCoordinateDtos() {
+    private List<Coordinates> createDenverCoordinateDtos() {
         [
-                new CoordinateDto(-105.00, 39.73),
-                new CoordinateDto(-104.98, 39.73),
-                new CoordinateDto(-104.98, 39.75),
-                new CoordinateDto(-105.00, 39.75),
-                new CoordinateDto(-105.00, 39.73)
+                new Coordinates(-105.00, 39.73),
+                new Coordinates(-104.98, 39.73),
+                new Coordinates(-104.98, 39.75),
+                new Coordinates(-105.00, 39.75),
+                new Coordinates(-105.00, 39.73)
         ]
     }
 

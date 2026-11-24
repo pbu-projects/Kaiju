@@ -7,7 +7,7 @@ import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.AdministrativeRegion
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand
 import lol.pbu.kaiju.dto.UsSyncResult
@@ -83,13 +83,13 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         return geometryFactory.createPolygon(coords)
     }
 
-    private List<CoordinateDto> createCoordinateDtos() {
+    private List<Coordinates> createCoordinateDtos() {
         [
-                new CoordinateDto(-105.0, 39.0),
-                new CoordinateDto(-104.0, 39.0),
-                new CoordinateDto(-104.0, 40.0),
-                new CoordinateDto(-105.0, 40.0),
-                new CoordinateDto(-105.0, 39.0)
+                new Coordinates(-105.0, 39.0),
+                new Coordinates(-104.0, 39.0),
+                new Coordinates(-104.0, 40.0),
+                new Coordinates(-105.0, 40.0),
+                new Coordinates(-105.0, 39.0)
         ]
     }
 

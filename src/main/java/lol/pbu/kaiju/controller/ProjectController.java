@@ -35,9 +35,9 @@ import lol.pbu.kaiju.dto.UpdateProjectCommand;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.ProjectService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -60,13 +60,13 @@ public class ProjectController {
     private final ProjectService projectService;
     private final ProjectRepository projectRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public ProjectController(
             ProjectService projectService,
             ProjectRepository projectRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.projectService = projectService;
         this.projectRepository = projectRepository;
@@ -85,7 +85,7 @@ public class ProjectController {
             @Nullable @Valid CursoredPageable pageable,
             @Nullable Principal principal
     ) {
-        CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
+        CursoredPageable resolved = PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         boolean hasTitle = title != null && !title.isBlank();
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
         if (projectSecurityService.isSystemAdmin(userId)) {

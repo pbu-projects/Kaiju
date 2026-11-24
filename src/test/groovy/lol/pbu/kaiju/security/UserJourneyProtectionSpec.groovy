@@ -11,7 +11,7 @@ import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.UpdateBoundaryCommand
 import lol.pbu.kaiju.dto.UpdateLocationCommand
@@ -38,7 +38,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
     OrganizationService organizationService
 
     @Inject
-    ProjectSecurityService projectSecurityService
+    AuthorizationService projectSecurityService
 
     def "org manager can view own draft project while outsider gets 403 and deleted project returns 404"() {
         given: "a draft project and a soft-deleted active project for Denver Metro Branch"
@@ -469,11 +469,11 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         def moveBoundaryCmd = new UpdateBoundaryCommand(
                 "Moved to Boulder",
                 [
-                        new CoordinateDto(-105.2805, 40.0050),
-                        new CoordinateDto(-105.2605, 40.0050),
-                        new CoordinateDto(-105.2605, 40.0250),
-                        new CoordinateDto(-105.2805, 40.0250),
-                        new CoordinateDto(-105.2805, 40.0050)
+                        new Coordinates(-105.2805, 40.0050),
+                        new Coordinates(-105.2605, 40.0050),
+                        new Coordinates(-105.2605, 40.0250),
+                        new Coordinates(-105.2805, 40.0250),
+                        new Coordinates(-105.2805, 40.0050)
                 ]
         )
 

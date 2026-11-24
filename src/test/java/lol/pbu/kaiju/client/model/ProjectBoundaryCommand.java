@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import lol.pbu.kaiju.client.model.CoordinateDto;
+import lol.pbu.kaiju.client.model.Coordinates;
 import com.fasterxml.jackson.annotation.*;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.*;
@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * ProjectBoundaryCommand
+ * Child boundary command embedded inside Project commands. CRITICAL: Contains NO 'id' field, eliminating child entity mass assignment (Issue #26).
  */
 @JsonPropertyOrder({
     ProjectBoundaryCommand.JSON_PROPERTY_NAME,
@@ -47,14 +47,14 @@ public class ProjectBoundaryCommand {
     private String name;
 
     @NotNull(message = "Boundary coordinates are required.")
-    @Size(min = 3, message = "A polygon boundary must contain at least 3 coordinates.")
+    @Size(min = 3, max = 5000, message = "A polygon boundary must contain between 3 and 5000 coordinates.")
     @JsonProperty(JSON_PROPERTY_COORDINATES)
-    private List<@Valid CoordinateDto> coordinates = new ArrayList<>();
+    private List<@Valid Coordinates> coordinates = new ArrayList<>();
 
     public ProjectBoundaryCommand() {
     }
 
-    public ProjectBoundaryCommand(String name, List<@Valid CoordinateDto> coordinates) {
+    public ProjectBoundaryCommand(String name, List<@Valid Coordinates> coordinates) {
         this.name = name;
         this.coordinates = coordinates;
     }
@@ -88,7 +88,7 @@ public class ProjectBoundaryCommand {
     /**
      * @return the coordinates property value
      */
-    public List<@Valid CoordinateDto> getCoordinates() {
+    public List<@Valid Coordinates> getCoordinates() {
         return coordinates;
     }
 
@@ -97,7 +97,7 @@ public class ProjectBoundaryCommand {
      *
      * @param coordinates property value to set
      */
-    public void setCoordinates(List<@Valid CoordinateDto> coordinates) {
+    public void setCoordinates(List<@Valid Coordinates> coordinates) {
         this.coordinates = coordinates;
     }
 
@@ -106,7 +106,7 @@ public class ProjectBoundaryCommand {
      *
      * @return The same instance of ProjectBoundaryCommand for chaining.
      */
-    public ProjectBoundaryCommand coordinates(List<@Valid CoordinateDto> coordinates) {
+    public ProjectBoundaryCommand coordinates(List<@Valid Coordinates> coordinates) {
         this.coordinates = coordinates;
         return this;
     }
@@ -116,7 +116,7 @@ public class ProjectBoundaryCommand {
      *
      * @return The same instance of ProjectBoundaryCommand for chaining.
      */
-    public ProjectBoundaryCommand addCoordinatesItem(CoordinateDto coordinatesItem) {
+    public ProjectBoundaryCommand addCoordinatesItem(Coordinates coordinatesItem) {
         coordinates.add(coordinatesItem);
         return this;
     }

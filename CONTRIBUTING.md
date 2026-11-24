@@ -15,19 +15,9 @@ Do not rewrite or reinvent established patterns. Follow the canonical documentat
 
 ---
 
-## 2. Code Style & Import Standards
+## 2. Code Style & Naming
 
-We follow the [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html) with strict enforcement of import hygiene and clean code practices:
-
-* **Explicit Imports (Google Java Style §3.3):**
-  - **No Wildcard Imports:** Wildcard imports (`import foo.bar.*`) are strictly prohibited (Google Java Style §3.3.1).
-  - **No Inline FQDNs / FQCNs:** **NEVER** use fully qualified domain/class names (e.g., `java.util.List`, `jakarta.validation.constraints.NotNull`, `org.slf4j.Logger`) inline within Java or Groovy code bodies, method signatures, return types, field definitions, or annotations.
-  - **Always Declare Explicit Imports:** Always declare appropriate, explicit `import` statements at the top of the file.
-  - **Name Collisions Exception:** The *only* exception to inline FQCN usage is resolving an unavoidable simple-name collision between two imported types in the same file (e.g., `java.util.Date` vs `java.sql.Date`).
-* **Quality & Reliability Standards (SonarClean):**
-  - **Thread-Safety & Lifecycle:** Avoid unmanaged `ThreadLocal` allocations in singleton beans (Sonar rule `java:S5164`). Prefer lightweight direct instantiation or managed container lifecycles.
-  - **Control Flow:** Avoid nested ternary operators (Sonar rule `java:S3358`) and collapsible nested `if` statements (Sonar rule `java:S1066`).
-  - **Null Safety:** Return empty collections or empty arrays rather than `null` from query and builder methods.
+See [Style Guide](STYLEGUIDE.md) for naming conventions, import hygiene, SonarClean rules, and code style standards.
 
 ---
 

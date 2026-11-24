@@ -21,7 +21,7 @@ import lol.pbu.kaiju.dto.CreateTagCommand;
 import lol.pbu.kaiju.dto.UpdateTagCommand;
 import lol.pbu.kaiju.repository.TagRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -62,7 +62,7 @@ public class TagController {
      */
     @Get
     public CursoredPage<Tag> getTags(@Nullable @Valid CursoredPageable pageable) {
-        return tagRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return tagRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**

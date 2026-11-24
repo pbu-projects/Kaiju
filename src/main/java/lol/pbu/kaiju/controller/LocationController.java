@@ -19,8 +19,8 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.dto.CreateLocationCommand;
 import lol.pbu.kaiju.dto.UpdateLocationCommand;
 import lol.pbu.kaiju.repository.LocationRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -46,12 +46,12 @@ public class LocationController {
 
     private final LocationRepository locationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public LocationController(
             LocationRepository locationRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.locationRepository = locationRepository;
         this.spatialMappingService = spatialMappingService;
@@ -60,7 +60,7 @@ public class LocationController {
 
     @Get
     public CursoredPage<Location> getLocations(@Nullable @Valid CursoredPageable pageable) {
-        return locationRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return locationRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")

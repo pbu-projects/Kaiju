@@ -4,12 +4,12 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.Sort;
 
-public final class PageableUtils {
+public final class PageRequests {
 
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
 
-    private PageableUtils() {
+    private PageRequests() {
     }
 
     public static CursoredPageable resolvePageable(@Nullable CursoredPageable pageable, String sortField) {

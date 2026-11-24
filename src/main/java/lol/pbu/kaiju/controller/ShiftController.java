@@ -23,9 +23,9 @@ import lol.pbu.kaiju.dto.CreateShiftCommand;
 import lol.pbu.kaiju.dto.UpdateShiftCommand;
 import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.repository.TagRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.ShiftService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.util.List;
@@ -46,13 +46,13 @@ public class ShiftController {
     private final ShiftService shiftService;
     private final LocationRepository locationRepository;
     private final TagRepository tagRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService projectSecurityService;
 
     public ShiftController(
             ShiftService shiftService,
             LocationRepository locationRepository,
             TagRepository tagRepository,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService projectSecurityService
     ) {
         this.shiftService = shiftService;
         this.locationRepository = locationRepository;
@@ -66,7 +66,7 @@ public class ShiftController {
 
     @Get
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable, @Nullable Principal principal) {
-        CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
+        CursoredPageable resolved = PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
         if (projectSecurityService.isSystemAdmin(userId)) {
             return shiftService.getShifts(resolved);
