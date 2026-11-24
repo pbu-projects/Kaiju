@@ -6,7 +6,7 @@ info:
   contact:
     name: Peanut Butter Unicorn
     url: https://kaiju.pbu.lol
-  version: 0.0.5
+  version: 0.1.0
 servers:
 - url: /
   description: Current Server
