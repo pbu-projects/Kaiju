@@ -81,8 +81,7 @@ public class LocationController {
     public Location addLocation(@Valid @Body CreateLocationRequest request, Principal principal) {
         Point point = spatialMappingService.toPoint(request.longitude(), request.latitude());
         authorizationService.authorizeLocationCreate(UUID.fromString(principal.getName()), point);
-        Location location = new Location(
-                null,
+        Location location = Location.forCreation(
                 request.name(),
                 request.addressLine(),
                 request.city(),
@@ -115,8 +114,7 @@ public class LocationController {
         Location existing = locationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND));
         String timezone = resolveUpdatedTimezone(existing, point, request.timezone());
-        Location location = new Location(
-                id,
+        Location location = existing.withUpdatedDetails(
                 request.name(),
                 request.addressLine(),
                 request.city(),

@@ -35,6 +35,18 @@ public record Boundary(
     public Geometry geom() {
         return geom;
     }
+    public static Boundary forId(@NotNull UUID id) {
+        return new Boundary(id, null, null);
+    }
+
+    public static Boundary forCreation(@NotNull String name, @NotNull Geometry geom) {
+        return new Boundary(null, name, geom);
+    }
+
+    public static Boundary forUpdate(@NotNull UUID id, @NotNull String name, @NotNull Geometry geom) {
+        return new Boundary(id, name, geom);
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing boundary ID and assign that to
      * the boundary properties in this boundary record.

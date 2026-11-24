@@ -87,7 +87,7 @@ public class ProjectController {
         if (authorizationService.isSystemAdmin(userId)) {
             return hasTitle
                     ? projectRepository.findByTitleAndDeletedAtIsNull(title, resolved)
-                    : projectRepository.findByDeletedAtIsNull(resolved);
+                    : projectService.getProjects(resolved);
         }
         return hasTitle
                 ? projectRepository.findByTitleAndStatusAndDeletedAtIsNull(title, ProjectStatus.ACTIVE, resolved)
@@ -97,7 +97,7 @@ public class ProjectController {
     @Secured(IS_ANONYMOUS)
     @Get("/{id}")
     public Optional<Project> getProject(@PathVariable UUID id, @Nullable Principal principal) {
-        Optional<Project> projectOpt = projectRepository.findByIdAndDeletedAtIsNull(id);
+        Optional<Project> projectOpt = projectService.getProjectById(id);
         if (projectOpt.isEmpty()) {
             return Optional.empty();
         }
@@ -118,26 +118,22 @@ public class ProjectController {
     @Post
     public Project submitProject(@Valid @Body CreateProjectRequest request, Principal principal) {
         Organization org = request.organizationId() != null
-                ? new Organization(request.organizationId(), null, null, null, true, null, null, null)
+                ? Organization.forId(request.organizationId())
                 : null;
         AdministrativeRegion managingRegion = request.managingRegionId() != null
-                ? new AdministrativeRegion(request.managingRegionId(), null, null, null)
+                ? AdministrativeRegion.forId(request.managingRegionId())
                 : null;
 
         List<Location> domainLocations = mapLocations(request.locations());
         List<Boundary> domainBoundaries = mapBoundaries(request.boundaries());
 
-        Project transientProject = new Project(
-                null,
+        Project transientProject = Project.forCreation(
                 org,
                 managingRegion,
                 request.title(),
                 request.description(),
                 request.projectType(),
                 request.status(),
-                null,
-                null,
-                null,
                 domainLocations,
                 domainBoundaries
         );
@@ -152,26 +148,22 @@ public class ProjectController {
     @Put("/{id}")
     public Project updateProject(@PathVariable UUID id, @Valid @Body UpdateProjectRequest request, Principal principal) {
         Organization org = request.organizationId() != null
-                ? new Organization(request.organizationId(), null, null, null, true, null, null, null)
+                ? Organization.forId(request.organizationId())
                 : null;
         AdministrativeRegion managingRegion = request.managingRegionId() != null
-                ? new AdministrativeRegion(request.managingRegionId(), null, null, null)
+                ? AdministrativeRegion.forId(request.managingRegionId())
                 : null;
 
         List<Location> domainLocations = mapLocations(request.locations());
         List<Boundary> domainBoundaries = mapBoundaries(request.boundaries());
 
-        Project transientProject = new Project(
+        Project transientProject = Project.forUpdate(
                 id,
                 org,
                 managingRegion,
                 request.title(),
                 request.description(),
                 request.projectType(),
-                null,
-                null,
-                null,
-                null,
                 domainLocations,
                 domainBoundaries
         );
@@ -228,8 +220,7 @@ public class ProjectController {
             return List.of();
         }
         return locations.stream()
-                .map(loc -> new Location(
-                        null,
+                .map(loc -> Location.forCreation(
                         loc.name(),
                         loc.addressLine(),
                         loc.city(),
@@ -246,8 +237,7 @@ public class ProjectController {
             return List.of();
         }
         return boundaries.stream()
-                .map(bnd -> new Boundary(
-                        null,
+                .map(bnd -> Boundary.forCreation(
                         bnd.name(),
                         spatialMappingService.toPolygon(bnd.coordinates())
                 ))

@@ -91,15 +91,7 @@ public class DefaultShiftService implements ShiftService {
         Location location = resolveLocation(shift);
         List<Tag> tags = resolveTags(shift.tags());
 
-        Shift toSave = new Shift(
-                null,
-                project,
-                shift.isVirtual(),
-                location,
-                shift.startTime(),
-                shift.endTime(),
-                tags
-        );
+        Shift toSave = shift.withCreationDetails(project, location, tags);
         return shiftRepository.save(toSave);
     }
 
@@ -118,15 +110,7 @@ public class DefaultShiftService implements ShiftService {
         Location location = resolveLocation(shift);
         List<Tag> tags = resolveTags(shift.tags());
 
-        Shift safeUpdate = new Shift(
-                id,
-                project,
-                shift.isVirtual(),
-                location,
-                shift.startTime(),
-                shift.endTime(),
-                tags
-        );
+        Shift safeUpdate = existing.withUpdatedDetails(shift, location, tags);
         return shiftRepository.update(safeUpdate);
     }
 

@@ -64,6 +64,62 @@ public record Project(
         @JoinTable(name = "project_boundaries")
         List<Boundary> boundaries
 ) {
+    public static Project forId(@NotNull UUID id) {
+        return new Project(id, null, null, null, null, null, null, null, null, null, null, null);
+    }
+
+    public static Project forCreation(
+            @Nullable Organization organization,
+            @Nullable AdministrativeRegion managingRegion,
+            @NotNull String title,
+            @NotNull String description,
+            @NotNull ProjectType projectType,
+            @Nullable ProjectStatus status,
+            @NotNull List<Location> locations,
+            @NotNull List<Boundary> boundaries
+    ) {
+        return new Project(
+                null,
+                organization,
+                managingRegion,
+                title,
+                description,
+                projectType,
+                status,
+                null,
+                null,
+                null,
+                locations,
+                boundaries
+        );
+    }
+
+    public static Project forUpdate(
+            @NotNull UUID id,
+            @Nullable Organization organization,
+            @Nullable AdministrativeRegion managingRegion,
+            @NotNull String title,
+            @NotNull String description,
+            @NotNull ProjectType projectType,
+            @NotNull List<Location> locations,
+            @NotNull List<Boundary> boundaries
+    ) {
+        return new Project(
+                id,
+                organization,
+                managingRegion,
+                title,
+                description,
+                projectType,
+                null,
+                null,
+                null,
+                null,
+                locations,
+                boundaries
+        );
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing project ID and assign that to
      * the project properties in this project record.
@@ -82,6 +138,88 @@ public record Project(
                 this.createdAt(),
                 this.deletedAt(),
                 this.deletedBy(),
+                this.locations(),
+                this.boundaries()
+        );
+    }
+
+    public Project withStatus(@NotNull ProjectStatus newStatus) {
+        return new Project(
+                this.id(),
+                this.organization(),
+                this.managingRegion(),
+                this.title(),
+                this.description(),
+                this.projectType(),
+                newStatus,
+                this.createdAt(),
+                this.deletedAt(),
+                this.deletedBy(),
+                this.locations(),
+                this.boundaries()
+        );
+    }
+
+    public Project withCreationDetails(
+            @NotNull Organization newOrganization,
+            @Nullable AdministrativeRegion newManagingRegion,
+            @NotNull ProjectStatus newStatus,
+            @NotNull OffsetDateTime newCreatedAt,
+            @NotNull List<Location> newLocations,
+            @NotNull List<Boundary> newBoundaries
+    ) {
+        return new Project(
+                null,
+                newOrganization,
+                newManagingRegion,
+                this.title(),
+                this.description(),
+                this.projectType(),
+                newStatus,
+                newCreatedAt,
+                null,
+                null,
+                newLocations,
+                newBoundaries
+        );
+    }
+
+    public Project withUpdatedDetails(
+            @NotNull Organization newOrganization,
+            @Nullable AdministrativeRegion newManagingRegion,
+            @NotNull Project source,
+            @NotNull ProjectStatus newStatus,
+            @NotNull List<Location> newLocations,
+            @NotNull List<Boundary> newBoundaries
+    ) {
+        return new Project(
+                this.id(),
+                newOrganization,
+                newManagingRegion,
+                source.title(),
+                source.description(),
+                source.projectType(),
+                newStatus,
+                this.createdAt(),
+                this.deletedAt(),
+                this.deletedBy(),
+                newLocations,
+                newBoundaries
+        );
+    }
+
+    public Project withDeleted(@NotNull OffsetDateTime newDeletedAt, @NotNull User newDeletedBy) {
+        return new Project(
+                this.id(),
+                this.organization(),
+                this.managingRegion(),
+                this.title(),
+                this.description(),
+                this.projectType(),
+                this.status(),
+                this.createdAt(),
+                newDeletedAt,
+                newDeletedBy,
                 this.locations(),
                 this.boundaries()
         );

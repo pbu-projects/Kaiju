@@ -77,11 +77,10 @@ public class DefaultUserService implements UserService {
     public User createUser(@NonNull User user, @NonNull UUID actorUserId) {
         authorizationService.authorizeUserManager(actorUserId);
         String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
-        User toSave = new User(
-                null,
+        User toSave = user.withCreationDetails(
                 canonicalEmail,
-                user.role() != null ? user.role() : UserRole.STANDARD_USER,
-                user.createdAt() != null ? user.createdAt() : OffsetDateTime.now(ZoneOffset.UTC)
+                UserRole.STANDARD_USER,
+                OffsetDateTime.now(ZoneOffset.UTC)
         );
         return userRepository.save(toSave);
     }
@@ -95,12 +94,7 @@ public class DefaultUserService implements UserService {
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
 
         String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
-        User safeUpdate = new User(
-                id,
-                canonicalEmail,
-                existing.role(),
-                existing.createdAt()
-        );
+        User safeUpdate = existing.withEmail(canonicalEmail);
         return userRepository.update(safeUpdate);
     }
 
@@ -112,7 +106,7 @@ public class DefaultUserService implements UserService {
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
         userRepository.updateRole(id, role);
-        return new User(existing.id(), existing.email(), role, existing.createdAt());
+        return existing.withRole(role);
     }
 
     @Override
@@ -137,7 +131,7 @@ public class DefaultUserService implements UserService {
         String canonicalEmail = canonicalizeEmail(email);
         return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
-                User newUser = new User(null, canonicalEmail, initialRole, OffsetDateTime.now(ZoneOffset.UTC));
+                User newUser = User.forCreation(canonicalEmail, initialRole, OffsetDateTime.now(ZoneOffset.UTC));
                 return userRepository.save(newUser);
             } catch (Exception ex) {
                 if (isUniqueConstraintViolation(ex)) {

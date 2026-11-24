@@ -93,11 +93,7 @@ public class BoundaryController {
     public Boundary addBoundary(@Valid @Body CreateBoundaryRequest request, Principal principal) {
         Geometry polygon = spatialMappingService.toPolygon(request.coordinates());
         authorizationService.authorizeBoundaryCreate(UUID.fromString(principal.getName()), polygon);
-        Boundary boundary = new Boundary(
-                null,
-                request.name(),
-                polygon
-        );
+        Boundary boundary = Boundary.forCreation(request.name(), polygon);
         return boundaryRepository.save(boundary);
     }
 
@@ -121,11 +117,7 @@ public class BoundaryController {
         if (!boundaryRepository.existsById(id)) {
             throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
         }
-        Boundary boundary = new Boundary(
-                id,
-                request.name(),
-                polygon
-        );
+        Boundary boundary = Boundary.forUpdate(id, request.name(), polygon);
         return boundaryRepository.update(boundary);
     }
 
