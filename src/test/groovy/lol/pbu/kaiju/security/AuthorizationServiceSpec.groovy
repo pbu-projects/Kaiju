@@ -6,12 +6,16 @@ import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
+import lol.pbu.kaiju.domain.AdministrativeRegion
+import lol.pbu.kaiju.domain.Location
+import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
+import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.PermissionQueryRepository
 import lol.pbu.kaiju.service.ShiftService
 import lol.pbu.kaiju.service.UserService
@@ -1545,5 +1549,305 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         then:
         HttpStatusException agentViewEx = thrown()
         agentViewEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "region agents face boundary rules when creating projects or assigning regions"() {
+        given: "two regions, an organization, an agent assigned to region A, and a director assigned to region A"
+        def regionA = dataBuilder.region().withName("Agent Region A").withGeometry(denverBoxPolygon()).persist()
+        def regionB = dataBuilder.region().withName("Agent Region B").withGeometry(wyomingBoxPolygon()).persist()
+        def org = dataBuilder.organization().withName("Agent Member Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, regionA)
+
+        def agent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agent, regionA).persist()
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(director, regionA).persist()
+
+        def memberAgent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(memberAgent, regionA).persist()
+        dataBuilder.organizationUser().asOrgMember(memberAgent, org).persist()
+
+        def outsideLoc = dataBuilder.location()
+                .withName("Wyoming Site")
+                .withAddress("100 Pine St", "Laramie", "WY", "82070", "US")
+                .atPoint(-106.2, 41.2)
+                .build()
+
+        def outsidePhysicalProject = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Out of Bounds Project")
+                .withDescription("Physical project outside agent region.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(outsideLoc)
+                .build()
+
+        def virtualProjectInRegionA = dataBuilder.project()
+                .forOrg(org)
+                .inRegion(regionA)
+                .withTitle("Virtual Region Project")
+                .withDescription("Virtual project inside agent region.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
+
+        expect: "non-member agent can create a virtual project in their own region as PENDING, and out-of-region region assignment is denied"
+        verifyAll {
+            service.evaluateProjectCreationByUser(agent.id(), virtualProjectInRegionA) == ProjectStatus.PENDING
+            service.canAssignManagingRegion(agent.id(), org.id(), regionB.id()) == false
+            service.canAssignManagingRegion(director.id(), org.id(), regionB.id()) == false
+        }
+
+        when: "a region agent who is an org member submits a non-draft physical project outside their region"
+        service.evaluateProjectCreationByUser(memberAgent.id(), outsidePhysicalProject)
+
+        then:
+        HttpStatusException boundaryEx = thrown()
+        verifyAll(boundaryEx) {
+            status == HttpStatus.FORBIDDEN
+            message == "Region Agents cannot post outside their boundaries without Org Manager privileges"
+        }
+    }
+
+    def "authorizeSystemAdmin allows global admins and rejects non-admin roles"() {
+        given: "users with global admin, region director, and standard roles"
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        def standardUser = saveUser(UserRole.STANDARD_USER)
+
+        when: "a global admin calls authorizeSystemAdmin"
+        service.authorizeSystemAdmin(admin.id())
+
+        then:
+        noExceptionThrown()
+
+        when: "a standard user calls authorizeSystemAdmin"
+        service.authorizeSystemAdmin(standardUser.id())
+
+        then:
+        HttpStatusException standardEx = thrown()
+        standardEx.status == HttpStatus.FORBIDDEN
+
+        when: "a region director calls authorizeSystemAdmin"
+        service.authorizeSystemAdmin(director.id())
+
+        then:
+        HttpStatusException directorEx = thrown()
+        directorEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "out-of-region admins cannot view non-active physical projects or virtual projects without a managing region"() {
+        given: "two regions, an org, a physical pending project in region A, and a virtual pending project with no managing region"
+        def regionA = dataBuilder.region().withName("View Check A").withGeometry(denverBoxPolygon()).persist()
+        def regionB = dataBuilder.region().withName("View Check B").withGeometry(wyomingBoxPolygon()).persist()
+        def org = dataBuilder.organization().withName("View Check Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, regionA)
+
+        def locA = dataBuilder.location()
+                .withName("Denver Site")
+                .withAddress("123 Main St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def physicalPending = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Physical Pending Project")
+                .withDescription("Pending physical project.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(locA)
+                .persist()
+        def virtualWithoutRegion = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Virtual No Region Project")
+                .withDescription("Pending virtual project without managing region.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
+
+        def agentB = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agentB, regionB).persist()
+        def directorB = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(directorB, regionB).persist()
+
+        expect:
+        verifyAll {
+            service.canViewProject(agentB.id(), physicalPending) == false
+            service.canViewProject(directorB.id(), physicalPending) == false
+            service.canViewProject(agentB.id(), virtualWithoutRegion) == false
+            service.canViewProject(directorB.id(), virtualWithoutRegion) == false
+        }
+    }
+
+    def "public orgs with future verification expiry are visible, and shift by user ID and missing-location checks enforce access"() {
+        given: "an org, a region, a director, an org manager, a sponsor, an outsider, and a project"
+        def region = dataBuilder.region().withName("Shift Access Region").withGeometry(denverBoxPolygon()).persist()
+        def org = dataBuilder.organization().withName("Shift Access Org").asPublic().verified().persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Shift Access Project")
+                .withDescription("Project for shift access checks.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
+
+        def futureVerifiedOrg = dataBuilder.organization()
+                .withName("Future Verified Public Org")
+                .asPublic()
+                .verified()
+                .withVerificationExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).plusDays(30))
+                .build()
+
+        def manager = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgManager(manager, org).persist()
+        def sponsor = saveUser(UserRole.STANDARD_USER)
+        addProjectSponsor(sponsor.id(), project.id())
+        def outsider = saveUser(UserRole.STANDARD_USER)
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
+
+        def start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(3)
+        def orphanShift = new Shift(null, null, true, null, start, start.plusHours(2), [])
+
+        expect: "public org with future expiration, shift management by user ID, and anonymous orphan shift view behave properly"
+        verifyAll {
+            service.canViewOrganization(null, futureVerifiedOrg) == true
+            service.canManageShift(manager.id(), project) == true
+            service.canManageShift(sponsor.id(), project) == true
+            service.canManageShift(outsider.id(), project) == false
+            service.canViewShift(null, orphanShift) == false
+        }
+
+        when: "authorized users call authorizeShiftManagement by user ID"
+        service.authorizeShiftManagement(manager.id(), project)
+        service.authorizeShiftManagement(sponsor.id(), project)
+
+        then:
+        noExceptionThrown()
+
+        when: "outsider calls authorizeShiftManagement by user ID"
+        service.authorizeShiftManagement(outsider.id(), project)
+
+        then:
+        HttpStatusException shiftForbidEx = thrown()
+        shiftForbidEx.status == HttpStatus.FORBIDDEN
+
+        when: "missing user calls authorizeShiftManagement by user ID"
+        service.authorizeShiftManagement(UUID.randomUUID(), project)
+
+        then:
+        HttpStatusException shiftMissingEx = thrown()
+        shiftMissingEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "anonymous user calls authorizeShiftView on an orphan shift"
+        service.authorizeShiftView(null, orphanShift)
+
+        then:
+        HttpStatusException orphanViewEx = thrown()
+        orphanViewEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "a region director calls authorizeLocationCreate with a null point"
+        service.authorizeLocationCreate(director.id(), null)
+
+        then:
+        HttpStatusException nullPointEx = thrown()
+        nullPointEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "null and unsaved records are handled safely across project, shift, location, and organization checks"() {
+        given: "users and regions for unsaved and partial record checks"
+        def region = dataBuilder.region().withName("Saved Guard Region").withGeometry(denverBoxPolygon()).persist()
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def standardUser = saveUser(UserRole.STANDARD_USER)
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
+        def agent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agent, region).persist()
+
+        def unsavedOrg = new Organization(null, "Unsaved Org", "https://example.org", null, false, VerificationStatus.UNVERIFIED, null, [])
+        def unsavedRegion = new AdministrativeRegion(null, "Unsaved Region", null, denverBoxPolygon())
+        def locationWithoutGeom = new Location(null, "No Geom", "123 St", "Denver", "CO", "80202", "US", null, "America/Denver")
+
+        def projectWithNullGeomLoc = dataBuilder.project()
+                .withoutOrg()
+                .withTitle("Null Geom Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(locationWithoutGeom)
+                .build()
+
+        def projectWithoutOrg = dataBuilder.project()
+                .withoutOrg()
+                .withTitle("No Org Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
+
+        def projectWithNullLocations = dataBuilder.project()
+                .withoutOrg()
+                .withTitle("Null Locations Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .withNullLocations()
+                .build()
+
+        def projectWithUnsavedRegion = dataBuilder.project()
+                .withoutOrg()
+                .inRegion(unsavedRegion)
+                .withTitle("Unsaved Region Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
+
+        def projectWithUnsavedOrg = dataBuilder.project()
+                .forOrg(unsavedOrg)
+                .withTitle("Unsaved Org Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
+
+        def virtualWithUnsavedRegion = dataBuilder.project()
+                .withId(UUID.randomUUID())
+                .withoutOrg()
+                .inRegion(unsavedRegion)
+                .withTitle("Virtual Project Missing Region ID")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .build()
+
+        expect: "all unsaved and null guards safely return false or PENDING as appropriate"
+        verifyAll {
+            service.areAllLocationsInOrgRegion(projectWithNullGeomLoc, orgId) == false
+            service.evaluateProjectCreationByUser(admin, projectWithoutOrg) == ProjectStatus.PENDING
+            service.evaluateProjectCreationByUser(admin, projectWithNullLocations) == ProjectStatus.PENDING
+            service.canModifyProject(director, projectWithoutOrg) == false
+            service.canModifyProject(standardUser, projectWithUnsavedOrg) == false
+            service.canViewProject(standardUser.id(), projectWithoutOrg) == false
+            service.canViewProject(standardUser.id(), projectWithUnsavedOrg) == false
+            service.canViewProject(agent.id(), projectWithoutOrg) == false
+            service.canViewProject(agent.id(), virtualWithUnsavedRegion) == false
+            service.canManageShift(standardUser, projectWithoutOrg) == false
+            service.canManageShift(standardUser, projectWithUnsavedOrg) == false
+            service.canViewOrganization(standardUser.id(), unsavedOrg) == false
+        }
+
+        when: "a standard user attempts to create a project with no organization"
+        service.authorizeProjectCreation(standardUser, projectWithoutOrg)
+
+        then:
+        HttpStatusException noOrgEx = thrown()
+        noOrgEx.status == HttpStatus.FORBIDDEN
+
+        when: "a region agent attempts to create a virtual project whose managing region has no ID"
+        service.authorizeProjectCreation(agent, projectWithUnsavedRegion)
+
+        then:
+        HttpStatusException unsavedRegionEx = thrown()
+        unsavedRegionEx.status == HttpStatus.FORBIDDEN
     }
 }
