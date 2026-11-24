@@ -18,8 +18,8 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.domain.Tag;
-import lol.pbu.kaiju.dto.CreateShiftCommand;
-import lol.pbu.kaiju.dto.UpdateShiftCommand;
+import lol.pbu.kaiju.dto.CreateShiftRequest;
+import lol.pbu.kaiju.dto.UpdateShiftRequest;
 import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.ShiftService;
 import lol.pbu.kaiju.util.PageRequests;
@@ -70,15 +70,15 @@ public class ShiftController {
     }
 
     @Post
-    public Shift addShift(@Valid @Body CreateShiftCommand command, Principal principal) {
+    public Shift addShift(@Valid @Body CreateShiftRequest request, Principal principal) {
         Shift shift = new Shift(
                 null,
-                stubProject(command.projectId()),
-                command.isVirtual(),
-                stubLocation(command.locationId()),
-                command.startTime(),
-                command.endTime(),
-                stubTags(command.tagIds())
+                stubProject(request.projectId()),
+                request.isVirtual(),
+                stubLocation(request.locationId()),
+                request.startTime(),
+                request.endTime(),
+                stubTags(request.tagIds())
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return shiftService.createShift(shift, actorUserId);
@@ -91,20 +91,20 @@ public class ShiftController {
      * Throws 404 NOT_FOUND if the shift does not exist.
      *
      * @param id        the ID of the shift to update
-     * @param command   the updated shift details
+     * @param request   the updated shift details
      * @param principal the authenticated principal
      * @return the updated shift
      */
     @Put("/{id}")
-    public Shift updateShift(@PathVariable UUID id, @Valid @Body UpdateShiftCommand command, Principal principal) {
+    public Shift updateShift(@PathVariable UUID id, @Valid @Body UpdateShiftRequest request, Principal principal) {
         Shift candidate = new Shift(
                 id,
                 null,
-                command.isVirtual(),
-                stubLocation(command.locationId()),
-                command.startTime(),
-                command.endTime(),
-                stubTags(command.tagIds())
+                request.isVirtual(),
+                stubLocation(request.locationId()),
+                request.startTime(),
+                request.endTime(),
+                stubTags(request.tagIds())
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return shiftService.updateShift(id, candidate, actorUserId);

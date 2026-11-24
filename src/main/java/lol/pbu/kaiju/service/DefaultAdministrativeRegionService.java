@@ -11,10 +11,10 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.dto.CoveringRegion;
-import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.dto.RegionCoordinateResolution;
-import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest;
 import lol.pbu.kaiju.model.RegionAuditAction;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import lol.pbu.kaiju.repository.UserRepository;
@@ -154,18 +154,18 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
     @Transactional
     @NonNull
     public AdministrativeRegion createAdministrativeRegion(
-            @NonNull CreateAdministrativeRegionCommand command,
+            @NonNull CreateAdministrativeRegionRequest request,
             @NonNull UUID actorUserId
     ) {
         User actor = resolveActor(actorUserId);
 
         AdministrativeRegion parent = null;
-        if (command.parentRegionId() != null) {
-            parent = regionRepository.findById(command.parentRegionId())
+        if (request.parentRegionId() != null) {
+            parent = regionRepository.findById(request.parentRegionId())
                     .orElseThrow(() -> new HttpStatusException(HttpStatus.BAD_REQUEST, PARENT_NOT_FOUND));
         }
 
-        Polygon polygon = spatialMappingService.toPolygon(command.coordinates());
+        Polygon polygon = spatialMappingService.toPolygon(request.coordinates());
         if (!polygon.isValid()) {
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
         }
@@ -177,8 +177,8 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
 
         AdministrativeRegion region = new AdministrativeRegion(
                 null,
-                command.name(),
-                command.parentRegionId(),
+                request.name(),
+                request.parentRegionId(),
                 polygon,
                 level,
                 countryCode,
@@ -198,31 +198,31 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
     @NonNull
     public AdministrativeRegion updateAdministrativeRegion(
             @NonNull UUID id,
-            @NonNull UpdateAdministrativeRegionCommand command,
+            @NonNull UpdateAdministrativeRegionRequest request,
             @NonNull UUID actorUserId
     ) {
         User actor = resolveActor(actorUserId);
 
-        if (command.parentRegionId() != null && id.equals(command.parentRegionId())) {
+        if (request.parentRegionId() != null && id.equals(request.parentRegionId())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "An administrative region cannot be its own parent");
         }
 
-        if (command.parentRegionId() != null && !regionRepository.existsById(command.parentRegionId())) {
+        if (request.parentRegionId() != null && !regionRepository.existsById(request.parentRegionId())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, PARENT_NOT_FOUND);
         }
 
         AdministrativeRegion existing = regionRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND));
 
-        Polygon polygon = spatialMappingService.toPolygon(command.coordinates());
+        Polygon polygon = spatialMappingService.toPolygon(request.coordinates());
         if (!polygon.isValid()) {
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
         }
 
         AdministrativeRegion updated = new AdministrativeRegion(
                 id,
-                command.name(),
-                command.parentRegionId(),
+                request.name(),
+                request.parentRegionId(),
                 polygon,
                 existing.level(),
                 existing.countryCode(),

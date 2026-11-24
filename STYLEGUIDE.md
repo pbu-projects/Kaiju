@@ -13,7 +13,7 @@ Name classes, methods, and files so anyone can tell what they do without opening
   * When only one implementation exists and no interface is needed, use a single concrete `@Singleton` class (for example, `AuthorizationService`, `BoundaryIngestionService`).
 * **No `Dto`, `Utils`, or `Helper` suffixes:**
   * Name read models and value records after what they represent (`Coordinates`, `CoveringRegion`).
-  * Name write payloads `<Action><Entity>Command` and place them in `lol.pbu.kaiju.dto` (for example, `CreateUserCommand`, `UpdateUserRoleCommand`). Do not put request payloads in `model/` or name them `*Request`.
+  * Name HTTP request payloads `<Action><Entity>Request` and place them in `lol.pbu.kaiju.dto` (for example, `CreateUserRequest`, `UpdateUserRoleRequest`). Do not put request payloads in `model/` or name them `*Command`.
   * Name utility classes after what they provide (`PageRequests` instead of `PageableUtils`).
 * **Spell out non-obvious abbreviations:**
   * Prefer `IdentityProviderRoleMapper` over `IdpRoleMapper`.

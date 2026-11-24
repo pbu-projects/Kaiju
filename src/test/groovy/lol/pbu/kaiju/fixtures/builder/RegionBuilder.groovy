@@ -2,7 +2,7 @@ package lol.pbu.kaiju.fixtures.builder
 
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
@@ -77,12 +77,12 @@ class RegionBuilder {
         return saved
     }
 
-    CreateAdministrativeRegionCommand asCommand() {
+    CreateAdministrativeRegionRequest asRequest() {
         AdministrativeRegion region = build()
         List<Coordinates> coordinates = region.geom().getCoordinates().collect { c ->
             new Coordinates(c.getX(), c.getY())
         }
-        return new CreateAdministrativeRegionCommand(region.name(), region.parentRegionId(), coordinates)
+        return new CreateAdministrativeRegionRequest(region.name(), region.parentRegionId(), coordinates)
     }
 
     private Geometry defaultPolygon() {

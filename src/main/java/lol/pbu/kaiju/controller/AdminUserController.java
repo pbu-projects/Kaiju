@@ -9,7 +9,7 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.dto.UpdateUserRoleCommand;
+import lol.pbu.kaiju.dto.UpdateUserRoleRequest;
 import lol.pbu.kaiju.service.UserService;
 
 import java.security.Principal;
@@ -30,16 +30,16 @@ public class AdminUserController {
 
     /**
      * Updates a user's role.
-     * Only accepts an UpdateUserRoleCommand so other user fields cannot be changed.
+     * Only accepts an UpdateUserRoleRequest so other user fields cannot be changed.
      *
      * @param id        the ID of the user to promote or demote
-     * @param command   the requested role
+     * @param request   the requested role
      * @param principal the authenticated caller
      * @return the updated user
      */
     @Put("/{id}/role")
-    public User updateUserRole(@PathVariable UUID id, @Valid @Body UpdateUserRoleCommand command, Principal principal) {
+    public User updateUserRole(@PathVariable UUID id, @Valid @Body UpdateUserRoleRequest request, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
-        return userService.updateRole(id, command.role(), actorUserId);
+        return userService.updateRole(id, request.role(), actorUserId);
     }
 }

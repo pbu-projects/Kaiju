@@ -16,7 +16,7 @@ paths:
   /admin/users/{id}/role:
     put:
       summary: Updates a user's role.
-      description: Updates a user's role. Only accepts an UpdateUserRoleCommand so
+      description: Updates a user's role. Only accepts an UpdateUserRoleRequest so
         other user fields cannot be changed.
       operationId: updateUserRole
       parameters:
@@ -32,7 +32,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateUserRoleCommand"
+              $ref: "#/components/schemas/UpdateUserRoleRequest"
         required: true
       responses:
         "200":
@@ -113,11 +113,11 @@ paths:
         to platform administrators.
       operationId: addAdministrativeRegion
       requestBody:
-        description: the administrative region creation command
+        description: the administrative region creation request
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateAdministrativeRegionCommand"
+              $ref: "#/components/schemas/CreateAdministrativeRegionRequest"
         required: true
       responses:
         "200":
@@ -225,11 +225,11 @@ paths:
           type: string
           format: uuid
       requestBody:
-        description: the updated region command data
+        description: the updated region request data
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateAdministrativeRegionCommand"
+              $ref: "#/components/schemas/UpdateAdministrativeRegionRequest"
         required: true
       responses:
         "200":
@@ -271,11 +271,11 @@ paths:
           type: string
           format: uuid
       requestBody:
-        description: the boundary ingestion command
+        description: the boundary ingestion request
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/IngestBoundaryCommand"
+              $ref: "#/components/schemas/IngestBoundaryRequest"
         required: true
       responses:
         "200":
@@ -315,7 +315,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateBoundaryCommand"
+              $ref: "#/components/schemas/CreateBoundaryRequest"
         required: true
       responses:
         "200":
@@ -363,7 +363,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateBoundaryCommand"
+              $ref: "#/components/schemas/UpdateBoundaryRequest"
         required: true
       responses:
         "200":
@@ -417,7 +417,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateLocationCommand"
+              $ref: "#/components/schemas/CreateLocationRequest"
         required: true
       responses:
         "200":
@@ -462,7 +462,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateLocationCommand"
+              $ref: "#/components/schemas/UpdateLocationRequest"
         required: true
       responses:
         "200":
@@ -547,7 +547,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateOrganizationUserCommand"
+              $ref: "#/components/schemas/CreateOrganizationUserRequest"
         required: true
       responses:
         "200":
@@ -598,7 +598,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateOrganizationUserCommand"
+              $ref: "#/components/schemas/UpdateOrganizationUserRequest"
         required: true
       responses:
         "200":
@@ -649,7 +649,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateOrganizationCommand"
+              $ref: "#/components/schemas/CreateOrganizationRequest"
         required: true
       responses:
         "200":
@@ -813,11 +813,11 @@ paths:
           type: string
           format: uuid
       requestBody:
-        description: the updated organization command
+        description: the updated organization request
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateOrganizationCommand"
+              $ref: "#/components/schemas/UpdateOrganizationRequest"
         required: true
       responses:
         "200":
@@ -909,7 +909,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateProjectCommand"
+              $ref: "#/components/schemas/CreateProjectRequest"
         required: true
       responses:
         "200":
@@ -1005,7 +1005,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateProjectCommand"
+              $ref: "#/components/schemas/UpdateProjectRequest"
         required: true
       responses:
         "200":
@@ -1080,7 +1080,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateRegionUserCommand"
+              $ref: "#/components/schemas/CreateRegionUserRequest"
         required: true
       responses:
         "200":
@@ -1142,7 +1142,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateRegionUserCommand"
+              $ref: "#/components/schemas/UpdateRegionUserRequest"
         required: true
       responses:
         "200":
@@ -1198,7 +1198,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateShiftCommand"
+              $ref: "#/components/schemas/CreateShiftRequest"
         required: true
       responses:
         "200":
@@ -1245,7 +1245,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateShiftCommand"
+              $ref: "#/components/schemas/UpdateShiftRequest"
         required: true
       responses:
         "200":
@@ -1304,7 +1304,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateTagCommand"
+              $ref: "#/components/schemas/CreateTagRequest"
         required: true
       responses:
         "200":
@@ -1352,7 +1352,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateTagCommand"
+              $ref: "#/components/schemas/UpdateTagRequest"
         required: true
       responses:
         "200":
@@ -1402,7 +1402,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateUserCommand"
+              $ref: "#/components/schemas/CreateUserRequest"
         required: true
       responses:
         "200":
@@ -1459,7 +1459,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UpdateUserCommand"
+              $ref: "#/components/schemas/UpdateUserRequest"
         required: true
       responses:
         "200":
@@ -1631,7 +1631,7 @@ components:
           x-maximum-message: Latitude must be less than or equal to 90.
           x-minimum-message: Latitude must be greater than or equal to -90.
           x-not-null-message: Latitude is required.
-    CreateAdministrativeRegionCommand:
+    CreateAdministrativeRegionRequest:
       required:
       - coordinates
       - name
@@ -1654,7 +1654,7 @@ components:
             $ref: "#/components/schemas/Coordinates"
           x-size-message: A region polygon must contain between 3 and 5000 coordinates.
           x-not-null-message: Region coordinates are required.
-    CreateBoundaryCommand:
+    CreateBoundaryRequest:
       required:
       - coordinates
       - name
@@ -1673,7 +1673,7 @@ components:
             $ref: "#/components/schemas/Coordinates"
           x-size-message: A polygon boundary must contain between 3 and 5000 coordinates.
           x-not-null-message: Boundary coordinates are required.
-    CreateLocationCommand:
+    CreateLocationRequest:
       required:
       - addressLine
       - city
@@ -1737,7 +1737,7 @@ components:
           type: string
           nullable: true
           x-size-message: Location timezone must be between 1 and 100 characters.
-    CreateOrganizationCommand:
+    CreateOrganizationRequest:
       required:
       - isPublic
       - name
@@ -1763,7 +1763,7 @@ components:
         isPublic:
           type: boolean
           x-not-null-message: isPublic is required.
-    CreateOrganizationUserCommand:
+    CreateOrganizationUserRequest:
       required:
       - organizationId
       - role
@@ -1780,7 +1780,7 @@ components:
           x-not-null-message: Organization ID is required.
         role:
           $ref: "#/components/schemas/OrganizationUserRole"
-    CreateProjectCommand:
+    CreateProjectRequest:
       required:
       - boundaries
       - description
@@ -1818,17 +1818,17 @@ components:
           type: array
           nullable: true
           items:
-            $ref: "#/components/schemas/ProjectLocationCommand"
+            $ref: "#/components/schemas/ProjectLocationRequest"
           x-size-message: Project cannot have more than 50 locations.
         boundaries:
           maxItems: 50
           minItems: 1
           type: array
           items:
-            $ref: "#/components/schemas/ProjectBoundaryCommand"
+            $ref: "#/components/schemas/ProjectBoundaryRequest"
           x-size-message: Project cannot have more than 50 boundaries.
           x-not-null-message: Project boundaries are required.
-    CreateRegionUserCommand:
+    CreateRegionUserRequest:
       required:
       - regionId
       - role
@@ -1845,7 +1845,7 @@ components:
           x-not-null-message: Region ID is required.
         role:
           $ref: "#/components/schemas/RegionUserRole"
-    CreateShiftCommand:
+    CreateShiftRequest:
       required:
       - endTime
       - isVirtual
@@ -1879,7 +1879,7 @@ components:
             type: string
             format: uuid
           x-size-message: A shift cannot have more than 50 tags.
-    CreateTagCommand:
+    CreateTagRequest:
       required:
       - name
       type: object
@@ -1889,7 +1889,7 @@ components:
           minLength: 1
           type: string
           x-size-message: Tag name must be between 1 and 50 characters.
-    CreateUserCommand:
+    CreateUserRequest:
       required:
       - email
       type: object
@@ -2301,7 +2301,7 @@ components:
           format: int32
         coordinateSequenceFactory:
           $ref: "#/components/schemas/CoordinateSequenceFactory"
-    IngestBoundaryCommand:
+    IngestBoundaryRequest:
       required:
       - sourceUrl
       type: object
@@ -2868,7 +2868,7 @@ components:
         createdAt:
           type: string
           format: date-time
-    ProjectBoundaryCommand:
+    ProjectBoundaryRequest:
       required:
       - coordinates
       - name
@@ -2889,7 +2889,7 @@ components:
           x-not-null-message: Boundary coordinates are required.
       description: Boundary details sent inside a project create or update request.
         Excludes `id` so callers cannot overwrite existing boundary records directly.
-    ProjectLocationCommand:
+    ProjectLocationRequest:
       required:
       - addressLine
       - city
@@ -3531,7 +3531,7 @@ components:
           minLength: 1
           type: string
           x-size-message: Tag name must be between 1 and 50 characters.
-    UpdateAdministrativeRegionCommand:
+    UpdateAdministrativeRegionRequest:
       required:
       - coordinates
       - name
@@ -3554,7 +3554,7 @@ components:
             $ref: "#/components/schemas/Coordinates"
           x-size-message: A region polygon must contain between 3 and 5000 coordinates.
           x-not-null-message: Region coordinates are required.
-    UpdateBoundaryCommand:
+    UpdateBoundaryRequest:
       required:
       - coordinates
       - name
@@ -3573,7 +3573,7 @@ components:
             $ref: "#/components/schemas/Coordinates"
           x-size-message: A polygon boundary must contain between 3 and 5000 coordinates.
           x-not-null-message: Boundary coordinates are required.
-    UpdateLocationCommand:
+    UpdateLocationRequest:
       required:
       - addressLine
       - city
@@ -3637,7 +3637,7 @@ components:
           type: string
           nullable: true
           x-size-message: Location timezone must be between 1 and 100 characters.
-    UpdateOrganizationCommand:
+    UpdateOrganizationRequest:
       required:
       - isPublic
       - name
@@ -3663,14 +3663,14 @@ components:
         isPublic:
           type: boolean
           x-not-null-message: isPublic is required.
-    UpdateOrganizationUserCommand:
+    UpdateOrganizationUserRequest:
       required:
       - role
       type: object
       properties:
         role:
           $ref: "#/components/schemas/OrganizationUserRole"
-    UpdateProjectCommand:
+    UpdateProjectRequest:
       required:
       - boundaries
       - description
@@ -3703,24 +3703,24 @@ components:
           type: array
           nullable: true
           items:
-            $ref: "#/components/schemas/ProjectLocationCommand"
+            $ref: "#/components/schemas/ProjectLocationRequest"
           x-size-message: Project cannot have more than 50 locations.
         boundaries:
           maxItems: 50
           minItems: 1
           type: array
           items:
-            $ref: "#/components/schemas/ProjectBoundaryCommand"
+            $ref: "#/components/schemas/ProjectBoundaryRequest"
           x-size-message: Project cannot have more than 50 boundaries.
           x-not-null-message: Project boundaries are required.
-    UpdateRegionUserCommand:
+    UpdateRegionUserRequest:
       required:
       - role
       type: object
       properties:
         role:
           $ref: "#/components/schemas/RegionUserRole"
-    UpdateShiftCommand:
+    UpdateShiftRequest:
       required:
       - endTime
       - isVirtual
@@ -3749,7 +3749,7 @@ components:
             type: string
             format: uuid
           x-size-message: A shift cannot have more than 50 tags.
-    UpdateTagCommand:
+    UpdateTagRequest:
       required:
       - name
       type: object
@@ -3759,7 +3759,7 @@ components:
           minLength: 1
           type: string
           x-size-message: Tag name must be between 1 and 50 characters.
-    UpdateUserCommand:
+    UpdateUserRequest:
       required:
       - email
       type: object
@@ -3774,7 +3774,7 @@ components:
       description: Input for updating a user's profile. Excludes `role` so users cannot
         raise their own access level during profile edits. Roles can only be changed
         by a system admin through the user role endpoint.
-    UpdateUserRoleCommand:
+    UpdateUserRoleRequest:
       required:
       - role
       type: object

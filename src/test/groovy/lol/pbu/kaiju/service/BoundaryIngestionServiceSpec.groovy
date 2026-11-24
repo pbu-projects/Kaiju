@@ -7,7 +7,7 @@ import io.micronaut.json.tree.JsonNode
 import io.micronaut.serde.ObjectMapper
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import lol.pbu.kaiju.dto.IngestBoundaryCommand
+import lol.pbu.kaiju.dto.IngestBoundaryRequest
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -54,15 +54,15 @@ class BoundaryIngestionServiceSpec extends Specification {
 
 
 
-    def "should validate regionId and command null checks"() {
+    def "should validate regionId and request null checks"() {
         when: "regionId is null"
-        service.ingestBoundary(null, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/test", 0.001))
+        service.ingestBoundary(null, new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/test", 0.001))
 
         then:
         def e1 = thrown(HttpStatusException)
         e1.status == HttpStatus.BAD_REQUEST
 
-        when: "command is null"
+        when: "request is null"
         service.ingestBoundary(UUID.randomUUID(), null)
 
         then:
@@ -70,7 +70,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         e2.status == HttpStatus.BAD_REQUEST
 
         when: "sourceUrl is blank"
-        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("   ", 0.001))
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("   ", 0.001))
 
         then:
         def e3 = thrown(HttpStatusException)
@@ -111,7 +111,7 @@ class BoundaryIngestionServiceSpec extends Specification {
     @Unroll
     def "should reject invalid tolerance through ingestBoundary: #badTolerance"() {
         when:
-        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", badTolerance))
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", badTolerance))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -123,7 +123,7 @@ class BoundaryIngestionServiceSpec extends Specification {
 
     def "should validate and reject disallowed source URLs"() {
         when:
-        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand(url, 0.001))
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest(url, 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -183,7 +183,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         when:
         IngestBoundaryResponse response = customService.ingestBoundary(
                 testRegionId,
-                new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001)
+                new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001)
         )
 
         then:
@@ -226,7 +226,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand(urlWithDescription, 0.001))
+        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryRequest(urlWithDescription, 0.001))
 
         then:
         verifyAll(response) {
@@ -253,7 +253,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when: "payload is processed"
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -344,7 +344,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when: "attempting to ingest a multi-feature FeatureCollection"
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then: "a 400 Bad Request exception is thrown with appropriate explanation"
         def ex = thrown(HttpStatusException)
@@ -372,7 +372,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -394,7 +394,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when: "upstream returns 500"
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex1 = thrown(HttpStatusException)
@@ -404,7 +404,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         stubClient.sendHandler = { req, handler ->
             throw new IOException("Connection reset")
         }
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex2 = thrown(HttpStatusException)
@@ -439,7 +439,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         UUID existingRegionId = UUID.fromString("a0000000-0000-0000-0000-000000000002")
 
         when:
-        customService.ingestBoundary(existingRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(existingRegionId, new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -483,7 +483,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         verifyAll(response) {
@@ -538,7 +538,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         verifyAll(response) {
@@ -580,7 +580,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(missingRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(missingRegionId, new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -619,7 +619,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when: "attempting to ingest geometry with fewer than 4 coordinates"
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then: "a 400 Bad Request exception is thrown specifically for ring length"
         def ex = thrown(HttpStatusException)
@@ -675,7 +675,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         when:
         IngestBoundaryResponse response = customService.ingestBoundary(
                 testRegionId,
-                new IngestBoundaryCommand("https://tigerweb.geo.census.gov:443/arcgis/rest/services/TIGERweb/query", 0.001)
+                new IngestBoundaryRequest("https://tigerweb.geo.census.gov:443/arcgis/rest/services/TIGERweb/query", 0.001)
         )
 
         then:
@@ -720,7 +720,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        IngestBoundaryResponse response = customService.ingestBoundary(testRegionId, new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         verifyAll(response) {
@@ -748,7 +748,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -779,7 +779,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -820,7 +820,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -849,7 +849,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)
@@ -891,7 +891,7 @@ class BoundaryIngestionServiceSpec extends Specification {
                 "tigerweb.geo.census.gov",
                 "/arcgis/rest/services/TIGERweb/"
         )
-        svc1.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        svc1.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex1 = thrown(HttpStatusException)
@@ -922,7 +922,7 @@ class BoundaryIngestionServiceSpec extends Specification {
                 "tigerweb.geo.census.gov",
                 "/arcgis/rest/services/TIGERweb/"
         )
-        svc2.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        svc2.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex2 = thrown(HttpStatusException)
@@ -956,7 +956,7 @@ class BoundaryIngestionServiceSpec extends Specification {
                 "tigerweb.geo.census.gov",
                 "/arcgis/rest/services/TIGERweb/"
         )
-        svc3.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        svc3.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex3 = thrown(HttpStatusException)
@@ -989,7 +989,7 @@ class BoundaryIngestionServiceSpec extends Specification {
                 "tigerweb.geo.census.gov",
                 "/arcgis/rest/services/TIGERweb/"
         )
-        IngestBoundaryResponse res4 = svc4.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        IngestBoundaryResponse res4 = svc4.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         verifyAll(res4) {
@@ -1040,7 +1040,7 @@ class BoundaryIngestionServiceSpec extends Specification {
         )
 
         when:
-        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
 
         then:
         def ex = thrown(HttpStatusException)

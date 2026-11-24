@@ -6,7 +6,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.dto.UpdateUserRoleCommand
+import lol.pbu.kaiju.dto.UpdateUserRoleRequest
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 
@@ -23,7 +23,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
         User user = dataBuilder.user().asVolunteer().persist()
 
         when: "an admin promotes them to REGION_AGENT via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/admin/users/${user.id()}/role", new UpdateUserRoleCommand(UserRole.REGION_AGENT))), User)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/admin/users/${user.id()}/role", new UpdateUserRoleRequest(UserRole.REGION_AGENT))), User)
         User result = response.body()
 
         then: "the returned user has the updated role"
@@ -41,7 +41,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
         UUID nonExistentId = UUID.randomUUID()
 
         when: "an admin attempts to update a role for an unknown user via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/admin/users/${nonExistentId}/role", new UpdateUserRoleCommand(UserRole.GLOBAL_ADMIN))), User)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/admin/users/${nonExistentId}/role", new UpdateUserRoleRequest(UserRole.GLOBAL_ADMIN))), User)
 
         then: "a 404 Not Found is thrown"
         def e = thrown(HttpClientResponseException)
@@ -53,7 +53,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
         User user = dataBuilder.user().asVolunteer().persist()
 
         when: "a standard user attempts to update role"
-        client.exchange(asVolunteer(HttpRequest.PUT("/admin/users/${user.id()}/role", new UpdateUserRoleCommand(UserRole.REGION_AGENT))), User)
+        client.exchange(asVolunteer(HttpRequest.PUT("/admin/users/${user.id()}/role", new UpdateUserRoleRequest(UserRole.REGION_AGENT))), User)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -62,7 +62,7 @@ class AdminUserControllerSpec extends BaseControllerSpec {
 
     def "updateUserRole throws 401 UNAUTHORIZED for unauthenticated caller"() {
         when: "an unauthenticated caller attempts to update a role"
-        client.exchange(HttpRequest.PUT("/admin/users/${UUID.randomUUID()}/role", new UpdateUserRoleCommand(UserRole.REGION_AGENT)), User)
+        client.exchange(HttpRequest.PUT("/admin/users/${UUID.randomUUID()}/role", new UpdateUserRoleRequest(UserRole.REGION_AGENT)), User)
 
         then: "a 401 UNAUTHORIZED is thrown"
         def e = thrown(HttpClientResponseException)

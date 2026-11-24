@@ -3,10 +3,10 @@ package lol.pbu.kaiju.service;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
-import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.dto.RegionCoordinateResolution;
-import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -23,10 +23,10 @@ public interface AdministrativeRegionService {
     Optional<AdministrativeRegion> getAdministrativeRegionById(@NonNull UUID id);
 
     @NonNull
-    AdministrativeRegion createAdministrativeRegion(@NonNull CreateAdministrativeRegionCommand command, @NonNull UUID actorUserId);
+    AdministrativeRegion createAdministrativeRegion(@NonNull CreateAdministrativeRegionRequest request, @NonNull UUID actorUserId);
 
     @NonNull
-    AdministrativeRegion updateAdministrativeRegion(@NonNull UUID id, @NonNull UpdateAdministrativeRegionCommand command, @NonNull UUID actorUserId);
+    AdministrativeRegion updateAdministrativeRegion(@NonNull UUID id, @NonNull UpdateAdministrativeRegionRequest request, @NonNull UUID actorUserId);
 
     void deleteAdministrativeRegion(@NonNull UUID id, @NonNull UUID actorUserId);
 

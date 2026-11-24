@@ -10,10 +10,10 @@ import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import lol.pbu.kaiju.dto.RegionCoordinateResolution
-import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest
 import lol.pbu.kaiju.model.RegionAuditAction
 import lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
@@ -119,8 +119,8 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "QUERY | should get administrative regions page and find by id"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Query Region", null, validCoordinates())
-        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Query Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(region)
 
         when: "querying regions with a pageable"
@@ -145,11 +145,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should create an administrative region and record an immutable audit log"() {
-        given: "a valid create command"
-        def command = new CreateAdministrativeRegionCommand("Metro North", null, validCoordinates())
+        given: "a valid create request"
+        def request = new CreateAdministrativeRegionRequest("Metro North", null, validCoordinates())
 
         when: "the region is created via the service"
-        AdministrativeRegion region = regionService.createAdministrativeRegion(command, testAdminUser.id())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(request, testAdminUser.id())
         track(region)
 
         then: "the region is saved"
@@ -169,12 +169,12 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should fail when parent administrative region does not exist"() {
-        given: "a command referencing a non-existent parent ID"
+        given: "a request referencing a non-existent parent ID"
         UUID missingParentId = UUID.randomUUID()
-        def command = new CreateAdministrativeRegionCommand("Child Region", missingParentId, validCoordinates())
+        def request = new CreateAdministrativeRegionRequest("Child Region", missingParentId, validCoordinates())
 
         when: "attempting to create the region"
-        regionService.createAdministrativeRegion(command, testAdminUser.id())
+        regionService.createAdministrativeRegion(request, testAdminUser.id())
 
         then: "HTTP 400 Bad Request is thrown"
         def e = thrown(HttpStatusException)
@@ -184,11 +184,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should fail when geometry is topologically invalid"() {
-        given: "a command with a self-intersecting polygon"
-        def command = new CreateAdministrativeRegionCommand("Invalid Region", null, bowtieCoordinates())
+        given: "a request with a self-intersecting polygon"
+        def request = new CreateAdministrativeRegionRequest("Invalid Region", null, bowtieCoordinates())
 
         when: "attempting to create the region"
-        regionService.createAdministrativeRegion(command, testAdminUser.id())
+        regionService.createAdministrativeRegion(request, testAdminUser.id())
 
         then: "HTTP 422 Unprocessable Entity is thrown"
         def e = thrown(HttpStatusException)
@@ -200,10 +200,10 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     def "CREATE | should fail when actor user does not exist"() {
         given: "a non-existent actor UUID"
         UUID missingUserId = UUID.randomUUID()
-        def command = new CreateAdministrativeRegionCommand("Valid Region", null, validCoordinates())
+        def request = new CreateAdministrativeRegionRequest("Valid Region", null, validCoordinates())
 
         when: "attempting to create the region"
-        regionService.createAdministrativeRegion(command, missingUserId)
+        regionService.createAdministrativeRegion(request, missingUserId)
 
         then: "HTTP 401 Unauthorized is thrown"
         def e = thrown(HttpStatusException)
@@ -217,11 +217,11 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         AdministrativeRegion parent = dataBuilder.region().withName("Parent With Null Level").persist()
         track(parent)
 
-        and: "a command to create a child region referencing the parent"
-        def command = new CreateAdministrativeRegionCommand("Child With Level Fallback", parent.id(), validCoordinates())
+        and: "a request to create a child region referencing the parent"
+        def request = new CreateAdministrativeRegionRequest("Child With Level Fallback", parent.id(), validCoordinates())
 
         when: "creating the child region"
-        AdministrativeRegion child = regionService.createAdministrativeRegion(command, testAdminUser.id())
+        AdministrativeRegion child = regionService.createAdministrativeRegion(request, testAdminUser.id())
         track(child)
 
         then: "the child region is assigned level 2"
@@ -234,15 +234,15 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "UPDATE | should update an existing administrative region and record an audit log"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Original Name", null, validCoordinates())
-        AdministrativeRegion initial = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Original Name", null, validCoordinates())
+        AdministrativeRegion initial = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(initial)
 
-        and: "an update command"
-        def updateCmd = new UpdateAdministrativeRegionCommand("Renamed Region", null, validCoordinates())
+        and: "an update request"
+        def updateRequest = new UpdateAdministrativeRegionRequest("Renamed Region", null, validCoordinates())
 
         when: "updating the administrative region"
-        AdministrativeRegion updated = regionService.updateAdministrativeRegion(initial.id(), updateCmd, testAdminUser.id())
+        AdministrativeRegion updated = regionService.updateAdministrativeRegion(initial.id(), updateRequest, testAdminUser.id())
 
         then: "the region name is updated"
         verifyAll {
@@ -260,15 +260,15 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject an administrative region setting itself as parent"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Self Parent Region", null, validCoordinates())
-        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Self Parent Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(region)
 
-        and: "an update command setting parentRegionId to its own ID"
-        def updateCmd = new UpdateAdministrativeRegionCommand("Self Parent Region", region.id(), validCoordinates())
+        and: "an update request setting parentRegionId to its own ID"
+        def updateRequest = new UpdateAdministrativeRegionRequest("Self Parent Region", region.id(), validCoordinates())
 
         when: "attempting to update the region"
-        regionService.updateAdministrativeRegion(region.id(), updateCmd, testAdminUser.id())
+        regionService.updateAdministrativeRegion(region.id(), updateRequest, testAdminUser.id())
 
         then: "HTTP 400 Bad Request is thrown"
         def e = thrown(HttpStatusException)
@@ -279,15 +279,15 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject setting a non-existent parent administrative region"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Region", null, validCoordinates())
-        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(region)
 
-        and: "an update command setting a non-existent parent ID"
-        def updateCmd = new UpdateAdministrativeRegionCommand("Region", UUID.randomUUID(), validCoordinates())
+        and: "an update request setting a non-existent parent ID"
+        def updateRequest = new UpdateAdministrativeRegionRequest("Region", UUID.randomUUID(), validCoordinates())
 
         when: "attempting to update the region"
-        regionService.updateAdministrativeRegion(region.id(), updateCmd, testAdminUser.id())
+        regionService.updateAdministrativeRegion(region.id(), updateRequest, testAdminUser.id())
 
         then: "HTTP 400 Bad Request is thrown"
         def e = thrown(HttpStatusException)
@@ -299,10 +299,10 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     def "UPDATE | should return 404 when updating non-existent region"() {
         given: "a non-existent region ID"
         UUID missingId = UUID.randomUUID()
-        def updateCmd = new UpdateAdministrativeRegionCommand("New Name", null, validCoordinates())
+        def updateRequest = new UpdateAdministrativeRegionRequest("New Name", null, validCoordinates())
 
         when: "attempting to update"
-        regionService.updateAdministrativeRegion(missingId, updateCmd, testAdminUser.id())
+        regionService.updateAdministrativeRegion(missingId, updateRequest, testAdminUser.id())
 
         then: "HTTP 404 Not Found is thrown"
         def e = thrown(HttpStatusException)
@@ -313,15 +313,15 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "UPDATE | should fail when updating with topologically invalid geometry"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Valid Region Before Update", null, validCoordinates())
-        AdministrativeRegion initial = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Valid Region Before Update", null, validCoordinates())
+        AdministrativeRegion initial = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(initial)
 
-        and: "an update command with a self-intersecting polygon"
-        def updateCmd = new UpdateAdministrativeRegionCommand("Updated Region", null, bowtieCoordinates())
+        and: "an update request with a self-intersecting polygon"
+        def updateRequest = new UpdateAdministrativeRegionRequest("Updated Region", null, bowtieCoordinates())
 
         when: "attempting to update the region"
-        regionService.updateAdministrativeRegion(initial.id(), updateCmd, testAdminUser.id())
+        regionService.updateAdministrativeRegion(initial.id(), updateRequest, testAdminUser.id())
 
         then: "HTTP 422 Unprocessable Entity is thrown"
         def e = thrown(HttpStatusException)
@@ -332,8 +332,8 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "DELETE | should delete an administrative region and preserve immutable audit log"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Region To Delete", null, validCoordinates())
-        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Region To Delete", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
 
         when: "deleting the administrative region"
         regionService.deleteAdministrativeRegion(region.id(), testAdminUser.id())
@@ -367,8 +367,8 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
 
     def "BOUNDARY | should apply ingested boundary to administrative region"() {
         given: "an existing administrative region"
-        def createCmd = new CreateAdministrativeRegionCommand("Boundary Test Region", null, validCoordinates())
-        AdministrativeRegion region = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Boundary Test Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(region)
 
         and: "a valid geojson polygon string"
@@ -479,8 +479,8 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         AdministrativeRegion state = regionService.findState("CO").orElseThrow()
 
         and: "a county created under that state"
-        def createCmd = new CreateAdministrativeRegionCommand("Preserved County", state.id(), validCoordinates())
-        AdministrativeRegion created = regionService.createAdministrativeRegion(createCmd, testAdminUser.id())
+        def createRequest = new CreateAdministrativeRegionRequest("Preserved County", state.id(), validCoordinates())
+        AdministrativeRegion created = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
         track(created)
 
         verifyAll {
@@ -491,8 +491,8 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
 
         when: "updating the region name and coordinates"
-        def updateCmd = new UpdateAdministrativeRegionCommand("Preserved County Renamed", state.id(), validCoordinates())
-        AdministrativeRegion updated = regionService.updateAdministrativeRegion(created.id(), updateCmd, testAdminUser.id())
+        def updateRequest = new UpdateAdministrativeRegionRequest("Preserved County Renamed", state.id(), validCoordinates())
+        AdministrativeRegion updated = regionService.updateAdministrativeRegion(created.id(), updateRequest, testAdminUser.id())
 
         then: "level, countryCode, stateCode, and timeZone are preserved"
         verifyAll {

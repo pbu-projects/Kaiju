@@ -28,10 +28,10 @@ import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
-import lol.pbu.kaiju.dto.CreateProjectCommand;
-import lol.pbu.kaiju.dto.ProjectBoundaryCommand;
-import lol.pbu.kaiju.dto.ProjectLocationCommand;
-import lol.pbu.kaiju.dto.UpdateProjectCommand;
+import lol.pbu.kaiju.dto.CreateProjectRequest;
+import lol.pbu.kaiju.dto.ProjectBoundaryRequest;
+import lol.pbu.kaiju.dto.ProjectLocationRequest;
+import lol.pbu.kaiju.dto.UpdateProjectRequest;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
@@ -116,25 +116,25 @@ public class ProjectController {
     }
 
     @Post
-    public Project submitProject(@Valid @Body CreateProjectCommand command, Principal principal) {
-        Organization org = command.organizationId() != null
-                ? new Organization(command.organizationId(), null, null, null, true, null, null, null)
+    public Project submitProject(@Valid @Body CreateProjectRequest request, Principal principal) {
+        Organization org = request.organizationId() != null
+                ? new Organization(request.organizationId(), null, null, null, true, null, null, null)
                 : null;
-        AdministrativeRegion managingRegion = command.managingRegionId() != null
-                ? new AdministrativeRegion(command.managingRegionId(), null, null, null)
+        AdministrativeRegion managingRegion = request.managingRegionId() != null
+                ? new AdministrativeRegion(request.managingRegionId(), null, null, null)
                 : null;
 
-        List<Location> domainLocations = mapLocations(command.locations());
-        List<Boundary> domainBoundaries = mapBoundaries(command.boundaries());
+        List<Location> domainLocations = mapLocations(request.locations());
+        List<Boundary> domainBoundaries = mapBoundaries(request.boundaries());
 
         Project transientProject = new Project(
                 null,
                 org,
                 managingRegion,
-                command.title(),
-                command.description(),
-                command.projectType(),
-                command.status(),
+                request.title(),
+                request.description(),
+                request.projectType(),
+                request.status(),
                 null,
                 null,
                 null,
@@ -150,24 +150,24 @@ public class ProjectController {
      * Updates an existing project by its ID after validating that it exists.
      */
     @Put("/{id}")
-    public Project updateProject(@PathVariable UUID id, @Valid @Body UpdateProjectCommand command, Principal principal) {
-        Organization org = command.organizationId() != null
-                ? new Organization(command.organizationId(), null, null, null, true, null, null, null)
+    public Project updateProject(@PathVariable UUID id, @Valid @Body UpdateProjectRequest request, Principal principal) {
+        Organization org = request.organizationId() != null
+                ? new Organization(request.organizationId(), null, null, null, true, null, null, null)
                 : null;
-        AdministrativeRegion managingRegion = command.managingRegionId() != null
-                ? new AdministrativeRegion(command.managingRegionId(), null, null, null)
+        AdministrativeRegion managingRegion = request.managingRegionId() != null
+                ? new AdministrativeRegion(request.managingRegionId(), null, null, null)
                 : null;
 
-        List<Location> domainLocations = mapLocations(command.locations());
-        List<Boundary> domainBoundaries = mapBoundaries(command.boundaries());
+        List<Location> domainLocations = mapLocations(request.locations());
+        List<Boundary> domainBoundaries = mapBoundaries(request.boundaries());
 
         Project transientProject = new Project(
                 id,
                 org,
                 managingRegion,
-                command.title(),
-                command.description(),
-                command.projectType(),
+                request.title(),
+                request.description(),
+                request.projectType(),
                 null,
                 null,
                 null,
@@ -223,7 +223,7 @@ public class ProjectController {
         return projectService.approveProject(id, regionalAdminId);
     }
 
-    private List<Location> mapLocations(List<ProjectLocationCommand> locations) {
+    private List<Location> mapLocations(List<ProjectLocationRequest> locations) {
         if (locations == null) {
             return List.of();
         }
@@ -241,7 +241,7 @@ public class ProjectController {
                 .toList();
     }
 
-    private List<Boundary> mapBoundaries(List<ProjectBoundaryCommand> boundaries) {
+    private List<Boundary> mapBoundaries(List<ProjectBoundaryRequest> boundaries) {
         if (boundaries == null) {
             return List.of();
         }

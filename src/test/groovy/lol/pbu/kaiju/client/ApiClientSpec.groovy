@@ -4,7 +4,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.client.api.DefaultApi
 import lol.pbu.kaiju.client.model.AdministrativeRegion
-import lol.pbu.kaiju.client.model.CreateTagCommand
+import lol.pbu.kaiju.client.model.CreateTagRequest
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegion
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegionAuditLog
 import lol.pbu.kaiju.client.model.CursoredPageBoundary
@@ -21,9 +21,9 @@ import lol.pbu.kaiju.client.model.CursoredPageUser
 import lol.pbu.kaiju.client.model.Organization
 import lol.pbu.kaiju.client.model.OrganizationUser
 import lol.pbu.kaiju.client.model.RegionUser
-import lol.pbu.kaiju.client.model.UpdateUserRoleCommand
+import lol.pbu.kaiju.client.model.UpdateUserRoleRequest
 import lol.pbu.kaiju.client.model.Tag
-import lol.pbu.kaiju.client.model.UpdateTagCommand
+import lol.pbu.kaiju.client.model.UpdateTagRequest
 import lol.pbu.kaiju.client.model.User
 import lol.pbu.kaiju.client.model.UserRole
 import lol.pbu.kaiju.controller.BaseControllerSpec
@@ -139,8 +139,8 @@ class ApiClientSpec extends BaseControllerSpec {
         }
 
         when: "updating user role"
-        UpdateUserRoleCommand roleCommand = new UpdateUserRoleCommand(UserRole.REGION_AGENT)
-        User updatedUser = defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, roleCommand)
+        UpdateUserRoleRequest roleRequest = new UpdateUserRoleRequest(UserRole.REGION_AGENT)
+        User updatedUser = defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, roleRequest)
 
         then: "user role is updated"
         verifyAll(updatedUser) {
@@ -149,16 +149,16 @@ class ApiClientSpec extends BaseControllerSpec {
         }
 
         cleanup:
-        defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, new UpdateUserRoleCommand(UserRole.STANDARD_USER))
+        defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, new UpdateUserRoleRequest(UserRole.STANDARD_USER))
     }
 
     def "can create update and delete tags"() {
         given: "a logged in global admin"
         loginAs(TestPersonas.SARAH_ADMIN)
-        CreateTagCommand createCommand = new CreateTagCommand("client-tag-test")
+        CreateTagRequest createRequest = new CreateTagRequest("client-tag-test")
 
         when: "creating a new tag"
-        Tag createdTag = defaultApi.addTag(createCommand)
+        Tag createdTag = defaultApi.addTag(createRequest)
 
         then: "the tag is created with valid id"
         verifyAll(createdTag) {
@@ -177,8 +177,8 @@ class ApiClientSpec extends BaseControllerSpec {
         }
 
         when: "updating the tag"
-        UpdateTagCommand updateCommand = new UpdateTagCommand("client-tag-updated")
-        Tag updatedTag = defaultApi.updateTag(createdTag.id, updateCommand)
+        UpdateTagRequest updateRequest = new UpdateTagRequest("client-tag-updated")
+        Tag updatedTag = defaultApi.updateTag(createdTag.id, updateRequest)
 
         then: "the tag name is updated"
         verifyAll(updatedTag) {

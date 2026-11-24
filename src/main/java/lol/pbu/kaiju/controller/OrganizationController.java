@@ -22,8 +22,8 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.Organization;
-import lol.pbu.kaiju.dto.CreateOrganizationCommand;
-import lol.pbu.kaiju.dto.UpdateOrganizationCommand;
+import lol.pbu.kaiju.dto.CreateOrganizationRequest;
+import lol.pbu.kaiju.dto.UpdateOrganizationRequest;
 import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
@@ -203,14 +203,14 @@ public class OrganizationController {
     }
 
     @Post
-    public Organization addOrganization(@Valid @Body CreateOrganizationCommand command, Principal principal) {
+    public Organization addOrganization(@Valid @Body CreateOrganizationRequest request, Principal principal) {
         UUID creatorUserId = UUID.fromString(principal.getName());
         Organization organization = new Organization(
                 null,
-                command.name(),
-                command.websiteUrl(),
-                command.parentId(),
-                command.isPublic(),
+                request.name(),
+                request.websiteUrl(),
+                request.parentId(),
+                request.isPublic(),
                 VerificationStatus.UNVERIFIED,
                 null,
                 List.of()
@@ -224,18 +224,18 @@ public class OrganizationController {
      * Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id        the ID of the organization to update
-     * @param command   the updated organization command
+     * @param request   the updated organization request
      * @param principal the authenticated principal
      * @return the updated organization
      */
     @Put("/{id}")
-    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationCommand command, Principal principal) {
+    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationRequest request, Principal principal) {
         Organization candidate = new Organization(
                 id,
-                command.name(),
-                command.websiteUrl(),
-                command.parentId(),
-                command.isPublic(),
+                request.name(),
+                request.websiteUrl(),
+                request.parentId(),
+                request.isPublic(),
                 null,
                 null,
                 null

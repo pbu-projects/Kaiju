@@ -27,7 +27,7 @@ Rather than writing messy SQL scripts by hand, Kaiju uses a type-safe tool calle
 * **Safety During Code Changes**: Builders use real domain classes and repositories. If a field name or type changes in Java, our build tools highlight any broken tests immediately before code is ever merged.
 * **Fun, Unique Persona Names**: Builders use [DataFaker](https://www.datafaker.net/) with Star Wars and Zelda character names and unique email addresses. This guarantees that test accounts never collide with each other or overwrite pre-seeded database rows.
 * **Automatic Cleanup**: The builder tracks every record created during a test. When the test finishes, `BaseControllerSpec.cleanup()` deletes those records in reverse order (children before parents). This keeps the database clean between tests without needing transaction rollbacks that could interfere with multi-threaded web server tests.
-* **Fast Request Payloads**: Builders include `.asCommand()` helpers (such as `ProjectBuilder.asCommand()`). These helpers generate valid JSON request bodies instantly, saving developers from typing repetitive boilerplate payloads in controller tests.
+* **Fast Request Payloads**: Builders include `.asRequest()` helpers (such as `ProjectBuilder.asRequest()`). These helpers generate valid JSON request bodies instantly, saving developers from typing repetitive boilerplate payloads in controller tests.
 
 ### Available Builders
 

@@ -18,16 +18,16 @@ import io.micronaut.core.convert.format.Format;
 import lol.pbu.kaiju.client.model.AdministrativeRegion;
 import lol.pbu.kaiju.client.model.AdministrativeRegionAuditLog;
 import lol.pbu.kaiju.client.model.Boundary;
-import lol.pbu.kaiju.client.model.CreateAdministrativeRegionCommand;
-import lol.pbu.kaiju.client.model.CreateBoundaryCommand;
-import lol.pbu.kaiju.client.model.CreateLocationCommand;
-import lol.pbu.kaiju.client.model.CreateOrganizationCommand;
-import lol.pbu.kaiju.client.model.CreateOrganizationUserCommand;
-import lol.pbu.kaiju.client.model.CreateProjectCommand;
-import lol.pbu.kaiju.client.model.CreateRegionUserCommand;
-import lol.pbu.kaiju.client.model.CreateShiftCommand;
-import lol.pbu.kaiju.client.model.CreateTagCommand;
-import lol.pbu.kaiju.client.model.CreateUserCommand;
+import lol.pbu.kaiju.client.model.CreateAdministrativeRegionRequest;
+import lol.pbu.kaiju.client.model.CreateBoundaryRequest;
+import lol.pbu.kaiju.client.model.CreateLocationRequest;
+import lol.pbu.kaiju.client.model.CreateOrganizationRequest;
+import lol.pbu.kaiju.client.model.CreateOrganizationUserRequest;
+import lol.pbu.kaiju.client.model.CreateProjectRequest;
+import lol.pbu.kaiju.client.model.CreateRegionUserRequest;
+import lol.pbu.kaiju.client.model.CreateShiftRequest;
+import lol.pbu.kaiju.client.model.CreateTagRequest;
+import lol.pbu.kaiju.client.model.CreateUserRequest;
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegion;
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegionAuditLog;
 import lol.pbu.kaiju.client.model.CursoredPageBoundary;
@@ -42,7 +42,7 @@ import lol.pbu.kaiju.client.model.CursoredPageShift;
 import lol.pbu.kaiju.client.model.CursoredPageTag;
 import lol.pbu.kaiju.client.model.CursoredPageUser;
 import lol.pbu.kaiju.client.model.CursoredPageable;
-import lol.pbu.kaiju.client.model.IngestBoundaryCommand;
+import lol.pbu.kaiju.client.model.IngestBoundaryRequest;
 import lol.pbu.kaiju.client.model.IngestBoundaryResponse;
 import lol.pbu.kaiju.client.model.Location;
 import lol.pbu.kaiju.client.model.Organization;
@@ -57,17 +57,17 @@ import lol.pbu.kaiju.client.model.RegionUser;
 import lol.pbu.kaiju.client.model.Shift;
 import lol.pbu.kaiju.client.model.Tag;
 import java.util.UUID;
-import lol.pbu.kaiju.client.model.UpdateAdministrativeRegionCommand;
-import lol.pbu.kaiju.client.model.UpdateBoundaryCommand;
-import lol.pbu.kaiju.client.model.UpdateLocationCommand;
-import lol.pbu.kaiju.client.model.UpdateOrganizationCommand;
-import lol.pbu.kaiju.client.model.UpdateOrganizationUserCommand;
-import lol.pbu.kaiju.client.model.UpdateProjectCommand;
-import lol.pbu.kaiju.client.model.UpdateRegionUserCommand;
-import lol.pbu.kaiju.client.model.UpdateShiftCommand;
-import lol.pbu.kaiju.client.model.UpdateTagCommand;
-import lol.pbu.kaiju.client.model.UpdateUserCommand;
-import lol.pbu.kaiju.client.model.UpdateUserRoleCommand;
+import lol.pbu.kaiju.client.model.UpdateAdministrativeRegionRequest;
+import lol.pbu.kaiju.client.model.UpdateBoundaryRequest;
+import lol.pbu.kaiju.client.model.UpdateLocationRequest;
+import lol.pbu.kaiju.client.model.UpdateOrganizationRequest;
+import lol.pbu.kaiju.client.model.UpdateOrganizationUserRequest;
+import lol.pbu.kaiju.client.model.UpdateProjectRequest;
+import lol.pbu.kaiju.client.model.UpdateRegionUserRequest;
+import lol.pbu.kaiju.client.model.UpdateShiftRequest;
+import lol.pbu.kaiju.client.model.UpdateTagRequest;
+import lol.pbu.kaiju.client.model.UpdateUserRequest;
+import lol.pbu.kaiju.client.model.UpdateUserRoleRequest;
 import lol.pbu.kaiju.client.model.UsSyncResult;
 import lol.pbu.kaiju.client.model.User;
 import jakarta.annotation.Generated;
@@ -86,113 +86,113 @@ public interface DefaultApi {
      * {@summary Creates and persists a new administrative region polygon.}
      * Creates and persists a new administrative region polygon. Restricted to platform administrators.
      *
-     * @param createAdministrativeRegionCommand the administrative region creation command (required)
+     * @param createAdministrativeRegionRequest the administrative region creation request (required)
      *
      * @return the persisted administrative region (status code 200)
      */
     @Post("/administrative-regions")
     AdministrativeRegion addAdministrativeRegion(
-        @Body @NotNull @Valid CreateAdministrativeRegionCommand createAdministrativeRegionCommand
+        @Body @NotNull @Valid CreateAdministrativeRegionRequest createAdministrativeRegionRequest
     );
 
     /**
      * {@summary Creates a new boundary polygon.}
      * Creates a new boundary polygon. Restricted to platform administrators and directors of an intersecting region.
      *
-     * @param createBoundaryCommand the payload containing boundary name and polygon coordinates (required)
+     * @param createBoundaryRequest the payload containing boundary name and polygon coordinates (required)
      *
      * @return the persisted Boundary (status code 200)
      */
     @Post("/boundaries")
     Boundary addBoundary(
-        @Body @NotNull @Valid CreateBoundaryCommand createBoundaryCommand
+        @Body @NotNull @Valid CreateBoundaryRequest createBoundaryRequest
     );
 
     /**
      * {@summary Creates a new location.}
      * Creates a new location. Restricted to platform administrators and directors of the enclosing region.
      *
-     * @param createLocationCommand the payload containing location details (required)
+     * @param createLocationRequest the payload containing location details (required)
      *
      * @return the persisted location (status code 200)
      */
     @Post("/locations")
     Location addLocation(
-        @Body @NotNull @Valid CreateLocationCommand createLocationCommand
+        @Body @NotNull @Valid CreateLocationRequest createLocationRequest
     );
 
     /**
      * addOrganization
      *
-     * @param createOrganizationCommand (required)
+     * @param createOrganizationRequest (required)
      *
      * @return addOrganization 200 response (status code 200)
      */
     @Post("/organizations")
     Organization addOrganization(
-        @Body @NotNull @Valid CreateOrganizationCommand createOrganizationCommand
+        @Body @NotNull @Valid CreateOrganizationRequest createOrganizationRequest
     );
 
     /**
      * addOrganizationUser
      *
-     * @param createOrganizationUserCommand (required)
+     * @param createOrganizationUserRequest (required)
      *
      * @return addOrganizationUser 200 response (status code 200)
      */
     @Post("/organization-users")
     OrganizationUser addOrganizationUser(
-        @Body @NotNull @Valid CreateOrganizationUserCommand createOrganizationUserCommand
+        @Body @NotNull @Valid CreateOrganizationUserRequest createOrganizationUserRequest
     );
 
     /**
      * {@summary Associates a user with an administrative region under a designated role.}
      * Associates a user with an administrative region under a designated role. Restricted to platform administrators and directors of the target region.
      *
-     * @param createRegionUserCommand the payload containing the target user ID, region ID, and role (required)
+     * @param createRegionUserRequest the payload containing the target user ID, region ID, and role (required)
      *
      * @return the persisted RegionUser relationship (status code 200)
      */
     @Post("/region-users")
     RegionUser addRegionUser(
-        @Body @NotNull @Valid CreateRegionUserCommand createRegionUserCommand
+        @Body @NotNull @Valid CreateRegionUserRequest createRegionUserRequest
     );
 
     /**
      * addShift
      *
-     * @param createShiftCommand (required)
+     * @param createShiftRequest (required)
      *
      * @return addShift 200 response (status code 200)
      */
     @Post("/shifts")
     Shift addShift(
-        @Body @NotNull @Valid CreateShiftCommand createShiftCommand
+        @Body @NotNull @Valid CreateShiftRequest createShiftRequest
     );
 
     /**
      * {@summary Creates a new tag.}
      * Creates a new tag. Restricted to platform administrators and regional managers.
      *
-     * @param createTagCommand the payload containing tag details (required)
+     * @param createTagRequest the payload containing tag details (required)
      *
      * @return the persisted tag (status code 200)
      */
     @Post("/tags")
     Tag addTag(
-        @Body @NotNull @Valid CreateTagCommand createTagCommand
+        @Body @NotNull @Valid CreateTagRequest createTagRequest
     );
 
     /**
      * addUser
      *
-     * @param createUserCommand (required)
+     * @param createUserRequest (required)
      *
      * @return addUser 200 response (status code 200)
      */
     @Post("/users")
     User addUser(
-        @Body @NotNull @Valid CreateUserCommand createUserCommand
+        @Body @NotNull @Valid CreateUserRequest createUserRequest
     );
 
     /**
@@ -662,14 +662,14 @@ public interface DefaultApi {
      * Ingests, simplifies, and validates a geographic boundary for an administrative region from an authoritative external source such as US Census Bureau TIGERweb. Restricted strictly to platform administrators.
      *
      * @param id the unique UUID of the administrative region to update (required)
-     * @param ingestBoundaryCommand the boundary ingestion command (required)
+     * @param ingestBoundaryRequest the boundary ingestion request (required)
      *
      * @return the ingestion summary response (status code 200)
      */
     @Post("/administrative-regions/{id}/boundary/ingest")
     IngestBoundaryResponse ingestBoundary(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid IngestBoundaryCommand ingestBoundaryCommand
+        @Body @NotNull @Valid IngestBoundaryRequest ingestBoundaryRequest
     );
 
     /**
@@ -745,13 +745,13 @@ public interface DefaultApi {
     /**
      * submitProject
      *
-     * @param createProjectCommand (required)
+     * @param createProjectRequest (required)
      *
      * @return submitProject 200 response (status code 200)
      */
     @Post("/projects")
     Project submitProject(
-        @Body @NotNull @Valid CreateProjectCommand createProjectCommand
+        @Body @NotNull @Valid CreateProjectRequest createProjectRequest
     );
 
     /**
@@ -796,14 +796,14 @@ public interface DefaultApi {
      * Updates an existing administrative region by ID. Restricted to platform administrators.
      *
      * @param id the unique UUID of the administrative region to update (required)
-     * @param updateAdministrativeRegionCommand the updated region command data (required)
+     * @param updateAdministrativeRegionRequest the updated region request data (required)
      *
      * @return the updated administrative region (status code 200)
      */
     @Put("/administrative-regions/{id}")
     AdministrativeRegion updateAdministrativeRegion(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateAdministrativeRegionCommand updateAdministrativeRegionCommand
+        @Body @NotNull @Valid UpdateAdministrativeRegionRequest updateAdministrativeRegionRequest
     );
 
     /**
@@ -811,14 +811,14 @@ public interface DefaultApi {
      * Updates an existing boundary after checking caller permission and region access.
      *
      * @param id the ID of the boundary to update (required)
-     * @param updateBoundaryCommand the updated boundary details (required)
+     * @param updateBoundaryRequest the updated boundary details (required)
      *
      * @return the updated boundary (status code 200)
      */
     @Put("/boundaries/{id}")
     Boundary updateBoundary(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateBoundaryCommand updateBoundaryCommand
+        @Body @NotNull @Valid UpdateBoundaryRequest updateBoundaryRequest
     );
 
     /**
@@ -826,14 +826,14 @@ public interface DefaultApi {
      * Updates an existing location after checking caller permission and region access.
      *
      * @param id the ID of the location to update (required)
-     * @param updateLocationCommand the updated location details (required)
+     * @param updateLocationRequest the updated location details (required)
      *
      * @return the updated location (status code 200)
      */
     @Put("/locations/{id}")
     Location updateLocation(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateLocationCommand updateLocationCommand
+        @Body @NotNull @Valid UpdateLocationRequest updateLocationRequest
     );
 
     /**
@@ -841,14 +841,14 @@ public interface DefaultApi {
      * Updates an existing organization by ID. Verifies that the caller is a global admin or organization manager before checking if the organization exists. Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id the ID of the organization to update (required)
-     * @param updateOrganizationCommand the updated organization command (required)
+     * @param updateOrganizationRequest the updated organization request (required)
      *
      * @return the updated organization (status code 200)
      */
     @Put("/organizations/{id}")
     Organization updateOrganization(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateOrganizationCommand updateOrganizationCommand
+        @Body @NotNull @Valid UpdateOrganizationRequest updateOrganizationRequest
     );
 
     /**
@@ -856,7 +856,7 @@ public interface DefaultApi {
      *
      * @param userId (required)
      * @param organizationId (required)
-     * @param updateOrganizationUserCommand (required)
+     * @param updateOrganizationUserRequest (required)
      *
      * @return updateOrganizationUser 200 response (status code 200)
      */
@@ -864,7 +864,7 @@ public interface DefaultApi {
     OrganizationUser updateOrganizationUser(
         @PathVariable("userId") @NotNull UUID userId,
         @PathVariable("organizationId") @NotNull UUID organizationId,
-        @Body @NotNull @Valid UpdateOrganizationUserCommand updateOrganizationUserCommand
+        @Body @NotNull @Valid UpdateOrganizationUserRequest updateOrganizationUserRequest
     );
 
     /**
@@ -872,14 +872,14 @@ public interface DefaultApi {
      * Updates an existing project by its ID after validating that it exists.
      *
      * @param id (required)
-     * @param updateProjectCommand (required)
+     * @param updateProjectRequest (required)
      *
      * @return updateProject 200 response (status code 200)
      */
     @Put("/projects/{id}")
     Project updateProject(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateProjectCommand updateProjectCommand
+        @Body @NotNull @Valid UpdateProjectRequest updateProjectRequest
     );
 
     /**
@@ -888,7 +888,7 @@ public interface DefaultApi {
      *
      * @param userId the unique identifier of the user (required)
      * @param regionId the unique identifier of the region (required)
-     * @param updateRegionUserCommand the payload containing the new role assignment (required)
+     * @param updateRegionUserRequest the payload containing the new role assignment (required)
      *
      * @return the updated RegionUser relationship (status code 200)
      */
@@ -896,7 +896,7 @@ public interface DefaultApi {
     RegionUser updateRegionUser(
         @PathVariable("userId") @NotNull UUID userId,
         @PathVariable("regionId") @NotNull UUID regionId,
-        @Body @NotNull @Valid UpdateRegionUserCommand updateRegionUserCommand
+        @Body @NotNull @Valid UpdateRegionUserRequest updateRegionUserRequest
     );
 
     /**
@@ -904,14 +904,14 @@ public interface DefaultApi {
      * Updates an existing shift by its ID after validating that it exists. Allows system admins, organization managers or admins, regional admins with jurisdiction, and project sponsors. Throws 403 FORBIDDEN if the caller is not allowed to manage shifts for the project. Throws 404 NOT_FOUND if the shift does not exist.
      *
      * @param id the ID of the shift to update (required)
-     * @param updateShiftCommand the updated shift details (required)
+     * @param updateShiftRequest the updated shift details (required)
      *
      * @return the updated shift (status code 200)
      */
     @Put("/shifts/{id}")
     Shift updateShift(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateShiftCommand updateShiftCommand
+        @Body @NotNull @Valid UpdateShiftRequest updateShiftRequest
     );
 
     /**
@@ -919,14 +919,14 @@ public interface DefaultApi {
      * Updates an existing tag by its ID after validating that it exists. Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND if the tag does not exist.
      *
      * @param id the ID of the tag to update (required)
-     * @param updateTagCommand the updated tag details (required)
+     * @param updateTagRequest the updated tag details (required)
      *
      * @return the updated tag (status code 200)
      */
     @Put("/tags/{id}")
     Tag updateTag(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateTagCommand updateTagCommand
+        @Body @NotNull @Valid UpdateTagRequest updateTagRequest
     );
 
     /**
@@ -934,28 +934,28 @@ public interface DefaultApi {
      * Updates an existing user by ID. Keeps the existing user's role and createdAt timestamp unchanged. Only the user themselves or a user manager can update an account. Throws 403 FORBIDDEN if the caller tries to change another account without user management permission. Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id the ID of the user to update (required)
-     * @param updateUserCommand the updated user details (required)
+     * @param updateUserRequest the updated user details (required)
      *
      * @return the updated user (status code 200)
      */
     @Put("/users/{id}")
     User updateUser(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateUserCommand updateUserCommand
+        @Body @NotNull @Valid UpdateUserRequest updateUserRequest
     );
 
     /**
      * {@summary Updates a user's role.}
-     * Updates a user's role. Only accepts an UpdateUserRoleCommand so other user fields cannot be changed.
+     * Updates a user's role. Only accepts an UpdateUserRoleRequest so other user fields cannot be changed.
      *
      * @param id the ID of the user to promote or demote (required)
-     * @param updateUserRoleCommand the requested role (required)
+     * @param updateUserRoleRequest the requested role (required)
      *
      * @return the updated user (status code 200)
      */
     @Put("/admin/users/{id}/role")
     User updateUserRole(
         @PathVariable("id") @NotNull UUID id,
-        @Body @NotNull @Valid UpdateUserRoleCommand updateUserRoleCommand
+        @Body @NotNull @Valid UpdateUserRoleRequest updateUserRoleRequest
     );
 }

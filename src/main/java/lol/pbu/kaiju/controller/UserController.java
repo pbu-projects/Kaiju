@@ -15,8 +15,8 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.dto.CreateUserCommand;
-import lol.pbu.kaiju.dto.UpdateUserCommand;
+import lol.pbu.kaiju.dto.CreateUserRequest;
+import lol.pbu.kaiju.dto.UpdateUserRequest;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.service.UserService;
 import lol.pbu.kaiju.util.PageRequests;
@@ -63,12 +63,12 @@ public class UserController {
 
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     @Post
-    public User addUser(@Valid @Body CreateUserCommand command, Principal principal) {
+    public User addUser(@Valid @Body CreateUserRequest request, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
-        UserRole targetRole = command.role() != null ? command.role() : UserRole.STANDARD_USER;
+        UserRole targetRole = request.role() != null ? request.role() : UserRole.STANDARD_USER;
         User safeUser = new User(
                 null,
-                command.email(),
+                request.email(),
                 targetRole,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
@@ -83,16 +83,16 @@ public class UserController {
      * Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id        the ID of the user to update
-     * @param command   the updated user details
+     * @param request   the updated user details
      * @param principal the authenticated principal
      * @return the updated user
      */
     @Put("/{id}")
-    public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserCommand command, Principal principal) {
+    public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserRequest request, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
         User candidate = new User(
                 id,
-                command.email(),
+                request.email(),
                 null,
                 null
         );

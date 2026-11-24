@@ -13,10 +13,10 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CreateProjectCommand
-import lol.pbu.kaiju.dto.ProjectBoundaryCommand
-import lol.pbu.kaiju.dto.ProjectLocationCommand
-import lol.pbu.kaiju.dto.UpdateProjectCommand
+import lol.pbu.kaiju.dto.CreateProjectRequest
+import lol.pbu.kaiju.dto.ProjectBoundaryRequest
+import lol.pbu.kaiju.dto.ProjectLocationRequest
+import lol.pbu.kaiju.dto.UpdateProjectRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.model.ProjectStatus
@@ -76,9 +76,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
         return dataBuilder.organization().persist()
     }
 
-    private List<ProjectBoundaryCommand> defaultBoundaries(String name = "Default Boundary") {
+    private List<ProjectBoundaryRequest> defaultBoundaries(String name = "Default Boundary") {
         [
-                new ProjectBoundaryCommand(
+                new ProjectBoundaryRequest(
                         name,
                         [
                                 new Coordinates(-105.0, 39.0),
@@ -90,15 +90,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
         ]
     }
 
-    private CreateProjectCommand createProjectCommand(
+    private CreateProjectRequest createProjectRequest(
             UUID orgId,
             String title = "Valid Project Title ${faker.number().digits(5)}",
             String description = "Valid Description that has at least 20 chars long.",
             ProjectType projectType = STANDARD,
             ProjectStatus status = DRAFT,
             UUID managingRegionId = null,
-            List<ProjectLocationCommand> locations = [],
-            List<ProjectBoundaryCommand> boundaries = defaultBoundaries()
+            List<ProjectLocationRequest> locations = [],
+            List<ProjectBoundaryRequest> boundaries = defaultBoundaries()
     ) {
         dataBuilder.project()
                 .forOrg(orgId)
@@ -107,19 +107,19 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withDescription(description)
                 .withType(projectType)
                 .withStatus(status)
-                .withCommandLocations(locations)
-                .withCommandBoundaries(boundaries)
-                .asCommand()
+                .withRequestLocations(locations)
+                .withRequestBoundaries(boundaries)
+                .asRequest()
     }
 
-    private UpdateProjectCommand updateProjectCommand(
+    private UpdateProjectRequest updateProjectRequest(
             UUID orgId = null,
             String title = "Updated Project Title ${faker.number().digits(5)}",
             String description = "Updated Description that has at least 20 chars long.",
             ProjectType projectType = STANDARD,
             UUID managingRegionId = null,
-            List<ProjectLocationCommand> locations = [],
-            List<ProjectBoundaryCommand> boundaries = defaultBoundaries()
+            List<ProjectLocationRequest> locations = [],
+            List<ProjectBoundaryRequest> boundaries = defaultBoundaries()
     ) {
         dataBuilder.project()
                 .forOrg(orgId)
@@ -127,29 +127,29 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withTitle(title)
                 .withDescription(description)
                 .withType(projectType)
-                .withCommandLocations(locations)
-                .withCommandBoundaries(boundaries)
-                .asUpdateCommand()
+                .withRequestLocations(locations)
+                .withRequestBoundaries(boundaries)
+                .asUpdateRequest()
     }
 
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid project"() {
-        given: "a valid create project command"
+        given: "a valid create project request"
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Test Project ${faker.company().name()}", "Test Description with plenty of words to exceed twenty characters limit.", STANDARD, DRAFT)
+        def request = createProjectRequest(org.id(), "Test Project ${faker.company().name()}", "Test Description with plenty of words to exceed twenty characters limit.", STANDARD, DRAFT)
 
         when: "the project is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
         Project saved = track(response.body())
 
         then: "the project is persisted with 200 OK and a generated ID"
         verifyAll {
             response.status == HttpStatus.OK
             saved.id() != null
-            saved.title() == command.title()
-            saved.description() == command.description()
-            saved.projectType() == command.projectType()
+            saved.title() == request.title()
+            saved.description() == request.description()
+            saved.projectType() == request.projectType()
             saved.status() == DRAFT
         }
 
@@ -158,15 +158,15 @@ class ProjectControllerSpec extends BaseControllerSpec {
         verifyAll(result) {
             result != null
             id() == saved.id()
-            title() == command.title()
-            description() == command.description()
+            title() == request.title()
+            description() == request.description()
         }
     }
 
     def "CREATE | should ensure child locations and boundaries have server-generated IDs (Issue #26 mass-assignment immunity)"() {
-        given: "a project create command with child locations and boundaries"
+        given: "a project create request with child locations and boundaries"
         def org = getRandomOrganization()
-        def locCmd = new ProjectLocationCommand(
+        def locCmd = new ProjectLocationRequest(
                 "Mass Assign Loc",
                 "123 St",
                 "Denver",
@@ -176,7 +176,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 -104.9903,
                 39.7392
         )
-        def bndCmd = new ProjectBoundaryCommand(
+        def bndCmd = new ProjectBoundaryRequest(
                 "Mass Assign Bnd",
                 [
                         new Coordinates(-105.0, 39.0),
@@ -185,7 +185,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
                         new Coordinates(-105.0, 39.0)
                 ]
         )
-        def command = new CreateProjectCommand(
+        def request = new CreateProjectRequest(
                 org.id(),
                 null,
                 "Mass Assignment Project",
@@ -197,7 +197,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         )
 
         when: "submitting the project via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
         Project saved = track(response.body())
 
         then: "the project is persisted with generated ID"
@@ -220,9 +220,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should fail when boundaries list is empty (Issue #41)"() {
-        given: "a command with empty boundaries"
+        given: "a request with empty boundaries"
         def org = getRandomOrganization()
-        def command = new CreateProjectCommand(
+        def request = new CreateProjectRequest(
                 org.id(),
                 null,
                 "Empty Boundaries Project",
@@ -234,7 +234,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         )
 
         when: "submitting via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -242,9 +242,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should fail when description is less than 20 characters (Issue #42)"() {
-        given: "a command with description under 20 characters"
+        given: "a request with description under 20 characters"
         def org = getRandomOrganization()
-        def command = new CreateProjectCommand(
+        def request = new CreateProjectRequest(
                 org.id(),
                 null,
                 "Short Desc Proj",
@@ -256,7 +256,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         )
 
         when: "submitting via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -286,12 +286,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should throw 400 when organization does not exist"() {
-        given: "a create command with non-existent organization ID"
+        given: "a create request with non-existent organization ID"
         def nonExistentOrgId = UUID.randomUUID()
-        def command = createProjectCommand(nonExistentOrgId, "Orphan Project")
+        def request = createProjectRequest(nonExistentOrgId, "Orphan Project")
 
         when: "submitting via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -299,11 +299,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should return 403 Forbidden for standard user with non-existent organizationId (no existence oracle)"() {
-        given: "a create command with non-existent organization ID"
-        def command = createProjectCommand(UUID.randomUUID(), "Outsider Orphan Project")
+        given: "a create request with non-existent organization ID"
+        def request = createProjectRequest(UUID.randomUUID(), "Outsider Orphan Project")
 
         when: "an unprivileged standard user submits via HTTP POST"
-        client.exchange(asVolunteer(HttpRequest.POST("/projects", command), TestPersonas.VICTOR_VOLUNTEER), Project)
+        client.exchange(asVolunteer(HttpRequest.POST("/projects", request), TestPersonas.VICTOR_VOLUNTEER), Project)
 
         then: "a 403 Forbidden is returned instead of 400"
         def e = thrown(HttpClientResponseException)
@@ -315,8 +315,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "READ | should retrieve an existing project by ID"() {
         given: "an existing project created via HTTP"
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Test Project Read")
-        Project created = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
+        def request = createProjectRequest(org.id(), "Test Project Read")
+        Project created = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project).body())
         UUID id = created.id()
 
         when: "the project is requested by its ID via HTTP GET"
@@ -345,8 +345,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         given: "an existing project in the database"
         def org = getRandomOrganization()
         def targetTitle = "Searchable Title ${faker.number().digits(5)}"
-        def command = createProjectCommand(org.id(), targetTitle)
-        track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
+        def request = createProjectRequest(org.id(), targetTitle)
+        track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project).body())
 
         when: "projects are searched by this title via HTTP GET"
         def uri = UriBuilder.of("/projects").queryParam("title", targetTitle).build().toString()
@@ -366,16 +366,16 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should successfully update an existing project"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def createCmd = createProjectCommand(org.id(), "Original Project Title", "Original Description with plenty of words to exceed 20 characters.", STANDARD, DRAFT)
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(org.id(), "Original Project Title", "Original Description with plenty of words to exceed 20 characters.", STANDARD, DRAFT)
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
         UUID id = saved.id()
 
         def newTitle = "Updated ${faker.book().title()}"
         def newDescription = "Updated Description with plenty of words to exceed twenty characters limit."
-        def updateCmd = updateProjectCommand(org.id(), newTitle, newDescription, STANDARD)
+        def updateRequest = updateProjectRequest(org.id(), newTitle, newDescription, STANDARD)
 
         when: "the project is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${id}", updateCmd)), Project)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${id}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "the returned project contains updated data while status remains DRAFT"
@@ -398,13 +398,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent project"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
         def org = getRandomOrganization()
-        def updateCmd = updateProjectCommand(org.id(), "New Title", "New Description exceeding twenty chars length.")
+        def updateRequest = updateProjectRequest(org.id(), "New Title", "New Description exceeding twenty chars length.")
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${nonExistentId}", updateCmd)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${nonExistentId}", updateRequest)), Project)
 
         then: "a 404 Not Found exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -414,11 +414,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should fail when boundaries list is empty (Issue #41)"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def createCmd = createProjectCommand(org.id(), "Project Before Empty Boundary Update")
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(org.id(), "Project Before Empty Boundary Update")
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
-        and: "an update command with empty boundaries"
-        def updateCmd = new UpdateProjectCommand(
+        and: "an update request with empty boundaries"
+        def updateRequest = new UpdateProjectRequest(
                 org.id(),
                 null,
                 "Updated Title With Empty Boundaries",
@@ -429,7 +429,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         )
 
         when: "updating via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -439,11 +439,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should fail when description is less than 20 characters (Issue #42)"() {
         given: "an existing project"
         def org = getRandomOrganization()
-        def createCmd = createProjectCommand(org.id(), "Project Before Short Desc Update")
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(org.id(), "Project Before Short Desc Update")
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
-        and: "an update command with description under 20 characters"
-        def updateCmd = new UpdateProjectCommand(
+        and: "an update request with description under 20 characters"
+        def updateRequest = new UpdateProjectRequest(
                 org.id(),
                 null,
                 "Valid Updated Title",
@@ -454,7 +454,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         )
 
         when: "updating via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -476,11 +476,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def projectId = project.id()
 
-        and: "an update command attempting to reassign the project to Org B"
-        def updateCmd = updateProjectCommand(orgBId, "Hijacked Title", "Hijacked Description that is at least twenty chars long.")
+        and: "an update request attempting to reassign the project to Org B"
+        def updateRequest = updateProjectRequest(orgBId, "Hijacked Title", "Hijacked Description that is at least twenty chars long.")
 
         when: "the Org Manager attempts to reassign the project to Org B via HTTP PUT"
-        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateRequest)), Project)
 
         then: "the request is rejected with 403 Forbidden"
         def e = thrown(HttpClientResponseException)
@@ -510,10 +510,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def projectId = project.id()
 
         and: "an update payload preserving Org A with updated title and description"
-        def updateCmd = updateProjectCommand(orgAId, "Legit Updated Title", "Legit Updated Description that is at least twenty chars long.")
+        def updateRequest = updateProjectRequest(orgAId, "Legit Updated Title", "Legit Updated Description that is at least twenty chars long.")
 
         when: "the Org Manager updates the project via HTTP PUT"
-        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "the update succeeds"
@@ -548,11 +548,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def projectId = project.id()
 
-        and: "an update command reassigning the project to Org B"
-        def updateCmd = updateProjectCommand(orgBId, "Admin Updated Title", "Admin Updated Description that is at least twenty chars long.")
+        and: "an update request reassigning the project to Org B"
+        def updateRequest = updateProjectRequest(orgBId, "Admin Updated Title", "Admin Updated Description that is at least twenty chars long.")
 
         when: "the Global Admin reassigns the project to Org B via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projectId}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "the update succeeds"
@@ -591,11 +591,11 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def projectId = project.id()
 
-        and: "an update command reassigning the project to Org B"
-        def updateCmd = updateProjectCommand(orgBId, "Reassigned by Dual Manager", "Desc with plenty of characters to pass validation.")
+        and: "an update request reassigning the project to Org B"
+        def updateRequest = updateProjectRequest(orgBId, "Reassigned by Dual Manager", "Desc with plenty of characters to pass validation.")
 
         when: "the dual manager attempts to reassign the project to Org B via HTTP PUT"
-        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateRequest)), Project)
 
         then: "the update is rejected with 403 Forbidden"
         def e = thrown(HttpClientResponseException)
@@ -624,12 +624,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def projectId = project.id()
 
-        and: "an update command with a non-existent destination organization"
+        and: "an update request with a non-existent destination organization"
         def nonExistentOrgId = UUID.randomUUID()
-        def updateCmd = updateProjectCommand(nonExistentOrgId, "Ghost Org Project", "Description with plenty of characters to pass validation.")
+        def updateRequest = updateProjectRequest(nonExistentOrgId, "Ghost Org Project", "Description with plenty of characters to pass validation.")
 
         when: "the Global Admin reassigns the project to non-existent organization via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${projectId}", updateRequest)), Project)
 
         then: "a 404 Not Found exception is thrown"
         def e = thrown(HttpClientResponseException)
@@ -674,8 +674,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def projectId = project.id()
 
-        and: "an update command with a location outside the region (Boulder)"
-        def outsideLoc = new ProjectLocationCommand(
+        and: "an update request with a location outside the region (Boulder)"
+        def outsideLoc = new ProjectLocationRequest(
                 "Boulder Loc",
                 "123 Pearl St",
                 "Boulder",
@@ -685,10 +685,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 -105.2705,
                 40.0150
         )
-        def updateCmd = updateProjectCommand(orgId, "Updated Active Project", "Updated Description with plenty of words to exceed twenty chars.", STANDARD, null, [outsideLoc])
+        def updateRequest = updateProjectRequest(orgId, "Updated Active Project", "Updated Description with plenty of words to exceed twenty chars.", STANDARD, null, [outsideLoc])
 
         when: "the Org Manager updates the project with outside locations via HTTP PUT"
-        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateCmd)), Project)
+        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${projectId}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "the project status is demoted to PENDING for regional review"
@@ -711,8 +711,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "DELETE | should remove an existing project"() {
         given: "a new project created via HTTP"
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Temporary Project to Delete")
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
+        def request = createProjectRequest(org.id(), "Temporary Project to Delete")
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project).body())
         UUID id = saved.id()
 
         when: "the project is deleted via HTTP DELETE"
@@ -1221,8 +1221,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "APPROVE | should reject approval of DRAFT project with 400 Bad Request"() {
         given: "a project in DRAFT status"
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Draft Approval Project", "Description with at least twenty characters here.", STANDARD, DRAFT)
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
+        def request = createProjectRequest(org.id(), "Draft Approval Project", "Description with at least twenty characters here.", STANDARD, DRAFT)
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project).body())
 
         when: "attempting to approve the draft project via HTTP PUT"
         client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}/status", "")), Project)
@@ -1263,8 +1263,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "APPROVE | should throw 401 Unauthorized when approving principal does not exist in users table"() {
         given: "a PENDING project"
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Actor 401 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
+        def request = createProjectRequest(org.id(), "Actor 401 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project).body())
 
         when: "calling approveProject directly with a principal UUID that is not in the users table"
         def nonExistentUserId = UUID.randomUUID()
@@ -1374,13 +1374,13 @@ class ProjectControllerSpec extends BaseControllerSpec {
     /********** MANAGING REGION Tests **********/
 
     def "SUBMIT | should throw 400 when managingRegion does not exist"() {
-        given: "a create project command referencing a non-existent managing region"
+        given: "a create project request referencing a non-existent managing region"
         def org = getRandomOrganization()
         def nonExistentRegionId = UUID.randomUUID()
-        def command = createProjectCommand(org.id(), "Ghost Project", "Description with at least twenty characters here.", STANDARD, DRAFT, nonExistentRegionId)
+        def request = createProjectRequest(org.id(), "Ghost Project", "Description with at least twenty characters here.", STANDARD, DRAFT, nonExistentRegionId)
 
         when: "submitting the project via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
 
         then: "a 400 Bad Request is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1404,7 +1404,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
         and: "an organization and a location outside the managing region"
         def org = getRandomOrganization()
-        def outLoc = new ProjectLocationCommand(
+        def outLoc = new ProjectLocationRequest(
                 "Out Loc",
                 "123 St",
                 "Boulder",
@@ -1414,10 +1414,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 -106.0,
                 41.0
         )
-        def command = createProjectCommand(org.id(), "Out Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [outLoc])
+        def request = createProjectRequest(org.id(), "Out Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [outLoc])
 
         when: "submitting the project via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
 
         then: "a 400 Bad Request is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1442,10 +1442,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
         and: "an organization"
         def org = getRandomOrganization()
 
-        def command = createProjectCommand(org.id(), "Unauthorized Region Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
+        def request = createProjectRequest(org.id(), "Unauthorized Region Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
 
         when: "submitting the project via HTTP POST by unauthorized user"
-        client.exchange(asVolunteer(HttpRequest.POST("/projects", command)), Project)
+        client.exchange(asVolunteer(HttpRequest.POST("/projects", request)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1467,10 +1467,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def regId = region.id()
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Virtual Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
+        def request = createProjectRequest(org.id(), "Virtual Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
 
         when: "submitting virtual project with global admin via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
         Project saved = track(response.body())
 
         then: "project is saved and managingRegion is set"
@@ -1498,14 +1498,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def regId = region.id()
         def org = getRandomOrganization()
 
-        def inLoc = new ProjectLocationCommand("In Loc", "123 St", "Denver", null, null, "US", -104.9, 39.7)
-        def createCmd = createProjectCommand(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [inLoc])
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def inLoc = new ProjectLocationRequest("In Loc", "123 St", "Denver", null, null, "US", -104.9, 39.7)
+        def createRequest = createProjectRequest(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, DRAFT, regId, [inLoc])
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "updating the project with locations outside the managing region without modifying managingRegion"
-        def outLoc = new ProjectLocationCommand("Out Loc", "123 St", "Boulder", null, null, "US", -106.0, 41.0)
-        def updateCmd = updateProjectCommand(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, regId, [outLoc])
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def outLoc = new ProjectLocationRequest("Out Loc", "123 St", "Boulder", null, null, "US", -106.0, 41.0)
+        def updateRequest = updateProjectRequest(org.id(), "Initial Project", "Description with at least twenty characters here.", STANDARD, regId, [outLoc])
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
 
         then: "a 400 Bad Request is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1531,12 +1531,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .persist()
         def foreignRegionId = foreignRegion.id()
 
-        def createCmd = createProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT)
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, DRAFT)
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "the Org Manager attempts to assign a foreign region not linked to their organization via HTTP PUT"
-        def updateCmd = updateProjectCommand(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, foreignRegionId)
-        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def updateRequest = updateProjectRequest(orgId, "Unauth Region Proj", "Description with at least twenty characters here.", STANDARD, foreignRegionId)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1562,12 +1562,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def orgId = org.id()
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
-        def createCmd = createProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, DRAFT, regBId)
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, DRAFT, regBId)
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "the Org Manager attempts to unassign the managingRegion via HTTP PUT"
-        def updateCmd = updateProjectCommand(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, null)
-        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def updateRequest = updateProjectRequest(orgId, "Project with Region B", "Description with at least twenty characters here.", STANDARD, null)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1594,12 +1594,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
         dataBuilder.linkOrganizationToRegion(org, region)
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
-        def createCmd = createProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, DRAFT, regId)
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "the Org Manager updates the project setting managingRegion to null via HTTP PUT"
-        def updateCmd = updateProjectCommand(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, null)
-        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def updateRequest = updateProjectRequest(orgId, "Project with Region", "Description with at least twenty characters here.", STANDARD, null)
+        def response = client.exchange(asOrgManager(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "managingRegion is successfully unassigned"
@@ -1647,14 +1647,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         dataBuilder.linkOrganizationToRegion(orgB, boulderReg)
 
         and: "an ACTIVE project under Denver Org with a location in Denver"
-        def denverLoc = new ProjectLocationCommand("Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
-        def createCmd = createProjectCommand(orgAId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def denverLoc = new ProjectLocationRequest("Denver Reassign Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
+        def createRequest = createProjectRequest(orgAId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
         dataBuilder.updateProjectStatus(saved.id(), ACTIVE)
 
         when: "a Global Admin reassigns the active Denver project to Boulder Org via HTTP PUT"
-        def updateCmd = updateProjectCommand(orgBId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def updateRequest = updateProjectRequest(orgBId, "Active Denver Reassign Project", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "the status is automatically demoted to PENDING for regional review"
@@ -1691,14 +1691,14 @@ class ProjectControllerSpec extends BaseControllerSpec {
         dataBuilder.linkOrganizationToRegion(org2, region)
 
         and: "an ACTIVE project in Org Alpha"
-        def denverLoc = new ProjectLocationCommand("Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
-        def createCmd = createProjectCommand(org1Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def denverLoc = new ProjectLocationRequest("Denver Shared Loc", "16th St", "Denver", "CO", "80202", "US", -104.9, 39.7)
+        def createRequest = createProjectRequest(org1Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, ACTIVE, null, [denverLoc])
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
         dataBuilder.updateProjectStatus(saved.id(), ACTIVE)
 
         when: "reassigning to Org Beta which also encloses the location via HTTP PUT"
-        def updateCmd = updateProjectCommand(org2Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def updateRequest = updateProjectRequest(org2Id, "Active Alpha Shared Proj", "Description with at least twenty characters here.", STANDARD, null, [denverLoc])
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
         Project updated = response.body()
 
         then: "status is preserved as ACTIVE"
@@ -1715,12 +1715,12 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "UPDATE | should reject project update by unaffiliated standard user with 403 Forbidden"() {
         given: "an existing project and an unaffiliated standard user"
         def org = getRandomOrganization()
-        def createCmd = createProjectCommand(org.id(), "Protected Project", "Description with at least twenty characters here.")
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(org.id(), "Protected Project", "Description with at least twenty characters here.")
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "unaffiliated user attempts to update the project via HTTP PUT"
-        def updateCmd = updateProjectCommand(org.id(), "Tampered Title", "Description with at least twenty characters here.")
-        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${saved.id()}", updateCmd)), Project)
+        def updateRequest = updateProjectRequest(org.id(), "Tampered Title", "Description with at least twenty characters here.")
+        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -1730,8 +1730,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "DELETE | should reject project deletion by unaffiliated user with 403 Forbidden"() {
         given: "an existing project and an unaffiliated standard user"
         def org = getRandomOrganization()
-        def createCmd = createProjectCommand(org.id(), "Protected Delete Proj", "Description with at least twenty characters here.")
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(org.id(), "Protected Delete Proj", "Description with at least twenty characters here.")
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "unaffiliated user attempts to delete the project via HTTP DELETE"
         client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${saved.id()}")))
@@ -1747,8 +1747,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         def orgId = org.id()
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
 
-        def createCmd = createProjectCommand(orgId, "Project to Delete", "Description with at least twenty characters here.")
-        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createCmd)), Project).body())
+        def createRequest = createProjectRequest(orgId, "Project to Delete", "Description with at least twenty characters here.")
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
 
         when: "the Org Manager deletes the project via HTTP DELETE"
         def response = client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${saved.id()}")))
@@ -1776,17 +1776,17 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .deleted()
                 .persist()
         def missingId = UUID.randomUUID()
-        def updateCmd = updateProjectCommand(org.id(), "Tampered Title", "Description with at least twenty characters here.")
+        def updateRequest = updateProjectRequest(org.id(), "Tampered Title", "Description with at least twenty characters here.")
 
         when: "an unaffiliated user attempts to update the missing and soft-deleted projects"
-        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${missingId}", updateCmd)), Project)
+        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${missingId}", updateRequest)), Project)
 
         then:
         def updateMissingEx = thrown(HttpClientResponseException)
         updateMissingEx.status == HttpStatus.FORBIDDEN
 
         when:
-        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${deletedProject.id()}", updateCmd)), Project)
+        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${deletedProject.id()}", updateRequest)), Project)
 
         then:
         def updateDeletedEx = thrown(HttpClientResponseException)
@@ -1807,7 +1807,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         deleteDeletedEx.status == HttpStatus.FORBIDDEN
 
         when: "the owning org manager attempts to update or delete their soft-deleted project"
-        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${deletedProject.id()}", updateCmd), TestPersonas.LAURA_LOCAL_MANAGER), Project)
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${deletedProject.id()}", updateRequest), TestPersonas.LAURA_LOCAL_MANAGER), Project)
 
         then:
         def managerUpdateDeletedEx = thrown(HttpClientResponseException)
@@ -1827,8 +1827,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         setup:
         def org = getRandomOrganization()
         (1..12).each { i ->
-            def cmd = createProjectCommand(org.id(), "Cursor Drain Project ${String.format('%02d', i)}")
-            track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project).body())
+            def req = createProjectRequest(org.id(), "Cursor Drain Project ${String.format('%02d', i)}")
+            track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", req)), Project).body())
         }
         Set<Project> allProjects = new LinkedHashSet<>()
         int pageSize = 5
@@ -1855,8 +1855,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         setup:
         def org = getRandomOrganization()
         (1..5).each { i ->
-            def cmd = createProjectCommand(org.id(), "Http Paging Project ${i}")
-            track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", cmd)), Project).body())
+            def req = createProjectRequest(org.id(), "Http Paging Project ${i}")
+            track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", req)), Project).body())
         }
 
         when: "querying projects via HTTP GET"

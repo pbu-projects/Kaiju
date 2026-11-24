@@ -10,8 +10,8 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.dto.CreateUserCommand
-import lol.pbu.kaiju.dto.UpdateUserCommand
+import lol.pbu.kaiju.dto.CreateUserRequest
+import lol.pbu.kaiju.dto.UpdateUserRequest
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import net.datafaker.Faker
@@ -40,12 +40,12 @@ class UserControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid user with default role via HTTP POST"() {
-        given: "a create user command without role specified"
+        given: "a create user request without role specified"
         String email = "test-user-${faker.number().digits(6)}@example.com"
-        def command = new CreateUserCommand(email, null)
+        def request = new CreateUserRequest(email, null)
 
         when: "the user is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", command)), User)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", request)), User)
         User saved = track(response.body())
 
         then: "the user is persisted with 200 OK and default STANDARD_USER role"
@@ -85,7 +85,7 @@ class UserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should reject unauthenticated POST /users with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to create a user"
-        client.exchange(HttpRequest.POST("/users", new CreateUserCommand("unauth@example.com", null)), User)
+        client.exchange(HttpRequest.POST("/users", new CreateUserRequest("unauth@example.com", null)), User)
 
         then: "a 401 UNAUTHORIZED status is returned"
         def e = thrown(HttpClientResponseException)
@@ -97,10 +97,10 @@ class UserControllerSpec extends BaseControllerSpec {
     def "AUTHORIZATION | should throw 403 when non-admin attempts to create a user with elevated role"() {
         given: "a standard user caller"
         def caller = createDbUser("std-caller-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
-        def command = new CreateUserCommand("rogue-admin-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+        def request = new CreateUserRequest("rogue-admin-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
 
         when: "the standard user attempts to create a global admin"
-        client.exchange(authenticated(HttpRequest.POST("/users", command), caller.id().toString(), ["STANDARD_USER"]), User)
+        client.exchange(authenticated(HttpRequest.POST("/users", request), caller.id().toString(), ["STANDARD_USER"]), User)
 
         then: "a 403 Forbidden is returned"
         def e = thrown(HttpClientResponseException)
@@ -110,10 +110,10 @@ class UserControllerSpec extends BaseControllerSpec {
     def "AUTHORIZATION | should allow admin to create a user with elevated role"() {
         given: "an admin caller"
         def adminCaller = createDbUser("admin-caller-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
-        def command = new CreateUserCommand("elevated-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
+        def request = new CreateUserRequest("elevated-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
 
         when: "the admin creates an elevated user"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", command), adminCaller.id().toString()), User)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/users", request), adminCaller.id().toString()), User)
         User saved = track(response.body())
 
         then: "the user is saved with the elevated role"
@@ -187,10 +187,10 @@ class UserControllerSpec extends BaseControllerSpec {
         given: "an existing user updating their own profile"
         def user = createDbUser("update-self-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
         String newEmail = "updated-${faker.number().digits(5)}@example.com"
-        def command = new UpdateUserCommand(newEmail)
+        def request = new UpdateUserRequest(newEmail)
 
         when: "the user updates themselves via HTTP PUT"
-        def response = client.exchange(authenticated(HttpRequest.PUT("/users/${user.id()}", command), user.id().toString(), ["STANDARD_USER"]), User)
+        def response = client.exchange(authenticated(HttpRequest.PUT("/users/${user.id()}", request), user.id().toString(), ["STANDARD_USER"]), User)
         User updated = response.body()
 
         then: "the returned user contains updated email and retains original role"
@@ -214,10 +214,10 @@ class UserControllerSpec extends BaseControllerSpec {
         given: "a victim and an attacker"
         def victim = createDbUser("victim-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
         def attacker = createDbUser("attacker-${faker.number().digits(5)}@example.com", UserRole.STANDARD_USER)
-        def command = new UpdateUserCommand("hacked-${faker.number().digits(5)}@example.com")
+        def request = new UpdateUserRequest("hacked-${faker.number().digits(5)}@example.com")
 
         when: "attacker attempts to update victim via HTTP PUT"
-        client.exchange(authenticated(HttpRequest.PUT("/users/${victim.id()}", command), attacker.id().toString(), ["STANDARD_USER"]), User)
+        client.exchange(authenticated(HttpRequest.PUT("/users/${victim.id()}", request), attacker.id().toString(), ["STANDARD_USER"]), User)
 
         then: "a 403 Forbidden is returned"
         def e = thrown(HttpClientResponseException)
@@ -228,10 +228,10 @@ class UserControllerSpec extends BaseControllerSpec {
         given: "an admin and a random non-existent ID"
         def admin = createDbUser("admin-upd-${faker.number().digits(5)}@example.com", UserRole.GLOBAL_ADMIN)
         def nonExistentId = UUID.randomUUID()
-        def command = new UpdateUserCommand("notfound-${faker.number().digits(5)}@example.com")
+        def request = new UpdateUserRequest("notfound-${faker.number().digits(5)}@example.com")
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/users/${nonExistentId}", command), admin.id().toString()), User)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/users/${nonExistentId}", request), admin.id().toString()), User)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)

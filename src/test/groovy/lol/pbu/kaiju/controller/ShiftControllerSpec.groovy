@@ -11,8 +11,8 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.UpdateShiftRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.repository.LocationRepository
@@ -114,14 +114,14 @@ class ShiftControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid virtual shift when called by admin"() {
-        given: "a new valid virtual shift command"
+        given: "a new valid virtual shift request"
         def project = getRandomProject()
         def startTime = OffsetDateTime.now()
         def endTime = startTime.plusHours(2)
-        def command = new CreateShiftCommand(project.id(), true, null, startTime, endTime, null)
+        def request = new CreateShiftRequest(project.id(), true, null, startTime, endTime, null)
 
         when: "the shift is added by admin via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", request)), Shift)
         Shift saved = track(response.body())
 
         then: "the response is 200 OK and shift is persisted with a generated ID"
@@ -145,7 +145,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should successfully save a valid physical shift when called by admin"() {
-        given: "a new valid physical shift command"
+        given: "a new valid physical shift request"
         def location = getRandomLocation()
         def project = dataBuilder.project()
                 .withTitle("Physical Shift Test Proj")
@@ -155,10 +155,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
                 .persist()
         def startTime = OffsetDateTime.now()
         def endTime = startTime.plusHours(2)
-        def command = new CreateShiftCommand(project.id(), false, location.id(), startTime, endTime, null)
+        def request = new CreateShiftRequest(project.id(), false, location.id(), startTime, endTime, null)
 
         when: "the shift is added by admin via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", request)), Shift)
         Shift saved = track(response.body())
 
         then: "the response is 200 OK and shift is persisted with a generated ID"
@@ -189,10 +189,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
                 .withDescription("Project managed by Laura exceeding 20 chars")
                 .persist()
         UUID projectId = project.id()
-        def command = new CreateShiftCommand(projectId, true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def request = new CreateShiftRequest(projectId, true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "the org manager adds shift via HTTP POST"
-        def response = client.exchange(asOrgManager(HttpRequest.POST("/shifts", command), TestPersonas.LAURA_LOCAL_MANAGER), Shift)
+        def response = client.exchange(asOrgManager(HttpRequest.POST("/shifts", request), TestPersonas.LAURA_LOCAL_MANAGER), Shift)
         Shift saved = track(response.body())
 
         then: "the shift is persisted with 200 OK"
@@ -205,10 +205,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
     def "CREATE | should throw 403 Forbidden when standard user attempts to add shift for unmanaged project"() {
         given: "a standard user and a project"
         def project = getRandomProject()
-        def command = new CreateShiftCommand(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def request = new CreateShiftRequest(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "the standard user attempts to add shift via HTTP POST"
-        client.exchange(asVolunteer(HttpRequest.POST("/shifts", command), TestPersonas.VICTOR_VOLUNTEER), Shift)
+        client.exchange(asVolunteer(HttpRequest.POST("/shifts", request), TestPersonas.VICTOR_VOLUNTEER), Shift)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -229,9 +229,9 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def end = start.plusHours(2)
 
         when: "an authorized manager creates a virtual shift with two tags"
-        def createCommand = new CreateShiftCommand(project.id(), true, null, start, end, [tag1.id(), tag2.id()])
+        def createRequest = new CreateShiftRequest(project.id(), true, null, start, end, [tag1.id(), tag2.id()])
         def response = client.exchange(
-                asOrgManager(HttpRequest.POST("/shifts", createCommand), TestPersonas.LAURA_LOCAL_MANAGER),
+                asOrgManager(HttpRequest.POST("/shifts", createRequest), TestPersonas.LAURA_LOCAL_MANAGER),
                 Shift
         )
         Shift saved = track(response.body())
@@ -244,8 +244,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
         }
 
         when: "an outsider tries to create a shift referencing a non-existent location"
-        def oracleCommand = new CreateShiftCommand(project.id(), false, UUID.randomUUID(), start, end, null)
-        client.exchange(asVolunteer(HttpRequest.POST("/shifts", oracleCommand), TestPersonas.VICTOR_VOLUNTEER), Shift)
+        def oracleRequest = new CreateShiftRequest(project.id(), false, UUID.randomUUID(), start, end, null)
+        client.exchange(asVolunteer(HttpRequest.POST("/shifts", oracleRequest), TestPersonas.VICTOR_VOLUNTEER), Shift)
 
         then: "403 FORBIDDEN is returned instead of leaking 404 for the location"
         def outsiderErr = thrown(HttpClientResponseException)
@@ -253,12 +253,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject unauthenticated POST /shifts with 401 UNAUTHORIZED"() {
-        given: "a valid create shift command"
+        given: "a valid create shift request"
         def project = getRandomProject()
-        def command = new CreateShiftCommand(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def request = new CreateShiftRequest(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "an unauthenticated caller attempts to add shift"
-        client.exchange(HttpRequest.POST("/shifts", command), Shift)
+        client.exchange(HttpRequest.POST("/shifts", request), Shift)
 
         then: "a 401 UNAUTHORIZED is thrown"
         def e = thrown(HttpClientResponseException)
@@ -267,12 +267,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     @Unroll
     def "CREATE | should throw 400 Bad Request on invalid location logic: #testCase"(String testCase, boolean isVirtual, UUID locationId) {
-        given: "a command with invalid location logic"
+        given: "a request with invalid location logic"
         def project = getRandomProject()
-        def command = new CreateShiftCommand(project.id(), isVirtual, locationId, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def request = new CreateShiftRequest(project.id(), isVirtual, locationId, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "attempting to create shift via HTTP POST"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", request)), Shift)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -287,10 +287,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
     def "CREATE | should throw 404 Not Found when project does not exist"() {
         given: "a non-existent project id"
         def nonExistentProjectId = UUID.randomUUID()
-        def command = new CreateShiftCommand(nonExistentProjectId, true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def request = new CreateShiftRequest(nonExistentProjectId, true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "attempting to create shift"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", request)), Shift)
 
         then: "a 404 Not Found is thrown"
         def e = thrown(HttpClientResponseException)
@@ -311,7 +311,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "an unrelated volunteer tries to add a shift to a non-existent project"
         client.exchange(
-                asVolunteer(HttpRequest.POST("/shifts", new CreateShiftCommand(UUID.randomUUID(), true, null, start, end, null)), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.POST("/shifts", new CreateShiftRequest(UUID.randomUUID(), true, null, start, end, null)), TestPersonas.VICTOR_VOLUNTEER),
                 Shift
         )
 
@@ -321,7 +321,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "an unrelated volunteer tries to add a shift to the soft-deleted project"
         client.exchange(
-                asVolunteer(HttpRequest.POST("/shifts", new CreateShiftCommand(deletedProject.id(), true, null, start, end, null)), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.POST("/shifts", new CreateShiftRequest(deletedProject.id(), true, null, start, end, null)), TestPersonas.VICTOR_VOLUNTEER),
                 Shift
         )
 
@@ -398,10 +398,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
         UUID id = getAnyShiftId()
         def newStart = OffsetDateTime.now().plusDays(1)
         def newEnd = newStart.plusHours(4)
-        def updateCommand = new UpdateShiftCommand(true, null, newStart, newEnd, null)
+        def updateRequest = new UpdateShiftRequest(true, null, newStart, newEnd, null)
 
         when: "the shift is updated by admin via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/shifts/${id}", updateCommand)), Shift)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/shifts/${id}", updateRequest)), Shift)
         Shift updated = response.body()
 
         then: "the response is 200 OK and contains updated data"
@@ -424,10 +424,10 @@ class ShiftControllerSpec extends BaseControllerSpec {
     def "UPDATE | should throw 403 Forbidden when standard user attempts to update unmanaged shift"() {
         given: "an existing shift and an unauthorized user"
         UUID id = getAnyShiftId()
-        def updateCommand = new UpdateShiftCommand(true, null, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
+        def updateRequest = new UpdateShiftRequest(true, null, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
 
         when: "unauthorized user attempts to update shift via HTTP PUT"
-        client.exchange(asVolunteer(HttpRequest.PUT("/shifts/${id}", updateCommand), TestPersonas.VICTOR_VOLUNTEER), Shift)
+        client.exchange(asVolunteer(HttpRequest.PUT("/shifts/${id}", updateRequest), TestPersonas.VICTOR_VOLUNTEER), Shift)
 
         then: "a 403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
@@ -435,12 +435,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject unauthenticated PUT /shifts/{id} with 401 UNAUTHORIZED"() {
-        given: "an existing shift ID and update command"
+        given: "an existing shift ID and update request"
         UUID id = getAnyShiftId()
-        def updateCommand = new UpdateShiftCommand(true, null, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
+        def updateRequest = new UpdateShiftRequest(true, null, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
 
         when: "an unauthenticated caller attempts to update a shift"
-        client.exchange(HttpRequest.PUT("/shifts/${id}", updateCommand), Shift)
+        client.exchange(HttpRequest.PUT("/shifts/${id}", updateRequest), Shift)
 
         then: "a 401 UNAUTHORIZED is thrown"
         def e = thrown(HttpClientResponseException)
@@ -448,12 +448,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent shift when called by admin"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateShiftCommand(true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def updateRequest = new UpdateShiftRequest(true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
 
         when: "an update is attempted by admin via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/shifts/${nonExistentId}", updateCommand)), Shift)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/shifts/${nonExistentId}", updateRequest)), Shift)
 
         then: "a 404 NOT FOUND is thrown"
         def e = thrown(HttpClientResponseException)
@@ -472,11 +472,11 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def deletedShift = dataBuilder.shift().forProject(deletedProject).asVirtual().persist()
         def start = OffsetDateTime.now().plusDays(1)
         def end = start.plusHours(2)
-        def updateCommand = new UpdateShiftCommand(true, null, start, end, null)
+        def updateRequest = new UpdateShiftRequest(true, null, start, end, null)
 
         when: "an unrelated volunteer tries to update a non-existent shift"
         client.exchange(
-                asVolunteer(HttpRequest.PUT("/shifts/${UUID.randomUUID()}", updateCommand), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.PUT("/shifts/${UUID.randomUUID()}", updateRequest), TestPersonas.VICTOR_VOLUNTEER),
                 Shift
         )
 
@@ -486,7 +486,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "an unrelated volunteer tries to update the shift on the soft-deleted project"
         client.exchange(
-                asVolunteer(HttpRequest.PUT("/shifts/${deletedShift.id()}", updateCommand), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.PUT("/shifts/${deletedShift.id()}", updateRequest), TestPersonas.VICTOR_VOLUNTEER),
                 Shift
         )
 
@@ -496,7 +496,7 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
         when: "the owning org manager tries to update the shift on the soft-deleted project"
         client.exchange(
-                asOrgManager(HttpRequest.PUT("/shifts/${deletedShift.id()}", updateCommand), TestPersonas.LAURA_LOCAL_MANAGER),
+                asOrgManager(HttpRequest.PUT("/shifts/${deletedShift.id()}", updateRequest), TestPersonas.LAURA_LOCAL_MANAGER),
                 Shift
         )
 
@@ -507,12 +507,12 @@ class ShiftControllerSpec extends BaseControllerSpec {
 
     @Unroll
     def "UPDATE | should throw 400 Bad Request on invalid location logic: #testCase"(String testCase, boolean isVirtual, UUID locationId) {
-        given: "an existing shift and an update command with invalid location logic"
+        given: "an existing shift and an update request with invalid location logic"
         UUID id = getAnyShiftId()
-        def updateCommand = new UpdateShiftCommand(isVirtual, locationId, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
+        def updateRequest = new UpdateShiftRequest(isVirtual, locationId, OffsetDateTime.now().plusDays(1), OffsetDateTime.now().plusDays(1).plusHours(2), null)
 
         when: "attempting to update shift via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/shifts/${id}", updateCommand)), Shift)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/shifts/${id}", updateRequest)), Shift)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -529,8 +529,8 @@ class ShiftControllerSpec extends BaseControllerSpec {
     def "DELETE | should remove an existing shift when called by admin"() {
         given: "a new shift to be deleted"
         def project = getRandomProject()
-        def command = new CreateShiftCommand(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
-        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", command)), Shift)
+        def request = new CreateShiftRequest(project.id(), true, null, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), null)
+        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/shifts", request)), Shift)
         UUID id = track(createResponse.body()).id()
         assert shiftRepository.existsById(id)
 

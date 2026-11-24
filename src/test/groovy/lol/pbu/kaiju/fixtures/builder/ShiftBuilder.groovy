@@ -5,8 +5,8 @@ import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.domain.Tag
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.UpdateShiftRequest
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.VerificationStatus
@@ -188,7 +188,7 @@ class ShiftBuilder {
         )
     }
 
-    CreateShiftCommand asCommand() {
+    CreateShiftRequest asRequest() {
         UUID projId = projectId ?: project?.id()
         if (projId == null && dataBuilder != null) {
             projId = dataBuilder.project().persist().id()
@@ -210,7 +210,7 @@ class ShiftBuilder {
         OffsetDateTime end = endTime ?: start.plusHours(2)
         List<UUID> tagIds = tags.isEmpty() ? null : tags.stream().map { it.id() }.toList()
 
-        return new CreateShiftCommand(
+        return new CreateShiftRequest(
                 projId,
                 isVirtual,
                 locId,
@@ -220,7 +220,7 @@ class ShiftBuilder {
         )
     }
 
-    UpdateShiftCommand asUpdateCommand() {
+    UpdateShiftRequest asUpdateRequest() {
         UUID locId = null
         if (!isVirtual) {
             locId = locationId ?: location?.id()
@@ -235,7 +235,7 @@ class ShiftBuilder {
         OffsetDateTime end = endTime ?: start.plusHours(2)
         List<UUID> tagIds = tags.isEmpty() ? null : tags.stream().map { it.id() }.toList()
 
-        return new UpdateShiftCommand(
+        return new UpdateShiftRequest(
                 isVirtual,
                 locId,
                 start,

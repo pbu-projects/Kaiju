@@ -11,8 +11,8 @@ import io.micronaut.http.uri.UriBuilder
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Organization
-import lol.pbu.kaiju.dto.CreateOrganizationCommand
-import lol.pbu.kaiju.dto.UpdateOrganizationCommand
+import lol.pbu.kaiju.dto.CreateOrganizationRequest
+import lol.pbu.kaiju.dto.UpdateOrganizationRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.OrganizationRepository
@@ -124,8 +124,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid organization"() {
-        given: "a new valid organization command"
-        def command = new CreateOrganizationCommand(
+        given: "a new valid organization request"
+        def request = new CreateOrganizationRequest(
                 "Test Org ${faker.company().name()}",
                 "https://${faker.internet().domainName()}",
                 null,
@@ -133,15 +133,15 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         )
 
         when: "the organization is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", request)), Organization)
         Organization saved = track(response.body())
 
         then: "the organization is persisted with a generated ID"
         verifyAll {
             response.status == HttpStatus.OK
             saved.id() != null
-            saved.name() == command.name()
-            saved.websiteUrl() == command.websiteUrl()
+            saved.name() == request.name()
+            saved.websiteUrl() == request.websiteUrl()
         }
 
         and: "it can be retrieved from the database"
@@ -149,8 +149,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         verifyAll(result) {
             result != null
             id() == saved.id()
-            name() == command.name()
-            websiteUrl() == command.websiteUrl()
+            name() == request.name()
+            websiteUrl() == request.websiteUrl()
         }
     }
 
@@ -207,10 +207,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         UUID id = org.id()
         def newName = "Updated ${faker.company().name()}"
         def newUrl = "https://${faker.internet().domainName()}"
-        def updateCommand = new UpdateOrganizationCommand(newName, newUrl, null, true)
+        def updateRequest = new UpdateOrganizationRequest(newName, newUrl, null, true)
 
         when: "the organization is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateCommand)), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateRequest)), Organization)
         Organization updated = response.body()
 
         then: "the returned organization contains the updated data"
@@ -231,12 +231,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent organization"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateOrganizationCommand("Test Org", "https://example.com", null, true)
+        def updateRequest = new UpdateOrganizationRequest("Test Org", "https://example.com", null, true)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateCommand)), Organization)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateRequest)), Organization)
 
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpClientResponseException)
@@ -291,13 +291,13 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing organization"() {
         given: "a new organization to be deleted"
-        def command = new CreateOrganizationCommand(
+        def request = new CreateOrganizationRequest(
                 "Temporary Org to Delete",
                 "https://example.org",
                 null,
                 true
         )
-        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
+        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", request)), Organization)
         UUID id = createResponse.body().id()
         assert organizationRepository.existsById(id)
 
@@ -1047,8 +1047,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should reject unauthenticated POST /organizations with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to create an organization"
-        def command = new CreateOrganizationCommand("Unauth Org", "https://example.com", null, true)
-        client.exchange(HttpRequest.POST("/organizations", command), Organization)
+        def request = new CreateOrganizationRequest("Unauth Org", "https://example.com", null, true)
+        client.exchange(HttpRequest.POST("/organizations", request), Organization)
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -1057,8 +1057,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should reject unauthenticated PUT /organizations/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to update an organization"
-        def command = new UpdateOrganizationCommand("Unauth Org", "https://example.com", null, true)
-        client.exchange(HttpRequest.PUT("/organizations/${UUID.randomUUID()}", command), Organization)
+        def request = new UpdateOrganizationRequest("Unauth Org", "https://example.com", null, true)
+        client.exchange(HttpRequest.PUT("/organizations/${UUID.randomUUID()}", request), Organization)
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -1087,7 +1087,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority updates organization"() {
         given: "an organization and a standard unauthorized user"
         def org = dataBuilder.organization().withName("Auth Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
-        def updated = new UpdateOrganizationCommand("Hacked Name", "https://hacked.com", null, true)
+        def updated = new UpdateOrganizationRequest("Hacked Name", "https://hacked.com", null, true)
 
         when: "unauthorized user attempts to update the organization"
         client.exchange(asVolunteer(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.VICTOR_VOLUNTEER), Organization)
@@ -1114,7 +1114,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         def org = dataBuilder.organization().withName("Allowed Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
         dataBuilder.organizationUser().asOrgAdmin(TestPersonas.LEO_LOCAL_ADMIN.id, org.id()).persist()
 
-        def updated = new UpdateOrganizationCommand("Updated By Admin", "https://example.com", null, true)
+        def updated = new UpdateOrganizationRequest("Updated By Admin", "https://example.com", null, true)
 
         when: "org admin updates the organization via HTTP PUT"
         def response = client.exchange(asOrgAdmin(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.LEO_LOCAL_ADMIN), Organization)

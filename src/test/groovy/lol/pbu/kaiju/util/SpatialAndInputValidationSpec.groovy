@@ -13,11 +13,11 @@ import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.validation.validator.Validator as MicronautValidator
 import jakarta.validation.Validator
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CreateOrganizationCommand
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.IngestBoundaryCommand
-import lol.pbu.kaiju.dto.UpdateOrganizationCommand
-import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.CreateOrganizationRequest
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.IngestBoundaryRequest
+import lol.pbu.kaiju.dto.UpdateOrganizationRequest
+import lol.pbu.kaiju.dto.UpdateShiftRequest
 import lol.pbu.kaiju.model.JtsPointConverter
 import lol.pbu.kaiju.model.JtsPolygonConverter
 import lol.pbu.kaiju.serde.JtsGeometrySerde
@@ -341,15 +341,15 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- DTO Bean Validation tests ---
 
-    def "organization commands reject javascript URLs for websiteUrl"() {
+    def "organization requests reject javascript URLs for websiteUrl"() {
         given:
-        CreateOrganizationCommand createCmd = new CreateOrganizationCommand(
+        CreateOrganizationRequest createRequest = new CreateOrganizationRequest(
                 "Mutual Aid Group",
                 "javascript:alert(1)",
                 null,
                 true
         )
-        UpdateOrganizationCommand updateCmd = new UpdateOrganizationCommand(
+        UpdateOrganizationRequest updateRequest = new UpdateOrganizationRequest(
                 "Mutual Aid Group",
                 "javascript:alert(1)",
                 null,
@@ -357,8 +357,8 @@ class SpatialAndInputValidationSpec extends Specification {
         )
 
         when:
-        def createViolations = validator.validate(createCmd)
-        def updateViolations = validator.validate(updateCmd)
+        def createViolations = validator.validate(createRequest)
+        def updateViolations = validator.validate(updateRequest)
 
         then:
         verifyAll {
@@ -369,11 +369,11 @@ class SpatialAndInputValidationSpec extends Specification {
         }
     }
 
-    def "shift commands reject endTime before startTime"() {
+    def "shift requests reject endTime before startTime"() {
         given:
         OffsetDateTime start = OffsetDateTime.of(2026, 6, 15, 14, 0, 0, 0, ZoneOffset.UTC)
         OffsetDateTime end = start.minusHours(2)
-        CreateShiftCommand createCmd = new CreateShiftCommand(
+        CreateShiftRequest createRequest = new CreateShiftRequest(
                 UUID.randomUUID(),
                 true,
                 null,
@@ -381,7 +381,7 @@ class SpatialAndInputValidationSpec extends Specification {
                 end,
                 []
         )
-        UpdateShiftCommand updateCmd = new UpdateShiftCommand(
+        UpdateShiftRequest updateRequest = new UpdateShiftRequest(
                 true,
                 null,
                 start,
@@ -390,8 +390,8 @@ class SpatialAndInputValidationSpec extends Specification {
         )
 
         when:
-        def createViolations = validator.validate(createCmd)
-        def updateViolations = validator.validate(updateCmd)
+        def createViolations = validator.validate(createRequest)
+        def updateViolations = validator.validate(updateRequest)
 
         then:
         verifyAll {
@@ -436,13 +436,13 @@ class SpatialAndInputValidationSpec extends Specification {
                 "/arcgis/rest/services/TIGERweb/"
         )
         UUID regionId = UUID.randomUUID()
-        IngestBoundaryCommand command = new IngestBoundaryCommand(
+        IngestBoundaryRequest request = new IngestBoundaryRequest(
                 "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query",
                 0.001d
         )
 
         when:
-        ingestionService.ingestBoundary(regionId, command, null)
+        ingestionService.ingestBoundary(regionId, request, null)
 
         then:
         def ex = thrown(IllegalArgumentException)

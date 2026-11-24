@@ -7,10 +7,10 @@ import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CreateProjectCommand
-import lol.pbu.kaiju.dto.ProjectBoundaryCommand
-import lol.pbu.kaiju.dto.ProjectLocationCommand
-import lol.pbu.kaiju.dto.UpdateProjectCommand
+import lol.pbu.kaiju.dto.CreateProjectRequest
+import lol.pbu.kaiju.dto.ProjectBoundaryRequest
+import lol.pbu.kaiju.dto.ProjectLocationRequest
+import lol.pbu.kaiju.dto.UpdateProjectRequest
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.VerificationStatus
@@ -41,8 +41,8 @@ class ProjectBuilder {
     private User deletedBy
     private final List<Location> locations = []
     private final List<Boundary> boundaries = []
-    private List<ProjectBoundaryCommand> customCommandBoundaries
-    private List<ProjectLocationCommand> customCommandLocations
+    private List<ProjectBoundaryRequest> customRequestBoundaries
+    private List<ProjectLocationRequest> customRequestLocations
     private boolean explicitNoOrg = false
     private boolean explicitNullLocations = false
 
@@ -165,13 +165,13 @@ class ProjectBuilder {
         return this
     }
 
-    ProjectBuilder withCommandBoundaries(List<ProjectBoundaryCommand> boundaries) {
-        this.customCommandBoundaries = boundaries
+    ProjectBuilder withRequestBoundaries(List<ProjectBoundaryRequest> boundaries) {
+        this.customRequestBoundaries = boundaries
         return this
     }
 
-    ProjectBuilder withCommandLocations(List<ProjectLocationCommand> locations) {
-        this.customCommandLocations = locations
+    ProjectBuilder withRequestLocations(List<ProjectLocationRequest> locations) {
+        this.customRequestLocations = locations
         return this
     }
 
@@ -253,7 +253,7 @@ class ProjectBuilder {
         )
     }
 
-    CreateProjectCommand asCommand() {
+    CreateProjectRequest asRequest() {
         UUID orgId = organizationId ?: organization?.id()
         if (orgId == null && dataBuilder != null) {
             orgId = dataBuilder.organization().persist().id()
@@ -264,37 +264,37 @@ class ProjectBuilder {
         UUID regId = managingRegionId ?: managingRegion?.id()
         String projectTitle = title ?: defaultTitle()
         String projectDesc = description ?: defaultDescription()
-        List<ProjectBoundaryCommand> boundaryCommands = customCommandBoundaries ?: defaultCommandBoundaries()
-        List<ProjectLocationCommand> locationCommands = customCommandLocations ?: (locations.isEmpty() ? [] : defaultCommandLocations())
+        List<ProjectBoundaryRequest> boundaryRequests = customRequestBoundaries ?: defaultRequestBoundaries()
+        List<ProjectLocationRequest> locationRequests = customRequestLocations ?: (locations.isEmpty() ? [] : defaultRequestLocations())
 
-        return new CreateProjectCommand(
+        return new CreateProjectRequest(
                 orgId,
                 regId,
                 projectTitle,
                 projectDesc,
                 projectType,
                 status,
-                locationCommands,
-                boundaryCommands
+                locationRequests,
+                boundaryRequests
         )
     }
 
-    UpdateProjectCommand asUpdateCommand() {
+    UpdateProjectRequest asUpdateRequest() {
         UUID orgId = organizationId ?: organization?.id()
         UUID regId = managingRegionId ?: managingRegion?.id()
         String projectTitle = title ?: defaultTitle()
         String projectDesc = description ?: defaultDescription()
-        List<ProjectBoundaryCommand> boundaryCommands = customCommandBoundaries ?: defaultCommandBoundaries()
-        List<ProjectLocationCommand> locationCommands = customCommandLocations ?: (locations.isEmpty() ? [] : defaultCommandLocations())
+        List<ProjectBoundaryRequest> boundaryRequests = customRequestBoundaries ?: defaultRequestBoundaries()
+        List<ProjectLocationRequest> locationRequests = customRequestLocations ?: (locations.isEmpty() ? [] : defaultRequestLocations())
 
-        return new UpdateProjectCommand(
+        return new UpdateProjectRequest(
                 orgId,
                 regId,
                 projectTitle,
                 projectDesc,
                 projectType,
-                locationCommands,
-                boundaryCommands
+                locationRequests,
+                boundaryRequests
         )
     }
 
@@ -357,9 +357,9 @@ class ProjectBuilder {
         return faker != null ? "Org ${faker.company().name()} ${UUID.randomUUID().toString().substring(0, 8)}" : "Org ${UUID.randomUUID()}"
     }
 
-    private List<ProjectBoundaryCommand> defaultCommandBoundaries() {
+    private List<ProjectBoundaryRequest> defaultRequestBoundaries() {
         return [
-                new ProjectBoundaryCommand(
+                new ProjectBoundaryRequest(
                         "Default Boundary",
                         [
                                 new Coordinates(-105.0, 39.0),
@@ -371,10 +371,10 @@ class ProjectBuilder {
         ]
     }
 
-    private List<ProjectLocationCommand> defaultCommandLocations() {
+    private List<ProjectLocationRequest> defaultRequestLocations() {
         return locations.stream()
                 .map { loc ->
-                    new ProjectLocationCommand(
+                    new ProjectLocationRequest(
                             loc.name() ?: "Location ${UUID.randomUUID().toString().substring(0, 8)}",
                             loc.addressLine() ?: "123 Main St",
                             loc.city() ?: "Denver",
