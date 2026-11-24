@@ -83,7 +83,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         return geometryFactory.createPolygon(coords)
     }
 
-    private List<Coordinates> createCoordinateDtos() {
+    private List<Coordinates> createCoordinates() {
         [
                 new Coordinates(-105.0, 39.0),
                 new Coordinates(-104.0, 39.0),
@@ -98,7 +98,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
     def "CREATE | should successfully save a valid administrative region"() {
         given: "a new valid administrative region command"
         String regionName = "Region ${faker.address().state()}"
-        def command = new CreateAdministrativeRegionCommand(regionName, null, createCoordinateDtos())
+        def command = new CreateAdministrativeRegionCommand(regionName, null, createCoordinates())
 
         when: "the administrative region is added via HTTP POST"
         def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions", command)), AdministrativeRegion)
@@ -198,7 +198,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         def region = dataBuilder.region().withName("Original Region Name").withGeometry(geom).persist()
         UUID id = region.id()
         def newName = "Updated Region ${faker.address().state()}"
-        def updateCommand = new UpdateAdministrativeRegionCommand(newName, null, createCoordinateDtos())
+        def updateCommand = new UpdateAdministrativeRegionCommand(newName, null, createCoordinates())
 
         when: "the administrative region is updated via HTTP PUT"
         def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/administrative-regions/${id}", updateCommand)), AdministrativeRegion)
@@ -222,7 +222,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
     def "UPDATE | should fail to update a non-existent administrative region"() {
         given: "a random non-existent ID and an update command"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateAdministrativeRegionCommand("Test Region", null, createCoordinateDtos())
+        def updateCommand = new UpdateAdministrativeRegionCommand("Test Region", null, createCoordinates())
 
         when: "an update is attempted via HTTP PUT"
         client.exchange(asGlobalAdmin(HttpRequest.PUT("/administrative-regions/${nonExistentId}", updateCommand)), AdministrativeRegion)

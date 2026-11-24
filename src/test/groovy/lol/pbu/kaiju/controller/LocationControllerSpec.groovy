@@ -629,6 +629,18 @@ class LocationControllerSpec extends BaseControllerSpec {
         }
     }
 
+    def "UPDATE | should reject regional director updating non-existent location with 403 FORBIDDEN (no existence oracle)"() {
+        given: "an update command targeting a non-existent location ID"
+        def updateCommand = new UpdateLocationCommand("Missing Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+
+        when: "a regional director attempts to update a non-existent location"
+        client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}", updateCommand)), Location)
+
+        then: "a 403 FORBIDDEN response is returned instead of 404"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     def "UPDATE | should reject standard user attempting PUT /locations/{id} with 403 FORBIDDEN"() {
         given: "an update command and target location ID"
         def updateCommand = new UpdateLocationCommand("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
@@ -714,6 +726,15 @@ class LocationControllerSpec extends BaseControllerSpec {
             !locationRepository.findById(id).isPresent()
             !locationRepository.existsById(id)
         }
+    }
+
+    def "DELETE | should reject regional director deleting non-existent location with 403 FORBIDDEN (no existence oracle)"() {
+        when: "a regional director attempts to delete a non-existent location"
+        client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned instead of 404"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "DELETE | should reject standard user attempting DELETE /locations/{id} with 403 FORBIDDEN"() {

@@ -9,8 +9,8 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 /**
- * Child location command embedded inside Project commands.
- * CRITICAL: Contains NO 'id' field, eliminating child entity mass assignment (Issue #26).
+ * Location details sent inside a project create or update request.
+ * Excludes {@code id} so callers cannot overwrite existing location records directly.
  */
 @Serdeable
 public record ProjectLocationCommand(

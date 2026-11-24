@@ -15,14 +15,14 @@ security:
 paths:
   /admin/users/{id}/role:
     put:
-      summary: Explicit endpoint for role elevation.
-      description: Explicit endpoint for role elevation. Prevents Mass Assignment
-        by only accepting a UpdateUserRoleCommand.
+      summary: Updates a user's role.
+      description: Updates a user's role. Only accepts an UpdateUserRoleCommand so
+        other user fields cannot be changed.
       operationId: updateUserRole
       parameters:
       - name: id
         in: path
-        description: the ID of the user to promote/demote
+        description: the ID of the user to promote or demote
         required: true
         schema:
           type: string
@@ -345,10 +345,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Boundary"
     put:
-      summary: Updates an existing boundary by its ID after validating that it exists
-        and is within caller jurisdiction.
-      description: Updates an existing boundary by its ID after validating that it
-        exists and is within caller jurisdiction.
+      summary: Updates an existing boundary after checking caller permission and region
+        access.
+      description: Updates an existing boundary after checking caller permission and
+        region access.
       operationId: updateBoundary
       parameters:
       - name: id
@@ -373,10 +373,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Boundary"
     delete:
-      summary: Deletes a boundary by its ID after validating that it exists and is
-        within caller jurisdiction.
-      description: Deletes a boundary by its ID after validating that it exists and
-        is within caller jurisdiction.
+      summary: Deletes a boundary by its ID after checking caller permission and region
+        access.
+      description: Deletes a boundary by its ID after checking caller permission and
+        region access.
       operationId: deleteBoundary
       parameters:
       - name: id
@@ -444,10 +444,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Location"
     put:
-      summary: Updates an existing location by its ID after validating that it exists
-        and is within caller jurisdiction.
-      description: Updates an existing location by its ID after validating that it
-        exists and is within caller jurisdiction.
+      summary: Updates an existing location after checking caller permission and region
+        access.
+      description: Updates an existing location after checking caller permission and
+        region access.
       operationId: updateLocation
       parameters:
       - name: id
@@ -472,10 +472,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/Location"
     delete:
-      summary: Deletes a location by its ID after validating that it exists and is
-        within caller jurisdiction.
-      description: Deletes a location by its ID after validating that it exists and
-        is within caller jurisdiction.
+      summary: Deletes a location by its ID after checking caller permission and region
+        access.
+      description: Deletes a location by its ID after checking caller permission and
+        region access.
       operationId: deleteById
       parameters:
       - name: id
@@ -798,10 +798,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Organization"
     put:
-      summary: Updates an existing organization by its ID after validating that it
-        exists.
-      description: Updates an existing organization by its ID after validating that
-        it exists. Throws 404 NOT_FOUND if the organization does not exist.
+      summary: Updates an existing organization by ID.
+      description: "Updates an existing organization by ID. Verifies that the caller\
+        \ is a global admin or organization manager before checking if the organization\
+        \ exists. Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization\
+        \ does not exist."
       operationId: updateOrganization
       parameters:
       - name: id
@@ -826,9 +827,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/Organization"
     delete:
-      summary: Deletes an organization by its ID after validating that it exists.
-      description: Deletes an organization by its ID after validating that it exists.
-        Throws 404 NOT_FOUND if the organization does not exist.
+      summary: Deletes an organization by ID.
+      description: "Deletes an organization by ID. Verifies that the caller is an\
+        \ organization admin or system admin before deleting the organization. Throws\
+        \ 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does\
+        \ not exist."
       operationId: deleteOrganization
       parameters:
       - name: id
@@ -1223,10 +1226,11 @@ paths:
                 $ref: "#/components/schemas/Shift"
     put:
       summary: Updates an existing shift by its ID after validating that it exists.
-      description: Updates an existing shift by its ID after validating that it exists.
-        Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project.
-        Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND
-        if the shift does not exist.
+      description: "Updates an existing shift by its ID after validating that it exists.\
+        \ Allows system admins, organization managers or admins, regional admins with\
+        \ jurisdiction, and project sponsors. Throws 403 FORBIDDEN if the caller is\
+        \ not allowed to manage shifts for the project. Throws 404 NOT_FOUND if the\
+        \ shift does not exist."
       operationId: updateShift
       parameters:
       - name: id
@@ -1252,10 +1256,11 @@ paths:
                 $ref: "#/components/schemas/Shift"
     delete:
       summary: Deletes a shift by its ID after validating that it exists.
-      description: Deletes a shift by its ID after validating that it exists. Enforces
-        that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws
-        403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND
-        if the shift does not exist.
+      description: "Deletes a shift by its ID after validating that it exists. Allows\
+        \ system admins, organization managers or admins, regional admins with jurisdiction,\
+        \ and project sponsors. Throws 403 FORBIDDEN if the caller is not allowed\
+        \ to manage shifts for the project. Throws 404 NOT_FOUND if the shift does\
+        \ not exist."
       operationId: deleteShift
       parameters:
       - name: id
@@ -1434,12 +1439,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
     put:
-      summary: Updates an existing user by its ID.
-      description: "Updates an existing user by its ID. Prevents Mass Assignment by\
-        \ explicitly retaining the existing user's role and createdAt timestamp. Enforces\
-        \ horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.\
-        \ Throws 403 FORBIDDEN if the user attempts to modify another account without\
-        \ system manage privileges. Throws 404 NOT_FOUND if the user does not exist."
+      summary: Updates an existing user by ID.
+      description: Updates an existing user by ID. Keeps the existing user's role
+        and createdAt timestamp unchanged. Only the user themselves or a user manager
+        can update an account. Throws 403 FORBIDDEN if the caller tries to change
+        another account without user management permission. Throws 404 NOT_FOUND if
+        the user does not exist.
       operationId: updateUser
       parameters:
       - name: id
@@ -1464,11 +1469,11 @@ paths:
               schema:
                 $ref: "#/components/schemas/User"
     delete:
-      summary: Deletes a user by its ID after validating that it exists.
-      description: "Deletes a user by its ID after validating that it exists. Enforces\
-        \ horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.\
-        \ Throws 403 FORBIDDEN if the user attempts to delete another account without\
-        \ system manage privileges. Throws 404 NOT_FOUND if the user does not exist."
+      summary: Deletes a user by ID after checking that it exists.
+      description: Deletes a user by ID after checking that it exists. Only the user
+        themselves or a user manager can delete an account. Throws 403 FORBIDDEN if
+        the caller tries to delete another account without user management permission.
+        Throws 404 NOT_FOUND if the user does not exist.
       operationId: deleteUser
       parameters:
       - name: id
@@ -1900,6 +1905,9 @@ components:
           nullable: true
           allOf:
           - $ref: "#/components/schemas/UserRole"
+      description: Input for creating a new user account. The `role` field is optional
+        and defaults to `STANDARD_USER`. Only callers with user-management permission
+        can assign a higher role.
     CursoredPage_AdministrativeRegionAuditLog_:
       required:
       - cursors
@@ -2879,9 +2887,8 @@ components:
             $ref: "#/components/schemas/Coordinates"
           x-size-message: A polygon boundary must contain between 3 and 5000 coordinates.
           x-not-null-message: Boundary coordinates are required.
-      description: "Child boundary command embedded inside Project commands. CRITICAL:\
-        \ Contains NO 'id' field, eliminating child entity mass assignment (Issue\
-        \ #26)."
+      description: Boundary details sent inside a project create or update request.
+        Excludes `id` so callers cannot overwrite existing boundary records directly.
     ProjectLocationCommand:
       required:
       - addressLine
@@ -2940,6 +2947,8 @@ components:
           x-maximum-message: Latitude must be less than or equal to 90.
           x-minimum-message: Latitude must be greater than or equal to -90.
           x-not-null-message: Latitude is required.
+      description: Location details sent inside a project create or update request.
+        Excludes `id` so callers cannot overwrite existing location records directly.
     ProjectSearchCard:
       required:
       - locationId
@@ -3762,6 +3771,9 @@ components:
           format: email
           x-pattern-message: User email must be a valid email address.
           x-size-message: User email must be between 1 and 255 characters.
+      description: Input for updating a user's profile. Excludes `role` so users cannot
+        raise their own access level during profile edits. Roles can only be changed
+        by a system admin through the user role endpoint.
     UpdateUserRoleCommand:
       required:
       - role
@@ -3801,6 +3813,8 @@ components:
           type: array
           items:
             type: string
+      description: Summary of a US Census TIGERweb boundary sync run for a state or
+        country level.
     User:
       required:
       - createdAt

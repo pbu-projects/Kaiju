@@ -39,14 +39,14 @@ public class OrganizationUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final OrganizationUserRepository organizationUserRepository;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public OrganizationUserController(
             OrganizationUserRepository organizationUserRepository,
-            AuthorizationService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.organizationUserRepository = organizationUserRepository;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -62,9 +62,7 @@ public class OrganizationUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!actorId.equals(userId)) {
-            verifyOrgAdminAuthority(principal, organizationId);
-        }
+        authorizationService.authorizeOrganizationUserView(actorId, userId, organizationId);
         return organizationUserRepository.findById(new OrganizationUserId(userId, organizationId));
     }
 
@@ -105,6 +103,6 @@ public class OrganizationUserController {
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
         UUID callerId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeOrganizationAdmin(callerId, organizationId, true);
+        authorizationService.authorizeOrganizationAdmin(callerId, organizationId, true);
     }
 }

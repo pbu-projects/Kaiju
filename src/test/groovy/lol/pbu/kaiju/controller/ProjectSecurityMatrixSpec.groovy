@@ -24,7 +24,7 @@ import static lol.pbu.kaiju.model.ProjectStatus.PENDING
 class ProjectSecurityMatrixSpec extends BaseControllerSpec {
 
     @Inject
-    AuthorizationService projectSecurityService
+    AuthorizationService authorizationService
 
     // Simplified polygon roughly tracing the civic boundary of Denver, Colorado
     static final String DENVER_WKT = "POLYGON((-105.1099 39.7891, -104.7432 39.7912, -104.7528 39.6158, -105.0536 39.6137, -105.1099 39.7891))"
@@ -92,7 +92,7 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         def actualResult
         HttpStatusException thrownException = null
         try {
-            actualResult = projectSecurityService.evaluateProjectCreationByUser(userId, dummyProject)
+            actualResult = authorizationService.evaluateProjectCreationByUser(userId, dummyProject)
         } catch (HttpStatusException e) {
             actualResult = null
             thrownException = e

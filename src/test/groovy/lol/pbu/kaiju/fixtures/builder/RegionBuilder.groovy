@@ -79,11 +79,10 @@ class RegionBuilder {
 
     CreateAdministrativeRegionCommand asCommand() {
         AdministrativeRegion region = build()
-        Coordinate[] coordinates = region.geom().getCoordinates()
-        List<Coordinates> dtos = coordinates.collect { c ->
+        List<Coordinates> coordinates = region.geom().getCoordinates().collect { c ->
             new Coordinates(c.getX(), c.getY())
         }
-        return new CreateAdministrativeRegionCommand(region.name(), region.parentRegionId(), dtos)
+        return new CreateAdministrativeRegionCommand(region.name(), region.parentRegionId(), coordinates)
     }
 
     private Geometry defaultPolygon() {

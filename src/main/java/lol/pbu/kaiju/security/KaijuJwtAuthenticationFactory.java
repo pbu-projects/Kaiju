@@ -29,15 +29,15 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
     private static final Logger LOG = LoggerFactory.getLogger(KaijuJwtAuthenticationFactory.class);
 
     private final UserService userService;
-    private final IdentityProviderRoleMapper idpRoleMapper;
+    private final IdentityProviderRoleMapper identityProviderRoleMapper;
 
     public KaijuJwtAuthenticationFactory(@NonNull TokenConfiguration tokenConfiguration,
                                          @NonNull RolesFinder rolesFinder,
                                          @NonNull UserService userService,
-                                         @NonNull IdentityProviderRoleMapper idpRoleMapper) {
+                                         @NonNull IdentityProviderRoleMapper identityProviderRoleMapper) {
         super(tokenConfiguration, rolesFinder);
         this.userService = userService;
-        this.idpRoleMapper = idpRoleMapper;
+        this.identityProviderRoleMapper = identityProviderRoleMapper;
     }
 
     @Override
@@ -74,7 +74,7 @@ public class KaijuJwtAuthenticationFactory extends DefaultJwtAuthenticationFacto
     private Optional<Authentication> authenticateUser(@NonNull String email, @NonNull Map<String, Object> claims) {
         try {
             String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
-            UserRole initialRole = idpRoleMapper.resolveRoleFromClaims(claims);
+            UserRole initialRole = identityProviderRoleMapper.resolveRoleFromClaims(claims);
             User user = userService.provisionOrGetUser(canonicalEmail, initialRole);
             List<String> roles = new ArrayList<>();
             roles.add(user.role().name());

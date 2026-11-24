@@ -6,8 +6,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 /**
- * Note: 'role' is intentionally excluded to prevent self-privilege escalation during profile update.
- * Roles are modified exclusively via AdminUserController#updateUserRole.
+ * Input for updating a user's profile.
+ * Excludes {@code role} so users cannot raise their own access level during profile edits.
+ * Roles can only be changed by a system admin through the user role endpoint.
  */
 @Serdeable
 public record UpdateUserCommand(

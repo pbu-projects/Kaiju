@@ -27,7 +27,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * UsSyncResult
+ * Summary of a US Census TIGERweb boundary sync run for a state or country level.
  */
 @JsonPropertyOrder({
     UsSyncResult.JSON_PROPERTY_STATE_CODE,

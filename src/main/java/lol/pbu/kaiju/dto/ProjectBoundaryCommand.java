@@ -9,8 +9,8 @@ import jakarta.validation.constraints.Size;
 import java.util.List;
 
 /**
- * Child boundary command embedded inside Project commands.
- * CRITICAL: Contains NO 'id' field, eliminating child entity mass assignment (Issue #26).
+ * Boundary details sent inside a project create or update request.
+ * Excludes {@code id} so callers cannot overwrite existing boundary records directly.
  */
 @Serdeable
 public record ProjectBoundaryCommand(

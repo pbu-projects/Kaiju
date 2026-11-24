@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * CreateUserCommand
+ * Input for creating a new user account. The `role` field is optional and defaults to `STANDARD_USER`. Only callers with user-management permission can assign a higher role.
  */
 @JsonPropertyOrder({
     CreateUserCommand.JSON_PROPERTY_EMAIL,

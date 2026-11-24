@@ -54,18 +54,18 @@ public class DefaultOrganizationService implements OrganizationService {
 
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
     private final AuditService auditService;
 
     public DefaultOrganizationService(
             OrganizationRepository organizationRepository,
             UserRepository userRepository,
-            AuthorizationService projectSecurityService,
+            AuthorizationService authorizationService,
             AuditService auditService
     ) {
         this.organizationRepository = organizationRepository;
         this.userRepository = userRepository;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
         this.auditService = auditService;
     }
 
@@ -111,7 +111,7 @@ public class DefaultOrganizationService implements OrganizationService {
     @Transactional
     @NonNull
     public Organization updateOrganization(@NonNull UUID id, @NonNull Organization organization, @NonNull UUID actorUserId) {
-        projectSecurityService.authorizeOrganizationUpdate(actorUserId, id);
+        authorizationService.authorizeOrganizationUpdate(actorUserId, id);
 
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND));
@@ -142,7 +142,7 @@ public class DefaultOrganizationService implements OrganizationService {
     @Override
     @Transactional
     public void deleteOrganization(@NonNull UUID id, @NonNull UUID actorUserId) {
-        projectSecurityService.authorizeOrganizationAdmin(actorUserId, id);
+        authorizationService.authorizeOrganizationAdmin(actorUserId, id);
         long count = organizationRepository.removeById(id);
         if (count == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND);
@@ -158,7 +158,7 @@ public class DefaultOrganizationService implements OrganizationService {
             @Nullable String reason,
             @NonNull UUID actorUserId
     ) {
-        User actor = projectSecurityService.authorizeOrganizationVerification(actorUserId);
+        User actor = authorizationService.authorizeOrganizationVerification(actorUserId);
 
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND));

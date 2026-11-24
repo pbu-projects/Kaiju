@@ -5,18 +5,17 @@ import lol.pbu.kaiju.model.UserRole;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * Translates upstream Identity Provider (IdP) group claims into internal application roles.
+ * Maps login provider group names to Kaiju user roles.
  *
- * <p>Resolves incoming groups to the highest privilege tier matching the mapped groups.
- * If multiple groups match, the precedence is:
+ * <p>When a user belongs to more than one mapped group, the role with the most access wins:
  * GLOBAL_ADMIN &gt; REGION_DIRECTOR &gt; REGION_AGENT &gt; STANDARD_USER.</p>
  */
 @Singleton
@@ -28,10 +27,10 @@ public class IdentityProviderRoleMapper {
     public static final String CLAIMS_GROUPS_KEY = "groups";
 
     /**
-     * Resolves the user role based on a collection of IdP groups.
+     * Resolves the user role from a collection of login provider group names.
      *
-     * @param groups collection of group names assigned in the upstream IdP
-     * @return the highest matching {@link UserRole}, or {@link UserRole#STANDARD_USER} by default
+     * @param groups collection of group names from the login provider
+     * @return the matching {@link UserRole} with the most access, or {@link UserRole#STANDARD_USER} by default
      */
     @NonNull
     public UserRole resolveRoleFromGroups(@Nullable Collection<String> groups) {
@@ -53,10 +52,10 @@ public class IdentityProviderRoleMapper {
     }
 
     /**
-     * Extracts group claims from an IdP claims map and resolves the corresponding user role.
+     * Reads group names from a login claims map and picks the matching user role.
      *
-     * @param claims incoming JWT or OpenID claims map
-     * @return the highest matching {@link UserRole}, or {@link UserRole#STANDARD_USER} by default
+     * @param claims incoming login claims map
+     * @return the matching {@link UserRole} with the most access, or {@link UserRole#STANDARD_USER} by default
      */
     @NonNull
     public UserRole resolveRoleFromClaims(@Nullable Map<String, Object> claims) {
@@ -68,11 +67,11 @@ public class IdentityProviderRoleMapper {
     }
 
     /**
-     * Resolves the user role from an incoming groups claim object, which may be a
+     * Resolves the user role from a raw groups claim, which may be a
      * collection, an array, or a single string.
      *
-     * @param groupsObj raw groups object from IdP claims
-     * @return the highest matching {@link UserRole}, or {@link UserRole#STANDARD_USER} by default
+     * @param groupsObj raw groups value from login claims
+     * @return the matching {@link UserRole} with the most access, or {@link UserRole#STANDARD_USER} by default
      */
     @NonNull
     public UserRole resolveRoleFromGroupObject(@Nullable Object groupsObj) {
@@ -103,14 +102,9 @@ public class IdentityProviderRoleMapper {
 
     @NonNull
     private List<String> collectStrings(@NonNull Collection<?> collection) {
-        List<String> list = new ArrayList<>(collection.size());
-        for (Object item : collection) {
-            if (item instanceof String s) {
-                list.add(s);
-            } else if (item != null) {
-                list.add(item.toString());
-            }
-        }
-        return list;
+        return collection.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .toList();
     }
 }

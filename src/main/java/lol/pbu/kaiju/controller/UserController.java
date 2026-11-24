@@ -76,10 +76,10 @@ public class UserController {
     }
 
     /**
-     * Updates an existing user by its ID.
-     * Prevents Mass Assignment by explicitly retaining the existing user's role and createdAt timestamp.
-     * Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.
-     * Throws 403 FORBIDDEN if the user attempts to modify another account without system manage privileges.
+     * Updates an existing user by ID.
+     * Keeps the existing user's role and createdAt timestamp unchanged.
+     * Only the user themselves or a user manager can update an account.
+     * Throws 403 FORBIDDEN if the caller tries to change another account without user management permission.
      * Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id        the ID of the user to update
@@ -100,9 +100,9 @@ public class UserController {
     }
 
     /**
-     * Deletes a user by its ID after validating that it exists.
-     * Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.
-     * Throws 403 FORBIDDEN if the user attempts to delete another account without system manage privileges.
+     * Deletes a user by ID after checking that it exists.
+     * Only the user themselves or a user manager can delete an account.
+     * Throws 403 FORBIDDEN if the caller tries to delete another account without user management permission.
      * Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id        the ID of the user to delete

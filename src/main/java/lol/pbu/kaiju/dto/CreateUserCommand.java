@@ -8,8 +8,9 @@ import jakarta.validation.constraints.Size;
 import lol.pbu.kaiju.model.UserRole;
 
 /**
- * Note: 'role' is @Nullable to guarantee registration defaults safely to STANDARD_USER.
- * Role Escalation Guard: Only callers holding SYSTEM_USER_MANAGE_CLAIM may assign an elevated role.
+ * Input for creating a new user account.
+ * The {@code role} field is optional and defaults to {@code STANDARD_USER}.
+ * Only callers with user-management permission can assign a higher role.
  */
 @Serdeable
 public record CreateUserCommand(

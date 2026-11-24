@@ -43,14 +43,14 @@ public class RegionUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final RegionUserRepository regionUserRepository;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public RegionUserController(
             RegionUserRepository regionUserRepository,
-            AuthorizationService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.regionUserRepository = regionUserRepository;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     /**
@@ -80,9 +80,7 @@ public class RegionUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!actorId.equals(userId)) {
-            verifyRegionDirectorAuthority(principal, regionId);
-        }
+        authorizationService.authorizeRegionUserView(actorId, userId, regionId);
         return regionUserRepository.findById(new RegionUserId(userId, regionId));
     }
 
@@ -152,6 +150,6 @@ public class RegionUserController {
 
     private void verifyRegionDirectorAuthority(Principal principal, UUID regionId) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeRegionDirector(actorId, regionId);
+        authorizationService.authorizeRegionDirector(actorId, regionId);
     }
 }

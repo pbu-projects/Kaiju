@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * UpdateUserCommand
+ * Input for updating a user's profile. Excludes `role` so users cannot raise their own access level during profile edits. Roles can only be changed by a system admin through the user role endpoint.
  */
 @JsonPropertyOrder(UpdateUserCommand.JSON_PROPERTY_EMAIL)
 @Serdeable

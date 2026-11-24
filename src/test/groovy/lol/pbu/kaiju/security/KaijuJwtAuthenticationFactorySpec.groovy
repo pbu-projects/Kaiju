@@ -28,7 +28,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     UserService userService
 
     @Inject
-    IdentityProviderRoleMapper idpRoleMapper
+    IdentityProviderRoleMapper identityProviderRoleMapper
 
     @Inject
     UserRepository userRepository
@@ -36,7 +36,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     KaijuJwtAuthenticationFactory factory
 
     def setup() {
-        factory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, userService, idpRoleMapper)
+        factory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, userService, identityProviderRoleMapper)
     }
 
     def "createAuthentication | should successfully authenticate and map permissions when valid email claim is present"() {
@@ -175,7 +175,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         given: "a factory with a user service that throws an exception"
         UserService failingUserService = Mock(UserService)
         failingUserService.provisionOrGetUser(*_) >> { throw new RuntimeException("DB connection error") }
-        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService, idpRoleMapper)
+        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService, identityProviderRoleMapper)
 
         and: "a JWT with a valid email claim"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()

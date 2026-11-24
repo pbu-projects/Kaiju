@@ -49,5 +49,11 @@ public interface ShiftRepository extends PageableRepository<Shift, UUID> {
     @Join(value = "location", type = Join.Type.LEFT_FETCH)
     Optional<Shift> findById(@NonNull UUID id);
 
+    @NonNull
+    @Join("project")
+    @Join("project.organization")
+    @Join(value = "location", type = Join.Type.LEFT_FETCH)
+    Optional<Shift> findByIdAndProjectDeletedAtIsNull(@NonNull UUID id);
+
     long removeById(@NonNull UUID id);
 }

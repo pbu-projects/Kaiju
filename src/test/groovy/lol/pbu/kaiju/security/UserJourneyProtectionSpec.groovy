@@ -38,7 +38,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
     OrganizationService organizationService
 
     @Inject
-    AuthorizationService projectSecurityService
+    AuthorizationService authorizationService
 
     def "org manager can view own draft project while outsider gets 403 and deleted project returns 404"() {
         given: "a draft project and a soft-deleted active project for Denver Metro Branch"
@@ -179,9 +179,9 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 Shift
         )
 
-        then: "access is blocked"
+        then: "access is blocked with 403 FORBIDDEN"
         def outsiderErr = thrown(HttpClientResponseException)
-        outsiderErr.status in [HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
+        outsiderErr.status == HttpStatus.FORBIDDEN
 
         when: "a user fetches the soft-deleted project's shift"
         client.exchange(
@@ -397,7 +397,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 .build()
 
         expect: "region location check returns false"
-        !projectSecurityService.areAllLocationsInRegion(emptyLocProject, TestPersonas.DENVER_COUNTY_REGION_ID)
+        !authorizationService.areAllLocationsInRegion(emptyLocProject, TestPersonas.DENVER_COUNTY_REGION_ID)
     }
 
     def "organization service blocks self-parenting, missing parent orgs, and restoring revoked verification"() {

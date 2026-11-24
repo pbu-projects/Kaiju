@@ -8,6 +8,7 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.domain.User
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
@@ -15,6 +16,7 @@ import lol.pbu.kaiju.repository.PermissionQueryRepository
 import lol.pbu.kaiju.service.ShiftService
 import lol.pbu.kaiju.service.UserService
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.Polygon
 
 import javax.sql.DataSource
 import java.time.OffsetDateTime
@@ -61,6 +63,40 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     User saveUser(UserRole role) {
         dataBuilder.user().withRole(role).persist()
+    }
+
+    private Polygon polygonBox(double minLon, double minLat, double maxLon, double maxLat) {
+        Coordinate[] coords = [
+                new Coordinate(minLon, maxLat),
+                new Coordinate(maxLon, maxLat),
+                new Coordinate(maxLon, minLat),
+                new Coordinate(minLon, minLat),
+                new Coordinate(minLon, maxLat)
+        ]
+        Polygon polygon = dataBuilder.geometryFactory.createPolygon(coords)
+        polygon.setSRID(4326)
+        return polygon
+    }
+
+    private Polygon denverMetroPolygon() {
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        Polygon polygon = dataBuilder.geometryFactory.createPolygon(denverCoords)
+        polygon.setSRID(4326)
+        return polygon
+    }
+
+    private Polygon denverBoxPolygon() {
+        polygonBox(-105.1, 39.6, -104.7, 39.8)
+    }
+
+    private Polygon wyomingBoxPolygon() {
+        polygonBox(-106.5, 41.0, -106.0, 41.5)
     }
 
     def "canModifyProject returns true for GLOBAL_ADMIN without any org lookup"() {
@@ -116,7 +152,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         service.canModifyProject(user.id(), project) == false
     }
 
-    def "canModifyProject throws NOT_FOUND when user does not exist"() {
+    def "canModifyProject throws UNAUTHORIZED when user does not exist"() {
         given:
         def project = dataBuilder.project()
                 .withId(projectId)
@@ -131,7 +167,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
         then:
         HttpStatusException e = thrown()
-        e.status == HttpStatus.NOT_FOUND
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     def "authorizeRegionalAdminApproval passes for GLOBAL_ADMIN without any DB jurisdiction check"() {
@@ -139,10 +175,11 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         User admin = saveUser(UserRole.GLOBAL_ADMIN)
 
         when:
-        service.authorizeRegionalAdminApproval(admin.id(), projectId)
+        User actor = service.authorizeRegionalAdminApproval(admin.id(), projectId)
 
         then:
         noExceptionThrown()
+        actor.id() == admin.id()
     }
 
     def "authorizeRegionalAdminApproval throws FORBIDDEN when agent has no region covering the project"() {
@@ -157,13 +194,13 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "authorizeRegionalAdminApproval throws NOT_FOUND for unknown user"() {
+    def "authorizeRegionalAdminApproval throws UNAUTHORIZED for unknown user"() {
         when:
         service.authorizeRegionalAdminApproval(UUID.randomUUID(), projectId)
 
         then:
         HttpStatusException e = thrown()
-        e.status == HttpStatus.NOT_FOUND
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     def "canReassignProject returns true for GLOBAL_ADMIN without any jurisdiction check"() {
@@ -212,7 +249,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         service.canReassignProject(agent.id(), project) == false
     }
 
-    def "canReassignProject throws NOT_FOUND when user does not exist"() {
+    def "canReassignProject throws UNAUTHORIZED when user does not exist"() {
         given:
         def project = dataBuilder.project()
                 .withId(projectId)
@@ -227,7 +264,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
         then:
         HttpStatusException e = thrown()
-        e.status == HttpStatus.NOT_FOUND
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     def "areAllLocationsInOrgRegion returns false when locations is null or empty"() {
@@ -257,16 +294,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "areAllLocationsInOrgRegion evaluates geographic boundaries correctly"() {
         given: "a region and an organization mapped to it"
-        Coordinate[] denverCoords = [
-                new Coordinate(-105.1099, 39.7891),
-                new Coordinate(-104.7432, 39.7912),
-                new Coordinate(-104.7528, 39.6158),
-                new Coordinate(-105.0536, 39.6137),
-                new Coordinate(-105.1099, 39.7891)
-        ]
         def region = dataBuilder.region()
                 .withName("Denver Area")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .withGeometry(denverMetroPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Geo Org")
@@ -310,16 +340,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "authorizeRegionalAdminApproval allows REGION_DIRECTOR to approve virtual project when org is in their region"() {
         given: "a region and an organization mapped to it"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.7),
-                new Coordinate(-104.7, 39.7),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.7)
-        ]
         def region = dataBuilder.region()
                 .withName("Director Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(polygonBox(-105.1, 39.6, -104.7, 39.7))
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Virtual Org")
@@ -342,28 +365,23 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         dataBuilder.regionUser().asRegionDirector(director, region).persist()
 
         when: "the REGION_DIRECTOR attempts to approve the virtual project"
-        service.authorizeRegionalAdminApproval(director.id(), project.id())
+        User actor = service.authorizeRegionalAdminApproval(director.id(), project.id())
 
         then: "approval succeeds without throwing an exception"
         noExceptionThrown()
+        actor.id() == director.id()
     }
 
     def "authorizeRegionalAdminApproval throws FORBIDDEN when REGION_DIRECTOR attempts to approve virtual project outside their region"() {
         given: "a region and an organization mapped to a different region"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.7),
-                new Coordinate(-104.7, 39.7),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.7)
-        ]
+        def coords = polygonBox(-105.1, 39.6, -104.7, 39.7)
         def directorRegion = dataBuilder.region()
                 .withName("Director Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(coords)
                 .persist()
         def otherRegion = dataBuilder.region()
                 .withName("Other Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(coords)
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Other Org")
@@ -418,16 +436,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "hasJurisdictionOverAllProjectLocations recognizes REGION_DIRECTOR in addition to REGION_AGENT"() {
         given: "a region, a project with a location inside that region, and a REGION_DIRECTOR"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Director Loc Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def loc = dataBuilder.location()
                 .withName("Loc")
@@ -456,16 +467,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "canModifyProject allows REGION_DIRECTOR to modify a virtual project in their region"() {
         given: "a region, verified organization in that region, and virtual project"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Mod Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Mod Org")
@@ -491,20 +495,13 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "canModifyProject denies REGION_DIRECTOR on virtual project outside their region"() {
         given: "a region, organization in a different region, and virtual project"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def dirRegion = dataBuilder.region()
                 .withName("Dir Reg")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def otherRegion = dataBuilder.region()
                 .withName("Other Reg")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Other Org")
@@ -530,20 +527,13 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "isVirtualProjectInDirectorJurisdiction enforces managing_region_id precedence over organization_regions"() {
         given: "two regions A and B"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def regA = dataBuilder.region()
                 .withName("Region A")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def regB = dataBuilder.region()
                 .withName("Region B")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
 
         and: "an organization with presence in both Region A and Region B"
@@ -580,16 +570,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "isVirtualProjectInDirectorJurisdiction rejects unverified organizations"() {
         given: "a region and an UNVERIFIED organization in that region"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Unverified Reg")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def unverifiedOrg = dataBuilder.organization()
                 .withName("Unverified Org")
@@ -615,16 +598,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "canModifyProject allows REGION_DIRECTOR to modify a physical project with locations inside their region"() {
         given: "a region, verified org, location, and physical project"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Dir Phys Mod Reg")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Phys Mod Org")
@@ -655,16 +631,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "canReassignProject allows REGION_DIRECTOR to reassign a virtual project in their region"() {
         given: "a region, verified org, and virtual project"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Dir VReassign Reg")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("VReassign Org")
@@ -690,16 +659,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "authorizeRegionalAdminApproval throws FORBIDDEN for REGION_DIRECTOR on physical project outside their region"() {
         given: "a region, an out-of-region location, and a physical project"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Director Reg")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Org")
@@ -734,16 +696,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "areAllLocationsInOrgRegion batches multiple locations in single query"() {
         given: "an organization linked to a region"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Batch Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Batch Org")
@@ -784,16 +739,9 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
     def "canAssignManagingRegion evaluates roles and organization presence"() {
         given: "a region and organization"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("Assign Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Assign Org")
@@ -819,6 +767,13 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
             service.canAssignManagingRegion(regionalAgent.id(), org.id(), region.id()) == true
             service.canAssignManagingRegion(standardUser.id(), org.id(), region.id()) == false
         }
+
+        when: "canAssignManagingRegion is called with a missing actor"
+        service.canAssignManagingRegion(UUID.randomUUID(), org.id(), region.id())
+
+        then:
+        HttpStatusException e = thrown()
+        e.status == HttpStatus.UNAUTHORIZED
     }
 
     private void addProjectSponsor(UUID userId, UUID targetProjectId) {
@@ -831,18 +786,11 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "canViewProject and canViewShift enforce visibility for active and non-active projects"() {
+    def "canViewProject, canViewShift, and authorizeShiftView enforce visibility and handle null project"() {
         given: "an org, a region, an active project, and a pending project with a location"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
         def region = dataBuilder.region()
                 .withName("View Region")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("View Org")
@@ -881,24 +829,11 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         def regionalAgent = saveUser(UserRole.REGION_AGENT)
         dataBuilder.regionUser().asRegionAgent(regionalAgent, region).persist()
 
-        def activeShift = new Shift(
-                null,
-                activeProject,
-                true,
-                null,
-                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1),
-                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1).plusHours(2),
-                []
-        )
-        def pendingShift = new Shift(
-                null,
-                pendingProject,
-                true,
-                null,
-                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1),
-                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1).plusHours(2),
-                []
-        )
+        def start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
+        def end = start.plusHours(2)
+        def activeShift = new Shift(null, activeProject, true, null, start, end, [])
+        def pendingShift = new Shift(null, pendingProject, true, null, start, end, [])
+        def orphanShift = new Shift(null, null, true, null, start, end, [])
 
         expect:
         verifyAll {
@@ -912,32 +847,62 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
             service.canViewShift(null, activeShift) == true
             service.canViewShift(outsider.id(), pendingShift) == false
             service.canViewShift(sponsor.id(), pendingShift) == true
+            service.canViewShift(admin.id(), orphanShift) == false
         }
+
+        when: "authorizeShiftView passes for sponsor and fails with 403 for outsider"
+        service.authorizeShiftView(sponsor.id(), pendingShift)
+        service.authorizeShiftView(outsider.id(), pendingShift)
+
+        then:
+        HttpStatusException shiftViewEx = thrown()
+        shiftViewEx.status == HttpStatus.FORBIDDEN
+
+        when: "authorizeShiftView is called with null userId on a pending shift"
+        service.authorizeShiftView(null, pendingShift)
+
+        then:
+        HttpStatusException unauthShiftEx = thrown()
+        unauthShiftEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "canViewProject, canViewShift, and authorizeShiftView are called for an active resource with a missing actor"
+        service.canViewProject(UUID.randomUUID(), activeProject)
+
+        then:
+        HttpStatusException missingActiveProjEx = thrown()
+        missingActiveProjEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "canViewShift is called for an active shift with a missing actor"
+        service.canViewShift(UUID.randomUUID(), activeShift)
+
+        then:
+        HttpStatusException missingActiveShiftEx = thrown()
+        missingActiveShiftEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "authorizeShiftView is called for an active shift with a missing actor"
+        service.authorizeShiftView(UUID.randomUUID(), activeShift)
+
+        then:
+        HttpStatusException missingAuthShiftEx = thrown()
+        missingAuthShiftEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "canViewProject is called for a pending project with a missing actor"
+        service.canViewProject(UUID.randomUUID(), pendingProject)
+
+        then:
+        HttpStatusException missingActorEx = thrown()
+        missingActorEx.status == HttpStatus.UNAUTHORIZED
     }
 
     def "DefaultShiftService allows Regional Admins with jurisdiction and Project Sponsors while denying outsiders"() {
         given: "two regions, an active project in Region A, and various users"
-        Coordinate[] coordsA = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
-        Coordinate[] coordsB = [
-                new Coordinate(-106.5, 41.5),
-                new Coordinate(-106.0, 41.5),
-                new Coordinate(-106.0, 41.0),
-                new Coordinate(-106.5, 41.0),
-                new Coordinate(-106.5, 41.5)
-        ]
         def regionA = dataBuilder.region()
                 .withName("Shift Region A")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coordsA))
+                .withGeometry(denverBoxPolygon())
                 .persist()
         def regionB = dataBuilder.region()
                 .withName("Shift Region B")
-                .withGeometry(dataBuilder.geometryFactory.createPolygon(coordsB))
+                .withGeometry(wyomingBoxPolygon())
                 .persist()
         def org = dataBuilder.organization()
                 .withName("Shift Org")
@@ -1005,6 +970,27 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
 
         then:
         noExceptionThrown()
+
+        when: "a missing actor attempts create, update, or delete on ShiftService"
+        shiftService.createShift(candidateShift, UUID.randomUUID())
+
+        then:
+        HttpStatusException createMissingEx = thrown()
+        createMissingEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "a missing actor attempts updateShift"
+        shiftService.updateShift(UUID.randomUUID(), candidateShift, UUID.randomUUID())
+
+        then:
+        HttpStatusException updateMissingEx = thrown()
+        updateMissingEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "a missing actor attempts deleteShift"
+        shiftService.deleteShift(UUID.randomUUID(), UUID.randomUUID())
+
+        then:
+        HttpStatusException deleteMissingEx = thrown()
+        deleteMissingEx.status == HttpStatus.UNAUTHORIZED
     }
 
     def "UserService enforces authorizeSelfOrUserManager and authorizeUserManager"() {
@@ -1049,17 +1035,11 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         deleteEx.status == HttpStatus.FORBIDDEN
     }
 
-    def "AuthorizationService enforces org, region, location, and boundary authorization"() {
+    def "AuthorizationService enforces org, region, location, and boundary authorization without existence oracles"() {
         given: "regions, orgs, location, boundary, and users"
-        Coordinate[] coords = [
-                new Coordinate(-105.1, 39.8),
-                new Coordinate(-104.7, 39.8),
-                new Coordinate(-104.7, 39.6),
-                new Coordinate(-105.1, 39.6),
-                new Coordinate(-105.1, 39.8)
-        ]
-        def polygon = dataBuilder.geometryFactory.createPolygon(coords)
+        def polygon = denverBoxPolygon()
         def region = dataBuilder.region().withName("Auth Region").withGeometry(polygon).persist()
+        def otherRegion = dataBuilder.region().withName("Other Auth Region").withGeometry(wyomingBoxPolygon()).persist()
         def privateOrg = dataBuilder.organization().withName("Private Org").asPrivate().unverified().persist()
         def publicOrg = dataBuilder.organization().withName("Public Org").asPublic().verified().persist()
         def loc = dataBuilder.location()
@@ -1077,6 +1057,10 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         dataBuilder.organizationUser().asOrgAdmin(orgAdmin, privateOrg).persist()
         def director = saveUser(UserRole.REGION_DIRECTOR)
         dataBuilder.regionUser().asRegionDirector(director, region).persist()
+        def agent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agent, region).persist()
+        def otherDirector = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(otherDirector, otherRegion).persist()
 
         def insidePoint = dataBuilder.geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
         insidePoint.setSRID(4326)
@@ -1092,20 +1076,56 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
             service.canViewOrganization(admin.id(), privateOrg) == true
         }
 
-        when: "orgManager updates org, orgAdmin deletes org, admin verifies"
+        when: "authorized callers invoke organization, region, location, and boundary guards"
+        service.authorizeOrganizationView(null, publicOrg)
+        service.authorizeOrganizationView(orgManager.id(), privateOrg)
+        service.authorizeOrganizationView(admin.id(), privateOrg)
         service.authorizeOrganizationUpdate(orgManager.id(), privateOrg.id())
+        service.authorizeOrganizationUpdate(admin.id(), privateOrg.id())
         service.authorizeOrganizationAdmin(orgAdmin.id(), privateOrg.id())
-        service.authorizeOrganizationVerification(admin.id())
+        User verifiedActor = service.authorizeOrganizationVerification(admin.id())
         service.authorizeRegionDirector(director.id(), region.id())
+        service.authorizeRegionDirector(admin.id(), region.id())
         service.authorizeLocationCreate(director.id(), insidePoint)
         service.authorizeLocationUpdate(director.id(), loc.id(), insidePoint)
         service.authorizeLocationDelete(director.id(), loc.id())
+        service.authorizeLocationDelete(admin.id(), UUID.randomUUID())
         service.authorizeBoundaryCreate(director.id(), polygon)
         service.authorizeBoundaryUpdate(director.id(), boundary.id(), polygon)
         service.authorizeBoundaryDelete(director.id(), boundary.id())
+        service.authorizeBoundaryDelete(admin.id(), UUID.randomUUID())
 
         then:
         noExceptionThrown()
+        verifiedActor.id() == admin.id()
+
+        when: "outsider attempts to view private org via authorizeOrganizationView"
+        service.authorizeOrganizationView(outsider.id(), privateOrg)
+
+        then:
+        HttpStatusException orgViewEx = thrown()
+        orgViewEx.status == HttpStatus.FORBIDDEN
+
+        when: "unauthenticated caller with null userId attempts to view private org via authorizeOrganizationView"
+        service.authorizeOrganizationView(null, privateOrg)
+
+        then:
+        HttpStatusException unauthOrgViewEx = thrown()
+        unauthOrgViewEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "deleted or missing actor attempts to view a public org via canViewOrganization or authorizeOrganizationView"
+        service.canViewOrganization(UUID.randomUUID(), publicOrg)
+
+        then:
+        HttpStatusException missingOrgCanViewEx = thrown()
+        missingOrgCanViewEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "deleted or missing actor calls authorizeOrganizationView on a public org"
+        service.authorizeOrganizationView(UUID.randomUUID(), publicOrg)
+
+        then:
+        HttpStatusException missingOrgAuthViewEx = thrown()
+        missingOrgAuthViewEx.status == HttpStatus.UNAUTHORIZED
 
         when: "outsider attempts org update"
         service.authorizeOrganizationUpdate(outsider.id(), privateOrg.id())
@@ -1128,12 +1148,19 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         HttpStatusException e3 = thrown()
         e3.status == HttpStatus.FORBIDDEN
 
-        when: "outsider attempts region director action"
-        service.authorizeRegionDirector(outsider.id(), region.id())
+        when: "region agent attempts region director action"
+        service.authorizeRegionDirector(agent.id(), region.id())
 
         then:
-        HttpStatusException e4 = thrown()
-        e4.status == HttpStatus.FORBIDDEN
+        HttpStatusException agentDirEx = thrown()
+        agentDirEx.status == HttpStatus.FORBIDDEN
+
+        when: "cross-region director attempts region director action"
+        service.authorizeRegionDirector(otherDirector.id(), region.id())
+
+        then:
+        HttpStatusException crossDirEx = thrown()
+        crossDirEx.status == HttpStatus.FORBIDDEN
 
         when: "director attempts location create outside region"
         service.authorizeLocationCreate(director.id(), outsidePoint)
@@ -1142,18 +1169,381 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         HttpStatusException e5 = thrown()
         e5.status == HttpStatus.FORBIDDEN
 
-        when: "director attempts to delete missing location"
+        when: "director attempts to delete missing location (eliminated existence oracle)"
         service.authorizeLocationDelete(director.id(), UUID.randomUUID())
 
         then:
         HttpStatusException e6 = thrown()
-        e6.status == HttpStatus.NOT_FOUND
+        e6.status == HttpStatus.FORBIDDEN
 
-        when: "director attempts to delete missing boundary"
+        when: "director attempts to delete missing boundary (eliminated existence oracle)"
         service.authorizeBoundaryDelete(director.id(), UUID.randomUUID())
 
         then:
         HttpStatusException e7 = thrown()
-        e7.status == HttpStatus.NOT_FOUND
+        e7.status == HttpStatus.FORBIDDEN
+    }
+
+    def "AuthorizationService rejects out-of-region and null location and boundary changes"() {
+        given: "a region, a director, an in-region location/boundary, and an out-of-region location/boundary"
+        def inPolygon = denverBoxPolygon()
+        def outPolygon = wyomingBoxPolygon()
+
+        def region = dataBuilder.region().withName("Gap Region").withGeometry(inPolygon).persist()
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
+
+        def inLoc = dataBuilder.location()
+                .withName("In Loc")
+                .withAddress("123 Main", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def outLoc = dataBuilder.location()
+                .withName("Out Loc")
+                .withAddress("456 Far", "Laramie", "WY", "82070", "US")
+                .atPoint(-106.2, 41.2)
+                .persist()
+
+        def inBoundary = dataBuilder.boundary().withName("In Boundary").withGeometry(inPolygon).persist()
+        def outBoundary = dataBuilder.boundary().withName("Out Boundary").withGeometry(outPolygon).persist()
+
+        def outsidePoint = dataBuilder.geometryFactory.createPoint(new Coordinate(-106.2, 41.2))
+        outsidePoint.setSRID(4326)
+
+        when: "director updates an out-of-region location"
+        service.authorizeLocationUpdate(director.id(), outLoc.id(), outsidePoint)
+
+        then:
+        HttpStatusException locOutEx = thrown()
+        locOutEx.status == HttpStatus.FORBIDDEN
+
+        when: "director moves an in-region location outside their region"
+        service.authorizeLocationUpdate(director.id(), inLoc.id(), outsidePoint)
+
+        then:
+        HttpStatusException locMoveEx = thrown()
+        locMoveEx.status == HttpStatus.FORBIDDEN
+
+        when: "director updates a location with a null point"
+        service.authorizeLocationUpdate(director.id(), inLoc.id(), null)
+
+        then:
+        HttpStatusException locNullEx = thrown()
+        locNullEx.status == HttpStatus.FORBIDDEN
+
+        when: "director deletes an existing location outside their region"
+        service.authorizeLocationDelete(director.id(), outLoc.id())
+
+        then:
+        HttpStatusException locDelEx = thrown()
+        locDelEx.status == HttpStatus.FORBIDDEN
+
+        when: "director creates a boundary outside their region"
+        service.authorizeBoundaryCreate(director.id(), outPolygon)
+
+        then:
+        HttpStatusException bndCreateOutEx = thrown()
+        bndCreateOutEx.status == HttpStatus.FORBIDDEN
+
+        when: "director creates a boundary with null geometry"
+        service.authorizeBoundaryCreate(director.id(), null)
+
+        then:
+        HttpStatusException bndCreateNullEx = thrown()
+        bndCreateNullEx.status == HttpStatus.FORBIDDEN
+
+        when: "director updates an out-of-region boundary"
+        service.authorizeBoundaryUpdate(director.id(), outBoundary.id(), outPolygon)
+
+        then:
+        HttpStatusException bndUpdateOutEx = thrown()
+        bndUpdateOutEx.status == HttpStatus.FORBIDDEN
+
+        when: "director moves an in-region boundary outside their region"
+        service.authorizeBoundaryUpdate(director.id(), inBoundary.id(), outPolygon)
+
+        then:
+        HttpStatusException bndMoveEx = thrown()
+        bndMoveEx.status == HttpStatus.FORBIDDEN
+
+        when: "director updates a boundary with null geometry"
+        service.authorizeBoundaryUpdate(director.id(), inBoundary.id(), null)
+
+        then:
+        HttpStatusException bndUpdateNullEx = thrown()
+        bndUpdateNullEx.status == HttpStatus.FORBIDDEN
+
+        when: "director deletes an existing boundary outside their region"
+        service.authorizeBoundaryDelete(director.id(), outBoundary.id())
+
+        then:
+        HttpStatusException bndDelEx = thrown()
+        bndDelEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "AuthorizationService handles allowOrgManageUsers, expired org verification, project visibility edges, and missing actors"() {
+        given: "regions, orgs, projects, and users"
+        def regionA = dataBuilder.region()
+                .withName("Edge Region A")
+                .withGeometry(denverBoxPolygon())
+                .persist()
+        def regionB = dataBuilder.region()
+                .withName("Edge Region B")
+                .withGeometry(wyomingBoxPolygon())
+                .persist()
+
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def orgManager = saveUser(UserRole.STANDARD_USER)
+        def orgAdmin = saveUser(UserRole.STANDARD_USER)
+        def outsider = saveUser(UserRole.STANDARD_USER)
+        def agentA = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agentA, regionA).persist()
+        def agentB = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agentB, regionB).persist()
+
+        def privateOrg = dataBuilder.organization().withName("Edge Private Org").asPrivate().unverified().persist()
+        dataBuilder.organizationUser().asOrgManager(orgManager, privateOrg).persist()
+        dataBuilder.organizationUser().asOrgAdmin(orgAdmin, privateOrg).persist()
+
+        def expiredOrg = dataBuilder.organization()
+                .withName("Expired Public Org")
+                .asPublic()
+                .verified()
+                .withVerificationExpiresAt(OffsetDateTime.now(ZoneOffset.UTC).minusDays(1))
+                .persist()
+
+        def deletedProject = dataBuilder.project()
+                .forOrg(privateOrg)
+                .withTitle("Deleted Active Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.ACTIVE)
+                .deleted(admin)
+                .persist()
+
+        def draftProject = dataBuilder.project()
+                .forOrg(privateOrg)
+                .withTitle("Draft Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.DRAFT)
+                .persist()
+
+        def virtualManagedProject = dataBuilder.project()
+                .forOrg(privateOrg)
+                .inRegion(regionA)
+                .withTitle("Virtual Managed Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .persist()
+
+        expect: "project and organization visibility edge cases"
+        verifyAll {
+            service.canViewProject(null, deletedProject) == false
+            service.canViewProject(admin.id(), deletedProject) == false
+            service.canViewProject(null, draftProject) == false
+            service.canViewProject(outsider.id(), draftProject) == false
+            service.canViewProject(orgManager.id(), draftProject) == true
+            service.canViewProject(admin.id(), draftProject) == true
+            service.canViewProject(agentA.id(), virtualManagedProject) == true
+            service.canViewProject(agentB.id(), virtualManagedProject) == false
+            service.canViewOrganization(null, expiredOrg) == false
+            service.canViewOrganization(outsider.id(), expiredOrg) == false
+            service.canViewOrganization(admin.id(), expiredOrg) == true
+            service.isSystemAdmin(null) == false
+            service.isSystemAdmin(outsider.id()) == false
+            service.isSystemAdmin(admin.id()) == true
+        }
+
+        when: "authorizeOrganizationAdmin is called with allowOrgManageUsers = true for ORG_ADMIN"
+        service.authorizeOrganizationAdmin(orgAdmin.id(), privateOrg.id(), true)
+
+        then:
+        noExceptionThrown()
+
+        when: "authorizeOrganizationAdmin is called with allowOrgManageUsers = true for orgManager"
+        service.authorizeOrganizationAdmin(orgManager.id(), privateOrg.id(), true)
+
+        then:
+        HttpStatusException orgAdminEx = thrown()
+        orgAdminEx.status == HttpStatus.FORBIDDEN
+
+        when: "canManageShift is called with a missing actor"
+        service.canManageShift(UUID.randomUUID(), virtualManagedProject)
+
+        then:
+        HttpStatusException shiftActorEx = thrown()
+        shiftActorEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "authorizeOrganizationUpdate is called with a missing actor"
+        service.authorizeOrganizationUpdate(UUID.randomUUID(), privateOrg.id())
+
+        then:
+        HttpStatusException orgUpdActorEx = thrown()
+        orgUpdActorEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "authorizeOrganizationVerification is called with a missing actor"
+        service.authorizeOrganizationVerification(UUID.randomUUID())
+
+        then:
+        HttpStatusException orgVerActorEx = thrown()
+        orgVerActorEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "authorizeRegionDirector is called with a missing actor"
+        service.authorizeRegionDirector(UUID.randomUUID(), regionA.id())
+
+        then:
+        HttpStatusException regDirActorEx = thrown()
+        regDirActorEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "isSystemAdmin is called with a non-null missing actor"
+        service.isSystemAdmin(UUID.randomUUID())
+
+        then:
+        HttpStatusException sysAdminActorEx = thrown()
+        sysAdminActorEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "evaluateProjectCreationByUser is called with a missing actor"
+        service.evaluateProjectCreationByUser(UUID.randomUUID(), draftProject)
+
+        then:
+        HttpStatusException projCreateActorEx = thrown()
+        projCreateActorEx.status == HttpStatus.UNAUTHORIZED
+    }
+
+    def "AuthorizationService verifies actor existence in authorizeSelfOrUserManager, authorizeOrganizationUserView, and authorizeRegionUserView"() {
+        given: "seeded personas and an unseeded missing actor ID"
+        UUID missingActorId = UUID.randomUUID()
+
+        when: "valid self, admin, and membership views succeed"
+        service.authorizeSelfOrUserManager(TestPersonas.VICTOR_VOLUNTEER.id, TestPersonas.VICTOR_VOLUNTEER.id)
+        service.authorizeSelfOrUserManager(TestPersonas.SARAH_ADMIN.id, TestPersonas.VICTOR_VOLUNTEER.id)
+        service.authorizeOrganizationUserView(TestPersonas.LUKE_LOCAL_MEMBER.id, TestPersonas.LUKE_LOCAL_MEMBER.id, TestPersonas.DENVER_METRO_BRANCH_ID)
+        service.authorizeOrganizationUserView(TestPersonas.LEO_LOCAL_ADMIN.id, TestPersonas.LUKE_LOCAL_MEMBER.id, TestPersonas.DENVER_METRO_BRANCH_ID)
+        service.authorizeRegionUserView(TestPersonas.CONNIE_COUNTY_AGENT.id, TestPersonas.CONNIE_COUNTY_AGENT.id, TestPersonas.DENVER_COUNTY_REGION_ID)
+        service.authorizeRegionUserView(TestPersonas.DANIEL_COUNTY_DIRECTOR.id, TestPersonas.CONNIE_COUNTY_AGENT.id, TestPersonas.DENVER_COUNTY_REGION_ID)
+
+        then:
+        noExceptionThrown()
+
+        when: "a deleted/missing actor calls authorizeSelfOrUserManager matching their own ID"
+        service.authorizeSelfOrUserManager(missingActorId, missingActorId)
+
+        then:
+        HttpStatusException selfMissingEx = thrown()
+        selfMissingEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "a deleted/missing actor calls authorizeOrganizationUserView matching their own ID"
+        service.authorizeOrganizationUserView(missingActorId, missingActorId, TestPersonas.DENVER_METRO_BRANCH_ID)
+
+        then:
+        HttpStatusException orgSelfMissingEx = thrown()
+        orgSelfMissingEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "a deleted/missing actor calls authorizeRegionUserView matching their own ID"
+        service.authorizeRegionUserView(missingActorId, missingActorId, TestPersonas.DENVER_COUNTY_REGION_ID)
+
+        then:
+        HttpStatusException regSelfMissingEx = thrown()
+        regSelfMissingEx.status == HttpStatus.UNAUTHORIZED
+
+        when: "a cross-org admin calls authorizeOrganizationUserView"
+        service.authorizeOrganizationUserView(TestPersonas.URSULA_UTAH_ADMIN.id, TestPersonas.LUKE_LOCAL_MEMBER.id, TestPersonas.DENVER_METRO_BRANCH_ID)
+
+        then:
+        HttpStatusException crossOrgEx = thrown()
+        crossOrgEx.status == HttpStatus.FORBIDDEN
+
+        when: "a region agent calls authorizeRegionUserView for another user"
+        service.authorizeRegionUserView(TestPersonas.CONNIE_COUNTY_AGENT.id, TestPersonas.DANIEL_COUNTY_DIRECTOR.id, TestPersonas.DENVER_COUNTY_REGION_ID)
+
+        then:
+        HttpStatusException agentViewEx = thrown()
+        agentViewEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "demoted standard user still in region_users receives FORBIDDEN on regional approval and region edits"() {
+        given: "a region with a physical project inside it and a demoted STANDARD_USER still listed as region director"
+        def polygon = denverBoxPolygon()
+        def region = dataBuilder.region()
+                .withName("Demoted User Region")
+                .withGeometry(polygon)
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Demoted User Org")
+                .asPublic()
+                .verified()
+                .persist()
+        def loc = dataBuilder.location()
+                .withName("In Region Loc")
+                .withAddress("123 Main", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("In Region Project")
+                .withDescription("Description for demoted user test.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .persist()
+        def demotedUser = saveUser(UserRole.STANDARD_USER)
+        def demotedAgent = saveUser(UserRole.REGION_AGENT)
+        def otherMember = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.regionUser().asRegionDirector(demotedUser, region).persist()
+        dataBuilder.regionUser().asRegionDirector(demotedAgent, region).persist()
+        dataBuilder.regionUser().asRegionAgent(otherMember, region).persist()
+        def insidePoint = dataBuilder.geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
+        insidePoint.setSRID(4326)
+
+        when: "the demoted user calls authorizeRegionalAdminApproval"
+        service.authorizeRegionalAdminApproval(demotedUser.id(), project.id())
+
+        then:
+        HttpStatusException approvalEx = thrown()
+        approvalEx.status == HttpStatus.FORBIDDEN
+
+        when: "the demoted user calls authorizeLocationCreate"
+        service.authorizeLocationCreate(demotedUser.id(), insidePoint)
+
+        then:
+        HttpStatusException locationEx = thrown()
+        locationEx.status == HttpStatus.FORBIDDEN
+
+        when: "the demoted user calls authorizeBoundaryCreate"
+        service.authorizeBoundaryCreate(demotedUser.id(), polygon)
+
+        then:
+        HttpStatusException boundaryEx = thrown()
+        boundaryEx.status == HttpStatus.FORBIDDEN
+
+        when: "the demoted standard user calls authorizeRegionDirector"
+        service.authorizeRegionDirector(demotedUser.id(), region.id())
+
+        then:
+        HttpStatusException dirEx = thrown()
+        dirEx.status == HttpStatus.FORBIDDEN
+
+        when: "the demoted standard user calls authorizeRegionUserView for another member"
+        service.authorizeRegionUserView(demotedUser.id(), otherMember.id(), region.id())
+
+        then:
+        HttpStatusException viewEx = thrown()
+        viewEx.status == HttpStatus.FORBIDDEN
+
+        when: "a region agent with a stale REGION_DIRECTOR row calls authorizeRegionDirector"
+        service.authorizeRegionDirector(demotedAgent.id(), region.id())
+
+        then:
+        HttpStatusException agentDirEx = thrown()
+        agentDirEx.status == HttpStatus.FORBIDDEN
+
+        when: "a region agent with a stale REGION_DIRECTOR row calls authorizeRegionUserView for another member"
+        service.authorizeRegionUserView(demotedAgent.id(), otherMember.id(), region.id())
+
+        then:
+        HttpStatusException agentViewEx = thrown()
+        agentViewEx.status == HttpStatus.FORBIDDEN
     }
 }

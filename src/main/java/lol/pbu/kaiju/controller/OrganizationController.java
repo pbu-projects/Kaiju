@@ -14,7 +14,6 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -38,7 +37,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
@@ -52,18 +50,18 @@ public class OrganizationController {
     private final OrganizationService organizationService;
     private final OrganizationRepository organizationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public OrganizationController(
             OrganizationService organizationService,
             OrganizationRepository organizationRepository,
             SpatialMappingService spatialMappingService,
-            AuthorizationService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.organizationService = organizationService;
         this.organizationRepository = organizationRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -196,16 +194,12 @@ public class OrganizationController {
 
     @Get("/{id}")
     public Optional<Organization> getOrganization(@PathVariable UUID id, Principal principal) {
-        Optional<Organization> orgOpt = organizationService.getOrganizationById(id);
-        if (orgOpt.isEmpty()) {
-            return Optional.empty();
-        }
-        Organization org = orgOpt.get();
         UUID callerId = UUID.fromString(principal.getName());
-        if (!projectSecurityService.canViewOrganization(callerId, org)) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: You do not have permission to view this organization");
-        }
-        return Optional.of(org);
+        return organizationService.getOrganizationById(id)
+                .map(org -> {
+                    authorizationService.authorizeOrganizationView(callerId, org);
+                    return org;
+                });
     }
 
     @Post
@@ -225,8 +219,9 @@ public class OrganizationController {
     }
 
     /**
-     * Updates an existing organization by its ID after validating that it exists.
-     * Throws 404 NOT_FOUND if the organization does not exist.
+     * Updates an existing organization by ID.
+     * Verifies that the caller is a global admin or organization manager before checking if the organization exists.
+     * Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id        the ID of the organization to update
      * @param command   the updated organization command
@@ -250,8 +245,9 @@ public class OrganizationController {
     }
 
     /**
-     * Deletes an organization by its ID after validating that it exists.
-     * Throws 404 NOT_FOUND if the organization does not exist.
+     * Deletes an organization by ID.
+     * Verifies that the caller is an organization admin or system admin before deleting the organization.
+     * Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id        the ID of the organization to delete
      * @param principal the authenticated principal

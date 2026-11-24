@@ -46,16 +46,16 @@ public class LocationController {
 
     private final LocationRepository locationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public LocationController(
             LocationRepository locationRepository,
             SpatialMappingService spatialMappingService,
-            AuthorizationService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.locationRepository = locationRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Get
@@ -80,7 +80,7 @@ public class LocationController {
     @Post
     public Location addLocation(@Valid @Body CreateLocationCommand command, Principal principal) {
         Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        projectSecurityService.authorizeLocationCreate(UUID.fromString(principal.getName()), point);
+        authorizationService.authorizeLocationCreate(UUID.fromString(principal.getName()), point);
         Location location = new Location(
                 null,
                 command.name(),
@@ -96,7 +96,7 @@ public class LocationController {
     }
 
     /**
-     * Updates an existing location by its ID after validating that it exists and is within caller jurisdiction.
+     * Updates an existing location after checking caller permission and region access.
      *
      * @param id        the ID of the location to update
      * @param command   the updated location details
@@ -110,10 +110,10 @@ public class LocationController {
             @Valid @Body UpdateLocationCommand command,
             Principal principal
     ) {
+        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
+        authorizationService.authorizeLocationUpdate(UUID.fromString(principal.getName()), id, point);
         Location existing = locationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND));
-        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        projectSecurityService.authorizeLocationUpdate(UUID.fromString(principal.getName()), id, point);
         String timezone = resolveUpdatedTimezone(existing, point, command.timezone());
         Location location = new Location(
                 id,
@@ -130,7 +130,7 @@ public class LocationController {
     }
 
     /**
-     * Deletes a location by its ID after validating that it exists and is within caller jurisdiction.
+     * Deletes a location by its ID after checking caller permission and region access.
      *
      * @param id        the ID of the location to delete
      * @param principal the authenticated caller
@@ -139,7 +139,7 @@ public class LocationController {
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeLocationDelete(actorId, id);
+        authorizationService.authorizeLocationDelete(actorId, id);
         long deletedCount = locationRepository.removeById(id);
         if (deletedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND);

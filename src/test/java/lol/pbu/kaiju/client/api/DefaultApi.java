@@ -220,8 +220,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a boundary by its ID after validating that it exists and is within caller jurisdiction.}
-     * Deletes a boundary by its ID after validating that it exists and is within caller jurisdiction.
+     * {@summary Deletes a boundary by its ID after checking caller permission and region access.}
+     * Deletes a boundary by its ID after checking caller permission and region access.
      *
      * @param id the ID of the boundary to delete (required)
      */
@@ -231,8 +231,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a location by its ID after validating that it exists and is within caller jurisdiction.}
-     * Deletes a location by its ID after validating that it exists and is within caller jurisdiction.
+     * {@summary Deletes a location by its ID after checking caller permission and region access.}
+     * Deletes a location by its ID after checking caller permission and region access.
      *
      * @param id the ID of the location to delete (required)
      */
@@ -242,8 +242,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes an organization by its ID after validating that it exists.}
-     * Deletes an organization by its ID after validating that it exists. Throws 404 NOT_FOUND if the organization does not exist.
+     * {@summary Deletes an organization by ID.}
+     * Deletes an organization by ID. Verifies that the caller is an organization admin or system admin before deleting the organization. Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id the ID of the organization to delete (required)
      */
@@ -290,7 +290,7 @@ public interface DefaultApi {
 
     /**
      * {@summary Deletes a shift by its ID after validating that it exists.}
-     * Deletes a shift by its ID after validating that it exists. Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND if the shift does not exist.
+     * Deletes a shift by its ID after validating that it exists. Allows system admins, organization managers or admins, regional admins with jurisdiction, and project sponsors. Throws 403 FORBIDDEN if the caller is not allowed to manage shifts for the project. Throws 404 NOT_FOUND if the shift does not exist.
      *
      * @param id the ID of the shift to delete (required)
      */
@@ -311,8 +311,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Deletes a user by its ID after validating that it exists.}
-     * Deletes a user by its ID after validating that it exists. Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE. Throws 403 FORBIDDEN if the user attempts to delete another account without system manage privileges. Throws 404 NOT_FOUND if the user does not exist.
+     * {@summary Deletes a user by ID after checking that it exists.}
+     * Deletes a user by ID after checking that it exists. Only the user themselves or a user manager can delete an account. Throws 403 FORBIDDEN if the caller tries to delete another account without user management permission. Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id the ID of the user to delete (required)
      */
@@ -807,8 +807,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing boundary by its ID after validating that it exists and is within caller jurisdiction.}
-     * Updates an existing boundary by its ID after validating that it exists and is within caller jurisdiction.
+     * {@summary Updates an existing boundary after checking caller permission and region access.}
+     * Updates an existing boundary after checking caller permission and region access.
      *
      * @param id the ID of the boundary to update (required)
      * @param updateBoundaryCommand the updated boundary details (required)
@@ -822,8 +822,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing location by its ID after validating that it exists and is within caller jurisdiction.}
-     * Updates an existing location by its ID after validating that it exists and is within caller jurisdiction.
+     * {@summary Updates an existing location after checking caller permission and region access.}
+     * Updates an existing location after checking caller permission and region access.
      *
      * @param id the ID of the location to update (required)
      * @param updateLocationCommand the updated location details (required)
@@ -837,8 +837,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing organization by its ID after validating that it exists.}
-     * Updates an existing organization by its ID after validating that it exists. Throws 404 NOT_FOUND if the organization does not exist.
+     * {@summary Updates an existing organization by ID.}
+     * Updates an existing organization by ID. Verifies that the caller is a global admin or organization manager before checking if the organization exists. Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id the ID of the organization to update (required)
      * @param updateOrganizationCommand the updated organization command (required)
@@ -901,7 +901,7 @@ public interface DefaultApi {
 
     /**
      * {@summary Updates an existing shift by its ID after validating that it exists.}
-     * Updates an existing shift by its ID after validating that it exists. Enforces that the caller is an ORG_MANAGER or ORG_ADMIN for the shift's project. Throws 403 FORBIDDEN if the user does not manage the project. Throws 404 NOT_FOUND if the shift does not exist.
+     * Updates an existing shift by its ID after validating that it exists. Allows system admins, organization managers or admins, regional admins with jurisdiction, and project sponsors. Throws 403 FORBIDDEN if the caller is not allowed to manage shifts for the project. Throws 404 NOT_FOUND if the shift does not exist.
      *
      * @param id the ID of the shift to update (required)
      * @param updateShiftCommand the updated shift details (required)
@@ -930,8 +930,8 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Updates an existing user by its ID.}
-     * Updates an existing user by its ID. Prevents Mass Assignment by explicitly retaining the existing user's role and createdAt timestamp. Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE. Throws 403 FORBIDDEN if the user attempts to modify another account without system manage privileges. Throws 404 NOT_FOUND if the user does not exist.
+     * {@summary Updates an existing user by ID.}
+     * Updates an existing user by ID. Keeps the existing user's role and createdAt timestamp unchanged. Only the user themselves or a user manager can update an account. Throws 403 FORBIDDEN if the caller tries to change another account without user management permission. Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id the ID of the user to update (required)
      * @param updateUserCommand the updated user details (required)
@@ -945,10 +945,10 @@ public interface DefaultApi {
     );
 
     /**
-     * {@summary Explicit endpoint for role elevation.}
-     * Explicit endpoint for role elevation. Prevents Mass Assignment by only accepting a UpdateUserRoleCommand.
+     * {@summary Updates a user's role.}
+     * Updates a user's role. Only accepts an UpdateUserRoleCommand so other user fields cannot be changed.
      *
-     * @param id the ID of the user to promote/demote (required)
+     * @param id the ID of the user to promote or demote (required)
      * @param updateUserRoleCommand the requested role (required)
      *
      * @return the updated user (status code 200)

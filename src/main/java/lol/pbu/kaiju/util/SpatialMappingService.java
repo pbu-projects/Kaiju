@@ -30,14 +30,14 @@ public class SpatialMappingService {
         return geometryFactory.createPoint(new Coordinate(longitude, latitude));
     }
 
-    public Polygon toPolygon(List<Coordinates> dtos) {
-        if (dtos == null || dtos.size() < 3) {
+    public Polygon toPolygon(List<Coordinates> coordinates) {
+        if (coordinates == null || coordinates.size() < 3) {
             throw new IllegalArgumentException("A polygon requires at least 3 coordinates.");
         }
-        if (dtos.size() > MAX_VERTICES) {
+        if (coordinates.size() > MAX_VERTICES) {
             throw new IllegalArgumentException("A polygon cannot exceed " + MAX_VERTICES + " vertices.");
         }
-        List<Coordinate> coords = new ArrayList<>(dtos.stream()
+        List<Coordinate> coords = new ArrayList<>(coordinates.stream()
                 .map(this::toValidatedCoordinate)
                 .toList());
         // Ensure polygon ring closure
@@ -50,12 +50,12 @@ public class SpatialMappingService {
         return geometryFactory.createPolygon(ring);
     }
 
-    private Coordinate toValidatedCoordinate(Coordinates dto) {
-        if (dto == null || dto.longitude() == null || dto.latitude() == null) {
+    private Coordinate toValidatedCoordinate(Coordinates coordinate) {
+        if (coordinate == null || coordinate.longitude() == null || coordinate.latitude() == null) {
             throw new IllegalArgumentException("Polygon coordinates must not contain null elements.");
         }
-        validateCoordinate(dto.longitude(), dto.latitude());
-        return new Coordinate(dto.longitude(), dto.latitude());
+        validateCoordinate(coordinate.longitude(), coordinate.latitude());
+        return new Coordinate(coordinate.longitude(), coordinate.latitude());
     }
 
     private void validateCoordinate(double longitude, double latitude) {

@@ -40,7 +40,7 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
     LocationRepository locationRepository
 
     @Inject
-    PermissionQueryRepository securityQueryRepository
+    PermissionQueryRepository permissionQueryRepository
 
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
@@ -251,7 +251,7 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
                 Map
         )
         verifyAll {
-            !securityQueryRepository.isOrgVerified(expiredOrg.id())
+            !permissionQueryRepository.isOrgVerified(expiredOrg.id())
             !(searchRes.body().content as List).any { it.id == expiredOrg.id().toString() }
         }
     }

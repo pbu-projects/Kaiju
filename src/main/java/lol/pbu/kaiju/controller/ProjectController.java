@@ -60,22 +60,18 @@ public class ProjectController {
     private final ProjectService projectService;
     private final ProjectRepository projectRepository;
     private final SpatialMappingService spatialMappingService;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public ProjectController(
             ProjectService projectService,
             ProjectRepository projectRepository,
             SpatialMappingService spatialMappingService,
-            AuthorizationService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.projectService = projectService;
         this.projectRepository = projectRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
-    }
-
-    public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
-        return getProjects(title, pageable, null);
+        this.authorizationService = authorizationService;
     }
 
     @Secured(IS_ANONYMOUS)
@@ -88,7 +84,7 @@ public class ProjectController {
         CursoredPageable resolved = PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         boolean hasTitle = title != null && !title.isBlank();
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
-        if (projectSecurityService.isSystemAdmin(userId)) {
+        if (authorizationService.isSystemAdmin(userId)) {
             return hasTitle
                     ? projectRepository.findByTitleAndDeletedAtIsNull(title, resolved)
                     : projectRepository.findByDeletedAtIsNull(resolved);
@@ -113,7 +109,7 @@ public class ProjectController {
             return Optional.empty();
         }
         UUID userId = UUID.fromString(principal.getName());
-        if (!projectSecurityService.canViewProject(userId, project)) {
+        if (!authorizationService.canViewProject(userId, project)) {
             throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to view this project");
         }
         return projectOpt;

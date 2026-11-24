@@ -19,29 +19,19 @@ public interface UserService {
     User getCurrentUser(@NonNull UUID actorUserId);
 
     @NonNull
-    Optional<User> getUserById(@NonNull UUID id);
-
-    @NonNull
     Optional<User> getUserById(@NonNull UUID id, @NonNull UUID actorUserId);
 
     @NonNull
     Optional<User> getUserByEmail(@Nullable String email);
 
     @NonNull
-    User createUser(@NonNull User user);
-
-    @NonNull
     User createUser(@NonNull User user, @NonNull UUID actorUserId);
-
-    @NonNull
-    User updateUser(@NonNull UUID id, @NonNull User user);
 
     @NonNull
     User updateUser(@NonNull UUID id, @NonNull User user, @NonNull UUID actorUserId);
 
-    void updateRole(@NonNull UUID id, @NonNull UserRole role);
-
-    void deleteUser(@NonNull UUID id);
+    @NonNull
+    User updateRole(@NonNull UUID id, @NonNull UserRole role, @NonNull UUID actorUserId);
 
     void deleteUser(@NonNull UUID id, @NonNull UUID actorUserId);
 

@@ -139,8 +139,8 @@ class ApiClientSpec extends BaseControllerSpec {
         }
 
         when: "updating user role"
-        UpdateUserRoleCommand roleRequest = new UpdateUserRoleCommand(UserRole.REGION_AGENT)
-        User updatedUser = defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, roleRequest)
+        UpdateUserRoleCommand roleCommand = new UpdateUserRoleCommand(UserRole.REGION_AGENT)
+        User updatedUser = defaultApi.updateUserRole(TestPersonas.VICTOR_VOLUNTEER.id, roleCommand)
 
         then: "user role is updated"
         verifyAll(updatedUser) {

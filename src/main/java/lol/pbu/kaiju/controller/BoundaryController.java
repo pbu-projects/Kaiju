@@ -46,16 +46,16 @@ public class BoundaryController {
 
     private final BoundaryRepository boundaryRepository;
     private final SpatialMappingService spatialMappingService;
-    private final AuthorizationService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public BoundaryController(
             BoundaryRepository boundaryRepository,
             SpatialMappingService spatialMappingService,
-            AuthorizationService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.boundaryRepository = boundaryRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     /**
@@ -92,7 +92,7 @@ public class BoundaryController {
     @Post
     public Boundary addBoundary(@Valid @Body CreateBoundaryCommand command, Principal principal) {
         Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
-        projectSecurityService.authorizeBoundaryCreate(UUID.fromString(principal.getName()), polygon);
+        authorizationService.authorizeBoundaryCreate(UUID.fromString(principal.getName()), polygon);
         Boundary boundary = new Boundary(
                 null,
                 command.name(),
@@ -102,7 +102,7 @@ public class BoundaryController {
     }
 
     /**
-     * Updates an existing boundary by its ID after validating that it exists and is within caller jurisdiction.
+     * Updates an existing boundary after checking caller permission and region access.
      *
      * @param id        the ID of the boundary to update
      * @param command   the updated boundary details
@@ -116,10 +116,11 @@ public class BoundaryController {
             @Valid @Body UpdateBoundaryCommand command,
             Principal principal
     ) {
-        boundaryRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND));
         Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
-        projectSecurityService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
+        authorizationService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
+        if (!boundaryRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
+        }
         Boundary boundary = new Boundary(
                 id,
                 command.name(),
@@ -129,7 +130,7 @@ public class BoundaryController {
     }
 
     /**
-     * Deletes a boundary by its ID after validating that it exists and is within caller jurisdiction.
+     * Deletes a boundary by its ID after checking caller permission and region access.
      *
      * @param id        the ID of the boundary to delete
      * @param principal the authenticated caller
@@ -138,7 +139,7 @@ public class BoundaryController {
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeBoundaryDelete(actorId, id);
+        authorizationService.authorizeBoundaryDelete(actorId, id);
         long deletedCount = boundaryRepository.removeById(id);
         if (deletedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);

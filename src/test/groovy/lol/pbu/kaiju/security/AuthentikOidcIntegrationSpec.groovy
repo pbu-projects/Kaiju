@@ -592,7 +592,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         preEx.status == HttpStatus.FORBIDDEN
 
         when: "Victor is dynamically promoted to GLOBAL_ADMIN in the authoritative database"
-        userService.updateRole(victor.id(), UserRole.GLOBAL_ADMIN)
+        userService.updateRole(victor.id(), UserRole.GLOBAL_ADMIN, TestPersonas.SARAH_ADMIN.id)
 
         and: "Victor presents the exact same live Authentik token to POST /administrative-regions"
         def promotedRegion = data.region().withName("Victor Promoted Region").asCommand()
@@ -610,7 +610,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         }
 
         when: "Victor is dynamically demoted back to STANDARD_USER in the database"
-        userService.updateRole(victor.id(), UserRole.STANDARD_USER)
+        userService.updateRole(victor.id(), UserRole.STANDARD_USER, TestPersonas.SARAH_ADMIN.id)
 
         and: "Victor presents the exact same live Authentik token once again"
         def demotedRegion = data.region().withName("Victor Demoted Region").asCommand()
@@ -624,7 +624,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         postEx.status == HttpStatus.FORBIDDEN
 
         cleanup:
-        userService.updateRole(victor.id(), UserRole.STANDARD_USER)
+        userService.updateRole(victor.id(), UserRole.STANDARD_USER, TestPersonas.SARAH_ADMIN.id)
         if (createdRegionId != null) {
             administrativeRegionRepository.deleteById(createdRegionId)
         }

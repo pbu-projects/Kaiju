@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.Generated;
 
 /**
- * ProjectLocationCommand
+ * Location details sent inside a project create or update request. Excludes `id` so callers cannot overwrite existing location records directly.
  */
 @JsonPropertyOrder({
     ProjectLocationCommand.JSON_PROPERTY_NAME,
