@@ -28,7 +28,6 @@ import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
-import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.dto.CreateProjectCommand;
 import lol.pbu.kaiju.dto.ProjectBoundaryCommand;
 import lol.pbu.kaiju.dto.ProjectLocationCommand;
@@ -36,9 +35,7 @@ import lol.pbu.kaiju.dto.UpdateProjectCommand;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.service.ProjectService;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
@@ -63,21 +60,18 @@ public class ProjectController {
     private final ProjectService projectService;
     private final ProjectRepository projectRepository;
     private final SpatialMappingService spatialMappingService;
-    private final UserRepository userRepository;
-    private final SecurityQueryRepository queryRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public ProjectController(
             ProjectService projectService,
             ProjectRepository projectRepository,
             SpatialMappingService spatialMappingService,
-            UserRepository userRepository,
-            SecurityQueryRepository queryRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.projectService = projectService;
         this.projectRepository = projectRepository;
         this.spatialMappingService = spatialMappingService;
-        this.userRepository = userRepository;
-        this.queryRepository = queryRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
@@ -93,7 +87,8 @@ public class ProjectController {
     ) {
         CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         boolean hasTitle = title != null && !title.isBlank();
-        if (isGlobalAdmin(principal)) {
+        UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
+        if (projectSecurityService.isSystemAdmin(userId)) {
             return hasTitle
                     ? projectRepository.findByTitleAndDeletedAtIsNull(title, resolved)
                     : projectRepository.findByDeletedAtIsNull(resolved);
@@ -117,7 +112,8 @@ public class ProjectController {
         if (principal == null) {
             return Optional.empty();
         }
-        if (!canViewNonActiveProject(project, principal)) {
+        UUID userId = UUID.fromString(principal.getName());
+        if (!projectSecurityService.canViewProject(userId, project)) {
             throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to view this project");
         }
         return projectOpt;
@@ -229,44 +225,6 @@ public class ProjectController {
     public Project approveProject(@PathVariable @NonNull UUID id, @NonNull Principal principal) {
         UUID regionalAdminId = UUID.fromString(principal.getName());
         return projectService.approveProject(id, regionalAdminId);
-    }
-
-    private boolean isGlobalAdmin(@Nullable Principal principal) {
-        if (principal == null) {
-            return false;
-        }
-        UUID userId = UUID.fromString(principal.getName());
-        return userRepository.findById(userId)
-                .map(user -> user.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-    }
-
-    private boolean canViewNonActiveProject(Project project, Principal principal) {
-        UUID userId = UUID.fromString(principal.getName());
-        User user = userRepository.findById(userId).orElse(null);
-        if (user == null) {
-            return false;
-        }
-        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
-            return true;
-        }
-        if (project.organization() != null
-                && project.organization().id() != null
-                && queryRepository.isAnyOrgMember(userId, project.organization().id())) {
-            return true;
-        }
-        boolean isRegionalAdmin = user.role().hasPermission(Permission.PROJECT_APPROVE)
-                || user.role().hasPermission(Permission.REGION_MANAGE);
-        if (!isRegionalAdmin) {
-            return false;
-        }
-        if (queryRepository.countProjectLocations(project.id()) == 0) {
-            return queryRepository.isVirtualProjectInDirectorJurisdiction(userId, project.id())
-                    || (project.managingRegion() != null
-                    && project.managingRegion().id() != null
-                    && queryRepository.isUserInRegion(userId, project.managingRegion().id()));
-        }
-        return queryRepository.hasJurisdictionOverAllProjectLocations(userId, project.id());
     }
 
     private List<Location> mapLocations(List<ProjectLocationCommand> locations) {

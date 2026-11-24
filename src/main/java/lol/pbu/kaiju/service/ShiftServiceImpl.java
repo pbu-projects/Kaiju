@@ -8,13 +8,10 @@ import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
-import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.ShiftRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Objects;
@@ -28,19 +25,16 @@ public class ShiftServiceImpl implements ShiftService {
 
     private final ShiftRepository shiftRepository;
     private final ProjectRepository projectRepository;
-    private final UserRepository userRepository;
-    private final SecurityQueryRepository queryRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public ShiftServiceImpl(
             ShiftRepository shiftRepository,
             ProjectRepository projectRepository,
-            UserRepository userRepository,
-            SecurityQueryRepository queryRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.shiftRepository = shiftRepository;
         this.projectRepository = projectRepository;
-        this.userRepository = userRepository;
-        this.queryRepository = queryRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     @Override
@@ -78,7 +72,7 @@ public class ShiftServiceImpl implements ShiftService {
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
         validateProjectForShift(project, shift);
-        verifyShiftAuthority(actorUserId, project);
+        projectSecurityService.authorizeShiftManagement(actorUserId, project);
 
         Shift toSave = new Shift(
                 null,
@@ -102,7 +96,7 @@ public class ShiftServiceImpl implements ShiftService {
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, SHIFT_NOT_FOUND));
 
         validateProjectForShift(existing.project(), shift);
-        verifyShiftAuthority(actorUserId, existing.project());
+        projectSecurityService.authorizeShiftManagement(actorUserId, existing.project());
 
         Shift safeUpdate = new Shift(
                 id,
@@ -122,7 +116,7 @@ public class ShiftServiceImpl implements ShiftService {
         Shift existing = shiftRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, SHIFT_NOT_FOUND));
 
-        verifyShiftAuthority(actorUserId, existing.project());
+        projectSecurityService.authorizeShiftManagement(actorUserId, existing.project());
 
         long count = shiftRepository.removeById(id);
         if (count == 0) {
@@ -164,16 +158,5 @@ public class ShiftServiceImpl implements ShiftService {
         }
         return !projectRepository.hasAnyProjectLocation(project.id())
                 || projectRepository.hasProjectLocation(project.id(), locationId);
-    }
-
-    private void verifyShiftAuthority(UUID actorUserId, Project project) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
-        if (actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
-            return;
-        }
-        if (project.organization() == null || !queryRepository.isOrgManager(actorUserId, project.organization().id())) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "Forbidden: Only organization managers or system administrators may manage shifts for this project");
-        }
     }
 }

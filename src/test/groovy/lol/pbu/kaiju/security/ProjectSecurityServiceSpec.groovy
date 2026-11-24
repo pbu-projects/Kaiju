@@ -1,17 +1,24 @@
 package lol.pbu.kaiju.security
 
+import io.micronaut.data.connection.jdbc.advice.DelegatingDataSource
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
+import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.SecurityQueryRepository
+import lol.pbu.kaiju.service.ShiftService
+import lol.pbu.kaiju.service.UserService
 import org.locationtech.jts.geom.Coordinate
 
+import javax.sql.DataSource
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 @MicronautTest(transactional = false)
@@ -22,6 +29,15 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
 
     @Inject
     SecurityQueryRepository queryRepository
+
+    @Inject
+    ShiftService shiftService
+
+    @Inject
+    UserService userService
+
+    @Inject
+    DataSource dataSource
 
     UUID orgId
     UUID projectId
@@ -803,5 +819,341 @@ class ProjectSecurityServiceSpec extends BaseControllerSpec {
             service.canAssignManagingRegion(regionalAgent.id(), org.id(), region.id()) == true
             service.canAssignManagingRegion(standardUser.id(), org.id(), region.id()) == false
         }
+    }
+
+    private void addProjectSponsor(UUID userId, UUID targetProjectId) {
+        DelegatingDataSource.unwrapDataSource(dataSource).connection.withCloseable { conn ->
+            conn.prepareStatement("INSERT INTO project_users (user_id, project_id, role) VALUES (?, ?, 'PROJECT_SPONSOR')").withCloseable { ps ->
+                ps.setObject(1, userId)
+                ps.setObject(2, targetProjectId)
+                ps.executeUpdate()
+            }
+        }
+    }
+
+    def "canViewProject and canViewShift enforce visibility for active and non-active projects"() {
+        given: "an org, a region, an active project, and a pending project with a location"
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def region = dataBuilder.region()
+                .withName("View Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coords))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("View Org")
+                .asPublic()
+                .verified()
+                .persist()
+        def loc = dataBuilder.location()
+                .withName("View Loc")
+                .withAddress("St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def activeProject = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(loc)
+                .persist()
+        def pendingProject = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Pending Proj")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .persist()
+
+        and: "users with various roles"
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def outsider = saveUser(UserRole.STANDARD_USER)
+        def orgMember = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgMember(orgMember, org).persist()
+        def sponsor = saveUser(UserRole.STANDARD_USER)
+        addProjectSponsor(sponsor.id(), pendingProject.id())
+        def regionalAgent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(regionalAgent, region).persist()
+
+        def activeShift = new Shift(
+                null,
+                activeProject,
+                true,
+                null,
+                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1),
+                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1).plusHours(2),
+                []
+        )
+        def pendingShift = new Shift(
+                null,
+                pendingProject,
+                true,
+                null,
+                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1),
+                OffsetDateTime.now(ZoneOffset.UTC).plusDays(1).plusHours(2),
+                []
+        )
+
+        expect:
+        verifyAll {
+            service.canViewProject(null, activeProject) == true
+            service.canViewProject(null, pendingProject) == false
+            service.canViewProject(outsider.id(), pendingProject) == false
+            service.canViewProject(admin.id(), pendingProject) == true
+            service.canViewProject(orgMember.id(), pendingProject) == true
+            service.canViewProject(sponsor.id(), pendingProject) == true
+            service.canViewProject(regionalAgent.id(), pendingProject) == true
+            service.canViewShift(null, activeShift) == true
+            service.canViewShift(outsider.id(), pendingShift) == false
+            service.canViewShift(sponsor.id(), pendingShift) == true
+        }
+    }
+
+    def "ShiftServiceImpl allows Regional Admins with jurisdiction and Project Sponsors while denying outsiders"() {
+        given: "two regions, an active project in Region A, and various users"
+        Coordinate[] coordsA = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        Coordinate[] coordsB = [
+                new Coordinate(-106.5, 41.5),
+                new Coordinate(-106.0, 41.5),
+                new Coordinate(-106.0, 41.0),
+                new Coordinate(-106.5, 41.0),
+                new Coordinate(-106.5, 41.5)
+        ]
+        def regionA = dataBuilder.region()
+                .withName("Shift Region A")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coordsA))
+                .persist()
+        def regionB = dataBuilder.region()
+                .withName("Shift Region B")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(coordsB))
+                .persist()
+        def org = dataBuilder.organization()
+                .withName("Shift Org")
+                .asPublic()
+                .verified()
+                .persist()
+        def locA = dataBuilder.location()
+                .withName("Shift Loc A")
+                .withAddress("123 Main", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Shift Auth Project")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(locA)
+                .persist()
+
+        def inRegionAgent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(inRegionAgent, regionA).persist()
+        def outOfRegionAgent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(outOfRegionAgent, regionB).persist()
+        def sponsor = saveUser(UserRole.STANDARD_USER)
+        addProjectSponsor(sponsor.id(), project.id())
+        def outsider = saveUser(UserRole.STANDARD_USER)
+
+        def start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        def end = start.plusHours(3)
+        def candidateShift = new Shift(null, project, false, locA, start, end, [])
+
+        when: "in-region agent creates a shift"
+        def createdByAgent = track(shiftService.createShift(candidateShift, inRegionAgent.id()))
+
+        then:
+        createdByAgent.id() != null
+
+        when: "project sponsor updates the shift"
+        def updatedShift = shiftService.updateShift(
+                createdByAgent.id(),
+                new Shift(createdByAgent.id(), project, false, locA, start.plusHours(1), end.plusHours(1), []),
+                sponsor.id()
+        )
+
+        then:
+        updatedShift.startTime() == start.plusHours(1)
+
+        when: "out-of-region agent tries to create a shift"
+        shiftService.createShift(candidateShift, outOfRegionAgent.id())
+
+        then:
+        HttpStatusException outEx = thrown()
+        outEx.status == HttpStatus.FORBIDDEN
+
+        when: "non-sponsor standard user tries to delete the shift"
+        shiftService.deleteShift(createdByAgent.id(), outsider.id())
+
+        then:
+        HttpStatusException outsiderEx = thrown()
+        outsiderEx.status == HttpStatus.FORBIDDEN
+
+        when: "sponsor deletes the shift"
+        shiftService.deleteShift(createdByAgent.id(), sponsor.id())
+
+        then:
+        noExceptionThrown()
+    }
+
+    def "UserService enforces authorizeSelfOrUserManager and authorizeUserManager"() {
+        given: "two standard users and a user manager"
+        def alice = saveUser(UserRole.STANDARD_USER)
+        def bob = saveUser(UserRole.STANDARD_USER)
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+
+        expect: "self and admin can read user, outsider cannot"
+        verifyAll {
+            userService.getCurrentUser(alice.id()).id() == alice.id()
+            userService.getUserById(alice.id(), alice.id()).isPresent()
+            userService.getUserById(alice.id(), admin.id()).isPresent()
+        }
+
+        when: "bob tries to read alice"
+        userService.getUserById(alice.id(), bob.id())
+
+        then:
+        HttpStatusException readEx = thrown()
+        readEx.status == HttpStatus.FORBIDDEN
+
+        when: "bob tries to create a user"
+        userService.createUser(new User(null, "new@example.com", UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC)), bob.id())
+
+        then:
+        HttpStatusException createEx = thrown()
+        createEx.status == HttpStatus.FORBIDDEN
+
+        when: "bob tries to update alice"
+        userService.updateUser(alice.id(), new User(alice.id(), "hacked@example.com", null, null), bob.id())
+
+        then:
+        HttpStatusException updateEx = thrown()
+        updateEx.status == HttpStatus.FORBIDDEN
+
+        when: "bob tries to delete alice"
+        userService.deleteUser(alice.id(), bob.id())
+
+        then:
+        HttpStatusException deleteEx = thrown()
+        deleteEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "ProjectSecurityService enforces org, region, location, and boundary authorization"() {
+        given: "regions, orgs, location, boundary, and users"
+        Coordinate[] coords = [
+                new Coordinate(-105.1, 39.8),
+                new Coordinate(-104.7, 39.8),
+                new Coordinate(-104.7, 39.6),
+                new Coordinate(-105.1, 39.6),
+                new Coordinate(-105.1, 39.8)
+        ]
+        def polygon = dataBuilder.geometryFactory.createPolygon(coords)
+        def region = dataBuilder.region().withName("Auth Region").withGeometry(polygon).persist()
+        def privateOrg = dataBuilder.organization().withName("Private Org").asPrivate().unverified().persist()
+        def publicOrg = dataBuilder.organization().withName("Public Org").asPublic().verified().persist()
+        def loc = dataBuilder.location()
+                .withName("Auth Loc")
+                .withAddress("123 Main", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def boundary = dataBuilder.boundary().withName("Auth Boundary").withGeometry(polygon).persist()
+
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def outsider = saveUser(UserRole.STANDARD_USER)
+        def orgManager = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgManager(orgManager, privateOrg).persist()
+        def orgAdmin = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgAdmin(orgAdmin, privateOrg).persist()
+        def director = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(director, region).persist()
+
+        def insidePoint = dataBuilder.geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
+        insidePoint.setSRID(4326)
+        def outsidePoint = dataBuilder.geometryFactory.createPoint(new Coordinate(-106.0, 41.0))
+        outsidePoint.setSRID(4326)
+
+        expect: "organization view and verification checks"
+        verifyAll {
+            service.canViewOrganization(null, publicOrg) == true
+            service.canViewOrganization(null, privateOrg) == false
+            service.canViewOrganization(outsider.id(), privateOrg) == false
+            service.canViewOrganization(orgManager.id(), privateOrg) == true
+            service.canViewOrganization(admin.id(), privateOrg) == true
+        }
+
+        when: "orgManager updates org, orgAdmin deletes org, admin verifies"
+        service.authorizeOrganizationUpdate(orgManager.id(), privateOrg.id())
+        service.authorizeOrganizationAdmin(orgAdmin.id(), privateOrg.id())
+        service.authorizeOrganizationVerification(admin.id())
+        service.authorizeRegionDirector(director.id(), region.id())
+        service.authorizeLocationCreate(director.id(), insidePoint)
+        service.authorizeLocationUpdate(director.id(), loc.id(), insidePoint)
+        service.authorizeLocationDelete(director.id(), loc.id())
+        service.authorizeBoundaryCreate(director.id(), polygon)
+        service.authorizeBoundaryUpdate(director.id(), boundary.id(), polygon)
+        service.authorizeBoundaryDelete(director.id(), boundary.id())
+
+        then:
+        noExceptionThrown()
+
+        when: "outsider attempts org update"
+        service.authorizeOrganizationUpdate(outsider.id(), privateOrg.id())
+
+        then:
+        HttpStatusException e1 = thrown()
+        e1.status == HttpStatus.FORBIDDEN
+
+        when: "orgManager (not orgAdmin) attempts org admin action"
+        service.authorizeOrganizationAdmin(orgManager.id(), privateOrg.id())
+
+        then:
+        HttpStatusException e2 = thrown()
+        e2.status == HttpStatus.FORBIDDEN
+
+        when: "outsider attempts org verification"
+        service.authorizeOrganizationVerification(outsider.id())
+
+        then:
+        HttpStatusException e3 = thrown()
+        e3.status == HttpStatus.FORBIDDEN
+
+        when: "outsider attempts region director action"
+        service.authorizeRegionDirector(outsider.id(), region.id())
+
+        then:
+        HttpStatusException e4 = thrown()
+        e4.status == HttpStatus.FORBIDDEN
+
+        when: "director attempts location create outside region"
+        service.authorizeLocationCreate(director.id(), outsidePoint)
+
+        then:
+        HttpStatusException e5 = thrown()
+        e5.status == HttpStatus.FORBIDDEN
+
+        when: "director attempts to delete missing location"
+        service.authorizeLocationDelete(director.id(), UUID.randomUUID())
+
+        then:
+        HttpStatusException e6 = thrown()
+        e6.status == HttpStatus.NOT_FOUND
+
+        when: "director attempts to delete missing boundary"
+        service.authorizeBoundaryDelete(director.id(), UUID.randomUUID())
+
+        then:
+        HttpStatusException e7 = thrown()
+        e7.status == HttpStatus.NOT_FOUND
     }
 }

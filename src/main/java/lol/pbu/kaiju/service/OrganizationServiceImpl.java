@@ -10,9 +10,8 @@ import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -55,18 +54,18 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     private final OrganizationRepository organizationRepository;
     private final UserRepository userRepository;
-    private final SecurityQueryRepository securityQueryRepository;
+    private final ProjectSecurityService projectSecurityService;
     private final AuditService auditService;
 
     public OrganizationServiceImpl(
             OrganizationRepository organizationRepository,
             UserRepository userRepository,
-            SecurityQueryRepository securityQueryRepository,
+            ProjectSecurityService projectSecurityService,
             AuditService auditService
     ) {
         this.organizationRepository = organizationRepository;
         this.userRepository = userRepository;
-        this.securityQueryRepository = securityQueryRepository;
+        this.projectSecurityService = projectSecurityService;
         this.auditService = auditService;
     }
 
@@ -112,13 +111,7 @@ public class OrganizationServiceImpl implements OrganizationService {
     @Transactional
     @NonNull
     public Organization updateOrganization(@NonNull UUID id, @NonNull Organization organization, @NonNull UUID actorUserId) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
-
-        boolean isGlobalAdmin = actor.role().hasPermission(Permission.SYSTEM_ADMIN);
-        if (!isGlobalAdmin && !securityQueryRepository.isOrgManager(actorUserId, id)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "Only global admins or organization managers can update this organization");
-        }
+        projectSecurityService.authorizeOrganizationUpdate(actorUserId, id);
 
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND));
@@ -148,7 +141,8 @@ public class OrganizationServiceImpl implements OrganizationService {
 
     @Override
     @Transactional
-    public void deleteOrganization(@NonNull UUID id) {
+    public void deleteOrganization(@NonNull UUID id, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeOrganizationAdmin(actorUserId, id);
         long count = organizationRepository.removeById(id);
         if (count == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND);
@@ -164,12 +158,7 @@ public class OrganizationServiceImpl implements OrganizationService {
             @Nullable String reason,
             @NonNull UUID actorUserId
     ) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, "Actor user not found"));
-
-        if (!actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "Only system admins can change organization verification status");
-        }
+        User actor = projectSecurityService.authorizeOrganizationVerification(actorUserId);
 
         Organization existing = organizationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, ORGANIZATION_NOT_FOUND));

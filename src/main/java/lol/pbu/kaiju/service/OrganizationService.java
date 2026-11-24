@@ -24,7 +24,7 @@ public interface OrganizationService {
     @NonNull
     Organization updateOrganization(@NonNull UUID id, @NonNull Organization organization, @NonNull UUID actorUserId);
 
-    void deleteOrganization(@NonNull UUID id);
+    void deleteOrganization(@NonNull UUID id, @NonNull UUID actorUserId);
 
     @NonNull
     Organization updateVerificationStatus(

@@ -21,12 +21,9 @@ import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.domain.Tag;
 import lol.pbu.kaiju.dto.CreateShiftCommand;
 import lol.pbu.kaiju.dto.UpdateShiftCommand;
-import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.LocationRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.TagRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.service.ShiftService;
 import lol.pbu.kaiju.util.PageableUtils;
 
@@ -49,21 +46,18 @@ public class ShiftController {
     private final ShiftService shiftService;
     private final LocationRepository locationRepository;
     private final TagRepository tagRepository;
-    private final UserRepository userRepository;
-    private final SecurityQueryRepository queryRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public ShiftController(
             ShiftService shiftService,
             LocationRepository locationRepository,
             TagRepository tagRepository,
-            UserRepository userRepository,
-            SecurityQueryRepository queryRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.shiftService = shiftService;
         this.locationRepository = locationRepository;
         this.tagRepository = tagRepository;
-        this.userRepository = userRepository;
-        this.queryRepository = queryRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable) {
@@ -74,7 +68,7 @@ public class ShiftController {
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable, @Nullable Principal principal) {
         CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
-        if (isGlobalAdmin(userId)) {
+        if (projectSecurityService.isSystemAdmin(userId)) {
             return shiftService.getShifts(resolved);
         }
         return shiftService.getActiveShifts(resolved);
@@ -87,7 +81,7 @@ public class ShiftController {
             return Optional.empty();
         }
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
-        if (isGlobalAdmin(userId) || canViewShift(shiftOpt.get(), userId)) {
+        if (projectSecurityService.canViewShift(userId, shiftOpt.get())) {
             return shiftOpt;
         }
         return Optional.empty();
@@ -171,29 +165,6 @@ public class ShiftController {
     public void deleteShift(@PathVariable UUID id, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
         shiftService.deleteShift(id, actorUserId);
-    }
-
-    private boolean isGlobalAdmin(@Nullable UUID userId) {
-        if (userId == null) {
-            return false;
-        }
-        return userRepository.findById(userId)
-                .map(user -> user.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-    }
-
-    private boolean canViewShift(Shift shift, @Nullable UUID userId) {
-        Project project = shift.project();
-        if (project == null || project.deletedAt() != null) {
-            return false;
-        }
-        if (project.status() == ProjectStatus.ACTIVE) {
-            return true;
-        }
-        return userId != null
-                && project.organization() != null
-                && project.organization().id() != null
-                && queryRepository.isAnyOrgMember(userId, project.organization().id());
     }
 
     private Location resolveLocation(UUID locationId) {

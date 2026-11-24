@@ -5,21 +5,30 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.domain.Project;
+import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.ProjectStatus;
+import lol.pbu.kaiju.model.VerificationStatus;
+import lol.pbu.kaiju.repository.BoundaryRepository;
+import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.repository.SecurityQueryRepository;
 import lol.pbu.kaiju.repository.UserRepository;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.MultiPoint;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.WKBWriter;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
 import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
+import static io.micronaut.http.HttpStatus.UNAUTHORIZED;
 import static lol.pbu.kaiju.model.ProjectStatus.ACTIVE;
 import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 
@@ -27,14 +36,29 @@ import static lol.pbu.kaiju.model.ProjectStatus.PENDING;
 public class ProjectSecurityService {
 
     private static final String USER_NOT_FOUND = "User not found";
+    private static final String ACTOR_NOT_FOUND = "Actor user not found";
+    private static final String OUTSIDE_LOCATION_REGION_ERROR =
+            "Forbidden: Only system admins or region directors for this area may modify this location";
+    private static final String OUTSIDE_BOUNDARY_REGION_ERROR =
+            "Forbidden: Only system admins or region directors for this area may modify this boundary";
 
     private final SecurityQueryRepository queryRepository;
     private final UserRepository userRepository;
+    private final LocationRepository locationRepository;
+    private final BoundaryRepository boundaryRepository;
     private final GeometryFactory geometryFactory;
 
-    public ProjectSecurityService(SecurityQueryRepository queryRepository, UserRepository userRepository, GeometryFactory geometryFactory) {
+    public ProjectSecurityService(
+            SecurityQueryRepository queryRepository,
+            UserRepository userRepository,
+            LocationRepository locationRepository,
+            BoundaryRepository boundaryRepository,
+            GeometryFactory geometryFactory
+    ) {
         this.queryRepository = queryRepository;
         this.userRepository = userRepository;
+        this.locationRepository = locationRepository;
+        this.boundaryRepository = boundaryRepository;
         this.geometryFactory = geometryFactory;
     }
 
@@ -263,5 +287,254 @@ public class ProjectSecurityService {
         if (!hasJurisdiction) {
             throw new HttpStatusException(FORBIDDEN, "You do not have geographic jurisdiction to approve this project.");
         }
+    }
+
+    public boolean isSystemAdmin(@Nullable UUID userId) {
+        return hasPermission(userId, Permission.SYSTEM_ADMIN);
+    }
+
+    /**
+     * Checks if a user can view a project.
+     * Active non-deleted projects are visible to everyone; non-active projects are visible to
+     * system admins, organization members, project sponsors, and regional admins with jurisdiction.
+     */
+    public boolean canViewProject(@Nullable UUID userId, @NonNull Project project) {
+        if (project.deletedAt() != null) {
+            return false;
+        }
+        if (project.status() == ACTIVE) {
+            return true;
+        }
+        if (userId == null) {
+            return false;
+        }
+        User user = userRepository.findById(userId).orElse(null);
+        if (user == null) {
+            return false;
+        }
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return true;
+        }
+        if (project.organization() != null
+                && project.organization().id() != null
+                && queryRepository.isAnyOrgMember(userId, project.organization().id())) {
+            return true;
+        }
+        if (project.id() != null && queryRepository.isProjectSponsor(userId, project.id())) {
+            return true;
+        }
+        if (!isRegionalAdmin(user)) {
+            return false;
+        }
+        if (hasProjectJurisdiction(user, project.id())) {
+            return true;
+        }
+        return project.id() != null
+                && queryRepository.countProjectLocations(project.id()) == 0
+                && project.managingRegion() != null
+                && project.managingRegion().id() != null
+                && queryRepository.isUserInRegion(userId, project.managingRegion().id());
+    }
+
+    /**
+     * Checks if a user can create, update, or delete shifts for a project.
+     * Permits system admins, org managers/admins, regional admins with jurisdiction, and project sponsors.
+     */
+    public boolean canManageShift(@NonNull UUID userId, @NonNull Project project) {
+        User actor = userRepository.findById(userId)
+                .orElseThrow(() -> new HttpStatusException(UNAUTHORIZED, ACTOR_NOT_FOUND));
+        if (actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return true;
+        }
+        if (project.organization() != null
+                && project.organization().id() != null
+                && queryRepository.isOrgManager(userId, project.organization().id())) {
+            return true;
+        }
+        if (isRegionalAdmin(actor) && hasProjectJurisdiction(actor, project.id())) {
+            return true;
+        }
+        return project.id() != null && queryRepository.isProjectSponsor(userId, project.id());
+    }
+
+    public void authorizeShiftManagement(@NonNull UUID userId, @NonNull Project project) {
+        if (!canManageShift(userId, project)) {
+            throw new HttpStatusException(FORBIDDEN, "Forbidden: You do not have permission to manage shifts for this project");
+        }
+    }
+
+    public boolean canViewShift(@Nullable UUID userId, @NonNull Shift shift) {
+        return shift.project() != null && canViewProject(userId, shift.project());
+    }
+
+    public boolean canViewOrganization(@Nullable UUID userId, @NonNull Organization organization) {
+        if (isPubliclyVisible(organization)) {
+            return true;
+        }
+        if (userId == null) {
+            return false;
+        }
+        return isSystemAdmin(userId)
+                || (organization.id() != null && queryRepository.isAnyOrgMember(userId, organization.id()));
+    }
+
+    public void authorizeOrganizationUpdate(@NonNull UUID userId, @NonNull UUID organizationId) {
+        User actor = userRepository.findById(userId)
+                .orElseThrow(() -> new HttpStatusException(UNAUTHORIZED, ACTOR_NOT_FOUND));
+        if (actor.role().hasPermission(Permission.SYSTEM_ADMIN)
+                || queryRepository.isOrgManager(userId, organizationId)) {
+            return;
+        }
+        throw new HttpStatusException(FORBIDDEN, "Only global admins or organization managers can update this organization");
+    }
+
+    public void authorizeOrganizationAdmin(@NonNull UUID userId, @NonNull UUID organizationId) {
+        authorizeOrganizationAdmin(userId, organizationId, false);
+    }
+
+    public void authorizeOrganizationAdmin(
+            @NonNull UUID userId,
+            @NonNull UUID organizationId,
+            boolean allowOrgManageUsers
+    ) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (allowOrgManageUsers && hasPermission(userId, Permission.ORG_MANAGE_USERS)) {
+            return;
+        }
+        if (queryRepository.isOrgAdmin(userId, organizationId)) {
+            return;
+        }
+        throw new HttpStatusException(
+                FORBIDDEN,
+                "Forbidden: Only organization admins or system administrators may manage this organization"
+        );
+    }
+
+    @NonNull
+    public User authorizeOrganizationVerification(@NonNull UUID userId) {
+        User actor = userRepository.findById(userId)
+                .orElseThrow(() -> new HttpStatusException(UNAUTHORIZED, ACTOR_NOT_FOUND));
+        if (!actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            throw new HttpStatusException(FORBIDDEN, "Only system admins can change organization verification status");
+        }
+        return actor;
+    }
+
+    public void authorizeRegionDirector(@NonNull UUID userId, @NonNull UUID regionId) {
+        if (isSystemAdmin(userId) || queryRepository.isRegionDirector(userId, regionId)) {
+            return;
+        }
+        throw new HttpStatusException(
+                FORBIDDEN,
+                "Forbidden: Only system admins or region directors of this region may manage region members"
+        );
+    }
+
+    public void authorizeLocationCreate(@NonNull UUID userId, @Nullable Point point) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (point == null || !locationRepository.isPointInDirectorRegion(userId, point)) {
+            throw new HttpStatusException(FORBIDDEN, OUTSIDE_LOCATION_REGION_ERROR);
+        }
+    }
+
+    public void authorizeLocationUpdate(@NonNull UUID userId, @NonNull UUID locationId, @Nullable Point point) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (!locationRepository.isLocationInDirectorRegion(userId, locationId)
+                || point == null
+                || !locationRepository.isPointInDirectorRegion(userId, point)) {
+            throw new HttpStatusException(FORBIDDEN, OUTSIDE_LOCATION_REGION_ERROR);
+        }
+    }
+
+    public void authorizeLocationDelete(@NonNull UUID userId, @NonNull UUID locationId) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (!locationRepository.existsById(locationId)) {
+            throw new HttpStatusException(NOT_FOUND, "Location not found");
+        }
+        if (!locationRepository.isLocationInDirectorRegion(userId, locationId)) {
+            throw new HttpStatusException(FORBIDDEN, OUTSIDE_LOCATION_REGION_ERROR);
+        }
+    }
+
+    public void authorizeBoundaryCreate(@NonNull UUID userId, @Nullable Geometry geom) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (geom == null || !boundaryRepository.isGeometryInDirectorRegion(userId, geom)) {
+            throw new HttpStatusException(FORBIDDEN, OUTSIDE_BOUNDARY_REGION_ERROR);
+        }
+    }
+
+    public void authorizeBoundaryUpdate(@NonNull UUID userId, @NonNull UUID boundaryId, @Nullable Geometry geom) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (!boundaryRepository.isBoundaryInDirectorRegion(userId, boundaryId)
+                || geom == null
+                || !boundaryRepository.isGeometryInDirectorRegion(userId, geom)) {
+            throw new HttpStatusException(FORBIDDEN, OUTSIDE_BOUNDARY_REGION_ERROR);
+        }
+    }
+
+    public void authorizeBoundaryDelete(@NonNull UUID userId, @NonNull UUID boundaryId) {
+        if (isSystemAdmin(userId)) {
+            return;
+        }
+        if (!boundaryRepository.existsById(boundaryId)) {
+            throw new HttpStatusException(NOT_FOUND, "Boundary not found");
+        }
+        if (!boundaryRepository.isBoundaryInDirectorRegion(userId, boundaryId)) {
+            throw new HttpStatusException(FORBIDDEN, OUTSIDE_BOUNDARY_REGION_ERROR);
+        }
+    }
+
+    public void authorizeSelfOrUserManager(@NonNull UUID actorUserId, @NonNull UUID targetUserId) {
+        if (actorUserId.equals(targetUserId) || hasUserManagePermission(actorUserId)) {
+            return;
+        }
+        throw new HttpStatusException(FORBIDDEN, "Forbidden: You cannot modify or delete another user's account");
+    }
+
+    public void authorizeUserManager(@NonNull UUID actorUserId) {
+        if (!hasUserManagePermission(actorUserId)) {
+            throw new HttpStatusException(FORBIDDEN, "Forbidden: Only administrators can assign elevated user roles");
+        }
+    }
+
+    private boolean isRegionalAdmin(User user) {
+        return user.role().hasPermission(Permission.PROJECT_APPROVE)
+                || user.role().hasPermission(Permission.REGION_MANAGE);
+    }
+
+    private boolean hasUserManagePermission(UUID userId) {
+        return userRepository.findById(userId)
+                .map(u -> u.role().hasPermission(Permission.SYSTEM_USER_MANAGE)
+                        || u.role().hasPermission(Permission.SYSTEM_ADMIN))
+                .orElse(false);
+    }
+
+    private boolean hasPermission(@Nullable UUID userId, Permission permission) {
+        if (userId == null) {
+            return false;
+        }
+        return userRepository.findById(userId)
+                .map(u -> u.role().hasPermission(permission))
+                .orElse(false);
+    }
+
+    private boolean isPubliclyVisible(Organization org) {
+        boolean notExpired = org.verificationExpiresAt() == null
+                || org.verificationExpiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC));
+        return Boolean.TRUE.equals(org.isPublic())
+                && org.verificationStatus() == VerificationStatus.VERIFIED
+                && notExpired;
     }
 }

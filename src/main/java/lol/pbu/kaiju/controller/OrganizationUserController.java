@@ -21,16 +21,13 @@ import lol.pbu.kaiju.domain.OrganizationUserId;
 import lol.pbu.kaiju.dto.CreateOrganizationUserCommand;
 import lol.pbu.kaiju.dto.UpdateOrganizationUserCommand;
 import lol.pbu.kaiju.repository.OrganizationUserRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
@@ -42,17 +39,14 @@ public class OrganizationUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final OrganizationUserRepository organizationUserRepository;
-    private final SecurityQueryRepository queryRepository;
-    private final UserRepository userRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public OrganizationUserController(
             OrganizationUserRepository organizationUserRepository,
-            SecurityQueryRepository queryRepository,
-            UserRepository userRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.organizationUserRepository = organizationUserRepository;
-        this.queryRepository = queryRepository;
-        this.userRepository = userRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -111,14 +105,6 @@ public class OrganizationUserController {
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
         UUID callerId = UUID.fromString(principal.getName());
-        boolean isSysAdmin = userRepository.findById(callerId)
-                .map(u -> u.role().hasPermission(Permission.SYSTEM_ADMIN) || u.role().hasPermission(Permission.ORG_MANAGE_USERS))
-                .orElse(false);
-        if (isSysAdmin) {
-            return;
-        }
-        if (!queryRepository.isOrgAdmin(callerId, organizationId)) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: Only organization admins or system administrators may manage organization members");
-        }
+        projectSecurityService.authorizeOrganizationAdmin(callerId, organizationId, true);
     }
 }

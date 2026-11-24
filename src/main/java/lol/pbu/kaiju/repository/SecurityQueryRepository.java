@@ -107,6 +107,14 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
 
     @Query("""
         SELECT EXISTS (
+            SELECT 1 FROM project_users 
+            WHERE user_id = :userId AND project_id = :projectId AND role = 'PROJECT_SPONSOR'
+        )
+    """)
+    boolean isProjectSponsor(UUID userId, UUID projectId);
+
+    @Query("""
+        SELECT EXISTS (
             SELECT 1 FROM organization_users 
             WHERE user_id = :userId AND organization_id = :organizationId AND role = 'ORG_ADMIN'
         )

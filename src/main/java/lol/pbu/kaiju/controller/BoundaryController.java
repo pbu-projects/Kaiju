@@ -19,8 +19,7 @@ import lol.pbu.kaiju.domain.Boundary;
 import lol.pbu.kaiju.dto.CreateBoundaryCommand;
 import lol.pbu.kaiju.dto.UpdateBoundaryCommand;
 import lol.pbu.kaiju.repository.BoundaryRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Geometry;
@@ -29,7 +28,6 @@ import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
@@ -45,21 +43,19 @@ public class BoundaryController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
     private static final String BOUNDARY_NOT_FOUND = "Boundary not found";
-    private static final String OUTSIDE_REGION_ERROR =
-            "Forbidden: Only system admins or region directors for this area may modify this boundary";
 
     private final BoundaryRepository boundaryRepository;
     private final SpatialMappingService spatialMappingService;
-    private final UserRepository userRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public BoundaryController(
             BoundaryRepository boundaryRepository,
             SpatialMappingService spatialMappingService,
-            UserRepository userRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.boundaryRepository = boundaryRepository;
         this.spatialMappingService = spatialMappingService;
-        this.userRepository = userRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     /**
@@ -96,7 +92,7 @@ public class BoundaryController {
     @Post
     public Boundary addBoundary(@Valid @Body CreateBoundaryCommand command, Principal principal) {
         Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
-        verifyGeometryJurisdiction(principal, polygon);
+        projectSecurityService.authorizeBoundaryCreate(UUID.fromString(principal.getName()), polygon);
         Boundary boundary = new Boundary(
                 null,
                 command.name(),
@@ -123,7 +119,7 @@ public class BoundaryController {
         boundaryRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND));
         Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
-        verifyBoundaryAndGeometryJurisdiction(principal, id, polygon);
+        projectSecurityService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
         Boundary boundary = new Boundary(
                 id,
                 command.name(),
@@ -142,45 +138,10 @@ public class BoundaryController {
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!isSystemAdmin(actorId)) {
-            if (!boundaryRepository.existsById(id)) {
-                throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
-            }
-            if (!boundaryRepository.isBoundaryInDirectorRegion(actorId, id)) {
-                throw new HttpStatusException(FORBIDDEN, OUTSIDE_REGION_ERROR);
-            }
-        }
+        projectSecurityService.authorizeBoundaryDelete(actorId, id);
         long deletedCount = boundaryRepository.removeById(id);
         if (deletedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
         }
-    }
-
-    private void verifyGeometryJurisdiction(Principal principal, Geometry geom) {
-        UUID actorId = UUID.fromString(principal.getName());
-        if (isSystemAdmin(actorId)) {
-            return;
-        }
-        if (geom == null || !boundaryRepository.isGeometryInDirectorRegion(actorId, geom)) {
-            throw new HttpStatusException(FORBIDDEN, OUTSIDE_REGION_ERROR);
-        }
-    }
-
-    private void verifyBoundaryAndGeometryJurisdiction(Principal principal, UUID boundaryId, Geometry geom) {
-        UUID actorId = UUID.fromString(principal.getName());
-        if (isSystemAdmin(actorId)) {
-            return;
-        }
-        if (!boundaryRepository.isBoundaryInDirectorRegion(actorId, boundaryId)
-                || geom == null
-                || !boundaryRepository.isGeometryInDirectorRegion(actorId, geom)) {
-            throw new HttpStatusException(FORBIDDEN, OUTSIDE_REGION_ERROR);
-        }
-    }
-
-    private boolean isSystemAdmin(UUID userId) {
-        return userRepository.findById(userId)
-                .map(user -> user.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
     }
 }
