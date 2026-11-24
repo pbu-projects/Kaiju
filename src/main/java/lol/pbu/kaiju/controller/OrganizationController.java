@@ -24,7 +24,6 @@ import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.dto.CreateOrganizationCommand;
 import lol.pbu.kaiju.dto.UpdateOrganizationCommand;
-import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.service.OrganizationService;
@@ -33,7 +32,6 @@ import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -205,15 +203,11 @@ public class OrganizationController {
     @Post
     public Organization addOrganization(@Valid @Body CreateOrganizationCommand command, Principal principal) {
         UUID creatorUserId = UUID.fromString(principal.getName());
-        Organization organization = new Organization(
-                null,
+        Organization organization = Organization.forCreation(
                 command.name(),
                 command.websiteUrl(),
                 command.parentId(),
-                command.isPublic(),
-                VerificationStatus.UNVERIFIED,
-                null,
-                List.of()
+                command.isPublic()
         );
         return organizationService.createOrganization(organization, creatorUserId);
     }
@@ -229,15 +223,12 @@ public class OrganizationController {
      */
     @Put("/{id}")
     public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationCommand command, Principal principal) {
-        Organization candidate = new Organization(
+        Organization candidate = Organization.forUpdate(
                 id,
                 command.name(),
                 command.websiteUrl(),
                 command.parentId(),
-                command.isPublic(),
-                null,
-                null,
-                null
+                command.isPublic()
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return organizationService.updateOrganization(id, candidate, actorUserId);

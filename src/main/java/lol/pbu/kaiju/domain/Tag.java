@@ -21,6 +21,10 @@ public record Tag(
         @Size(min = 1, max = 50, message = "Tag name must be between 1 and 50 characters.")
         String name
 ) {
+    public static Tag forId(@NotNull UUID id) {
+        return new Tag(id, null);
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing tag ID and assign that to
      * the tag properties in this tag record.

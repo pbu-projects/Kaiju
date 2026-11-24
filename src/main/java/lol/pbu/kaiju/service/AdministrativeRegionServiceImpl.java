@@ -175,16 +175,14 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
         String stateCode = parent != null ? parent.stateCode() : null;
         String timeZone = parent != null ? parent.timeZone() : null;
 
-        AdministrativeRegion region = new AdministrativeRegion(
-                null,
+        AdministrativeRegion region = AdministrativeRegion.forCreation(
                 command.name(),
                 command.parentRegionId(),
                 polygon,
                 level,
                 countryCode,
                 stateCode,
-                timeZone,
-                null
+                timeZone
         );
         AdministrativeRegion saved = regionRepository.save(region);
 
@@ -219,16 +217,10 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
         }
 
-        AdministrativeRegion updated = new AdministrativeRegion(
-                id,
+        AdministrativeRegion updated = existing.withUpdatedDetails(
                 command.name(),
                 command.parentRegionId(),
-                polygon,
-                existing.level(),
-                existing.countryCode(),
-                existing.stateCode(),
-                existing.timeZone(),
-                existing.geoid()
+                polygon
         );
         AdministrativeRegion saved = regionRepository.update(updated);
 

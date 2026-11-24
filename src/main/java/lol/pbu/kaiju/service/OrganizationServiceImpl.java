@@ -94,14 +94,8 @@ public class OrganizationServiceImpl implements OrganizationService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Parent organization does not exist");
         }
 
-        Organization toSave = new Organization(
-                null,
-                organization.name(),
-                organization.websiteUrl(),
-                organization.parentId(),
-                organization.isPublic(),
+        Organization toSave = organization.withCreationDetails(
                 VerificationStatus.UNVERIFIED,
-                null,
                 organization.locations() != null ? organization.locations() : List.of()
         );
         return organizationRepository.save(toSave);
@@ -126,16 +120,7 @@ public class OrganizationServiceImpl implements OrganizationService {
             }
         }
 
-        Organization toUpdate = new Organization(
-                id,
-                organization.name(),
-                organization.websiteUrl(),
-                parentId,
-                organization.isPublic(),
-                existing.verificationStatus(),
-                existing.verificationExpiresAt(),
-                existing.locations()
-        );
+        Organization toUpdate = existing.withUpdatedDetails(organization, parentId);
         return organizationRepository.update(toUpdate);
     }
 
@@ -175,16 +160,7 @@ public class OrganizationServiceImpl implements OrganizationService {
             );
         }
 
-        Organization updated = new Organization(
-                existing.id(),
-                existing.name(),
-                existing.websiteUrl(),
-                existing.parentId(),
-                existing.isPublic(),
-                newStatus,
-                existing.verificationExpiresAt(),
-                existing.locations()
-        );
+        Organization updated = existing.withVerificationStatus(newStatus);
         Organization saved = organizationRepository.update(updated);
         auditService.recordOrganizationAudit(saved, actor, currentStatus.name(), newStatus.name(), reason);
         return saved;

@@ -94,39 +94,17 @@ public class ProjectServiceImpl implements ProjectService {
 
         AdministrativeRegion managingRegion = validateAndResolveManagingRegion(project, org.id(), actor);
 
-        Project transientProject = new Project(
-                null,
+        Project candidate = project.withCreationDetails(
                 org,
                 managingRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
                 requestedStatus,
                 OffsetDateTime.now(ZoneOffset.UTC),
-                null,
-                null,
                 domainLocations,
                 domainBoundaries
         );
 
-        ProjectStatus initialStatus = securityService.evaluateProjectCreationByUser(actor, transientProject);
-
-        Project toSave = new Project(
-                null,
-                org,
-                managingRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
-                initialStatus,
-                OffsetDateTime.now(ZoneOffset.UTC),
-                null,
-                null,
-                domainLocations,
-                domainBoundaries
-        );
-
-        Project saved = projectRepository.save(toSave);
+        ProjectStatus initialStatus = securityService.evaluateProjectCreationByUser(actor, candidate);
+        Project saved = projectRepository.save(candidate.withStatus(initialStatus));
         auditService.recordProjectAudit(saved, actor, AuditAction.CREATED);
         return saved;
     }
@@ -169,47 +147,28 @@ public class ProjectServiceImpl implements ProjectService {
         List<Location> domainLocations = project.locations() != null ? project.locations() : existingLocations;
         List<Boundary> domainBoundaries = project.boundaries() != null ? project.boundaries() : existingBoundaries;
 
-        Project transientProject = new Project(
-                id,
+        Project candidate = existing.withUpdatedDetails(
                 targetOrg,
                 targetRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
+                project,
                 project.status() != null ? project.status() : existing.status(),
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
                 domainLocations,
                 domainBoundaries
         );
 
         if (targetRegion != null && !domainLocations.isEmpty()
-                && !securityService.areAllLocationsInRegion(transientProject, targetRegion.id())) {
+                && !securityService.areAllLocationsInRegion(candidate, targetRegion.id())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
         }
 
         ProjectStatus newStatus = determineUpdatedStatus(
                 actor,
                 existing,
-                transientProject,
+                candidate,
                 project.status()
         );
 
-        Project updated = projectRepository.update(new Project(
-                id,
-                targetOrg,
-                targetRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
-                newStatus,
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
-                domainLocations,
-                domainBoundaries
-        ));
+        Project updated = projectRepository.update(candidate.withStatus(newStatus));
 
         auditService.recordProjectAudit(updated, actor, AuditAction.EDITED);
         return updated;
@@ -298,20 +257,9 @@ public class ProjectServiceImpl implements ProjectService {
         User actor = securityService.requireActor(actorUserId);
         Project existing = requireModifiableProject(id, actor, "You do not have permission to delete this project");
 
-        Project deleted = projectRepository.update(new Project(
-                existing.id(),
-                existing.organization(),
-                existing.managingRegion(),
-                existing.title(),
-                existing.description(),
-                existing.projectType(),
-                existing.status(),
-                existing.createdAt(),
-                OffsetDateTime.now(ZoneOffset.UTC),
-                actor,
-                existing.locations(),
-                existing.boundaries()
-        ));
+        Project deleted = projectRepository.update(
+                existing.withDeleted(OffsetDateTime.now(ZoneOffset.UTC), actor)
+        );
 
         auditService.recordProjectAudit(deleted, actor, AuditAction.EDITED);
     }
@@ -346,20 +294,7 @@ public class ProjectServiceImpl implements ProjectService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING or PENDING_UPDATE projects can be approved");
         }
 
-        Project approved = projectRepository.update(new Project(
-                existing.id(),
-                existing.organization(),
-                existing.managingRegion(),
-                existing.title(),
-                existing.description(),
-                existing.projectType(),
-                ProjectStatus.ACTIVE,
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
-                existing.locations(),
-                existing.boundaries()
-        ));
+        Project approved = projectRepository.update(existing.withStatus(ProjectStatus.ACTIVE));
 
         auditService.recordProjectAudit(approved, actor, AuditAction.APPROVED);
         return approved;
@@ -378,20 +313,7 @@ public class ProjectServiceImpl implements ProjectService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Cannot reject a project in " + existing.status() + " status");
         }
 
-        Project rejected = projectRepository.update(new Project(
-                existing.id(),
-                existing.organization(),
-                existing.managingRegion(),
-                existing.title(),
-                existing.description(),
-                existing.projectType(),
-                ProjectStatus.REJECTED,
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
-                existing.locations(),
-                existing.boundaries()
-        ));
+        Project rejected = projectRepository.update(existing.withStatus(ProjectStatus.REJECTED));
 
         auditService.recordProjectAudit(rejected, actor, AuditAction.REJECTED);
         return rejected;

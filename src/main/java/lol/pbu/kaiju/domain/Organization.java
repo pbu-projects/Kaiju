@@ -53,6 +53,47 @@ public record Organization(
         )
         List<Location> locations
 ) {
+    public static Organization forId(@NotNull UUID id) {
+        return new Organization(id, null, null, null, true, null, null, null);
+    }
+
+    public static Organization forCreation(
+            @NotNull String name,
+            @Nullable String websiteUrl,
+            @Nullable UUID parentId,
+            @NotNull Boolean isPublic
+    ) {
+        return new Organization(
+                null,
+                name,
+                websiteUrl,
+                parentId,
+                isPublic,
+                VerificationStatus.UNVERIFIED,
+                null,
+                List.of()
+        );
+    }
+
+    public static Organization forUpdate(
+            @NotNull UUID id,
+            @NotNull String name,
+            @Nullable String websiteUrl,
+            @Nullable UUID parentId,
+            @NotNull Boolean isPublic
+    ) {
+        return new Organization(
+                id,
+                name,
+                websiteUrl,
+                parentId,
+                isPublic,
+                null,
+                null,
+                null
+        );
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing organization ID and assign that to
      * the organization properties in this organization record.
@@ -68,6 +109,51 @@ public record Organization(
                 this.parentId(),
                 this.isPublic(),
                 this.verificationStatus(),
+                this.verificationExpiresAt(),
+                this.locations()
+        );
+    }
+
+    public Organization withCreationDetails(
+            @NotNull VerificationStatus newVerificationStatus,
+            @NotNull List<Location> newLocations
+    ) {
+        return new Organization(
+                null,
+                this.name(),
+                this.websiteUrl(),
+                this.parentId(),
+                this.isPublic(),
+                newVerificationStatus,
+                null,
+                newLocations
+        );
+    }
+
+    public Organization withUpdatedDetails(
+            @NotNull Organization source,
+            @Nullable UUID newParentId
+    ) {
+        return new Organization(
+                this.id(),
+                source.name(),
+                source.websiteUrl(),
+                newParentId,
+                source.isPublic(),
+                this.verificationStatus(),
+                this.verificationExpiresAt(),
+                this.locations()
+        );
+    }
+
+    public Organization withVerificationStatus(@NotNull VerificationStatus newStatus) {
+        return new Organization(
+                this.id(),
+                this.name(),
+                this.websiteUrl(),
+                this.parentId(),
+                this.isPublic(),
+                newStatus,
                 this.verificationExpiresAt(),
                 this.locations()
         );

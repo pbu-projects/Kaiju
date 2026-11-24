@@ -71,7 +71,7 @@ public class ShiftController {
 
     @Post
     public Shift addShift(@Valid @Body CreateShiftCommand command, Principal principal) {
-        Shift shift = new Shift(
+        Shift shift = Shift.forSubmission(
                 null,
                 stubProject(command.projectId()),
                 command.isVirtual(),
@@ -97,7 +97,7 @@ public class ShiftController {
      */
     @Put("/{id}")
     public Shift updateShift(@PathVariable UUID id, @Valid @Body UpdateShiftCommand command, Principal principal) {
-        Shift candidate = new Shift(
+        Shift candidate = Shift.forSubmission(
                 id,
                 null,
                 command.isVirtual(),
@@ -126,14 +126,14 @@ public class ShiftController {
     }
 
     private Project stubProject(UUID projectId) {
-        return new Project(projectId, null, null, null, null, null, null, null, null, null, null, null);
+        return Project.forId(projectId);
     }
 
     private Location stubLocation(@Nullable UUID locationId) {
         if (locationId == null) {
             return null;
         }
-        return new Location(locationId, null, null, null, null, null, null, null);
+        return Location.forId(locationId);
     }
 
     private List<Tag> stubTags(@Nullable List<UUID> tagIds) {
@@ -141,7 +141,7 @@ public class ShiftController {
             return List.of();
         }
         return tagIds.stream()
-                .map(id -> new Tag(id, null))
+                .map(Tag::forId)
                 .toList();
     }
 }

@@ -67,6 +67,35 @@ public record Location(
         this(id, name, addressLine, city, stateProvince, postalCode, countryCode, geom, null);
     }
 
+    public static Location forId(@NotNull UUID id) {
+        return new Location(id, null, null, null, null, null, null, null, null);
+    }
+
+    public static Location forCreation(
+            @NotNull String name,
+            @NotNull String addressLine,
+            @NotNull String city,
+            @Nullable String stateProvince,
+            @Nullable String postalCode,
+            @NotNull String countryCode,
+            @Nullable Point geom
+    ) {
+        return forCreation(name, addressLine, city, stateProvince, postalCode, countryCode, geom, null);
+    }
+
+    public static Location forCreation(
+            @NotNull String name,
+            @NotNull String addressLine,
+            @NotNull String city,
+            @Nullable String stateProvince,
+            @Nullable String postalCode,
+            @NotNull String countryCode,
+            @Nullable Point geom,
+            @Nullable String timezone
+    ) {
+        return new Location(null, name, addressLine, city, stateProvince, postalCode, countryCode, geom, timezone);
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing location ID and assign that to
      * the location properties in this location record.
@@ -85,6 +114,29 @@ public record Location(
                 this.countryCode(),
                 this.geom(),
                 this.timezone()
+        );
+    }
+
+    public Location withUpdatedDetails(
+            @NotNull String newName,
+            @NotNull String newAddressLine,
+            @NotNull String newCity,
+            @Nullable String newStateProvince,
+            @Nullable String newPostalCode,
+            @NotNull String newCountryCode,
+            @Nullable Point newGeom,
+            @Nullable String newTimezone
+    ) {
+        return new Location(
+                this.id(),
+                newName,
+                newAddressLine,
+                newCity,
+                newStateProvince,
+                newPostalCode,
+                newCountryCode,
+                newGeom,
+                newTimezone
         );
     }
 

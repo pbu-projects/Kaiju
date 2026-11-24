@@ -66,8 +66,7 @@ public class UserController {
     public User addUser(@Valid @Body CreateUserCommand command, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
         UserRole targetRole = command.role() != null ? command.role() : UserRole.STANDARD_USER;
-        User safeUser = new User(
-                null,
+        User safeUser = User.forCreation(
                 command.email(),
                 targetRole,
                 OffsetDateTime.now(ZoneOffset.UTC)
@@ -90,12 +89,7 @@ public class UserController {
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserCommand command, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
-        User candidate = new User(
-                id,
-                command.email(),
-                null,
-                null
-        );
+        User candidate = User.forEmailUpdate(id, command.email());
         return userService.updateUser(id, candidate, actorUserId);
     }
 

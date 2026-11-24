@@ -53,6 +53,32 @@ public record AdministrativeRegion(
         this(id, name, parentRegionId, geom, null, null, null, null, null);
     }
 
+    public static AdministrativeRegion forId(@NotNull UUID id) {
+        return new AdministrativeRegion(id, null, null, null);
+    }
+
+    public static AdministrativeRegion forCreation(
+            @NotNull String name,
+            @Nullable UUID parentRegionId,
+            @NotNull Geometry geom,
+            @Nullable Integer level,
+            @Nullable String countryCode,
+            @Nullable String stateCode,
+            @Nullable String timeZone
+    ) {
+        return new AdministrativeRegion(
+                null,
+                name,
+                parentRegionId,
+                geom,
+                level,
+                countryCode,
+                stateCode,
+                timeZone,
+                null
+        );
+    }
+
     @TypeDef(type = OBJECT, converter = JtsPolygonConverter.class)
     @Override
     public Geometry geom() {
@@ -65,6 +91,24 @@ public record AdministrativeRegion(
                 this.name(),
                 this.parentRegionId(),
                 this.geom(),
+                this.level(),
+                this.countryCode(),
+                this.stateCode(),
+                this.timeZone(),
+                this.geoid()
+        );
+    }
+
+    public AdministrativeRegion withUpdatedDetails(
+            @NotNull String newName,
+            @Nullable UUID newParentRegionId,
+            @NotNull Geometry newGeom
+    ) {
+        return new AdministrativeRegion(
+                this.id(),
+                newName,
+                newParentRegionId,
+                newGeom,
                 this.level(),
                 this.countryCode(),
                 this.stateCode(),
