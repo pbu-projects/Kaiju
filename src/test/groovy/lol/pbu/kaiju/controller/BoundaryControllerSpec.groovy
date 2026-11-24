@@ -331,6 +331,18 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         }
     }
 
+    def "UPDATE | should reject regional director updating non-existent boundary with 403 FORBIDDEN (no existence oracle)"() {
+        given: "an update command targeting a non-existent boundary ID"
+        def updateCommand = new UpdateBoundaryCommand("Missing Update", createDenverCoordinateDtos())
+
+        when: "a regional director attempts to update a non-existent boundary"
+        client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}", updateCommand)), Boundary)
+
+        then: "a 403 FORBIDDEN response is returned instead of 404"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     def "UPDATE | should reject standard user attempting PUT /boundaries/{id} with 403 FORBIDDEN"() {
         given: "an update command and target boundary ID"
         def updateCommand = new UpdateBoundaryCommand("Unauthorized Update", createCoordinateDtos())
@@ -416,6 +428,15 @@ class BoundaryControllerSpec extends BaseControllerSpec {
             !boundaryRepository.findById(id).isPresent()
             !boundaryRepository.existsById(id)
         }
+    }
+
+    def "DELETE | should reject regional director deleting non-existent boundary with 403 FORBIDDEN (no existence oracle)"() {
+        when: "a regional director attempts to delete a non-existent boundary"
+        client.exchange(asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}")))
+
+        then: "a 403 FORBIDDEN response is returned instead of 404"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "DELETE | should reject standard user attempting DELETE /boundaries/{id} with 403 FORBIDDEN"() {

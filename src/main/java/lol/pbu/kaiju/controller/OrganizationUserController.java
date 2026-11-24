@@ -62,9 +62,7 @@ public class OrganizationUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!actorId.equals(userId)) {
-            verifyOrgAdminAuthority(principal, organizationId);
-        }
+        projectSecurityService.authorizeOrganizationUserView(actorId, userId, organizationId);
         return organizationUserRepository.findById(new OrganizationUserId(userId, organizationId));
     }
 

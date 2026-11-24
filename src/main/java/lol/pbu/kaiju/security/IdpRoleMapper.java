@@ -5,12 +5,12 @@ import lol.pbu.kaiju.model.UserRole;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Translates upstream Identity Provider (IdP) group claims into internal application roles.
@@ -103,14 +103,9 @@ public class IdpRoleMapper {
 
     @NonNull
     private List<String> collectStrings(@NonNull Collection<?> collection) {
-        List<String> list = new ArrayList<>(collection.size());
-        for (Object item : collection) {
-            if (item instanceof String s) {
-                list.add(s);
-            } else if (item != null) {
-                list.add(item.toString());
-            }
-        }
-        return list;
+        return collection.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .toList();
     }
 }

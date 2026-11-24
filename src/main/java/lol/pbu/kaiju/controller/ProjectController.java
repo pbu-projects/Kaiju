@@ -74,10 +74,6 @@ public class ProjectController {
         this.projectSecurityService = projectSecurityService;
     }
 
-    public CursoredPage<Project> getProjects(@Nullable String title, @Nullable @Valid CursoredPageable pageable) {
-        return getProjects(title, pageable, null);
-    }
-
     @Secured(IS_ANONYMOUS)
     @Get
     public CursoredPage<Project> getProjects(

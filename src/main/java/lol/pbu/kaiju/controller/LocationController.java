@@ -110,10 +110,10 @@ public class LocationController {
             @Valid @Body UpdateLocationCommand command,
             Principal principal
     ) {
-        Location existing = locationRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND));
         Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
         projectSecurityService.authorizeLocationUpdate(UUID.fromString(principal.getName()), id, point);
+        Location existing = locationRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND));
         String timezone = resolveUpdatedTimezone(existing, point, command.timezone());
         Location location = new Location(
                 id,

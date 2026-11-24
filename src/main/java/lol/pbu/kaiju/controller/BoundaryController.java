@@ -116,10 +116,11 @@ public class BoundaryController {
             @Valid @Body UpdateBoundaryCommand command,
             Principal principal
     ) {
-        boundaryRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND));
         Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
         projectSecurityService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
+        if (!boundaryRepository.existsById(id)) {
+            throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
+        }
         Boundary boundary = new Boundary(
                 id,
                 command.name(),

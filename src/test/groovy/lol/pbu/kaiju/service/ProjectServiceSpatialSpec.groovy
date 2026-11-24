@@ -80,9 +80,9 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
         def org = dataBuilder.organization().withName("Denver Org").persist()
         dataBuilder.linkOrganizationToRegion(org, region)
 
-        and: "a user with region agent authority"
-        def agent = dataBuilder.user().asAgent().persist()
-        dataBuilder.regionUser().asRegionAgent(agent, region).persist()
+        and: "an org manager authorized for this org and region"
+        def manager = dataBuilder.user().asStandardUser().persist()
+        dataBuilder.organizationUser().asOrgManager(manager, org).persist()
 
         and: "a location outside the region (Boulder, CO: -105.27, 40.01)"
         def outsideLoc = dataBuilder.location()
@@ -101,7 +101,7 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
                 .build()
 
         when: "creating the project"
-        projectService.createProject(project, agent.id())
+        projectService.createProject(project, manager.id())
 
         then: "a BAD_REQUEST is thrown for locations not falling in managing region"
         def e = thrown(HttpStatusException)
@@ -127,8 +127,9 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
         def org = dataBuilder.organization().withName("Auth Org").persist()
         dataBuilder.linkOrganizationToRegion(org, region)
 
-        and: "a standard user without admin/manager roles"
-        def standardUser = dataBuilder.user().asStandardUser().persist()
+        and: "an org member without manager or regional admin roles"
+        def orgMember = dataBuilder.user().asStandardUser().persist()
+        dataBuilder.organizationUser().asOrgMember(orgMember, org).persist()
         def project = dataBuilder.project()
                 .forOrg(org)
                 .inRegion(region)
@@ -137,7 +138,7 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
                 .build()
 
         when: "creating the project"
-        projectService.createProject(project, standardUser.id())
+        projectService.createProject(project, orgMember.id())
 
         then: "a FORBIDDEN exception is thrown"
         def e = thrown(HttpStatusException)

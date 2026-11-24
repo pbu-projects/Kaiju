@@ -80,9 +80,7 @@ public class RegionUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!actorId.equals(userId)) {
-            verifyRegionDirectorAuthority(principal, regionId);
-        }
+        projectSecurityService.authorizeRegionUserView(actorId, userId, regionId);
         return regionUserRepository.findById(new RegionUserId(userId, regionId));
     }
 

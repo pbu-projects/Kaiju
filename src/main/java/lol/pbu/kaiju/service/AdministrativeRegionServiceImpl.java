@@ -137,12 +137,14 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@NonNull CursoredPageable pageable) {
         return regionRepository.findAll(pageable);
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public Optional<AdministrativeRegion> getAdministrativeRegionById(@NonNull UUID id) {
         return regionRepository.findById(id);
@@ -284,6 +286,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public Optional<RegionCoordinateResolution> resolveCoordinates(double lat, double lon) {
         if (Double.isNaN(lat) || Double.isNaN(lon) || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
@@ -360,12 +363,14 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public List<AdministrativeRegion> getStates() {
         return regionRepository.findByLevelOrderByNameAsc(1);
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public Optional<AdministrativeRegion> findState(@Nullable String state) {
         if (state == null || state.isBlank()) {
@@ -387,6 +392,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public List<AdministrativeRegion> getCounties(@Nullable String state) {
         if (state == null || state.isBlank()) {
@@ -398,6 +404,7 @@ public class AdministrativeRegionServiceImpl implements AdministrativeRegionServ
     }
 
     @Override
+    @Transactional(readOnly = true)
     @NonNull
     public List<AdministrativeRegion> getCities(@Nullable String state, @Nullable String county) {
         if (county != null && !county.isBlank()) {

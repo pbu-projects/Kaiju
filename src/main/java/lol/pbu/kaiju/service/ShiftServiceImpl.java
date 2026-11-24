@@ -6,14 +6,22 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.transaction.annotation.Transactional;
 import jakarta.inject.Singleton;
+import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
+import lol.pbu.kaiju.domain.Tag;
+import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.ProjectStatus;
+import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.repository.ShiftRepository;
+import lol.pbu.kaiju.repository.TagRepository;
+import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -25,15 +33,21 @@ public class ShiftServiceImpl implements ShiftService {
 
     private final ShiftRepository shiftRepository;
     private final ProjectRepository projectRepository;
+    private final LocationRepository locationRepository;
+    private final TagRepository tagRepository;
     private final ProjectSecurityService projectSecurityService;
 
     public ShiftServiceImpl(
             ShiftRepository shiftRepository,
             ProjectRepository projectRepository,
+            LocationRepository locationRepository,
+            TagRepository tagRepository,
             ProjectSecurityService projectSecurityService
     ) {
         this.shiftRepository = shiftRepository;
         this.projectRepository = projectRepository;
+        this.locationRepository = locationRepository;
+        this.tagRepository = tagRepository;
         this.projectSecurityService = projectSecurityService;
     }
 
@@ -55,33 +69,36 @@ public class ShiftServiceImpl implements ShiftService {
     @Transactional(readOnly = true)
     @NonNull
     public Optional<Shift> getShiftById(@NonNull UUID id) {
-        return shiftRepository.findById(id);
+        return shiftRepository.findByIdAndProjectDeletedAtIsNull(id);
     }
 
     @Override
     @Transactional
     @NonNull
     public Shift createShift(@NonNull Shift shift, @NonNull UUID actorUserId) {
-        validateShiftInvariants(shift);
+        User actor = projectSecurityService.requireActor(actorUserId);
 
         if (shift.project() == null || shift.project().id() == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Project is required");
         }
 
-        Project project = projectRepository.findByIdAndDeletedAtIsNull(shift.project().id())
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+        Project foundProject = projectRepository.findById(shift.project().id()).orElse(null);
+        Project project = requireAuthorizedProject(foundProject, actor, "Project not found");
 
+        validateShiftInvariants(shift);
         validateProjectForShift(project, shift);
-        projectSecurityService.authorizeShiftManagement(actorUserId, project);
+
+        Location location = resolveLocation(shift);
+        List<Tag> tags = resolveTags(shift.tags());
 
         Shift toSave = new Shift(
                 null,
                 project,
                 shift.isVirtual(),
-                shift.location(),
+                location,
                 shift.startTime(),
                 shift.endTime(),
-                shift.tags()
+                tags
         );
         return shiftRepository.save(toSave);
     }
@@ -90,22 +107,25 @@ public class ShiftServiceImpl implements ShiftService {
     @Transactional
     @NonNull
     public Shift updateShift(@NonNull UUID id, @NonNull Shift shift, @NonNull UUID actorUserId) {
+        User actor = projectSecurityService.requireActor(actorUserId);
+
+        Shift existing = shiftRepository.findById(id).orElse(null);
+        Project project = requireAuthorizedProject(existing != null ? existing.project() : null, actor, SHIFT_NOT_FOUND);
+
         validateShiftInvariants(shift);
+        validateProjectForShift(project, shift);
 
-        Shift existing = shiftRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, SHIFT_NOT_FOUND));
-
-        validateProjectForShift(existing.project(), shift);
-        projectSecurityService.authorizeShiftManagement(actorUserId, existing.project());
+        Location location = resolveLocation(shift);
+        List<Tag> tags = resolveTags(shift.tags());
 
         Shift safeUpdate = new Shift(
                 id,
-                existing.project(),
+                project,
                 shift.isVirtual(),
-                shift.location(),
+                location,
                 shift.startTime(),
                 shift.endTime(),
-                shift.tags()
+                tags
         );
         return shiftRepository.update(safeUpdate);
     }
@@ -113,15 +133,33 @@ public class ShiftServiceImpl implements ShiftService {
     @Override
     @Transactional
     public void deleteShift(@NonNull UUID id, @NonNull UUID actorUserId) {
-        Shift existing = shiftRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, SHIFT_NOT_FOUND));
+        User actor = projectSecurityService.requireActor(actorUserId);
 
-        projectSecurityService.authorizeShiftManagement(actorUserId, existing.project());
+        Shift existing = shiftRepository.findById(id).orElse(null);
+        requireAuthorizedProject(existing != null ? existing.project() : null, actor, SHIFT_NOT_FOUND);
 
         long count = shiftRepository.removeById(id);
         if (count == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, SHIFT_NOT_FOUND);
         }
+    }
+
+    private Project requireAuthorizedProject(
+            @Nullable Project project,
+            User actor,
+            String missingMessage
+    ) {
+        if (project == null) {
+            if (!actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+                throw new HttpStatusException(HttpStatus.FORBIDDEN, "Forbidden: You do not have permission to manage shifts for this project");
+            }
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, missingMessage);
+        }
+        projectSecurityService.authorizeShiftManagement(actor, project);
+        if (project.deletedAt() != null) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, missingMessage);
+        }
+        return project;
     }
 
     private void validateShiftInvariants(Shift shift) {
@@ -137,9 +175,6 @@ public class ShiftServiceImpl implements ShiftService {
     }
 
     private void validateProjectForShift(Project project, Shift shift) {
-        if (project == null || project.deletedAt() != null) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Project not found");
-        }
         if (project.status() != ProjectStatus.ACTIVE) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shifts can only be managed for ACTIVE projects");
         }
@@ -158,5 +193,33 @@ public class ShiftServiceImpl implements ShiftService {
         }
         return !projectRepository.hasAnyProjectLocation(project.id())
                 || projectRepository.hasProjectLocation(project.id(), locationId);
+    }
+
+    @Nullable
+    private Location resolveLocation(Shift shift) {
+        if (shift.isVirtual() || shift.location() == null) {
+            return null;
+        }
+        UUID locationId = shift.location().id();
+        if (locationId == null) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Location is required");
+        }
+        return locationRepository.findById(locationId)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Location not found"));
+    }
+
+    private List<Tag> resolveTags(@Nullable List<Tag> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> tagIds = tags.stream()
+                .map(Tag::id)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (tagIds.isEmpty()) {
+            return List.of();
+        }
+        return tagRepository.findByIdIn(tagIds);
     }
 }

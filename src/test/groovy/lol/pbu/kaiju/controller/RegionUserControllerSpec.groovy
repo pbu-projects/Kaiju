@@ -12,6 +12,7 @@ import lol.pbu.kaiju.domain.RegionUser
 import lol.pbu.kaiju.domain.RegionUserId
 import lol.pbu.kaiju.dto.CreateRegionUserCommand
 import lol.pbu.kaiju.dto.UpdateRegionUserCommand
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.RegionUserRole
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.RegionUserRepository
@@ -183,6 +184,82 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
     }
 
+    def "READ | should allow user to view their own region membership"() {
+        given: "a region agent assigned to Denver County"
+        UUID userId = TestPersonas.CONNIE_COUNTY_AGENT.id
+        UUID regionId = TestPersonas.DENVER_COUNTY_REGION_ID
+
+        when: "the agent requests their own region membership via HTTP GET"
+        def response = client.exchange(
+                asRegionAgent(HttpRequest.GET("${BASE_PATH}/${userId}/${regionId}"), TestPersonas.CONNIE_COUNTY_AGENT),
+                RegionUser
+        )
+        RegionUser result = response.body()
+
+        then: "200 OK is returned with her membership"
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.id().userId() == userId
+            result.id().regionId() == regionId
+            result.role() == RegionUserRole.REGION_AGENT
+        }
+    }
+
+    def "READ | should reject outsider, agent, and cross-region director viewing another user's region membership with 403 FORBIDDEN"() {
+        given: "a region user membership in Denver County"
+        UUID targetUserId = TestPersonas.DANIEL_COUNTY_DIRECTOR.id
+        UUID regionId = TestPersonas.DENVER_COUNTY_REGION_ID
+
+        when: "a standard user attempts to read the membership"
+        client.exchange(
+                asStandardUser(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.VICTOR_VOLUNTEER),
+                RegionUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def volErr = thrown(HttpClientResponseException)
+        volErr.status == HttpStatus.FORBIDDEN
+
+        when: "a region agent in the same region attempts to read the director's membership"
+        client.exchange(
+                asRegionAgent(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.CONNIE_COUNTY_AGENT),
+                RegionUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def agentErr = thrown(HttpClientResponseException)
+        agentErr.status == HttpStatus.FORBIDDEN
+
+        when: "a director from El Paso County attempts to read the Denver County membership"
+        client.exchange(
+                asRegionDirector(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.ETHAN_SIBLING_DIRECTOR),
+                RegionUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def crossRegionErr = thrown(HttpClientResponseException)
+        crossRegionErr.status == HttpStatus.FORBIDDEN
+    }
+
+    def "READ | should reject demoted standard user with stale REGION_DIRECTOR row viewing another user's region membership with 403 FORBIDDEN"() {
+        given: "a region with a demoted STANDARD_USER who still has a REGION_DIRECTOR row and a target member"
+        def demotedUser = dataBuilder.user().asStandardUser().withEmail("demoted-region-dir@example.com").persist()
+        def targetUser = dataBuilder.user().asStandardUser().withEmail("target-region-member@example.com").persist()
+        def region = dataBuilder.region().withName("Stale Region Director Test").persist()
+        dataBuilder.regionUser().asRegionDirector(demotedUser.id(), region.id()).persist()
+        dataBuilder.regionUser().asRegionAgent(targetUser.id(), region.id()).persist()
+
+        when: "the demoted user requests the target user's region membership via HTTP GET"
+        client.exchange(
+                asStandardUser(HttpRequest.GET("${BASE_PATH}/${targetUser.id()}/${region.id()}"), demotedUser.id().toString()),
+                RegionUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     def "READ | should return 404 for a non-existent composite ID"() {
         when: "a non-existent region user is requested via HTTP GET"
         client.exchange(asGlobalAdmin(HttpRequest.GET("/region-users/${UUID.randomUUID()}/${UUID.randomUUID()}")), RegionUser)
@@ -276,6 +353,23 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
+    def "UPDATE | should reject cross-region director attempting PUT /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
+        given: "a Denver County membership and an El Paso County director"
+        UUID targetUserId = TestPersonas.CONNIE_COUNTY_AGENT.id
+        UUID regionId = TestPersonas.DENVER_COUNTY_REGION_ID
+        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+
+        when: "the El Paso County director attempts to update the Denver County membership"
+        client.exchange(
+                asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${targetUserId}/${regionId}", command), TestPersonas.ETHAN_SIBLING_DIRECTOR),
+                RegionUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     def "UPDATE | should allow regional director with region:manage claim to update an existing region user role"() {
         given: "an existing region user association and regional director assigned to that region"
         def targetUser = dataBuilder.user().asStandardUser().withEmail("director-update-user@example.com").persist()
@@ -360,6 +454,21 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         client.exchange(asRegionAgent(HttpRequest.DELETE("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}")))
 
         then: "a 403 FORBIDDEN response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should reject cross-region director attempting DELETE /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
+        given: "a Denver County membership and an El Paso County director"
+        UUID targetUserId = TestPersonas.CONNIE_COUNTY_AGENT.id
+        UUID regionId = TestPersonas.DENVER_COUNTY_REGION_ID
+
+        when: "the El Paso County director attempts to delete the Denver County membership"
+        client.exchange(
+                asRegionDirector(HttpRequest.DELETE("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.ETHAN_SIBLING_DIRECTOR)
+        )
+
+        then: "403 Forbidden is thrown"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
     }

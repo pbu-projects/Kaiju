@@ -56,13 +56,6 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     @NonNull
-    public Optional<User> getUserById(@NonNull UUID id) {
-        return userRepository.findById(id);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    @NonNull
     public Optional<User> getUserById(@NonNull UUID id, @NonNull UUID actorUserId) {
         projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
         return userRepository.findById(id);
@@ -81,7 +74,8 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @NonNull
-    public User createUser(@NonNull User user) {
+    public User createUser(@NonNull User user, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeUserManager(actorUserId);
         String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
         User toSave = new User(
                 null,
@@ -95,15 +89,8 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @NonNull
-    public User createUser(@NonNull User user, @NonNull UUID actorUserId) {
-        projectSecurityService.authorizeUserManager(actorUserId);
-        return createUser(user);
-    }
-
-    @Override
-    @Transactional
-    @NonNull
-    public User updateUser(@NonNull UUID id, @NonNull User user) {
+    public User updateUser(@NonNull UUID id, @NonNull User user, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
 
@@ -120,33 +107,22 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @NonNull
-    public User updateUser(@NonNull UUID id, @NonNull User user, @NonNull UUID actorUserId) {
-        projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
-        return updateUser(id, user);
-    }
-
-    @Override
-    @Transactional
-    public void updateRole(@NonNull UUID id, @NonNull UserRole role) {
-        userRepository.findById(id)
+    public User updateRole(@NonNull UUID id, @NonNull UserRole role, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeSystemAdmin(actorUserId);
+        User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
         userRepository.updateRole(id, role);
-    }
-
-    @Override
-    @Transactional
-    public void deleteUser(@NonNull UUID id) {
-        long count = userRepository.removeById(id);
-        if (count == 0) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND);
-        }
+        return new User(existing.id(), existing.email(), role, existing.createdAt());
     }
 
     @Override
     @Transactional
     public void deleteUser(@NonNull UUID id, @NonNull UUID actorUserId) {
         projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
-        deleteUser(id);
+        long count = userRepository.removeById(id);
+        if (count == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND);
+        }
     }
 
     @Override
@@ -161,8 +137,7 @@ public class UserServiceImpl implements UserService {
         String canonicalEmail = canonicalizeEmail(email);
         return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
-                UserRole roleToAssign = initialRole != null ? initialRole : UserRole.STANDARD_USER;
-                User newUser = new User(null, canonicalEmail, roleToAssign, OffsetDateTime.now(ZoneOffset.UTC));
+                User newUser = new User(null, canonicalEmail, initialRole, OffsetDateTime.now(ZoneOffset.UTC));
                 return userRepository.save(newUser);
             } catch (Exception ex) {
                 if (isUniqueConstraintViolation(ex)) {

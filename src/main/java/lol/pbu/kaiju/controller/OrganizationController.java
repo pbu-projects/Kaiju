@@ -14,7 +14,6 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -38,7 +37,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
@@ -196,16 +194,12 @@ public class OrganizationController {
 
     @Get("/{id}")
     public Optional<Organization> getOrganization(@PathVariable UUID id, Principal principal) {
-        Optional<Organization> orgOpt = organizationService.getOrganizationById(id);
-        if (orgOpt.isEmpty()) {
-            return Optional.empty();
-        }
-        Organization org = orgOpt.get();
         UUID callerId = UUID.fromString(principal.getName());
-        if (!projectSecurityService.canViewOrganization(callerId, org)) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: You do not have permission to view this organization");
-        }
-        return Optional.of(org);
+        return organizationService.getOrganizationById(id)
+                .map(org -> {
+                    projectSecurityService.authorizeOrganizationView(callerId, org);
+                    return org;
+                });
     }
 
     @Post

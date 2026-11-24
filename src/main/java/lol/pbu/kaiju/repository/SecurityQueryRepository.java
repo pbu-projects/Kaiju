@@ -15,23 +15,6 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
 
     @Query("""
         SELECT EXISTS (
-            SELECT 1 FROM region_users 
-            WHERE user_id = :userId AND role = 'REGION_AGENT'
-        )
-    """)
-    boolean isRegionAgent(UUID userId);
-
-    @Query("""
-        SELECT EXISTS (
-            SELECT 1 FROM administrative_regions r
-            JOIN region_users ru ON ru.region_id = r.id
-            WHERE ru.user_id = :userId AND ST_Intersects(r.geom, ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326))
-        )
-    """)
-    boolean isPointInAgentAssignedRegion(UUID userId, double longitude, double latitude);
-
-    @Query("""
-        SELECT EXISTS (
             SELECT 1 FROM organizations 
             WHERE id = :organizationId AND verification_status = 'VERIFIED'
               AND (verification_expires_at IS NULL OR verification_expires_at > NOW())
@@ -54,15 +37,6 @@ public interface SecurityQueryRepository extends GenericRepository<User, UUID> {
         )
     """)
     boolean isAnyOrgMember(UUID userId, UUID organizationId);
-
-    @Query("""
-        SELECT EXISTS (
-            SELECT 1 FROM administrative_regions r
-            JOIN organization_regions or_reg ON or_reg.region_id = r.id
-            WHERE or_reg.organization_id = :organizationId AND ST_Intersects(r.geom, ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326))
-        )
-    """)
-    boolean isPointInOrgRegion(UUID organizationId, double longitude, double latitude);
 
     @Query("""
         SELECT NOT ST_IsEmpty(ST_GeomFromWKB(:wkb, 4326))
