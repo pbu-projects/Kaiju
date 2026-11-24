@@ -1,10 +1,24 @@
 package lol.pbu.kaiju.controller
 
+import io.micronaut.core.io.Writable
+import io.micronaut.data.model.CursoredPage
+import io.micronaut.data.model.CursoredPageable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.micronaut.views.ViewsRenderer
+import lol.pbu.kaiju.domain.AdministrativeRegion
+import lol.pbu.kaiju.domain.Location
+import lol.pbu.kaiju.domain.Organization
+import lol.pbu.kaiju.domain.Project
+import lol.pbu.kaiju.model.FeaturedProjectView
+import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.model.ProjectType
+import lol.pbu.kaiju.model.VerificationStatus
+import lol.pbu.kaiju.repository.ProjectRepository
+import spock.lang.Unroll
 
 @MicronautTest(transactional = false)
 class DiscoveryViewControllerSpec extends BaseControllerSpec {
@@ -126,5 +140,142 @@ class DiscoveryViewControllerSpec extends BaseControllerSpec {
             css != null
             css.contains("--action-primary: #4A2545")
         }
+    }
+
+    private FeaturedProjectView renderFeaturedProject(Project project) {
+        Map<String, Object> capturedModel = [:]
+        ViewsRenderer<Map<String, Object>, HttpRequest<?>> renderer = Mock(ViewsRenderer) {
+            render("index", _ as Map, _ as HttpRequest) >> { String view, Map<String, Object> model, HttpRequest<?> req ->
+                capturedModel.putAll(model)
+                return ({ Writer out -> } as Writable)
+            }
+        }
+        CursoredPage<Project> page = project == null
+                ? Mock(CursoredPage) { isEmpty() >> true; getContent() >> [] }
+                : Mock(CursoredPage) { isEmpty() >> false; getContent() >> [project] }
+        ProjectRepository repo = Mock(ProjectRepository) {
+            findByStatusAndDeletedAtIsNull(ProjectStatus.ACTIVE, _ as CursoredPageable) >> page
+        }
+        DiscoveryViewController controller = new DiscoveryViewController(renderer, repo)
+        HttpResponse<Writable> response = controller.index(HttpRequest.GET("/"))
+        assert response.status == HttpStatus.OK
+        return capturedModel.get("featuredProject") as FeaturedProjectView
+    }
+
+    private static Organization orgWith(String name, VerificationStatus status) {
+        return new Organization(UUID.randomUUID(), name, null, null, true, status, null, [])
+    }
+
+    private static Location locationWith(String name, String city, String stateProvince) {
+        return new Location(UUID.randomUUID(), name, "123 Main St", city, stateProvince, "80202", "US", null, null)
+    }
+
+    private static AdministrativeRegion regionWith(String name) {
+        return new AdministrativeRegion(UUID.randomUUID(), name, null, null)
+    }
+
+    private static Project projectWith(
+            Organization org,
+            AdministrativeRegion region,
+            ProjectType type,
+            List<Location> locations
+    ) {
+        return new Project(
+                UUID.randomUUID(),
+                org,
+                region,
+                "Community Pantry",
+                "Help pack and distribute weekly groceries.",
+                type,
+                ProjectStatus.ACTIVE,
+                null,
+                null,
+                null,
+                locations,
+                []
+        )
+    }
+
+    def "landing page handles empty active project results gracefully"() {
+        when: "no active projects exist"
+        FeaturedProjectView view = renderFeaturedProject(null)
+
+        then: "featuredProject is null"
+        view == null
+    }
+
+    @Unroll
+    def "landing page formats project type #projectType as '#expectedLabel'"(ProjectType projectType, String expectedLabel) {
+        given: "a project with the target project type"
+        Project project = projectWith(orgWith("Hope Kitchen", VerificationStatus.VERIFIED), null, projectType, [])
+
+        when: "rendering the landing page model"
+        FeaturedProjectView view = renderFeaturedProject(project)
+
+        then: "the project type label and verified status match"
+        verifyAll(view) {
+            id() == project.id()
+            title() == project.title()
+            description() == project.description()
+            projectTypeLabel() == expectedLabel
+            organizationName() == "Hope Kitchen"
+            verified()
+        }
+
+        where:
+        projectType           | expectedLabel
+        null                  | ""
+        ProjectType.STANDARD  | "Standard"
+        ProjectType.OPEN_DOOR | "Open Door"
+        ProjectType.REGIONAL  | "Regional"
+    }
+
+    def "landing page handles missing organization or missing organization name"() {
+        when: "rendering a project without an organization"
+        FeaturedProjectView noOrgView = renderFeaturedProject(projectWith(null, null, ProjectType.STANDARD, []))
+
+        and: "rendering a project whose organization has no name and is unverified"
+        FeaturedProjectView nullOrgNameView = renderFeaturedProject(
+                projectWith(orgWith(null, VerificationStatus.UNVERIFIED), null, ProjectType.STANDARD, [])
+        )
+
+        then: "organizationName defaults to empty string and verified is false"
+        verifyAll {
+            noOrgView.organizationName() == ""
+            !noOrgView.verified()
+            nullOrgNameView.organizationName() == ""
+            !nullOrgNameView.verified()
+        }
+    }
+
+    @Unroll
+    def "landing page formats location label for #caseName"(
+            String caseName,
+            List<Location> locations,
+            AdministrativeRegion region,
+            String expectedLabel
+    ) {
+        given: "a project with the given locations and managing region"
+        Project project = projectWith(orgWith("Metro Aid", VerificationStatus.VERIFIED), region, ProjectType.STANDARD, locations)
+
+        when: "rendering the landing page model"
+        FeaturedProjectView view = renderFeaturedProject(project)
+
+        then: "locationLabel matches the expected fallback"
+        view.locationLabel() == expectedLabel
+
+        where:
+        caseName                         | locations                                  | region                  | expectedLabel
+        "city and state"                 | [locationWith("Hub", "Denver", "CO")]      | regionWith("Colorado")  | "Denver, CO"
+        "city with null state"           | [locationWith("Hub", "Denver", null)]      | regionWith("Colorado")  | "Denver"
+        "city with blank state"          | [locationWith("Hub", "Denver", "   ")]     | regionWith("Colorado")  | "Denver"
+        "null city with location name"   | [locationWith("Main Hub", null, "CO")]     | regionWith("Colorado")  | "Main Hub"
+        "blank city with location name"  | [locationWith("Main Hub", "  ", "CO")]     | regionWith("Colorado")  | "Main Hub"
+        "null city and blank name"       | [locationWith("  ", null, "CO")]           | regionWith("Colorado")  | "Colorado"
+        "null city and null name"        | [locationWith(null, null, "CO")]           | regionWith("Colorado")  | "Colorado"
+        "null locations with region"     | null                                       | regionWith("Front Range") | "Front Range"
+        "empty locations with region"    | []                                         | regionWith("Front Range") | "Front Range"
+        "empty locations null region name" | []                                       | regionWith(null)        | ""
+        "empty locations and null region"  | []                                       | null                    | ""
     }
 }

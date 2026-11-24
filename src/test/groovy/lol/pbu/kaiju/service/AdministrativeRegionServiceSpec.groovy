@@ -1,15 +1,18 @@
 package lol.pbu.kaiju.service
 
+import io.micronaut.data.jdbc.runtime.JdbcOperations
 import io.micronaut.data.model.CursoredPageable
 import io.micronaut.data.model.Sort
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.serde.ObjectMapper
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CoveringRegion
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import lol.pbu.kaiju.dto.RegionCoordinateResolution
@@ -17,6 +20,7 @@ import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest
 import lol.pbu.kaiju.model.RegionAuditAction
 import lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
+import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.util.SpatialMappingService
 import org.locationtech.jts.geom.Polygon
 
@@ -926,6 +930,157 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         verifyAll {
             prRes.isPresent()
             prRes.get().state() == "PR"
+        }
+    }
+
+    def "RESOLVE & HIERARCHY | should ignore blank city, county, and timezone names and match prefix counties"() {
+        given: "regions with blank city, blank county, blank timezone, and a leading-space county name"
+        AdministrativeRegion state = createRegionWithMetadata("Test Blank State", 1, "TB", "   ", -85.0, 34.0, -84.0, 35.0)
+        createRegionWithMetadata("   ", 2, "TB", "   ", -84.9, 34.6, -84.1, 34.9)
+        createRegionWithMetadata("   ", 3, "TB", "   ", -84.8, 34.65, -84.2, 34.85)
+
+        Polygon countyPoly = spatialMappingService.toPolygon([
+                new Coordinates(-84.5, 34.1),
+                new Coordinates(-84.3, 34.1),
+                new Coordinates(-84.3, 34.3),
+                new Coordinates(-84.5, 34.3),
+                new Coordinates(-84.5, 34.1)
+        ])
+        AdministrativeRegion spacedCounty = regionRepository.save(new AdministrativeRegion(
+                null, "  Spacedville Region", state.id(), countyPoly, 2, "US", "TB", "America/New_York", "98001"
+        ))
+        track(spacedCounty)
+        AdministrativeRegion cityInSpaced = regionRepository.save(new AdministrativeRegion(
+                null, "Spaced City", spacedCounty.id(), countyPoly, 3, "US", "TB", "America/New_York", "9850001"
+        ))
+        track(cityInSpaced)
+
+        when: "resolving coordinates where city, county, and timezone are blank"
+        Optional<RegionCoordinateResolution> res = regionService.resolveCoordinates(34.75d, -84.5d)
+
+        then: "only non-blank state is populated while blank city, county, and timezone resolve to null"
+        verifyAll {
+            res.isPresent()
+            res.get().state() == "TB"
+            res.get().county() == null
+            res.get().city() == null
+            res.get().timeZone() == null
+        }
+
+        when: "finding a state by single-letter prefix when code lookup does not apply"
+        Optional<AdministrativeRegion> bySingleChar = regionService.findState("C")
+
+        and: "querying cities with blank state and normalized prefix county"
+        List<AdministrativeRegion> cities = regionService.getCities("   ", "Spaced")
+
+        then: "single-letter prefix finds a state and normalized county prefix finds the city"
+        verifyAll {
+            bySingleChar.isPresent()
+            cities.any { it.id() == cityInSpaced.id() }
+        }
+    }
+
+    def "UNIT | should handle null repository responses, concurrent delete race, null candidate names, and metadata IO errors"() {
+        given: "a DefaultAdministrativeRegionService with mocked dependencies"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        UserRepository mockUserRepo = Mock(UserRepository)
+        AuditService mockAudit = Mock(AuditService)
+        JdbcOperations mockJdbc = Mock(JdbcOperations)
+        ObjectMapper mockMapper = Mock(ObjectMapper)
+
+        DefaultAdministrativeRegionService unitService = new DefaultAdministrativeRegionService(
+                mockRegionRepo,
+                mockUserRepo,
+                spatialMappingService,
+                mockAudit,
+                mockJdbc,
+                mockMapper
+        )
+
+        UUID actorId = UUID.randomUUID()
+        UUID regionId = UUID.randomUUID()
+        User admin = dataBuilder.user().asAdmin().build().withId(actorId)
+        AdministrativeRegion region = new AdministrativeRegion(regionId, "Unit Region", null, null, 1, "US", "CO", null, null)
+
+        when: "deleteAdministrativeRegion finds the region but removeById returns 0"
+        mockUserRepo.findById(actorId) >> Optional.of(admin)
+        mockRegionRepo.findById(regionId) >> Optional.of(region)
+        mockMapper.writeValueAsString(_) >> '{"deletedName":"Unit Region"}'
+        mockRegionRepo.removeById(regionId) >> 0L
+        unitService.deleteAdministrativeRegion(regionId, actorId)
+
+        then: "404 Not Found is thrown"
+        HttpStatusException delEx = thrown()
+        delEx.status == HttpStatus.NOT_FOUND
+
+        when: "buildMetadata fails with IOException during deleteAdministrativeRegion"
+        ObjectMapper failingMapper = Mock(ObjectMapper) {
+            writeValueAsString(_) >> { throw new IOException("JSON write failed") }
+        }
+        DefaultAdministrativeRegionService failingMapperService = new DefaultAdministrativeRegionService(
+                mockRegionRepo,
+                mockUserRepo,
+                spatialMappingService,
+                mockAudit,
+                mockJdbc,
+                failingMapper
+        )
+        failingMapperService.deleteAdministrativeRegion(regionId, actorId)
+
+        then: "500 Internal Server Error is thrown"
+        HttpStatusException jsonEx = thrown()
+        jsonEx.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        when: "resolveCoordinates receives null list or regions with null fields"
+        mockRegionRepo.findCoveringRegions(39.0d, -105.0d) >> null
+        Optional<RegionCoordinateResolution> nullListRes = unitService.resolveCoordinates(39.0d, -105.0d)
+
+        mockRegionRepo.findCoveringRegions(40.0d, -105.0d) >> [
+                new CoveringRegion(UUID.randomUUID(), null, null, "US", null, null),
+                new CoveringRegion(UUID.randomUUID(), null, 3, "US", null, null),
+                new CoveringRegion(UUID.randomUUID(), "   ", 3, "US", null, null),
+                new CoveringRegion(UUID.randomUUID(), null, 2, "US", null, null),
+                new CoveringRegion(UUID.randomUUID(), "  ", 2, "US", null, null),
+                new CoveringRegion(UUID.randomUUID(), null, 1, "US", "  ", null),
+                new CoveringRegion(UUID.randomUUID(), "  ", 1, "US", "  ", "  ")
+        ]
+        Optional<RegionCoordinateResolution> nullFieldsRes = unitService.resolveCoordinates(40.0d, -105.0d)
+
+        then: "both return empty optional"
+        verifyAll {
+            nullListRes.isEmpty()
+            nullFieldsRes.isEmpty()
+        }
+
+        when: "getCities encounters a county with a null name, blank filters, and findState falls back to stateCode or name match"
+        mockRegionRepo.findByLevelOrderByNameAsc(2) >> [
+                new AdministrativeRegion(UUID.randomUUID(), null, null, null, 2, "US", "CO", null, null)
+        ]
+        List<AdministrativeRegion> nullCountyCities = unitService.getCities(null, "Denver")
+        mockRegionRepo.findByLevelOrderByNameAsc(3) >> []
+        List<AdministrativeRegion> blankFilterCities = unitService.getCities("   ", "   ")
+
+        mockRegionRepo.findCoveringRegions(41.0d, -105.0d) >> [
+                new CoveringRegion(UUID.randomUUID(), null, 1, "US", null, "America/Denver")
+        ]
+        Optional<RegionCoordinateResolution> tzOnlyRes = unitService.resolveCoordinates(41.0d, -105.0d)
+
+        mockRegionRepo.findFirstByLevelAndStateCodeIgnoreCase(1, "ZZ") >> Optional.empty()
+        mockRegionRepo.findByLevelOrderByNameAsc(1) >> [
+                new AdministrativeRegion(UUID.randomUUID(), null, null, null, 1, "US", null, null, null),
+                new AdministrativeRegion(UUID.randomUUID(), "Fallback State", null, null, 1, "US", "ZZ", null, null)
+        ]
+        Optional<AdministrativeRegion> fallbackByCode = unitService.findState("ZZ")
+        Optional<AdministrativeRegion> fallbackByName = unitService.findState("Fallback State")
+
+        then: "null names are safely skipped and fallback state matching works"
+        verifyAll {
+            nullCountyCities.isEmpty()
+            blankFilterCities.isEmpty()
+            tzOnlyRes.isPresent()
+            tzOnlyRes.get().timeZone() == "America/Denver"
+            fallbackByCode.isPresent()
+            fallbackByName.isPresent()
         }
     }
 }

@@ -379,6 +379,38 @@ class ShiftControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    def "READ | direct getShift works with null principal for active shift"() {
+        given: "an active shift ID"
+        UUID id = getAnyShiftId()
+
+        when: "getShift is called directly with a null principal"
+        Optional<Shift> found = shiftController.getShift(id, null)
+
+        then: "the active shift is returned"
+        verifyAll {
+            found.isPresent()
+            found.get().id() == id
+        }
+    }
+
+    def "CREATE | empty tagIds list creates shift with no tags"() {
+        given: "a project and a create shift request with an empty tag list"
+        def project = getRandomProject()
+        def start = OffsetDateTime.now().plusDays(1)
+        def end = start.plusHours(2)
+        def request = new CreateShiftRequest(project.id(), true, null, start, end, [])
+
+        when: "addShift is called directly with an empty tagIds list"
+        Shift saved = track(shiftController.addShift(request, createPrincipal(TestPersonas.SARAH_ADMIN.id)))
+
+        then: "the shift is created with an empty tags list"
+        verifyAll(saved) {
+            id() != null
+            tags() != null
+            tags().isEmpty()
+        }
+    }
+
     def "READ | should reject unauthenticated GET /shifts/{id} with 401 UNAUTHORIZED"() {
         given: "an existing shift ID"
         UUID id = getAnyShiftId()

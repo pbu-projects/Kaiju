@@ -27,14 +27,14 @@ class IdentityProviderRoleMapperSpec extends Specification {
         mapper.resolveRoleFromGroups([groupName]) == expectedRole
 
         where:
-        groupName                                 | expectedRole
-        IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS         | UserRole.GLOBAL_ADMIN
-        IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS      | UserRole.REGION_DIRECTOR
-        IdentityProviderRoleMapper.GROUP_REGION_AGENTS         | UserRole.REGION_AGENT
-        "Kaiju Org Admins"                        | UserRole.STANDARD_USER
-        "Kaiju Org Managers"                      | UserRole.STANDARD_USER
-        "Kaiju Standard Users"                    | UserRole.STANDARD_USER
-        "Arbitrary Group"                         | UserRole.STANDARD_USER
+        groupName                                         | expectedRole
+        IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS    | UserRole.GLOBAL_ADMIN
+        IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS | UserRole.REGION_DIRECTOR
+        IdentityProviderRoleMapper.GROUP_REGION_AGENTS    | UserRole.REGION_AGENT
+        "Kaiju Org Admins"                                | UserRole.STANDARD_USER
+        "Kaiju Org Managers"                              | UserRole.STANDARD_USER
+        "Kaiju Standard Users"                            | UserRole.STANDARD_USER
+        "Arbitrary Group"                                 | UserRole.STANDARD_USER
     }
 
     @Unroll
@@ -43,13 +43,13 @@ class IdentityProviderRoleMapperSpec extends Specification {
         mapper.resolveRoleFromGroups(groups) == expectedRole
 
         where:
-        groups                                                                                            | expectedRole
-        ["Kaiju Standard Users", IdentityProviderRoleMapper.GROUP_REGION_AGENTS]                                      | UserRole.REGION_AGENT
-        ["Kaiju Standard Users", IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS]                                   | UserRole.REGION_DIRECTOR
-        [IdentityProviderRoleMapper.GROUP_REGION_AGENTS, IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS]                         | UserRole.REGION_DIRECTOR
-        ["Kaiju Standard Users", IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS]                                       | UserRole.GLOBAL_ADMIN
-        [IdentityProviderRoleMapper.GROUP_REGION_AGENTS, IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS]                            | UserRole.GLOBAL_ADMIN
-        [IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS, IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS]                         | UserRole.GLOBAL_ADMIN
+        groups                                                                                                                                              | expectedRole
+        ["Kaiju Standard Users", IdentityProviderRoleMapper.GROUP_REGION_AGENTS]                                                                            | UserRole.REGION_AGENT
+        ["Kaiju Standard Users", IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS]                                                                         | UserRole.REGION_DIRECTOR
+        [IdentityProviderRoleMapper.GROUP_REGION_AGENTS, IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS]                                                 | UserRole.REGION_DIRECTOR
+        ["Kaiju Standard Users", IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS]                                                                            | UserRole.GLOBAL_ADMIN
+        [IdentityProviderRoleMapper.GROUP_REGION_AGENTS, IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS]                                                    | UserRole.GLOBAL_ADMIN
+        [IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS, IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS]                                                 | UserRole.GLOBAL_ADMIN
         [IdentityProviderRoleMapper.GROUP_REGION_AGENTS, IdentityProviderRoleMapper.GROUP_REGION_DIRECTORS, IdentityProviderRoleMapper.GROUP_GLOBAL_ADMINS] | UserRole.GLOBAL_ADMIN
     }
 

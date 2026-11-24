@@ -13,11 +13,19 @@ import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.validation.validator.Validator as MicronautValidator
 import jakarta.validation.Validator
 import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CreateOrganizationAuditLogRequest
 import lol.pbu.kaiju.dto.CreateOrganizationRequest
+import lol.pbu.kaiju.dto.CreateProjectAuditLogRequest
 import lol.pbu.kaiju.dto.CreateShiftRequest
 import lol.pbu.kaiju.dto.IngestBoundaryRequest
+import lol.pbu.kaiju.dto.ShiftTimeRange
+import lol.pbu.kaiju.dto.UpdateOrganizationAuditLogRequest
 import lol.pbu.kaiju.dto.UpdateOrganizationRequest
+import lol.pbu.kaiju.dto.UpdateProjectAuditLogRequest
 import lol.pbu.kaiju.dto.UpdateShiftRequest
+import lol.pbu.kaiju.dto.ValidShiftLocationValidator
+import lol.pbu.kaiju.dto.ValidTimeRangeValidator
+import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.model.JtsPointConverter
 import lol.pbu.kaiju.model.JtsPolygonConverter
 import lol.pbu.kaiju.serde.JtsGeometrySerde
@@ -448,5 +456,74 @@ class SpatialAndInputValidationSpec extends Specification {
         def ex = thrown(IllegalArgumentException)
         ex.message.contains("actorUserId must not be null")
         0 * regionService.applyIngestedBoundary(*_)
+    }
+
+    // --- Validator null-input and AuditLogRequest DTO tests ---
+
+    def "ValidTimeRangeValidator accepts null range and ranges with missing start or end time"() {
+        given:
+        ValidTimeRangeValidator rangeValidator = new ValidTimeRangeValidator()
+        OffsetDateTime sampleTime = OffsetDateTime.of(2026, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC)
+        ShiftTimeRange missingStart = [startTime: { null }, endTime: { sampleTime }] as ShiftTimeRange
+        ShiftTimeRange missingEnd = [startTime: { sampleTime }, endTime: { null }] as ShiftTimeRange
+
+        expect:
+        verifyAll {
+            rangeValidator.isValid(null, null)
+            rangeValidator.isValid(missingStart, null)
+            rangeValidator.isValid(missingEnd, null)
+        }
+    }
+
+    def "ValidShiftLocationValidator accepts null ShiftLocation"() {
+        given:
+        ValidShiftLocationValidator locationValidator = new ValidShiftLocationValidator()
+
+        expect:
+        locationValidator.isValid(null, null)
+    }
+
+    def "AuditLogRequest records construct cleanly and enforce validation rules"() {
+        given:
+        UUID orgId = UUID.randomUUID()
+        UUID projectId = UUID.randomUUID()
+        UUID actorId = UUID.randomUUID()
+
+        def createOrgReq = new CreateOrganizationAuditLogRequest(orgId, actorId, "UNVERIFIED", "VERIFIED", "Reviewed docs")
+        def createProjectReq = new CreateProjectAuditLogRequest(projectId, actorId, AuditAction.APPROVED)
+        def updateOrgReq = new UpdateOrganizationAuditLogRequest("VERIFIED", "SUSPENDED", "Expired")
+        def updateProjectReq = new UpdateProjectAuditLogRequest(AuditAction.EDITED)
+
+        def invalidCreateOrg = new CreateOrganizationAuditLogRequest(null, null, "", " ", null)
+        def invalidCreateProject = new CreateProjectAuditLogRequest(null, null, null)
+        def invalidUpdateOrg = new UpdateOrganizationAuditLogRequest("", " ", null)
+        def invalidUpdateProject = new UpdateProjectAuditLogRequest(null)
+
+        when:
+        def validResults = [
+                validator.validate(createOrgReq),
+                validator.validate(createProjectReq),
+                validator.validate(updateOrgReq),
+                validator.validate(updateProjectReq)
+        ]
+
+        then:
+        verifyAll {
+            validResults.every { it.isEmpty() }
+            createOrgReq.organizationId() == orgId
+            createOrgReq.actorId() == actorId
+            createOrgReq.previousStatus() == "UNVERIFIED"
+            createOrgReq.newStatus() == "VERIFIED"
+            createOrgReq.reason() == "Reviewed docs"
+            createProjectReq.projectId() == projectId
+            createProjectReq.action() == AuditAction.APPROVED
+            updateOrgReq.previousStatus() == "VERIFIED"
+            updateOrgReq.newStatus() == "SUSPENDED"
+            updateProjectReq.action() == AuditAction.EDITED
+            validator.validate(invalidCreateOrg).size() == 4
+            validator.validate(invalidCreateProject).size() == 3
+            validator.validate(invalidUpdateOrg).size() == 2
+            validator.validate(invalidUpdateProject).size() == 1
+        }
     }
 }

@@ -979,6 +979,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         and: "calling searchByName with Pageable.unpaged()"
         def resNameUnpaged = organizationController.searchByName("Paging Test Org", false, Pageable.unpaged())
 
+        and: "calling searchByName with oversized unsorted pageable above max size"
+        def oversizedUnsorted = Pageable.from(0, 500)
+        def resNameOversized = organizationController.searchByName("Paging Test Org", false, oversizedUnsorted)
+
         and: "calling searchByName with client-specified sort (which should be stripped to preserve native relevance order)"
         def sortedPageable = Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
         def resNameWithSort = organizationController.searchByName("Paging Test Org", false, sortedPageable)
@@ -1002,6 +1006,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             !resGetOrgsUnpaged.content.isEmpty()
             !resNameNullPageable.content.isEmpty()
             !resNameUnpaged.content.isEmpty()
+            !resNameOversized.content.isEmpty()
+            resNameOversized.pageable.size == 100
         }
 
         and: "searchByName with client DESC sort strips the client sort and maintains native relevance ASC tie-breaking"

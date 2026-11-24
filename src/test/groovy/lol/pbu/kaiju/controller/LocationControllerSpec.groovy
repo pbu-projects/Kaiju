@@ -8,7 +8,10 @@ import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.dto.CreateLocationRequest
 import lol.pbu.kaiju.dto.UpdateLocationRequest
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.repository.LocationRepository
+import lol.pbu.kaiju.security.AuthorizationService
+import lol.pbu.kaiju.util.SpatialMappingService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -29,6 +32,9 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     @Inject
     LocationController locationController
+
+    @Inject
+    AuthorizationService authorizationService
 
     @Shared
     Faker faker = new Faker()
@@ -552,6 +558,57 @@ class LocationControllerSpec extends BaseControllerSpec {
 
         then: "the fallback timezone is returned"
         result == "UTC"
+    }
+
+    def "UPDATE | applies fallback timezone when existing location had null timezone and coordinates stay the same"() {
+        given: "an existing location outside known boundaries with null timezone"
+        def createRequest = new CreateLocationRequest("London Null TZ ${faker.company().name()}", "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, createRequest)), Location).body())
+        assert created.timezone() == null
+
+        when: "updating the location with identical coordinates and an explicit timezone"
+        def updateRequest = new UpdateLocationRequest(
+                created.name(),
+                created.addressLine(),
+                created.city(),
+                created.stateProvince(),
+                created.postalCode(),
+                created.countryCode(),
+                -0.1276,
+                51.5072,
+                "Europe/London"
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
+        Location updated = response.body()
+
+        then: "the fallback timezone is applied"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.timezone() == "Europe/London"
+        }
+    }
+
+    def "UNIT | updateLocation resolves timezone when existing location has null geometry"() {
+        given: "a controller with a mocked repository returning a location with null geometry"
+        UUID locId = UUID.randomUUID()
+        Location existingNoGeom = new Location(locId, "Legacy Site", "1 Main St", "Denver", "CO", "80202", "US", null, "America/Denver")
+        LocationRepository mockRepo = Mock(LocationRepository) {
+            findById(locId) >> Optional.of(existingNoGeom)
+            findTimezoneByPoint(_ as Point) >> Optional.of("America/Chicago")
+            update(_ as Location) >> { Location loc -> loc }
+        }
+        LocationController controller = new LocationController(mockRepo, new SpatialMappingService(geometryFactory), authorizationService)
+        UpdateLocationRequest updateRequest = new UpdateLocationRequest("Legacy Site", "1 Main St", "Chicago", "IL", "60601", "US", -87.6298, 41.8781)
+
+        when: "updating the location as a global admin"
+        Location updated = controller.updateLocation(locId, updateRequest, createPrincipal(TestPersonas.SARAH_ADMIN.id))
+
+        then: "timezone is resolved from the new point instead of reading existing null geometry"
+        verifyAll(updated) {
+            id() == locId
+            timezone() == "America/Chicago"
+            geom() != null
+        }
     }
 
     def "UPDATE | should fail to update a non-existent location"() {

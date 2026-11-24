@@ -518,7 +518,7 @@ tasks.jacocoTestReport {
             classDirectories.files.map {
                 fileTree(it) {
                     exclude(
-                        "lol/pbu/kaiju/Application.class",
+                        "lol/pbu/Application.class",
                         "gg/jte/generated/**",
                         "**/*\$Introspection*",
                         "**/Serde*Deserializer*",

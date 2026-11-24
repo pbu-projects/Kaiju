@@ -9,7 +9,7 @@ import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
-import lol.pbu.kaiju.service.DefaultUserService
+import lol.pbu.kaiju.service.UserService
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -20,7 +20,7 @@ class AuthAndAccountEdgeCasesSpec extends Specification {
     AuthentikAuthenticationMapper mapper
 
     @Inject
-    DefaultUserService userService
+    UserService userService
 
     @Inject
     UserRepository userRepository

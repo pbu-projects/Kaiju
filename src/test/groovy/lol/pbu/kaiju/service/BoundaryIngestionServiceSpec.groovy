@@ -1056,6 +1056,280 @@ class BoundaryIngestionServiceSpec extends Specification {
         Double.POSITIVE_INFINITY | 0.0d
         0.0d                     | Double.POSITIVE_INFINITY
     }
+
+    @Unroll
+    def "should reject geometry containing out-of-bounds WGS84 coordinate: x=#x, y=#y"() {
+        given: "a serde returning a geometry with out-of-bounds coordinates on traversal"
+        double targetX = x
+        double targetY = y
+        JtsGeometrySerde outOfBoundsSerde = new JtsGeometrySerde() {
+            @Override
+            Geometry deserializeFromNode(JsonNode node) {
+                def gf = getGeometryFactory()
+                def ring = gf.createLinearRing([
+                        new Coordinate(-105.1, 39.7),
+                        new Coordinate(-104.9, 39.7),
+                        new Coordinate(-104.9, 39.8),
+                        new Coordinate(-105.1, 39.8),
+                        new Coordinate(-105.1, 39.7)
+                ] as Coordinate[])
+                return new NonFinitePolygon(ring, gf, targetX, targetY)
+            }
+        }
+        String validGeoJson = '''{
+            "type": "Polygon",
+            "coordinates": [[
+                [-105.1, 39.7],
+                [-104.9, 39.7],
+                [-104.9, 39.8],
+                [-105.1, 39.8],
+                [-105.1, 39.7]
+            ]]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(validGeoJson.getBytes("UTF-8")))
+        })
+        BoundaryIngestionService customService = new BoundaryIngestionService(
+                service.jdbcOperations,
+                objectMapper,
+                outOfBoundsSerde,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when:
+        customService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001))
+
+        then:
+        def ex = thrown(HttpStatusException)
+        verifyAll(ex) {
+            status == HttpStatus.BAD_REQUEST
+            message.contains("Coordinates out of valid WGS84 bounds")
+        }
+
+        where:
+        x      | y
+        -185.0d | 39.0d
+        185.0d  | 39.0d
+        -105.0d | -95.0d
+        -105.0d | 95.0d
+    }
+
+    def "should clamp negative antimeridian overshoot, handle fetchAndParseJson and parseAndValidateFeatureGeometry edge cases"() {
+        given: "a polygon with negative antimeridian overshoot -180.0000001"
+        String negativeOvershootGeoJson = '''{
+            "type": "Polygon",
+            "coordinates": [[
+                [-180.0000001, 51.5],
+                [-179.5, 51.5],
+                [-179.5, 52.0],
+                [-180.0000001, 52.0],
+                [-180.0000001, 51.5]
+            ]]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(negativeOvershootGeoJson.getBytes("UTF-8")))
+        })
+        UUID testRegionId = UUID.randomUUID()
+        executeSql("INSERT INTO administrative_regions (id, name, geom) VALUES (?, 'Negative Antimeridian Region', ST_GeographyFromText('POLYGON((-180.0 51.5, -179.5 51.5, -179.5 52.0, -180.0 52.0, -180.0 51.5))'))", testRegionId)
+
+        BoundaryIngestionService sixArgService = new BoundaryIngestionService(
+                null,
+                service.jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when: "ingesting polygon with negative antimeridian overshoot via 6-arg constructor"
+        IngestBoundaryResponse overshootRes = sixArgService.ingestBoundary(
+                testRegionId,
+                new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001)
+        )
+
+        then: "ingestion succeeds and clamps -180.0000001 to -180.0"
+        verifyAll(overshootRes) {
+            it != null
+            regionId() == testRegionId
+            name() == "Negative Antimeridian Region"
+            valid()
+        }
+        sixArgService.getJdbcOperations() === service.jdbcOperations
+
+        when: "calling fetchAndParseJson with null or blank URL"
+        sixArgService.fetchAndParseJson(null)
+
+        then:
+        HttpStatusException blankEx1 = thrown()
+        blankEx1.status == HttpStatus.BAD_REQUEST
+
+        when: "calling fetchAndParseJson with blank URL"
+        sixArgService.fetchAndParseJson("   ")
+
+        then:
+        HttpStatusException blankEx2 = thrown()
+        blankEx2.status == HttpStatus.BAD_REQUEST
+
+        when: "fetchAndParseJson receives invalid JSON"
+        stubClient.sendHandler = { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream("not-json".getBytes("UTF-8")))
+        }
+        sixArgService.fetchAndParseJson("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query")
+
+        then:
+        HttpStatusException invalidJsonEx = thrown()
+        invalidJsonEx.status == HttpStatus.BAD_REQUEST
+
+        when: "fetchAndParseJson receives a JSON array instead of an object"
+        stubClient.sendHandler = { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream("[1, 2, 3]".getBytes("UTF-8")))
+        }
+        sixArgService.fetchAndParseJson("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query")
+
+        then:
+        HttpStatusException arrayEx = thrown()
+        arrayEx.status == HttpStatus.BAD_REQUEST
+
+        when: "parseAndValidateFeatureGeometry receives null or non-object node or missing geometry"
+        sixArgService.parseAndValidateFeatureGeometry(null)
+
+        then:
+        HttpStatusException nullFeatureEx = thrown()
+        nullFeatureEx.status == HttpStatus.BAD_REQUEST
+
+        when: "parseAndValidateFeatureGeometry receives a non-object JSON node"
+        sixArgService.parseAndValidateFeatureGeometry(objectMapper.readValue("[1, 2]".getBytes("UTF-8"), JsonNode))
+
+        then:
+        HttpStatusException nonObjFeatureEx = thrown()
+        nonObjFeatureEx.status == HttpStatus.BAD_REQUEST
+
+        when: "parseAndValidateFeatureGeometry receives feature without geometry"
+        sixArgService.parseAndValidateFeatureGeometry(objectMapper.readValue('{"type": "Feature"}'.getBytes("UTF-8"), JsonNode))
+
+        then:
+        HttpStatusException missingGeomEx = thrown()
+        missingGeomEx.status == HttpStatus.BAD_REQUEST
+
+        when: "parseAndValidateFeatureGeometry receives feature with null geometry"
+        sixArgService.parseAndValidateFeatureGeometry(objectMapper.readValue('{"type": "Feature", "geometry": null}'.getBytes("UTF-8"), JsonNode))
+
+        then:
+        HttpStatusException nullGeomEx = thrown()
+        nullGeomEx.status == HttpStatus.BAD_REQUEST
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE id = ?", testRegionId)
+    }
+
+    def "should handle audited boundary ingestion null actor check and upsert error or invalid topology cases"() {
+        given: "an ingestion service wired to an AdministrativeRegionService"
+        AdministrativeRegionService mockRegionService = Mock(AdministrativeRegionService)
+        String validGeoJson = '''{
+            "type": "Polygon",
+            "coordinates": [[
+                [-105.1, 39.7],
+                [-104.9, 39.7],
+                [-104.9, 39.8],
+                [-105.1, 39.8],
+                [-105.1, 39.7]
+            ]]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(validGeoJson.getBytes("UTF-8")))
+        })
+        BoundaryIngestionService auditedService = new BoundaryIngestionService(
+                mockRegionService,
+                service.jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+
+        when: "ingestBoundary is called without actorUserId when administrativeRegionService is present"
+        auditedService.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001), null)
+
+        then:
+        thrown(IllegalArgumentException)
+
+        when: "ingestBoundary is called with actorUserId when administrativeRegionService is present"
+        UUID regionIdArg = UUID.randomUUID()
+        UUID actorIdArg = UUID.randomUUID()
+        IngestBoundaryResponse delegatedResp = new IngestBoundaryResponse(regionIdArg, "Delegated", 5, 5, "0.00%", true)
+        mockRegionService.applyIngestedBoundary(regionIdArg, _ as String, 0.001d, "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", actorIdArg) >> delegatedResp
+        IngestBoundaryResponse actualDelegated = auditedService.ingestBoundary(
+                regionIdArg,
+                new IngestBoundaryRequest("https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query", 0.001),
+                actorIdArg
+        )
+
+        then:
+        actualDelegated == delegatedResp
+
+        when: "upsertRegionByGeoid receives zero rows due to invalid topology"
+        PreparedStatement emptyStmt = Mock(PreparedStatement) {
+            executeQuery() >> Mock(ResultSet) { next() >> false }
+        }
+        Connection emptyConn = Mock(Connection) {
+            prepareStatement(_) >> emptyStmt
+        }
+        JdbcOperations emptyJdbc = Mock(JdbcOperations) {
+            execute(_) >> { args -> args[0].call(emptyConn) }
+        }
+        BoundaryIngestionService upsertEmptySvc = new BoundaryIngestionService(
+                emptyJdbc,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+        upsertEmptySvc.upsertRegionByGeoid(new BoundaryIngestionService.RegionUpsert(
+                "99", "Invalid", null, 1, "US", "ZZ", validGeoJson, 0.001d
+        ))
+
+        then:
+        HttpStatusException invalidRegionEx = thrown()
+        invalidRegionEx.status == HttpStatus.UNPROCESSABLE_ENTITY
+
+        when: "upsertPlaceByGeoid receives zero rows due to invalid topology"
+        upsertEmptySvc.upsertPlaceByGeoid("9900001", "Invalid Place", UUID.randomUUID(), "ZZ", validGeoJson, 0.001d)
+
+        then:
+        HttpStatusException invalidPlaceEx = thrown()
+        invalidPlaceEx.status == HttpStatus.UNPROCESSABLE_ENTITY
+
+        when: "upsertRegionByGeoid encounters a SQLException"
+        Connection sqlErrConn = Mock(Connection) {
+            prepareStatement(_) >> { throw new SQLException("Upsert region SQL error") }
+        }
+        JdbcOperations sqlErrJdbc = Mock(JdbcOperations) {
+            execute(_) >> { args -> args[0].call(sqlErrConn) }
+        }
+        BoundaryIngestionService upsertErrSvc = new BoundaryIngestionService(
+                sqlErrJdbc,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+        upsertErrSvc.upsertRegionByGeoid(new BoundaryIngestionService.RegionUpsert(
+                "99", "Error", null, 1, "US", "ZZ", validGeoJson, 0.001d
+        ))
+
+        then:
+        HttpStatusException sqlRegionEx = thrown()
+        sqlRegionEx.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        when: "upsertPlaceByGeoid encounters a SQLException"
+        upsertErrSvc.upsertPlaceByGeoid("9900001", "Error Place", UUID.randomUUID(), "ZZ", validGeoJson, 0.001d)
+
+        then:
+        HttpStatusException sqlPlaceEx = thrown()
+        sqlPlaceEx.status == HttpStatus.INTERNAL_SERVER_ERROR
+    }
 }
 
 class NonFinitePolygon extends Polygon {

@@ -166,7 +166,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     def "CREATE | should ensure child locations and boundaries have server-generated IDs (Issue #26 mass-assignment immunity)"() {
         given: "a project create request with child locations and boundaries"
         def org = getRandomOrganization()
-        def locCmd = new ProjectLocationRequest(
+        def locRequest = new ProjectLocationRequest(
                 "Mass Assign Loc",
                 "123 St",
                 "Denver",
@@ -176,7 +176,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 -104.9903,
                 39.7392
         )
-        def bndCmd = new ProjectBoundaryRequest(
+        def bndRequest = new ProjectBoundaryRequest(
                 "Mass Assign Bnd",
                 [
                         new Coordinates(-105.0, 39.0),
@@ -192,8 +192,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 "Description for mass assignment immunity test exceeding 20 chars.",
                 STANDARD,
                 DRAFT,
-                [locCmd],
-                [bndCmd]
+                [locRequest],
+                [bndRequest]
         )
 
         when: "submitting the project via HTTP POST"
@@ -1936,6 +1936,97 @@ class ProjectControllerSpec extends BaseControllerSpec {
             detailResponse.body() != null
             detailResponse.body()?.id() == project.id()
             searchResponse.status == HttpStatus.OK
+        }
+    }
+
+    def "READ | should handle blank title filter, public title filter, and non-active project visibility"() {
+        given: "an active project and a draft project"
+        def org = dataBuilder.organization().withName("Visibility Filter Org").asPublic().verified().persist()
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
+        def uniqueActiveTitle = "Active Filter ${faker.number().digits(6)}"
+        def activeProject = dataBuilder.project()
+                .forOrg(org)
+                .withTitle(uniqueActiveTitle)
+                .withDescription("Active project description with at least twenty chars.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .persist()
+        def draftProject = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("AAA Draft Hidden ${faker.number().digits(6)}")
+                .withDescription("Draft project description with at least twenty chars.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .persist()
+
+        when: "anonymous user queries /projects with a blank title"
+        def blankAnonUri = UriBuilder.of("/projects").queryParam("title", "   ").queryParam("size", 200).build().toString()
+        def blankAnonRes = client.exchange(HttpRequest.GET(blankAnonUri), Map)
+
+        and: "global admin queries /projects with a blank title"
+        def blankAdminRes = client.exchange(asGlobalAdmin(HttpRequest.GET(blankAnonUri)), Map)
+
+        and: "anonymous user queries /projects with an exact active title"
+        def titleAnonUri = UriBuilder.of("/projects").queryParam("title", uniqueActiveTitle).build().toString()
+        def titleAnonRes = client.exchange(HttpRequest.GET(titleAnonUri), Map)
+
+        and: "owning org manager views the non-active draft project"
+        def managerDraftRes = client.exchange(asOrgManager(HttpRequest.GET("/projects/${draftProject.id()}")), Project)
+
+        then: "blank titles fall back to unfiltered lists, title filter finds active project, and manager views draft"
+        verifyAll {
+            blankAnonRes.status == HttpStatus.OK
+            (blankAnonRes.body().content as List).any { it.id == activeProject.id().toString() }
+            blankAdminRes.status == HttpStatus.OK
+            (blankAdminRes.body().content as List).any { it.id == draftProject.id().toString() }
+            titleAnonRes.status == HttpStatus.OK
+            (titleAnonRes.body().content as List).collect { it.id } == [activeProject.id().toString()]
+            managerDraftRes.status == HttpStatus.OK
+            managerDraftRes.body().id() == draftProject.id()
+        }
+
+        when: "anonymous user requests the non-active draft project by ID"
+        client.exchange(HttpRequest.GET("/projects/${draftProject.id()}"), Project)
+
+        then: "404 Not Found is returned without revealing existence"
+        def anonDraftEx = thrown(HttpClientResponseException)
+        anonDraftEx.status == HttpStatus.NOT_FOUND
+
+        when: "unaffiliated user requests the non-active draft project by ID"
+        client.exchange(asVolunteer(HttpRequest.GET("/projects/${draftProject.id()}")), Project)
+
+        then: "403 Forbidden is returned"
+        def outsiderDraftEx = thrown(HttpClientResponseException)
+        outsiderDraftEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should accept null organizationId and null locations when updating a project"() {
+        given: "an existing draft project"
+        def org = getRandomOrganization()
+        def createRequest = createProjectRequest(org.id(), "Null Org Update Base", "Description with at least twenty characters here.", STANDARD, DRAFT, null, null, defaultBoundaries())
+        Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", createRequest)), Project).body())
+
+        and: "an update request with null organizationId and null locations"
+        def updateRequest = new UpdateProjectRequest(
+                null,
+                null,
+                "Updated Without Org Or Locations",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                null,
+                defaultBoundaries()
+        )
+
+        when: "updating via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
+        Project updated = response.body()
+
+        then: "the existing organization is preserved and title is updated"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.id() == saved.id()
+            updated.organization().id() == org.id()
+            updated.title() == "Updated Without Org Or Locations"
         }
     }
 }

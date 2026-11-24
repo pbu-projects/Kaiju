@@ -997,7 +997,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         deleteMissingEx.status == HttpStatus.UNAUTHORIZED
     }
 
-    def "UserService enforces authorizeSelfOrUserManager and authorizeUserManager"() {
+    def "DefaultUserService enforces authorizeSelfOrUserManager and authorizeUserManager"() {
         given: "two standard users and a user manager"
         def alice = saveUser(UserRole.STANDARD_USER)
         def bob = saveUser(UserRole.STANDARD_USER)
@@ -1849,5 +1849,123 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         then:
         HttpStatusException unsavedRegionEx = thrown()
         unsavedRegionEx.status == HttpStatus.FORBIDDEN
+    }
+
+    def "verified org managers and agents in assigned regions get active status while global admins handle admin guards"() {
+        given: "a region, verified and unverified orgs, and locations inside the region"
+        def polygon = denverBoxPolygon()
+        def region = dataBuilder.region().withName("Direct Active Region").withGeometry(polygon).persist()
+        def verifiedOrg = dataBuilder.organization().withName("Direct Active Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(verifiedOrg, region)
+        def unverifiedOrg = dataBuilder.organization().withName("Unverified Public Org").asPublic().unverified().persist()
+        dataBuilder.linkOrganizationToRegion(unverifiedOrg, region)
+        def privateVerifiedOrg = dataBuilder.organization().withName("Private Verified Org").asPrivate().verified().persist()
+
+        def loc = dataBuilder.location()
+                .withName("Denver Active Site")
+                .withAddress("123 Main St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def boundary = dataBuilder.boundary().withName("Direct Active Boundary").withGeometry(polygon).persist()
+
+        def admin = saveUser(UserRole.GLOBAL_ADMIN)
+        def orgManager = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgManager(orgManager, verifiedOrg).persist()
+        def verifiedMember = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgMember(verifiedMember, verifiedOrg).persist()
+        def unverifiedOrgManager = saveUser(UserRole.STANDARD_USER)
+        dataBuilder.organizationUser().asOrgManager(unverifiedOrgManager, unverifiedOrg).persist()
+        def agent = saveUser(UserRole.REGION_AGENT)
+        dataBuilder.regionUser().asRegionAgent(agent, region).persist()
+        def standardUser = saveUser(UserRole.STANDARD_USER)
+
+        def outsideLoc = dataBuilder.location()
+                .withName("Wyoming Out Site")
+                .withAddress("456 Far St", "Laramie", "WY", "82070", "US")
+                .atPoint(-106.2, 41.2)
+                .persist()
+
+        def activeByManagerProject = dataBuilder.project()
+                .forOrg(verifiedOrg)
+                .withTitle("Manager Active Project")
+                .withDescription("Physical project submitted by verified org manager.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .build()
+
+        def pendingOutsideByManagerProject = dataBuilder.project()
+                .forOrg(verifiedOrg)
+                .withTitle("Manager Outside Project")
+                .withDescription("Physical project outside org region.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(outsideLoc)
+                .build()
+
+        def activeByAgentProject = dataBuilder.project()
+                .forOrg(unverifiedOrg)
+                .withTitle("Agent Active Project")
+                .withDescription("Physical project submitted by region agent in assigned region.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .build()
+
+        def pendingByUnverifiedManagerProject = dataBuilder.project()
+                .forOrg(unverifiedOrg)
+                .withTitle("Unverified Org Manager Project")
+                .withDescription("Physical project by unverified org manager.")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.PENDING)
+                .atLocation(loc)
+                .build()
+
+        def insidePoint = dataBuilder.geometryFactory.createPoint(new Coordinate(-104.9903, 39.7392))
+        insidePoint.setSRID(4326)
+
+        expect: "creation status, shift management, and org visibility evaluate each role branch"
+        verifyAll {
+            service.evaluateProjectCreationByUser(orgManager.id(), activeByManagerProject) == ProjectStatus.ACTIVE
+            service.evaluateProjectCreationByUser(verifiedMember.id(), activeByManagerProject) == ProjectStatus.PENDING
+            service.evaluateProjectCreationByUser(orgManager.id(), pendingOutsideByManagerProject) == ProjectStatus.PENDING
+            service.evaluateProjectCreationByUser(agent.id(), activeByAgentProject) == ProjectStatus.ACTIVE
+            service.evaluateProjectCreationByUser(unverifiedOrgManager.id(), pendingByUnverifiedManagerProject) == ProjectStatus.PENDING
+            service.canManageShift(admin.id(), activeByManagerProject) == true
+            service.canViewOrganization(null, unverifiedOrg) == false
+            service.canViewOrganization(null, privateVerifiedOrg) == false
+        }
+
+        when: "global admin invokes admin guards for org, location, boundary, and users"
+        service.authorizeOrganizationAdmin(admin.id(), verifiedOrg.id())
+        service.authorizeLocationCreate(admin.id(), insidePoint)
+        service.authorizeLocationUpdate(admin.id(), loc.id(), insidePoint)
+        service.authorizeBoundaryCreate(admin.id(), polygon)
+        service.authorizeBoundaryUpdate(admin.id(), boundary.id(), polygon)
+        service.authorizeUserManager(admin.id())
+
+        then:
+        noExceptionThrown()
+
+        when: "standard user invokes location, boundary, and user manager guards"
+        service.authorizeLocationCreate(standardUser.id(), insidePoint)
+
+        then:
+        HttpStatusException locForbiddenEx = thrown()
+        locForbiddenEx.status == HttpStatus.FORBIDDEN
+
+        when: "standard user invokes boundary create guard"
+        service.authorizeBoundaryCreate(standardUser.id(), polygon)
+
+        then:
+        HttpStatusException bndForbiddenEx = thrown()
+        bndForbiddenEx.status == HttpStatus.FORBIDDEN
+
+        when: "standard user invokes user manager guard"
+        service.authorizeUserManager(standardUser.id())
+
+        then:
+        HttpStatusException userMgrForbiddenEx = thrown()
+        userMgrForbiddenEx.status == HttpStatus.FORBIDDEN
     }
 }

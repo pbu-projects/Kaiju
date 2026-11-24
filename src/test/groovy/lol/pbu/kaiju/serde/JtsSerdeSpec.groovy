@@ -2,10 +2,12 @@ package lol.pbu.kaiju.serde
 
 import io.micronaut.core.type.Argument
 import io.micronaut.json.JsonMapper
+import io.micronaut.json.tree.JsonNode
 import io.micronaut.serde.Decoder
 import io.micronaut.serde.Deserializer
 import io.micronaut.serde.Encoder
 import io.micronaut.serde.Serializer
+import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.locationtech.jts.geom.Coordinate
@@ -432,12 +434,92 @@ class JtsSerdeSpec extends Specification {
         "missing coordinates"         | '{"type":"Point"}'
         "non-array coordinates"       | '{"type":"Point","coordinates":"invalid"}'
         "empty polygon coordinates"   | '{"type":"Polygon","coordinates":[]}'
+        "empty polygon ring"          | '{"type":"Polygon","coordinates":[[]]}'
         "non-array shell"             | '{"type":"Polygon","coordinates":["invalid"]}'
         "non-array hole"              | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39],[-104,40],[-105,40],[-105,39]],"bad"]}'
+        "null hole"                   | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39],[-104,40],[-105,40],[-105,39]],null]}'
         "non-array multipolygon"      | '{"type":"MultiPolygon","coordinates":["bad"]}'
+        "null multipolygon member"    | '{"type":"MultiPolygon","coordinates":[null]}'
         "linear ring null coordinate" | '{"type":"Polygon","coordinates":[[[-105,39],null,[-104,40],[-105,39]]]}'
+        "coordinate not an array"     | '{"type":"Polygon","coordinates":[[[-105,39],"bad",[-104,40],[-105,39]]]}'
         "coordinate too small"        | '{"type":"Point","coordinates":[1]}'
         "coordinate not numbers"      | '{"type":"Point","coordinates":["a","b"]}'
         "linear ring too short"       | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39]]]}'
+    }
+
+    def "JtsGeometrySerde | handles null GeometryFactory, null JsonNode, and null elevation"() {
+        given: "a serde created with null GeometryFactory"
+        JtsGeometrySerde fallbackSerde = new JtsGeometrySerde(null)
+        JsonNode nullZPoint = jsonMapper.readValue('{"type":"Point","coordinates":[-105.0,39.0,null]}', JsonNode)
+
+        when: "deserializing null node, JsonNode.nullNode(), and point with null elevation"
+        Geometry nullResult = fallbackSerde.deserializeFromNode(null)
+        Geometry jsonNullResult = fallbackSerde.deserializeFromNode(JsonNode.nullNode())
+        Geometry pointResult = fallbackSerde.deserializeFromNode(nullZPoint)
+
+        then: "default factory is initialized, nulls return null, and null Z is ignored"
+        verifyAll {
+            fallbackSerde.geometryFactory.SRID == 4326
+            nullResult == null
+            jsonNullResult == null
+            pointResult instanceof Point
+            Double.isNaN(pointResult.coordinate.z)
+        }
+    }
+
+    def "JtsGeometrySerde | rejects polygons and multipolygons exceeding ring, member, or total vertex limits"() {
+        given: "an oversized polygon coordinates list, an oversized multipolygon list, and a two-ring polygon exceeding MAX_VERTICES"
+        List<JsonNode> tooManyRings = (0..10_000).collect { JsonNode.createArrayNode([]) }
+        JsonNode tooManyRingsPolygon = JsonNode.createObjectNode([
+                type       : JsonNode.createStringNode("Polygon"),
+                coordinates: JsonNode.createArrayNode(tooManyRings)
+        ])
+        JsonNode tooManyPolysMulti = JsonNode.createObjectNode([
+                type       : JsonNode.createStringNode("MultiPolygon"),
+                coordinates: JsonNode.createArrayNode(tooManyRings)
+        ])
+
+        List<JsonNode> shellRing = (0..<6_000).collect { int i ->
+            double angle = (2.0d * Math.PI * i) / 6_000.0d
+            JsonNode.createArrayNode([
+                    JsonNode.createNumberNode(-105.0d + Math.cos(angle) * 0.2d),
+                    JsonNode.createNumberNode(39.0d + Math.sin(angle) * 0.2d)
+            ])
+        }
+        List<JsonNode> holeRing = (0..<4_001).collect { int i ->
+            double angle = (2.0d * Math.PI * i) / 4_001.0d
+            JsonNode.createArrayNode([
+                    JsonNode.createNumberNode(-105.0d + Math.cos(angle) * 0.05d),
+                    JsonNode.createNumberNode(39.0d + Math.sin(angle) * 0.05d)
+            ])
+        }
+        JsonNode totalVerticesExceeded = JsonNode.createObjectNode([
+                type       : JsonNode.createStringNode("Polygon"),
+                coordinates: JsonNode.createArrayNode([
+                        JsonNode.createArrayNode(shellRing),
+                        JsonNode.createArrayNode(holeRing)
+                ])
+        ])
+
+        when: "deserializing polygon with more than 10000 rings"
+        geometrySerde.deserializeFromNode(tooManyRingsPolygon)
+
+        then:
+        def polyEx = thrown(SerdeException)
+        polyEx.message.contains("10000")
+
+        when: "deserializing multipolygon with more than 10000 members"
+        geometrySerde.deserializeFromNode(tooManyPolysMulti)
+
+        then:
+        def multiEx = thrown(SerdeException)
+        multiEx.message.contains("10000")
+
+        when: "deserializing multi-ring polygon whose cumulative vertices exceed 10000"
+        geometrySerde.deserializeFromNode(totalVerticesExceeded)
+
+        then:
+        def totalEx = thrown(SerdeException)
+        totalEx.message.contains("10000")
     }
 }

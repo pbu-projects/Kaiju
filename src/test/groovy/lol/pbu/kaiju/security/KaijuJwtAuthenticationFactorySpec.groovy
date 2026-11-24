@@ -171,6 +171,29 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         verifiedClaim << ["MISSING", null, false, "false", "FALSE", "unverified", "no", 0]
     }
 
+    def "createAuthentication | accepts string email_verified values like true with whitespace"() {
+        given: "a JWT where email_verified is a string true value"
+        String email = "jwt.string.verified@kaiju.local"
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("string-verified-user")
+                .claim("email", email)
+                .claim("email_verified", claimValue)
+                .build()
+        JWT token = new PlainJWT(claimsSet)
+
+        when: "the factory creates authentication"
+        def authOpt = factory.createAuthentication(token)
+
+        then: "authentication succeeds"
+        verifyAll {
+            authOpt.isPresent()
+            userRepository.findByEmail(email).isPresent()
+        }
+
+        where:
+        claimValue << ["true", " TRUE "]
+    }
+
     def "createAuthentication | should return empty when database lookup fails gracefully"() {
         given: "a factory with a user service that throws an exception"
         UserService failingUserService = Mock(UserService)

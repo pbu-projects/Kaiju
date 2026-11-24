@@ -230,10 +230,6 @@ public class BoundaryIngestionService {
         return jdbcOperations;
     }
 
-    public AdministrativeRegionService getAdministrativeRegionService() {
-        return administrativeRegionService;
-    }
-
     /**
      * Downloads boundary from authoritative Census Bureau endpoint, validates GeoJSON geometry,
      * simplifies geometry preserving topology, and updates administrative region in database.

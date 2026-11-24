@@ -9,8 +9,8 @@ Where this guide does not state a specific decision, follow the [Google Java Sty
 Name classes, methods, and files so anyone can tell what they do without opening them.
 
 * **No `Impl` suffixes:**
-  * Use `Default<Name>` when an interface is needed (for example, `DefaultUserService`, `DefaultShiftService`).
-  * When only one implementation exists and no interface is needed, use a single concrete `@Singleton` class (for example, `AuthorizationService`, `BoundaryIngestionService`).
+  * For new services with one implementation, use a concrete `@Singleton` class without an interface (for example, `AuthorizationService`, `BoundaryIngestionService`).
+  * Only add an interface and a `Default<Name>` class when you need multiple implementations or a clear test boundary. Existing `Default*Service` classes (such as `DefaultUserService` and `DefaultShiftService`) predate this rule and stay for their existing interfaces.
 * **No `Dto`, `Utils`, or `Helper` suffixes:**
   * Name read models and value records after what they represent (`Coordinates`, `CoveringRegion`).
   * Name HTTP request payloads `<Action><Entity>Request` and place them in `lol.pbu.kaiju.dto` (for example, `CreateUserRequest`, `UpdateUserRoleRequest`). Do not put request payloads in `model/` or name them `*Command`.

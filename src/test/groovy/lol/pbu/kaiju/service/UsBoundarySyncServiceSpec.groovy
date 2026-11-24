@@ -3,6 +3,7 @@ package lol.pbu.kaiju.service
 import io.micronaut.data.jdbc.runtime.JdbcOperations
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
+import io.micronaut.json.tree.JsonNode
 import io.micronaut.serde.ObjectMapper
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
@@ -14,9 +15,18 @@ import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.sql.Connection
+import java.sql.PreparedStatement
+import java.sql.SQLException
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 @MicronautTest(transactional = false)
 class UsBoundarySyncServiceSpec extends Specification {
@@ -635,6 +645,11 @@ class UsBoundarySyncServiceSpec extends Specification {
                 },
                 {
                     "type": "Feature",
+                    "properties": { "NAME": "Missing Geoid County" },
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
                     "properties": { "GEOID": "56098", "NAME": "Broken County" },
                     "geometry": null
                 }
@@ -650,6 +665,11 @@ class UsBoundarySyncServiceSpec extends Specification {
                 {
                     "type": "Feature",
                     "properties": { "GEOID": 12345, "NAME": "Numeric Geoid" },
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "5699998" },
                     "geometry": null
                 },
                 {
@@ -694,14 +714,14 @@ class UsBoundarySyncServiceSpec extends Specification {
         then: "incomplete features are skipped, geometry errors are counted, and the CDP is created"
         verifyAll(countyResult) {
             created() == 0
-            skipped() == 1
+            skipped() == 2
             failed() == 1
             errors().size() == 1
             errors()[0].startsWith("56098:")
         }
         verifyAll(placeResult) {
             created() == 1
-            skipped() == 2
+            skipped() == 3
             failed() == 1
             errors().size() == 1
             errors()[0].startsWith("5699999:")
@@ -721,5 +741,181 @@ class UsBoundarySyncServiceSpec extends Specification {
         then:
         def ex = thrown(HttpStatusException)
         ex.status == HttpStatus.NOT_FOUND
+    }
+
+    def "should handle trailing slash baseUrl, empty pages, blank properties, nested transfer limit, and audit log success"() {
+        given: "a sync service initialized with trailing slash baseUrl and an actor user in DB"
+        String page1 = '''{
+            "type": "FeatureCollection",
+            "exceededTransferLimit": "not-a-boolean",
+            "properties": { "exceededTransferLimit": true },
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": "not-an-object",
+                    "geometry": null
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "GEOID": "   ", "STATE": "08", "NAME": "   " },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]]]
+                    }
+                }
+            ]
+        }'''
+        String page2 = '''{
+            "type": "FeatureCollection",
+            "properties": { "exceededTransferLimit": "not-a-boolean" },
+            "features": []
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            String uri = req.uri().toString()
+            String body = uri.contains("resultOffset=0") ? page1 : page2
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+        })
+        BoundaryIngestionService ingestionService = new BoundaryIngestionService(
+                jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+        UsBoundarySyncService syncService = new UsBoundarySyncService(
+                ingestionService,
+                jdbcOperations,
+                objectMapper,
+                "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/",
+                80, 82, 28, 30
+        )
+
+        UUID actorId = UUID.randomUUID()
+        executeSql("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", actorId, "sync-actor-${actorId}@example.com".toString())
+
+        when: "syncStates runs across two pages with an actor user ID"
+        UsSyncResult result = syncService.syncStates(actorId)
+
+        then: "Colorado updates via STATE fallback, invalid feature is skipped, empty page stops pagination, and audit log succeeds"
+        verifyAll(result) {
+            stateCode() == "US"
+            level() == 1
+            updated() == 1
+            skipped() == 1
+            failed() == 0
+        }
+        String auditMeta = queryString(
+                "SELECT metadata::text FROM administrative_region_audit_logs WHERE actor_id = ? ORDER BY created_at DESC LIMIT 1",
+                actorId
+        )
+        auditMeta != null && auditMeta.contains("US")
+
+        cleanup:
+        executeSql("DELETE FROM administrative_region_audit_logs WHERE actor_id = ?", actorId)
+        executeSql("DELETE FROM users WHERE id = ?", actorId)
+    }
+
+    def "should handle state lookup SQLException, metadata IOException fallback, and concurrency guard contention"() {
+        given: "a state payload and mocked JDBC and ObjectMapper"
+        String emptyFeaturesPayload = '{"type": "FeatureCollection", "features": []}'
+        StubHttpClient fastClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8)))
+        })
+        PreparedStatement auditStmt = Mock(PreparedStatement) {
+            executeUpdate() >> 1
+        }
+
+        when: "requireStateRegionId encounters a SQLException"
+        Connection errConn = Mock(Connection) {
+            prepareStatement(_) >> { throw new SQLException("State lookup failed") }
+        }
+        JdbcOperations errJdbc = Mock(JdbcOperations) {
+            execute(_) >> { args -> args[0].call(errConn) }
+        }
+        UsBoundarySyncService errSyncService = new UsBoundarySyncService(
+                new BoundaryIngestionService(errJdbc, objectMapper, fastClient, "tigerweb.geo.census.gov", "/arcgis/rest/services/TIGERweb/"),
+                errJdbc,
+                objectMapper
+        )
+        errSyncService.syncStateCounties("CO", null)
+
+        then: "500 Internal Server Error is thrown"
+        HttpStatusException sqlEx = thrown()
+        verifyAll(sqlEx) {
+            status == HttpStatus.INTERNAL_SERVER_ERROR
+            message.contains("Failed looking up state region")
+        }
+
+        when: "objectMapper fails to serialize audit metadata during recordAuditLog"
+        ObjectMapper failingMapper = Mock(ObjectMapper) {
+            readValue(_ as byte[], _ as Class) >> objectMapper.readValue(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8), JsonNode)
+            writeValueAsString(_) >> { throw new IOException("Audit JSON failed") }
+        }
+        Connection okConn = Mock(Connection) {
+            prepareStatement(_) >> auditStmt
+        }
+        JdbcOperations okJdbc = Mock(JdbcOperations) {
+            execute(_) >> { args -> args[0].call(okConn) }
+        }
+        UsBoundarySyncService fallbackSyncService = new UsBoundarySyncService(
+                new BoundaryIngestionService(okJdbc, failingMapper, fastClient, "tigerweb.geo.census.gov", "/arcgis/rest/services/TIGERweb/"),
+                okJdbc,
+                failingMapper
+        )
+        UsSyncResult fallbackResult = fallbackSyncService.syncStates(UUID.randomUUID())
+
+        then: "audit log falls back to empty JSON object and succeeds"
+        1 * auditStmt.setString(3, "{}")
+        fallbackResult.stateCode() == "US"
+
+        when: "a sync is already running and another thread times out or gets interrupted"
+        CountDownLatch startedLatch = new CountDownLatch(1)
+        CountDownLatch releaseLatch = new CountDownLatch(1)
+        StubHttpClient blockingClient = new StubHttpClient(sendHandler: { req, handler ->
+            startedLatch.countDown()
+            releaseLatch.await(30, TimeUnit.SECONDS)
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService contendedService = buildSyncService(blockingClient)
+        def executor = Executors.newVirtualThreadPerTaskExecutor()
+        Future<UsSyncResult> holderFuture = null
+        HttpStatusException interruptedEx = null
+        HttpStatusException busyEx = null
+        try {
+            holderFuture = executor.submit({ -> contendedService.syncStates(null) })
+            assert startedLatch.await(5, TimeUnit.SECONDS)
+
+            Future<HttpStatusException> interruptedFuture = executor.submit({ ->
+                Thread.currentThread().interrupt()
+                try {
+                    contendedService.syncStates(null)
+                    return null
+                } catch (HttpStatusException ex) {
+                    return ex
+                }
+            })
+            interruptedEx = interruptedFuture.get(5, TimeUnit.SECONDS)
+
+            try {
+                contendedService.syncStates(null)
+            } catch (HttpStatusException ex) {
+                busyEx = ex
+            }
+        } finally {
+            releaseLatch.countDown()
+            try {
+                holderFuture?.get(5, TimeUnit.SECONDS)
+            } finally {
+                executor.close()
+            }
+        }
+
+        then: "interrupted caller receives 503 and timed-out caller receives 429"
+        verifyAll {
+            interruptedEx != null
+            interruptedEx.status == HttpStatus.SERVICE_UNAVAILABLE
+            busyEx != null
+            busyEx.status == HttpStatus.TOO_MANY_REQUESTS
+        }
     }
 }
