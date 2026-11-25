@@ -9,8 +9,8 @@ import io.micronaut.http.uri.UriBuilder
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Location
-import lol.pbu.kaiju.dto.CreateLocationCommand
-import lol.pbu.kaiju.dto.UpdateLocationCommand
+import lol.pbu.kaiju.dto.CreateLocationRequest
+import lol.pbu.kaiju.dto.UpdateLocationRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.repository.LocationRepository
@@ -274,8 +274,8 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
     }
 
     def "region director can create and update a location inside their region while standard user is blocked"() {
-        given: "valid create and update commands inside Denver County"
-        def createCommand = new CreateLocationCommand(
+        given: "valid create and update requests inside Denver County"
+        def createRequest = new CreateLocationRequest(
                 "Denver Director Center",
                 "1437 Bannock St",
                 "Denver",
@@ -288,7 +288,7 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
 
         when: "a region director creates the location inside their assigned region"
         HttpResponse<Location> createResponse = client.exchange(
-                asRegionDirector(HttpRequest.POST("/locations", createCommand)),
+                asRegionDirector(HttpRequest.POST("/locations", createRequest)),
                 Location
         )
         Location created = track(createResponse.body())
@@ -303,7 +303,7 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
         }
 
         when: "the same region director updates that location inside their assigned region"
-        def updateCommand = new UpdateLocationCommand(
+        def updateRequest = new UpdateLocationRequest(
                 "Denver Director Center Updated",
                 "1437 Bannock St",
                 "Denver",
@@ -314,7 +314,7 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
                 39.7400
         )
         HttpResponse<Location> updateResponse = client.exchange(
-                asRegionDirector(HttpRequest.PUT("/locations/${created.id()}", updateCommand)),
+                asRegionDirector(HttpRequest.PUT("/locations/${created.id()}", updateRequest)),
                 Location
         )
         Location updated = updateResponse.body()
@@ -331,7 +331,7 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
 
         when: "a standard user attempts to create a location"
         client.exchange(
-                asStandardUser(HttpRequest.POST("/locations", createCommand)),
+                asStandardUser(HttpRequest.POST("/locations", createRequest)),
                 Location
         )
 
@@ -341,7 +341,7 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
 
         when: "a standard user attempts to update the location"
         client.exchange(
-                asStandardUser(HttpRequest.PUT("/locations/${created.id()}", updateCommand)),
+                asStandardUser(HttpRequest.PUT("/locations/${created.id()}", updateRequest)),
                 Location
         )
 

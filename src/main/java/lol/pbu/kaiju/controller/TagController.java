@@ -17,11 +17,11 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Tag;
-import lol.pbu.kaiju.dto.CreateTagCommand;
-import lol.pbu.kaiju.dto.UpdateTagCommand;
+import lol.pbu.kaiju.dto.CreateTagRequest;
+import lol.pbu.kaiju.dto.UpdateTagRequest;
 import lol.pbu.kaiju.repository.TagRepository;
 import lol.pbu.kaiju.security.Permission;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -62,7 +62,7 @@ public class TagController {
      */
     @Get
     public CursoredPage<Tag> getTags(@Nullable @Valid CursoredPageable pageable) {
-        return tagRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return tagRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -80,13 +80,13 @@ public class TagController {
      * Creates a new tag.
      * Restricted to platform administrators and regional managers.
      *
-     * @param command the payload containing tag details
+     * @param request the payload containing tag details
      * @return the persisted tag
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
-    public Tag addTag(@Valid @Body CreateTagCommand command) {
-        return tagRepository.save(new Tag(null, command.name()));
+    public Tag addTag(@Valid @Body CreateTagRequest request) {
+        return tagRepository.save(new Tag(null, request.name()));
     }
 
     /**
@@ -95,15 +95,15 @@ public class TagController {
      * Throws 404 NOT_FOUND if the tag does not exist.
      *
      * @param id      the ID of the tag to update
-     * @param command the updated tag details
+     * @param request the updated tag details
      * @return the updated tag
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
-    public Tag updateTag(@PathVariable UUID id, @Valid @Body UpdateTagCommand command) {
+    public Tag updateTag(@PathVariable UUID id, @Valid @Body UpdateTagRequest request) {
         tagRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, TAG_NOT_FOUND));
-        return tagRepository.update(new Tag(id, command.name()));
+        return tagRepository.update(new Tag(id, request.name()));
     }
 
     /**

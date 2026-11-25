@@ -16,11 +16,11 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Boundary;
-import lol.pbu.kaiju.dto.CreateBoundaryCommand;
-import lol.pbu.kaiju.dto.UpdateBoundaryCommand;
+import lol.pbu.kaiju.dto.CreateBoundaryRequest;
+import lol.pbu.kaiju.dto.UpdateBoundaryRequest;
 import lol.pbu.kaiju.repository.BoundaryRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Geometry;
 
@@ -46,16 +46,16 @@ public class BoundaryController {
 
     private final BoundaryRepository boundaryRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public BoundaryController(
             BoundaryRepository boundaryRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.boundaryRepository = boundaryRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     /**
@@ -66,7 +66,7 @@ public class BoundaryController {
      */
     @Get
     public CursoredPage<Boundary> getBoundaries(@Nullable @Valid CursoredPageable pageable) {
-        return boundaryRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return boundaryRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -84,24 +84,24 @@ public class BoundaryController {
      * Creates a new boundary polygon.
      * Restricted to platform administrators and directors of an intersecting region.
      *
-     * @param command   the payload containing boundary name and polygon coordinates
+     * @param request   the payload containing boundary name and polygon coordinates
      * @param principal the authenticated caller
      * @return the persisted {@link Boundary}
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
-    public Boundary addBoundary(@Valid @Body CreateBoundaryCommand command, Principal principal) {
-        Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
-        projectSecurityService.authorizeBoundaryCreate(UUID.fromString(principal.getName()), polygon);
-        Boundary boundary = Boundary.forCreation(command.name(), polygon);
+    public Boundary addBoundary(@Valid @Body CreateBoundaryRequest request, Principal principal) {
+        Geometry polygon = spatialMappingService.toPolygon(request.coordinates());
+        authorizationService.authorizeBoundaryCreate(UUID.fromString(principal.getName()), polygon);
+        Boundary boundary = Boundary.forCreation(request.name(), polygon);
         return boundaryRepository.save(boundary);
     }
 
     /**
-     * Updates an existing boundary by its ID after validating that it exists and is within caller jurisdiction.
+     * Updates an existing boundary after checking caller permission and region access.
      *
      * @param id        the ID of the boundary to update
-     * @param command   the updated boundary details
+     * @param request   the updated boundary details
      * @param principal the authenticated caller
      * @return the updated boundary
      */
@@ -109,20 +109,20 @@ public class BoundaryController {
     @Put("/{id}")
     public Boundary updateBoundary(
             @PathVariable UUID id,
-            @Valid @Body UpdateBoundaryCommand command,
+            @Valid @Body UpdateBoundaryRequest request,
             Principal principal
     ) {
-        Geometry polygon = spatialMappingService.toPolygon(command.coordinates());
-        projectSecurityService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
+        Geometry polygon = spatialMappingService.toPolygon(request.coordinates());
+        authorizationService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
         if (!boundaryRepository.existsById(id)) {
             throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
         }
-        Boundary boundary = Boundary.forUpdate(id, command.name(), polygon);
+        Boundary boundary = Boundary.forUpdate(id, request.name(), polygon);
         return boundaryRepository.update(boundary);
     }
 
     /**
-     * Deletes a boundary by its ID after validating that it exists and is within caller jurisdiction.
+     * Deletes a boundary by its ID after checking caller permission and region access.
      *
      * @param id        the ID of the boundary to delete
      * @param principal the authenticated caller
@@ -131,7 +131,7 @@ public class BoundaryController {
     @Delete("/{id}")
     public void deleteBoundary(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeBoundaryDelete(actorId, id);
+        authorizationService.authorizeBoundaryDelete(actorId, id);
         long deletedCount = boundaryRepository.removeById(id);
         if (deletedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);

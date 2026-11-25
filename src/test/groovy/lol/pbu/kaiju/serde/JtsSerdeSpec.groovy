@@ -2,10 +2,12 @@ package lol.pbu.kaiju.serde
 
 import io.micronaut.core.type.Argument
 import io.micronaut.json.JsonMapper
+import io.micronaut.json.tree.JsonNode
 import io.micronaut.serde.Decoder
 import io.micronaut.serde.Deserializer
 import io.micronaut.serde.Encoder
 import io.micronaut.serde.Serializer
+import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.locationtech.jts.geom.Coordinate
@@ -19,6 +21,7 @@ import org.locationtech.jts.geom.Polygon
 import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 @MicronautTest
 class JtsSerdeSpec extends Specification {
@@ -196,10 +199,9 @@ class JtsSerdeSpec extends Specification {
 
     /********** Specialized Typed Serde Tests **********/
 
-    def "JtsPointSerde | should deserialize Point directly and reject non-Point"() {
-        given: "Point JSON and Polygon JSON"
+    def "JtsPointSerde | deserializes Point directly"() {
+        given: "Point JSON"
         String pointJson = '{"type":"Point","coordinates":[-105.0,39.0]}'
-        String polyJson = '{"type":"Polygon","coordinates":[[[-105.0,39.0],[-104.0,39.0],[-104.0,40.0],[-105.0,40.0],[-105.0,39.0]]]}'
 
         when: "deserializing Point"
         Point pt = jsonMapper.readValue(pointJson, Point)
@@ -209,6 +211,11 @@ class JtsSerdeSpec extends Specification {
             it != null
             x == -105.0
         }
+    }
+
+    def "JtsPointSerde | rejects non-Point JSON"() {
+        given: "Polygon JSON"
+        String polyJson = '{"type":"Polygon","coordinates":[[[-105.0,39.0],[-104.0,39.0],[-104.0,40.0],[-105.0,40.0],[-105.0,39.0]]]}'
 
         when: "deserializing Polygon into Point type"
         jsonMapper.readValue(polyJson, Point)
@@ -217,9 +224,8 @@ class JtsSerdeSpec extends Specification {
         thrown(IOException)
     }
 
-    def "JtsPolygonSerde | should deserialize Polygon directly and reject non-Polygon"() {
-        given: "Point JSON and Polygon JSON"
-        String pointJson = '{"type":"Point","coordinates":[-105.0,39.0]}'
+    def "JtsPolygonSerde | deserializes Polygon directly"() {
+        given: "Polygon JSON"
         String polyJson = '{"type":"Polygon","coordinates":[[[-105.0,39.0],[-104.0,39.0],[-104.0,40.0],[-105.0,40.0],[-105.0,39.0]]]}'
 
         when: "deserializing Polygon"
@@ -227,6 +233,11 @@ class JtsSerdeSpec extends Specification {
 
         then: "Polygon deserialization succeeds"
         poly != null
+    }
+
+    def "JtsPolygonSerde | rejects non-Polygon JSON"() {
+        given: "Point JSON"
+        String pointJson = '{"type":"Point","coordinates":[-105.0,39.0]}'
 
         when: "deserializing Point into Polygon type"
         jsonMapper.readValue(pointJson, Polygon)
@@ -235,9 +246,8 @@ class JtsSerdeSpec extends Specification {
         thrown(IOException)
     }
 
-    def "JtsMultiPolygonSerde | should deserialize MultiPolygon directly and reject non-MultiPolygon"() {
-        given: "Point JSON and MultiPolygon JSON"
-        String pointJson = '{"type":"Point","coordinates":[-105.0,39.0]}'
+    def "JtsMultiPolygonSerde | deserializes MultiPolygon directly"() {
+        given: "MultiPolygon JSON"
         String multiPolyJson = '{"type":"MultiPolygon","coordinates":[[[[ -105.0, 39.0 ], [ -104.0, 39.0 ], [ -104.0, 40.0 ], [ -105.0, 40.0 ], [ -105.0, 39.0 ]]]]}'
 
         when: "deserializing MultiPolygon"
@@ -245,6 +255,11 @@ class JtsSerdeSpec extends Specification {
 
         then: "MultiPolygon deserialization succeeds"
         mp != null
+    }
+
+    def "JtsMultiPolygonSerde | rejects non-MultiPolygon JSON"() {
+        given: "Point JSON"
+        String pointJson = '{"type":"Point","coordinates":[-105.0,39.0]}'
 
         when: "deserializing Point into MultiPolygon type"
         jsonMapper.readValue(pointJson, MultiPolygon)
@@ -350,7 +365,7 @@ class JtsSerdeSpec extends Specification {
 
     /********** Null Handling & Direct Constructor Tests **********/
 
-    def "JtsGeometrySerde | should handle null values gracefully"() {
+    def "JtsGeometrySerde | serializes null Geometry as JSON null"() {
         given: "mock encoder"
         Encoder encoder = Mock(Encoder)
         Serializer.EncoderContext context = Mock(Serializer.EncoderContext)
@@ -360,47 +375,68 @@ class JtsSerdeSpec extends Specification {
 
         then: "encodeNull is invoked"
         1 * encoder.encodeNull()
-
-        when: "deserializing null JSON"
-        Geometry nullGeom = jsonMapper.readValue("null", Geometry)
-        Point nullPoint = jsonMapper.readValue("null", Point)
-        Polygon nullPoly = jsonMapper.readValue("null", Polygon)
-        MultiPolygon nullMultiPoly = jsonMapper.readValue("null", MultiPolygon)
-
-        then: "nulls are returned without exception"
-        verifyAll {
-            nullGeom == null
-            nullPoint == null
-            nullPoly == null
-            nullMultiPoly == null
-        }
     }
 
-    def "Specialized serdes | should serialize nulls without error"() {
+    @Unroll
+    def "JtsGeometrySerde | deserializes null JSON to null #targetType.simpleName"() {
+        when: "deserializing null JSON"
+        def result = jsonMapper.readValue("null", targetType)
+
+        then: "null is returned without exception"
+        result == null
+
+        where:
+        targetType << [Geometry, Point, Polygon, MultiPolygon]
+    }
+
+    @Unroll
+    def "Specialized serdes | #serdeName serializes null without error"() {
         given: "mock encoder"
         Encoder encoder = Mock(Encoder)
         Serializer.EncoderContext context = Mock(Serializer.EncoderContext)
+        def serde = serdeFor(serdeName)
 
-        when: "serializing nulls"
-        pointSerde.serialize(encoder, context, Argument.of(Point), null)
-        polygonSerde.serialize(encoder, context, Argument.of(Polygon), null)
-        multiPolygonSerde.serialize(encoder, context, Argument.of(MultiPolygon), null)
+        when: "serializing null"
+        serde.serialize(encoder, context, Argument.of(targetType), null)
 
-        then: "encodeNull is called each time"
-        3 * encoder.encodeNull()
+        then: "encodeNull is called"
+        1 * encoder.encodeNull()
+
+        where:
+        serdeName              | targetType
+        "JtsPointSerde"        | Point
+        "JtsPolygonSerde"      | Polygon
+        "JtsMultiPolygonSerde" | MultiPolygon
     }
 
-    def "Specialized serdes | should handle null return from delegate when decoding null node"() {
+    @Unroll
+    def "Specialized serdes | #serdeName returns null when decoding null node"() {
         given: "mock decoder returning null node"
         Decoder decoder = Mock(Decoder)
         Deserializer.DecoderContext context = Mock(Deserializer.DecoderContext)
         decoder.decodeNode() >> null
+        def serde = serdeFor(serdeName)
 
-        expect:
-        verifyAll {
-            pointSerde.deserialize(decoder, context, Argument.of(Point)) == null
-            polygonSerde.deserialize(decoder, context, Argument.of(Polygon)) == null
-            multiPolygonSerde.deserialize(decoder, context, Argument.of(MultiPolygon)) == null
+        expect: "null is returned"
+        serde.deserialize(decoder, context, Argument.of(targetType)) == null
+
+        where:
+        serdeName              | targetType
+        "JtsPointSerde"        | Point
+        "JtsPolygonSerde"      | Polygon
+        "JtsMultiPolygonSerde" | MultiPolygon
+    }
+
+    private Object serdeFor(String serdeName) {
+        switch (serdeName) {
+            case "JtsPointSerde":
+                return pointSerde
+            case "JtsPolygonSerde":
+                return polygonSerde
+            case "JtsMultiPolygonSerde":
+                return multiPolygonSerde
+            default:
+                throw new IllegalArgumentException("Unknown serde: ${serdeName}")
         }
     }
 
@@ -417,7 +453,8 @@ class JtsSerdeSpec extends Specification {
 
     /********** Error Validation Branches **********/
 
-    def "JtsGeometrySerde | should throw exception on invalid GeoJSON payloads"() {
+    @Unroll
+    def "JtsGeometrySerde | should throw exception on invalid GeoJSON payloads (#desc)"() {
         when: "deserializing invalid JSON #desc"
         jsonMapper.readValue(invalidJson, Geometry)
 
@@ -432,12 +469,99 @@ class JtsSerdeSpec extends Specification {
         "missing coordinates"         | '{"type":"Point"}'
         "non-array coordinates"       | '{"type":"Point","coordinates":"invalid"}'
         "empty polygon coordinates"   | '{"type":"Polygon","coordinates":[]}'
+        "empty polygon ring"          | '{"type":"Polygon","coordinates":[[]]}'
         "non-array shell"             | '{"type":"Polygon","coordinates":["invalid"]}'
         "non-array hole"              | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39],[-104,40],[-105,40],[-105,39]],"bad"]}'
+        "null hole"                   | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39],[-104,40],[-105,40],[-105,39]],null]}'
         "non-array multipolygon"      | '{"type":"MultiPolygon","coordinates":["bad"]}'
+        "null multipolygon member"    | '{"type":"MultiPolygon","coordinates":[null]}'
         "linear ring null coordinate" | '{"type":"Polygon","coordinates":[[[-105,39],null,[-104,40],[-105,39]]]}'
+        "coordinate not an array"     | '{"type":"Polygon","coordinates":[[[-105,39],"bad",[-104,40],[-105,39]]]}'
         "coordinate too small"        | '{"type":"Point","coordinates":[1]}'
         "coordinate not numbers"      | '{"type":"Point","coordinates":["a","b"]}'
         "linear ring too short"       | '{"type":"Polygon","coordinates":[[[-105,39],[-104,39]]]}'
+    }
+
+    def "JtsGeometrySerde | falls back to SRID 4326 factory when given null"() {
+        when: "creating serde with a null GeometryFactory"
+        JtsGeometrySerde fallbackSerde = new JtsGeometrySerde(null)
+
+        then: "default SRID 4326 factory is created"
+        verifyAll(fallbackSerde.geometryFactory) {
+            it != null
+            SRID == 4326
+        }
+    }
+
+    @Unroll
+    def "JtsGeometrySerde | deserializeFromNode returns null for #caseName"() {
+        when: "deserializing #caseName"
+        Geometry result = geometrySerde.deserializeFromNode(node)
+
+        then: "null is returned"
+        result == null
+
+        where:
+        caseName       | node
+        "null node"    | null
+        "JsonNode null"| JsonNode.nullNode()
+    }
+
+    def "JtsGeometrySerde | ignores null Z elevation on Point coordinates"() {
+        given: "a Point node with null Z coordinate"
+        JsonNode nullZPoint = jsonMapper.readValue('{"type":"Point","coordinates":[-105.0,39.0,null]}', JsonNode)
+
+        when: "deserializing the point"
+        Geometry pointResult = geometrySerde.deserializeFromNode(nullZPoint)
+
+        then: "a Point is returned with NaN Z elevation"
+        verifyAll {
+            pointResult instanceof Point
+            Double.isNaN(pointResult.coordinate.z)
+        }
+    }
+
+    private static List<JsonNode> createCircleRingNodes(int count, double radius) {
+        (0..<count).collect { int i ->
+            double angle = (2.0d * Math.PI * i) / (count as double)
+            JsonNode.createArrayNode([
+                    JsonNode.createNumberNode(-105.0d + Math.cos(angle) * radius),
+                    JsonNode.createNumberNode(39.0d + Math.sin(angle) * radius)
+            ])
+        }
+    }
+
+    private static JsonNode createOversizedArrayGeometry(String geometryType) {
+        List<JsonNode> items = (0..10_000).collect { JsonNode.createArrayNode([]) }
+        JsonNode.createObjectNode([
+                type       : JsonNode.createStringNode(geometryType),
+                coordinates: JsonNode.createArrayNode(items)
+        ])
+    }
+
+    private static JsonNode createTotalVerticesExceededPolygon() {
+        JsonNode.createObjectNode([
+                type       : JsonNode.createStringNode("Polygon"),
+                coordinates: JsonNode.createArrayNode([
+                        JsonNode.createArrayNode(createCircleRingNodes(6_000, 0.2d)),
+                        JsonNode.createArrayNode(createCircleRingNodes(4_001, 0.05d))
+                ])
+        ])
+    }
+
+    @Unroll
+    def "JtsGeometrySerde | rejects #caseName exceeding 10000 limit"() {
+        when: "deserializing oversized geometry"
+        geometrySerde.deserializeFromNode(oversizedNode)
+
+        then: "SerdeException mentions the 10000 limit"
+        SerdeException ex = thrown()
+        ex.message.contains("10000")
+
+        where:
+        caseName                              | oversizedNode
+        "polygon with over 10000 rings"       | createOversizedArrayGeometry("Polygon")
+        "multipolygon with over 10000 parts"  | createOversizedArrayGeometry("MultiPolygon")
+        "polygon over 10000 total vertices"   | createTotalVerticesExceededPolygon()
     }
 }

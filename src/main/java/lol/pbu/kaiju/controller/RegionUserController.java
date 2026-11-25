@@ -17,11 +17,11 @@ import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.RegionUser;
 import lol.pbu.kaiju.domain.RegionUserId;
-import lol.pbu.kaiju.dto.CreateRegionUserCommand;
-import lol.pbu.kaiju.dto.UpdateRegionUserCommand;
+import lol.pbu.kaiju.dto.CreateRegionUserRequest;
+import lol.pbu.kaiju.dto.UpdateRegionUserRequest;
 import lol.pbu.kaiju.repository.RegionUserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.util.Optional;
@@ -43,14 +43,14 @@ public class RegionUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final RegionUserRepository regionUserRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public RegionUserController(
             RegionUserRepository regionUserRepository,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.regionUserRepository = regionUserRepository;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     /**
@@ -62,7 +62,7 @@ public class RegionUserController {
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<RegionUser> getRegionUsers(@Nullable @Valid CursoredPageable pageable) {
-        return regionUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return regionUserRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -80,7 +80,7 @@ public class RegionUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeRegionUserView(actorId, userId, regionId);
+        authorizationService.authorizeRegionUserView(actorId, userId, regionId);
         return regionUserRepository.findById(new RegionUserId(userId, regionId));
     }
 
@@ -88,16 +88,16 @@ public class RegionUserController {
      * Associates a user with an administrative region under a designated role.
      * Restricted to platform administrators and directors of the target region.
      *
-     * @param command   the payload containing the target user ID, region ID, and role
+     * @param request   the payload containing the target user ID, region ID, and role
      * @param principal the authenticated caller
      * @return the persisted {@link RegionUser} relationship
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
-    public RegionUser addRegionUser(@Valid @Body CreateRegionUserCommand command, Principal principal) {
-        verifyRegionDirectorAuthority(principal, command.regionId());
-        RegionUserId id = new RegionUserId(command.userId(), command.regionId());
-        return regionUserRepository.save(new RegionUser(id, command.role()));
+    public RegionUser addRegionUser(@Valid @Body CreateRegionUserRequest request, Principal principal) {
+        verifyRegionDirectorAuthority(principal, request.regionId());
+        RegionUserId id = new RegionUserId(request.userId(), request.regionId());
+        return regionUserRepository.save(new RegionUser(id, request.role()));
     }
 
     /**
@@ -106,7 +106,7 @@ public class RegionUserController {
      *
      * @param userId    the unique identifier of the user
      * @param regionId  the unique identifier of the region
-     * @param command   the payload containing the new role assignment
+     * @param request   the payload containing the new role assignment
      * @param principal the authenticated caller
      * @return the updated {@link RegionUser} relationship
      */
@@ -115,14 +115,14 @@ public class RegionUserController {
     public RegionUser updateRegionUser(
             @PathVariable UUID userId,
             @PathVariable UUID regionId,
-            @Valid @Body UpdateRegionUserCommand command,
+            @Valid @Body UpdateRegionUserRequest request,
             Principal principal
     ) {
         verifyRegionDirectorAuthority(principal, regionId);
         RegionUserId id = new RegionUserId(userId, regionId);
         regionUserRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Region user not found"));
-        return regionUserRepository.update(new RegionUser(id, command.role()));
+        return regionUserRepository.update(new RegionUser(id, request.role()));
     }
 
     /**
@@ -150,6 +150,6 @@ public class RegionUserController {
 
     private void verifyRegionDirectorAuthority(Principal principal, UUID regionId) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeRegionDirector(actorId, regionId);
+        authorizationService.authorizeRegionDirector(actorId, regionId);
     }
 }

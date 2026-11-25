@@ -5,7 +5,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import lol.pbu.kaiju.dto.IngestBoundaryCommand
+import lol.pbu.kaiju.dto.IngestBoundaryRequest
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
 import lol.pbu.kaiju.service.StubHttpClient
 import lol.pbu.kaiju.service.StubHttpResponse
@@ -72,10 +72,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     def "SUCCESS | should successfully ingest, simplify, and validate boundary from authoritative TIGERweb API"() {
         given: "a valid administrative region and authoritative Census TIGERweb query URL for Denver County"
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "a global admin requests boundary ingestion via HTTP POST"
-        def request = asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command))
+        def request = asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest))
         def response = client.exchange(request, IngestBoundaryResponse)
         IngestBoundaryResponse body = response.body()
 
@@ -122,10 +122,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     def "SUCCESS | should permit valid query parameters containing words like description"() {
         given: "a query URL with outFields containing DESCRIPTION"
         String denverUrlWithDescription = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=NAME,DESCRIPTION&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrlWithDescription, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrlWithDescription, 0.001)
 
         when: "a global admin requests boundary ingestion"
-        def request = asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command))
+        def request = asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest))
         def response = client.exchange(request, IngestBoundaryResponse)
 
         then: "the request succeeds with 200 OK"
@@ -138,12 +138,12 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     }
 
     def "REJECT | should reject insecure HTTP scheme with 400 Bad Request"() {
-        given: "a command using unencrypted HTTP instead of HTTPS"
+        given: "a ingestRequest using unencrypted HTTP instead of HTTPS"
         String insecureUrl = "http://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?f=geojson"
-        def command = new IngestBoundaryCommand(insecureUrl, null)
+        def ingestRequest = new IngestBoundaryRequest(insecureUrl, null)
 
         when: "attempting boundary ingestion with insecure HTTP"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 400 Bad Request response is returned"
         def e = thrown(HttpClientResponseException)
@@ -152,11 +152,11 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
 
     @Unroll
     def "REJECT | should reject SSRF attempt targeting unauthorized host: #maliciousUrl"(String maliciousUrl) {
-        given: "a command targeting an unverified host"
-        def command = new IngestBoundaryCommand(maliciousUrl, null)
+        given: "a ingestRequest targeting an unverified host"
+        def ingestRequest = new IngestBoundaryRequest(maliciousUrl, null)
 
         when: "attempting ingestion against an unauthorized host"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the request is blocked with 400 Bad Request"
         def e = thrown(HttpClientResponseException)
@@ -173,12 +173,12 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     }
 
     def "REJECT | should reject non-standard port with 400 Bad Request"() {
-        given: "a command targeting an alternate port"
+        given: "a ingestRequest targeting an alternate port"
         String badPortUrl = "https://tigerweb.geo.census.gov:8443/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?f=geojson"
-        def command = new IngestBoundaryCommand(badPortUrl, null)
+        def ingestRequest = new IngestBoundaryRequest(badPortUrl, null)
 
         when: "attempting boundary ingestion with non-standard port"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -187,11 +187,11 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
 
     @Unroll
     def "REJECT | should reject invalid path or path traversal: #badPathUrl"(String badPathUrl) {
-        given: "a command with an unapproved path or traversal pattern"
-        def command = new IngestBoundaryCommand(badPathUrl, null)
+        given: "a ingestRequest with an unapproved path or traversal pattern"
+        def ingestRequest = new IngestBoundaryRequest(badPathUrl, null)
 
         when: "attempting ingestion with path violation"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -208,11 +208,11 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
 
     @Unroll
     def "REJECT | should reject script injection in query parameters: #injectedUrl"(String injectedUrl) {
-        given: "a command containing script injection or event handlers in query parameters"
-        def command = new IngestBoundaryCommand(injectedUrl, null)
+        given: "a ingestRequest containing script injection or event handlers in query parameters"
+        def ingestRequest = new IngestBoundaryRequest(injectedUrl, null)
 
         when: "attempting boundary ingestion"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -229,12 +229,12 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
 
     @Unroll
     def "REJECT | should reject non-finite or non-positive tolerance: #badTolerance"(Double badTolerance) {
-        given: "a command with an invalid tolerance value"
+        given: "a ingestRequest with an invalid tolerance value"
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, badTolerance)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, badTolerance)
 
         when: "attempting boundary ingestion with invalid tolerance"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -248,10 +248,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
         given: "a non-existent administrative region ID"
         UUID missingId = UUID.randomUUID()
         String validUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
-        def command = new IngestBoundaryCommand(validUrl, null)
+        def ingestRequest = new IngestBoundaryRequest(validUrl, null)
 
         when: "attempting ingestion on a missing region"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${missingId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${missingId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 404 Not Found is returned"
         def e = thrown(HttpClientResponseException)
@@ -259,11 +259,11 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     }
 
     def "REJECT | should return 400 Bad Request when source URL is blank"() {
-        given: "a command with blank source URL"
-        def command = new IngestBoundaryCommand("", null)
+        given: "a ingestRequest with blank source URL"
+        def ingestRequest = new IngestBoundaryRequest("", null)
 
         when: "attempting ingestion"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
@@ -273,10 +273,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     def "SECURITY | should return 403 Forbidden when regional director attempts boundary ingestion"() {
         given: "a regional director with region:manage claim"
         String validUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
-        def command = new IngestBoundaryCommand(validUrl, null)
+        def ingestRequest = new IngestBoundaryRequest(validUrl, null)
 
         when: "a regional director attempts boundary ingestion"
-        client.exchange(asRegionDirector(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asRegionDirector(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 403 Forbidden exception is returned"
         def e = thrown(HttpClientResponseException)
@@ -286,10 +286,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
     def "SECURITY | should return 403 Forbidden when standard user attempts boundary ingestion"() {
         given: "a standard user without administrative claims"
         String validUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27+AND+STATE%3D%2708%27&outFields=*&f=geojson"
-        def command = new IngestBoundaryCommand(validUrl, null)
+        def ingestRequest = new IngestBoundaryRequest(validUrl, null)
 
         when: "a standard user attempts boundary ingestion"
-        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "a 403 Forbidden exception is returned"
         def e = thrown(HttpClientResponseException)
@@ -303,10 +303,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(upstreamStatus, new ByteArrayInputStream("Server Error".getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 502 Bad Gateway"
         def e = thrown(HttpClientResponseException)
@@ -322,10 +322,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             throw new IOException("Connection abruptly closed by remote server")
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 502 Bad Gateway"
         def e = thrown(HttpClientResponseException)
@@ -340,10 +340,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, oversizedStream)
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 413 Payload Too Large"
         def e = thrown(HttpClientResponseException)
@@ -359,10 +359,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream("<html><body>Error from census gateway</body></html>".getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 400 Bad Request"
         def e = thrown(HttpClientResponseException)
@@ -376,10 +376,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 400 Bad Request"
         def e = thrown(HttpClientResponseException)
@@ -413,10 +413,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(multiFeatureJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 400 Bad Request"
         def e = thrown(HttpClientResponseException)
@@ -448,10 +448,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(bowtieJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 422 Unprocessable Entity"
         def e = thrown(HttpClientResponseException)
@@ -487,10 +487,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(driftedMissingPropJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion with drifted upstream schema"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the ingestion is blocked by schema validation error"
         def e = thrown(HttpClientResponseException)
@@ -521,10 +521,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(driftedPointJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion with invalid geometry type"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the ingestion is blocked by schema validation error"
         def e = thrown(HttpClientResponseException)
@@ -560,10 +560,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(unclosedRingJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion with unclosed ring"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the ingestion is blocked by schema validation error"
         def e = thrown(HttpClientResponseException)
@@ -593,10 +593,10 @@ class BoundaryIngestionSpec extends BaseControllerSpec {
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(triangleJson.getBytes("UTF-8")))
         }
         String denverUrl = "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82/query?where=BASENAME%3D%27Denver%27&f=geojson"
-        def command = new IngestBoundaryCommand(denverUrl, 0.001)
+        def ingestRequest = new IngestBoundaryRequest(denverUrl, 0.001)
 
         when: "attempting boundary ingestion through HTTP endpoint"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", command)), IngestBoundaryResponse)
+        client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions/${testRegionId}/boundary/ingest", ingestRequest)), IngestBoundaryResponse)
 
         then: "the controller returns 400 Bad Request"
         def e = thrown(HttpClientResponseException)

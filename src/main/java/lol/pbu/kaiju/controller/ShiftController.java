@@ -18,11 +18,11 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.domain.Project;
 import lol.pbu.kaiju.domain.Shift;
 import lol.pbu.kaiju.domain.Tag;
-import lol.pbu.kaiju.dto.CreateShiftCommand;
-import lol.pbu.kaiju.dto.UpdateShiftCommand;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.dto.CreateShiftRequest;
+import lol.pbu.kaiju.dto.UpdateShiftRequest;
+import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.ShiftService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.util.List;
@@ -39,21 +39,21 @@ public class ShiftController {
     public static final String DEFAULT_SORT_FIELD = "id";
 
     private final ShiftService shiftService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public ShiftController(
             ShiftService shiftService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.shiftService = shiftService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Get
     public CursoredPage<Shift> getShifts(@Nullable @Valid CursoredPageable pageable, @Nullable Principal principal) {
-        CursoredPageable resolved = PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD);
+        CursoredPageable resolved = PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD);
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
-        if (projectSecurityService.isSystemAdmin(userId)) {
+        if (authorizationService.isSystemAdmin(userId)) {
             return shiftService.getShifts(resolved);
         }
         return shiftService.getActiveShifts(resolved);
@@ -64,21 +64,21 @@ public class ShiftController {
         UUID userId = principal != null ? UUID.fromString(principal.getName()) : null;
         return shiftService.getShiftById(id)
                 .map(shift -> {
-                    projectSecurityService.authorizeShiftView(userId, shift);
+                    authorizationService.authorizeShiftView(userId, shift);
                     return shift;
                 });
     }
 
     @Post
-    public Shift addShift(@Valid @Body CreateShiftCommand command, Principal principal) {
+    public Shift addShift(@Valid @Body CreateShiftRequest request, Principal principal) {
         Shift shift = Shift.forSubmission(
                 null,
-                stubProject(command.projectId()),
-                command.isVirtual(),
-                stubLocation(command.locationId()),
-                command.startTime(),
-                command.endTime(),
-                stubTags(command.tagIds())
+                stubProject(request.projectId()),
+                request.isVirtual(),
+                stubLocation(request.locationId()),
+                request.startTime(),
+                request.endTime(),
+                stubTags(request.tagIds())
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return shiftService.createShift(shift, actorUserId);
@@ -91,20 +91,20 @@ public class ShiftController {
      * Throws 404 NOT_FOUND if the shift does not exist.
      *
      * @param id        the ID of the shift to update
-     * @param command   the updated shift details
+     * @param request   the updated shift details
      * @param principal the authenticated principal
      * @return the updated shift
      */
     @Put("/{id}")
-    public Shift updateShift(@PathVariable UUID id, @Valid @Body UpdateShiftCommand command, Principal principal) {
+    public Shift updateShift(@PathVariable UUID id, @Valid @Body UpdateShiftRequest request, Principal principal) {
         Shift candidate = Shift.forSubmission(
                 id,
                 null,
-                command.isVirtual(),
-                stubLocation(command.locationId()),
-                command.startTime(),
-                command.endTime(),
-                stubTags(command.tagIds())
+                request.isVirtual(),
+                stubLocation(request.locationId()),
+                request.startTime(),
+                request.endTime(),
+                stubTags(request.tagIds())
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return shiftService.updateShift(id, candidate, actorUserId);

@@ -11,8 +11,8 @@ import io.micronaut.http.uri.UriBuilder
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Organization
-import lol.pbu.kaiju.dto.CreateOrganizationCommand
-import lol.pbu.kaiju.dto.UpdateOrganizationCommand
+import lol.pbu.kaiju.dto.CreateOrganizationRequest
+import lol.pbu.kaiju.dto.UpdateOrganizationRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.OrganizationRepository
@@ -124,8 +124,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid organization"() {
-        given: "a new valid organization command"
-        def command = new CreateOrganizationCommand(
+        given: "a new valid organization request"
+        def request = new CreateOrganizationRequest(
                 "Test Org ${faker.company().name()}",
                 "https://${faker.internet().domainName()}",
                 null,
@@ -133,15 +133,15 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         )
 
         when: "the organization is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", request)), Organization)
         Organization saved = track(response.body())
 
         then: "the organization is persisted with a generated ID"
         verifyAll {
             response.status == HttpStatus.OK
             saved.id() != null
-            saved.name() == command.name()
-            saved.websiteUrl() == command.websiteUrl()
+            saved.name() == request.name()
+            saved.websiteUrl() == request.websiteUrl()
         }
 
         and: "it can be retrieved from the database"
@@ -149,8 +149,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         verifyAll(result) {
             result != null
             id() == saved.id()
-            name() == command.name()
-            websiteUrl() == command.websiteUrl()
+            name() == request.name()
+            websiteUrl() == request.websiteUrl()
         }
     }
 
@@ -207,10 +207,10 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         UUID id = org.id()
         def newName = "Updated ${faker.company().name()}"
         def newUrl = "https://${faker.internet().domainName()}"
-        def updateCommand = new UpdateOrganizationCommand(newName, newUrl, null, true)
+        def updateRequest = new UpdateOrganizationRequest(newName, newUrl, null, true)
 
         when: "the organization is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateCommand)), Organization)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${id}", updateRequest)), Organization)
         Organization updated = response.body()
 
         then: "the returned organization contains the updated data"
@@ -231,12 +231,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent organization"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateOrganizationCommand("Test Org", "https://example.com", null, true)
+        def updateRequest = new UpdateOrganizationRequest("Test Org", "https://example.com", null, true)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateCommand)), Organization)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organizations/${nonExistentId}", updateRequest)), Organization)
 
         then: "an exception is thrown indicating not found"
         def e = thrown(HttpClientResponseException)
@@ -291,13 +291,13 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "DELETE | should remove an existing organization"() {
         given: "a new organization to be deleted"
-        def command = new CreateOrganizationCommand(
+        def request = new CreateOrganizationRequest(
                 "Temporary Org to Delete",
                 "https://example.org",
                 null,
                 true
         )
-        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", command)), Organization)
+        def createResponse = client.exchange(asGlobalAdmin(HttpRequest.POST("/organizations", request)), Organization)
         UUID id = createResponse.body().id()
         assert organizationRepository.existsById(id)
 
@@ -652,7 +652,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "SEARCH SECURITY | should NOT return private organizations in name, location, or region search"() {
+    @Unroll
+    def "SEARCH SECURITY | hides private organizations from #searchType search"() {
         given: "a private organization and a public organization with similar names"
         def publicOrg = dataBuilder.organization().withName("Confidential Shelter Public").asPublic().verified().persist()
         def privateOrg = dataBuilder.organization().withName("Confidential Shelter Private").asPrivate().verified().persist()
@@ -670,21 +671,25 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         dataBuilder.linkOrganizationToRegion(publicOrgId, regionId)
         dataBuilder.linkOrganizationToRegion(privateOrgId, regionId)
 
-        when: "searching by name"
-        def nameResults = searchByName("Confidential Shelter", false, Pageable.from(0, 10))
-
-        and: "searching by location"
-        def locResults = searchByLocation(-104.99, 39.74, 5000, Pageable.from(0, 10))
-
-        and: "searching by region"
-        def regionResults = searchByRegion(regionId, Pageable.from(0, 10))
-
-        then: "private organization is never returned in any search endpoint"
-        verifyAll {
-            nameResults.content.collect { it.id() } == [publicOrgId]
-            locResults.content.collect { it.id() } == [publicOrgId]
-            regionResults.content.collect { it.id() } == [publicOrgId]
+        when: "searching by #searchType"
+        PageResponse<Organization> results
+        switch (searchType) {
+            case "name":
+                results = searchByName("Confidential Shelter", false, Pageable.from(0, 10))
+                break
+            case "location":
+                results = searchByLocation(-104.99, 39.74, 5000, Pageable.from(0, 10))
+                break
+            case "region":
+                results = searchByRegion(regionId, Pageable.from(0, 10))
+                break
         }
+
+        then: "private organization is never returned"
+        results.content.collect { it.id() } == [publicOrgId]
+
+        where:
+        searchType << ["name", "location", "region"]
     }
 
     def "SEARCH SECURITY | should NOT return unverified, suspended, or revoked organizations"() {
@@ -703,245 +708,187 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         results.content.collect { it.id() } == [verifiedId]
     }
 
-    def "SEARCH SECURITY | SQL wildcard queries ('%', '_', '%%') should return empty page rather than dumping table"() {
+    @Unroll
+    def "SEARCH SECURITY | wildcard or empty query '#query' returns empty results"() {
         given: "some organizations exist in the database"
         dataBuilder.organization().withName("Wildcard Test Org A").asPublic().verified().persist()
         dataBuilder.organization().withName("Wildcard Test Org B").asPublic().verified().persist()
 
-        when: "searching with wildcard characters"
-        def percentResults = searchByName("%", false, Pageable.from(0, 10))
-        def underscoreResults = searchByName("_", false, Pageable.from(0, 10))
-        def multiWildcardResults = searchByName(" %_% ", false, Pageable.from(0, 10))
-        def emptyQuotesResults = searchByName('""', false, Pageable.from(0, 10))
+        when: "searching with '#query'"
+        def results = searchByName(query, false, Pageable.from(0, 10))
 
-        then: "all wildcard-only and empty quote queries return empty results"
-        verifyAll {
-            percentResults.content.isEmpty()
-            underscoreResults.content.isEmpty()
-            multiWildcardResults.content.isEmpty()
-            emptyQuotesResults.content.isEmpty()
-        }
+        then: "an empty page is returned"
+        results.content.isEmpty()
+
+        where:
+        query << ["%", "_", " %_% ", '""']
     }
 
     /********** EXHAUSTIVE QUERY VARIATIONS & EDGE CASES **********/
 
-    def "SEARCH BY NAME | exhaustive syntax permutations: quote variations, padding, and mismatched quotes"() {
-        given: "an organization in database"
+    @Unroll
+    def "SEARCH BY NAME | quoted query '#query' with exact=#exact returns only the exact org"() {
+        given: "an organization and a branch organization in database"
         def org = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
         def orgId = org.id()
         dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
 
-        when: "searching with leading/trailing spaces outside quotes: '  \"The Salvation Army\"  '"
-        def resPaddedQuotes = searchByName('  "The Salvation Army"  ', false, Pageable.from(0, 10))
+        when: "searching with '#query' and exact=#exact"
+        def results = searchByName(query, exact, Pageable.from(0, 10))
 
-        and: "searching with spaces inside quotes: '\"  The Salvation Army  \"'"
-        def resSpacesInside = searchByName('"  The Salvation Army  "', false, Pageable.from(0, 10))
-
-        and: "searching with single-quote character only: '\'' and '\"'"
-        def resSingleQuoteOnly = searchByName("'", false, Pageable.from(0, 10))
-        def resDoubleQuoteOnly = searchByName('"', false, Pageable.from(0, 10))
-
-        and: "searching with empty quotes containing whitespace: '\"   \"' and '\'   \''"
-        def resEmptyDoubleWithSpaces = searchByName('"   "', false, Pageable.from(0, 10))
-        def resEmptySingleWithSpaces = searchByName("'   '", false, Pageable.from(0, 10))
-
-        and: "searching with mismatched opening quote: '\"The Salvation Army'"
-        def resMismatchedDoubleStart = searchByName('"The Salvation Army', false, Pageable.from(0, 10))
-
-        and: "searching with mismatched closing quote: 'The Salvation Army\"'"
-        def resMismatchedDoubleEnd = searchByName('The Salvation Army"', false, Pageable.from(0, 10))
-
-        and: "searching with mismatched opening single quote: '\'The Salvation Army'"
-        def resMismatchedSingleStart = searchByName("'The Salvation Army", false, Pageable.from(0, 10))
-
-        and: "searching with mismatched closing single quote: 'The Salvation Army\''"
-        def resMismatchedSingleEnd = searchByName("The Salvation Army'", false, Pageable.from(0, 10))
-
-        and: "searching with exact=true AND quoted together"
-        def resExactAndQuoted = searchByName('"The Salvation Army"', true, Pageable.from(0, 10))
-
-        then: "exact quote variations return strictly the single exact parent org"
+        then: "only the exact parent organization is returned"
         verifyAll {
-            resPaddedQuotes.content.size() == 1
-            resPaddedQuotes.content[0].id() == orgId
-
-            resSpacesInside.content.size() == 1
-            resSpacesInside.content[0].id() == orgId
-
-            resExactAndQuoted.content.size() == 1
-            resExactAndQuoted.content[0].id() == orgId
+            results.content.size() == 1
+            results.content[0].id() == orgId
         }
 
-        and: "single quote characters and empty quote queries return empty pages"
-        verifyAll {
-            resSingleQuoteOnly.content.isEmpty()
-            resDoubleQuoteOnly.content.isEmpty()
-            resEmptyDoubleWithSpaces.content.isEmpty()
-            resEmptySingleWithSpaces.content.isEmpty()
-        }
-
-        and: "mismatched quotes gracefully fall back to ranked search and surface parent org at top"
-        verifyAll {
-            !resMismatchedDoubleStart.content.isEmpty()
-            resMismatchedDoubleStart.content[0].id() == orgId
-
-            !resMismatchedDoubleEnd.content.isEmpty()
-            resMismatchedDoubleEnd.content[0].id() == orgId
-
-            !resMismatchedSingleStart.content.isEmpty()
-            resMismatchedSingleStart.content[0].id() == orgId
-
-            !resMismatchedSingleEnd.content.isEmpty()
-            resMismatchedSingleEnd.content[0].id() == orgId
-        }
+        where:
+        query                       | exact
+        '  "The Salvation Army"  '  | false
+        '"  The Salvation Army  "'  | false
+        '"The Salvation Army"'      | true
     }
 
-    def "SEARCH BY NAME | exhaustive typo permutations: subtle misspellings and transposed letters"() {
+    @Unroll
+    def "SEARCH BY NAME | quote-only or empty quote query '#query' returns empty results"() {
+        given: "organizations exist in database"
+        dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
+
+        when: "searching with '#query'"
+        def results = searchByName(query, false, Pageable.from(0, 10))
+
+        then: "an empty page is returned"
+        results.content.isEmpty()
+
+        where:
+        query << ["'", '"', '"   "', "'   '"]
+    }
+
+    @Unroll
+    def "SEARCH BY NAME | mismatched quote query '#query' falls back to ranked search"() {
+        given: "an organization and a branch organization in database"
+        def org = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
+        def orgId = org.id()
+        dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
+
+        when: "searching with mismatched quotes '#query'"
+        def results = searchByName(query, false, Pageable.from(0, 10))
+
+        then: "ranked search surfaces the parent organization first"
+        verifyAll {
+            !results.content.isEmpty()
+            results.content[0].id() == orgId
+        }
+
+        where:
+        query << ['"The Salvation Army', 'The Salvation Army"', "'The Salvation Army", "The Salvation Army'"]
+    }
+
+    @Unroll
+    def "SEARCH BY NAME | typo query '#query' still finds The Salvation Army first"() {
         given: "Salvation Army parent organization"
         def parent = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
         def parentId = parent.id()
         dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
 
-        when: "searching with transposed 'v' and 't': 'Salavtion Army'"
-        def resTransposedVt = searchByName("Salavtion Army", false, Pageable.from(0, 10))
+        when: "searching with misspelled query '#query'"
+        def results = searchByName(query, false, Pageable.from(0, 10))
 
-        and: "searching with transposed 'm' and 'r': 'Salvation Amry'"
-        def resTransposedMr = searchByName("Salvation Amry", false, Pageable.from(0, 10))
-
-        and: "searching with typo and article: 'The Slavation Army'"
-        def resTypoWithArticle = searchByName("The Slavation Army", false, Pageable.from(0, 10))
-
-        then: "all typo variations successfully find The Salvation Army via trigram similarity"
+        then: "The Salvation Army is ranked first"
         verifyAll {
-            !resTransposedVt.content.isEmpty()
-            resTransposedVt.content[0].id() == parentId
-
-            !resTransposedMr.content.isEmpty()
-            resTransposedMr.content[0].id() == parentId
-
-            !resTypoWithArticle.content.isEmpty()
-            resTypoWithArticle.content[0].id() == parentId
+            !results.content.isEmpty()
+            results.content[0].id() == parentId
         }
+
+        where:
+        query << ["Salavtion Army", "Salvation Amry", "The Slavation Army"]
     }
 
-    def "SEARCH BY NAME | article normalization with 'An' and 'A' leading articles"() {
-        given: "organizations with 'An' and 'A' prefixes alongside competing prefix organizations"
-        def orgAn = dataBuilder.organization().withName("An Organization Example").asPublic().verified().persist()
-        def orgA = dataBuilder.organization().withName("A Better Tomorrow Foundation").asPublic().verified().persist()
-        def compAn = dataBuilder.organization().withName("Organization Example Regional Branch").asPublic().verified().persist()
-        def compA = dataBuilder.organization().withName("Better Tomorrow Foundation Network").asPublic().verified().persist()
-
-        def orgAnId = orgAn.id()
-        def orgAId = orgA.id()
-        def compAnId = compAn.id()
-        def compAId = compA.id()
+    @Unroll
+    def "SEARCH BY NAME | query '#query' ranks '#canonicalName' above competitor"() {
+        given: "a canonical organization with a leading article and a competitor without it"
+        def canonical = dataBuilder.organization().withName(canonicalName).asPublic().verified().persist()
+        def competitor = dataBuilder.organization().withName(competitorName).asPublic().verified().persist()
 
         when: "searching without the leading article"
-        def resAn = searchByName("Organization Example", false, Pageable.from(0, 10))
-        def resA = searchByName("Better Tomorrow Foundation", false, Pageable.from(0, 10))
+        def results = searchByName(query, false, Pageable.from(0, 10))
 
-        then: "article normalization correctly ranks the parent entity with stripped article above the competitor"
+        then: "the canonical organization ranks above the competitor"
         verifyAll {
-            resAn.content.size() == 2
-            resAn.content[0].id() == orgAnId
-            resAn.content[1].id() == compAnId
+            results.content.size() == 2
+            results.content[0].id() == canonical.id()
+            results.content[1].id() == competitor.id()
         }
 
-        and: "second article query similarly elevates the canonical parent entity"
-        verifyAll {
-            resA.content.size() == 2
-            resA.content[0].id() == orgAId
-            resA.content[1].id() == compAId
-        }
+        where:
+        query                        | canonicalName                  | competitorName
+        "Organization Example"       | "An Organization Example"      | "Organization Example Regional Branch"
+        "Better Tomorrow Foundation" | "A Better Tomorrow Foundation" | "Better Tomorrow Foundation Network"
     }
 
-    def "SEARCH BY NAME | literal SQL wildcard characters (% and _) in organization names"() {
+    @Unroll
+    def "SEARCH BY NAME | literal wildcard query '#query' matches only '#expectedName'"() {
         given: "organizations with literal % and _ in their names"
         def orgPercent = dataBuilder.organization().withName("100% Volunteer Initiative").asPublic().verified().persist()
         def orgUnderscore = dataBuilder.organization().withName("Special_Ops Outreach").asPublic().verified().persist()
         dataBuilder.organization().withName("SpecialXOps Outreach").asPublic().verified().persist()
 
-        def orgPercentId = orgPercent.id()
-        def orgUnderscoreId = orgUnderscore.id()
+        def expectedId = expectedName == "100% Volunteer Initiative" ? orgPercent.id() : orgUnderscore.id()
 
-        when: "searching for literal '100%'"
-        def resPercent = searchByName("100%", false, Pageable.from(0, 10))
+        when: "searching for '#query'"
+        def results = searchByName(query, false, Pageable.from(0, 10))
 
-        and: "searching for literal 'Special_Ops'"
-        def resUnderscore = searchByName("Special_Ops", false, Pageable.from(0, 10))
-
-        then: "literal percent matches only the organization containing '100%'"
+        then: "only the matching organization is returned"
         verifyAll {
-            resPercent.content.size() == 1
-            resPercent.content[0].id() == orgPercentId
+            results.content.size() == 1
+            results.content[0].id() == expectedId
         }
 
-        and: "literal underscore does not expand as a single-character wildcard (SpecialXOps is not matched)"
-        verifyAll {
-            resUnderscore.content.size() == 1
-            resUnderscore.content[0].id() == orgUnderscoreId
-        }
+        where:
+        query         | expectedName
+        "100%"        | "100% Volunteer Initiative"
+        "Special_Ops" | "Special_Ops Outreach"
     }
 
-    def "SEARCH BY NAME | exhaustive cluster branch and keyword queries"() {
-        given: "a rich cluster of diverse Salvation Army organizations"
-        def parent = dataBuilder.organization().withName("The Salvation Army").asPublic().verified().persist()
-        def denver = dataBuilder.organization().withName("The Salvation Army - Denver Citadel Corps").asPublic().verified().persist()
-        def aurora = dataBuilder.organization().withName("The Salvation Army - Aurora Corps Community Center").asPublic().verified().persist()
-        def springs = dataBuilder.organization().withName("The Salvation Army - Colorado Springs Corps").asPublic().verified().persist()
-        def intermountain = dataBuilder.organization().withName("The Salvation Army Intermountain Division").asPublic().verified().persist()
-        def store = dataBuilder.organization().withName("Salvation Army Family Store").asPublic().verified().persist()
-        def disaster = dataBuilder.organization().withName("Salvation Army Emergency Disaster Services").asPublic().verified().persist()
-        def friends = dataBuilder.organization().withName("Friends of The Salvation Army").asPublic().verified().persist()
-
-        def parentId = parent.id()
-        def denverId = denver.id()
-        def auroraId = aurora.id()
-        def springsId = springs.id()
-        def intermountainId = intermountain.id()
-        def storeId = store.id()
-        def disasterId = disaster.id()
-        def friendsId = friends.id()
-
-        when: "searching for 'Denver Citadel'"
-        def resDenver = searchByName("Denver Citadel", false, Pageable.from(0, 10))
-
-        and: "searching for 'Aurora'"
-        def resAurora = searchByName("Aurora", false, Pageable.from(0, 10))
-
-        and: "searching for 'Colorado Springs Corps'"
-        def resSprings = searchByName("Colorado Springs Corps", false, Pageable.from(0, 10))
-
-        and: "searching for 'Intermountain'"
-        def resIntermountain = searchByName("Intermountain", false, Pageable.from(0, 10))
-
-        and: "searching for 'Family Store'"
-        def resStore = searchByName("Family Store", false, Pageable.from(0, 10))
-
-        and: "searching for 'Emergency Disaster'"
-        def resDisaster = searchByName("Emergency Disaster", false, Pageable.from(0, 10))
-
-        and: "searching for 'Friends of'"
-        def resFriends = searchByName("Friends of", false, Pageable.from(0, 10))
-
-        and: "searching for 'Salvation Army' ranks parent organization at top"
-        def resParent = searchByName("Salvation Army", false, Pageable.from(0, 10))
-
-        then: "each specific query accurately isolates its target entity at the top of results"
-        verifyAll {
-            resParent.content[0].id() == parentId
-            resDenver.content[0].id() == denverId
-            resAurora.content[0].id() == auroraId
-            resSprings.content[0].id() == springsId
-            resIntermountain.content[0].id() == intermountainId
-            resStore.content[0].id() == storeId
-            resDisaster.content[0].id() == disasterId
-            resFriends.content[0].id() == friendsId
+    @Unroll
+    def "SEARCH BY NAME | query '#query' ranks '#expectedName' first"() {
+        given: "a cluster of Salvation Army organizations"
+        Map<String, UUID> orgIdsByName = [
+                "The Salvation Army",
+                "The Salvation Army - Denver Citadel Corps",
+                "The Salvation Army - Aurora Corps Community Center",
+                "The Salvation Army - Colorado Springs Corps",
+                "The Salvation Army Intermountain Division",
+                "Salvation Army Family Store",
+                "Salvation Army Emergency Disaster Services",
+                "Friends of The Salvation Army"
+        ].collectEntries { name ->
+            [(name): dataBuilder.organization().withName(name).asPublic().verified().persist().id()]
         }
+
+        when: "searching for '#query'"
+        def results = searchByName(query, false, Pageable.from(0, 10))
+
+        then: "the target organization ranks at the top of results"
+        verifyAll {
+            !results.content.isEmpty()
+            results.content[0].id() == orgIdsByName[expectedName]
+        }
+
+        where:
+        query                    | expectedName
+        "Salvation Army"         | "The Salvation Army"
+        "Denver Citadel"         | "The Salvation Army - Denver Citadel Corps"
+        "Aurora"                 | "The Salvation Army - Aurora Corps Community Center"
+        "Colorado Springs Corps" | "The Salvation Army - Colorado Springs Corps"
+        "Intermountain"          | "The Salvation Army Intermountain Division"
+        "Family Store"           | "Salvation Army Family Store"
+        "Emergency Disaster"     | "Salvation Army Emergency Disaster Services"
+        "Friends of"             | "Friends of The Salvation Army"
     }
 
-    def "PAGINATION & SORTING | normalizePageable and getOrganizations branch coverage"() {
-        given: "organizations, locations, and regions exist"
+    private Map persistPagingFixtures() {
         def loc = dataBuilder.location()
                 .withName("Paging Test Loc")
                 .withAddressLine("100 Main St")
@@ -961,77 +908,118 @@ class OrganizationControllerSpec extends BaseControllerSpec {
                 .asPublic()
                 .verified()
                 .persist()
-        def org1Id = org1.id()
 
         def region = dataBuilder.region().withName("Paging Region").persist()
-        def regionId = region.id()
-        dataBuilder.linkOrganizationToRegion(org1Id, regionId)
+        dataBuilder.linkOrganizationToRegion(org1.id(), region.id())
 
-        when: "calling getOrganizations with null pageable"
-        def resGetOrgsNull = organizationController.getOrganizations(null)
+        return [org1Id: org1.id(), regionId: region.id()]
+    }
 
-        and: "calling getOrganizations with unpaged pageable"
-        def resGetOrgsUnpaged = organizationController.getOrganizations(CursoredPageable.from(Sort.of(Sort.Order.asc("name"))).withoutPaging())
+    @Unroll
+    def "PAGINATION & SORTING | getOrganizations handles #caseName pageable"() {
+        given: "organizations exist"
+        persistPagingFixtures()
 
-        and: "calling searchByName with null pageable"
-        def resNameNullPageable = organizationController.searchByName("Paging Test Org", false, null)
+        when: "calling getOrganizations with #caseName pageable"
+        def result = organizationController.getOrganizations(pageable)
 
-        and: "calling searchByName with Pageable.unpaged()"
-        def resNameUnpaged = organizationController.searchByName("Paging Test Org", false, Pageable.unpaged())
+        then: "organizations are returned"
+        !result.content.isEmpty()
 
-        and: "calling searchByName with client-specified sort (which should be stripped to preserve native relevance order)"
+        where:
+        caseName  | pageable
+        "null"    | null
+        "unpaged" | CursoredPageable.from(Sort.of(Sort.Order.asc("name"))).withoutPaging()
+    }
+
+    @Unroll
+    def "PAGINATION & SORTING | searchByName normalizes #caseName pageable"() {
+        given: "matching organizations exist"
+        persistPagingFixtures()
+
+        when: "calling searchByName with #caseName pageable"
+        def result = organizationController.searchByName("Paging Test Org", false, pageable)
+
+        then: "matching organizations are returned with normalized page size"
+        verifyAll(result) {
+            !content.isEmpty()
+            result.pageable.size == expectedSize
+        }
+
+        where:
+        caseName    | pageable              | expectedSize
+        "null"      | null                  | 20
+        "unpaged"   | Pageable.unpaged()    | 20
+        "oversized" | Pageable.from(0, 500) | 100
+    }
+
+    def "PAGINATION & SORTING | searchByName strips client DESC sort to keep native relevance order"() {
+        given: "matching organizations exist"
+        persistPagingFixtures()
         def sortedPageable = Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
-        def resNameWithSort = organizationController.searchByName("Paging Test Org", false, sortedPageable)
 
-        and: "calling searchByNameExact with client-specified sort (which strips sort to prevent duplicate ORDER BY)"
-        def resExactWithSort = organizationController.searchByName('"Paging Test Org 1"', false, sortedPageable)
+        when: "calling searchByName with client DESC sort"
+        def result = organizationController.searchByName("Paging Test Org", false, sortedPageable)
 
-        and: "calling searchByLocation with null, unpaged, and sorted pageables"
-        def resLocNull = organizationController.searchByLocation(-104.99, 39.74, 50000, null)
-        def resLocUnpaged = organizationController.searchByLocation(-104.99, 39.74, 50000, Pageable.unpaged())
-        def resLocSorted = organizationController.searchByLocation(-104.99, 39.74, 50000, sortedPageable)
+        then: "native relevance ASC tie-breaking is preserved"
+        result.content*.name() == ['Paging Test Org 1', 'Paging Test Org 2']
+    }
 
-        and: "calling searchByRegion with null, unpaged, and sorted pageables"
-        def resRegionNull = organizationController.searchByRegion(regionId, null)
-        def resRegionUnpaged = organizationController.searchByRegion(regionId, Pageable.unpaged())
-        def resRegionSorted = organizationController.searchByRegion(regionId, sortedPageable)
+    def "PAGINATION & SORTING | searchByName exact match strips client sort and isolates target entity"() {
+        given: "matching organizations exist"
+        def fixtures = persistPagingFixtures()
+        def sortedPageable = Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
 
-        then: "all permutations execute successfully with defaults"
-        verifyAll {
-            !resGetOrgsNull.content.isEmpty()
-            !resGetOrgsUnpaged.content.isEmpty()
-            !resNameNullPageable.content.isEmpty()
-            !resNameUnpaged.content.isEmpty()
+        when: "calling exact searchByName with client sort"
+        def result = organizationController.searchByName('"Paging Test Org 1"', false, sortedPageable)
+
+        then: "only the exact matching organization is returned"
+        verifyAll(result) {
+            content.size() == 1
+            content[0].id() == fixtures.org1Id
+        }
+    }
+
+    @Unroll
+    def "PAGINATION & SORTING | searchByLocation handles #caseName pageable"() {
+        given: "an organization at the search coordinates"
+        def fixtures = persistPagingFixtures()
+
+        when: "calling searchByLocation with #caseName pageable"
+        def result = organizationController.searchByLocation(-104.99, 39.74, 50000, pageable)
+
+        then: "the matching organization is returned"
+        verifyAll(result) {
+            !content.isEmpty()
+            content[0].id() == fixtures.org1Id
         }
 
-        and: "searchByName with client DESC sort strips the client sort and maintains native relevance ASC tie-breaking"
-        resNameWithSort.content*.name() == ['Paging Test Org 1', 'Paging Test Org 2']
+        where:
+        caseName  | pageable
+        "null"    | null
+        "unpaged" | Pageable.unpaged()
+        "sorted"  | Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
+    }
 
-        and: "searchByNameExact with client sort strips sort and matches the exact target entity"
-        verifyAll {
-            resExactWithSort.content.size() == 1
-            resExactWithSort.content[0].id() == org1Id
+    @Unroll
+    def "PAGINATION & SORTING | searchByRegion handles #caseName pageable"() {
+        given: "an organization linked to a region"
+        def fixtures = persistPagingFixtures()
+
+        when: "calling searchByRegion with #caseName pageable"
+        def result = organizationController.searchByRegion(fixtures.regionId, pageable)
+
+        then: "the matching organization is returned"
+        verifyAll(result) {
+            !content.isEmpty()
+            content[0].id() == fixtures.org1Id
         }
 
-        and: "searchByLocation returns matching organization across null, unpaged, and sorted pageables"
-        verifyAll {
-            !resLocNull.content.isEmpty()
-            resLocNull.content[0].id() == org1Id
-            !resLocUnpaged.content.isEmpty()
-            resLocUnpaged.content[0].id() == org1Id
-            !resLocSorted.content.isEmpty()
-            resLocSorted.content[0].id() == org1Id
-        }
-
-        and: "searchByRegion returns matching organization across null, unpaged, and sorted pageables"
-        verifyAll {
-            !resRegionNull.content.isEmpty()
-            resRegionNull.content[0].id() == org1Id
-            !resRegionUnpaged.content.isEmpty()
-            resRegionUnpaged.content[0].id() == org1Id
-            !resRegionSorted.content.isEmpty()
-            resRegionSorted.content[0].id() == org1Id
-        }
+        where:
+        caseName  | pageable
+        "null"    | null
+        "unpaged" | Pageable.unpaged()
+        "sorted"  | Pageable.from(0, 10, Sort.of(Sort.Order.desc("name")))
     }
 
     /********** AUTHORIZATION & SECURITY Tests **********/
@@ -1047,8 +1035,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should reject unauthenticated POST /organizations with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to create an organization"
-        def command = new CreateOrganizationCommand("Unauth Org", "https://example.com", null, true)
-        client.exchange(HttpRequest.POST("/organizations", command), Organization)
+        def request = new CreateOrganizationRequest("Unauth Org", "https://example.com", null, true)
+        client.exchange(HttpRequest.POST("/organizations", request), Organization)
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -1057,8 +1045,8 @@ class OrganizationControllerSpec extends BaseControllerSpec {
 
     def "SECURITY | should reject unauthenticated PUT /organizations/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to update an organization"
-        def command = new UpdateOrganizationCommand("Unauth Org", "https://example.com", null, true)
-        client.exchange(HttpRequest.PUT("/organizations/${UUID.randomUUID()}", command), Organization)
+        def request = new UpdateOrganizationRequest("Unauth Org", "https://example.com", null, true)
+        client.exchange(HttpRequest.PUT("/organizations/${UUID.randomUUID()}", request), Organization)
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -1087,7 +1075,7 @@ class OrganizationControllerSpec extends BaseControllerSpec {
     def "SECURITY | should return 403 FORBIDDEN when standard user without org admin authority updates organization"() {
         given: "an organization and a standard unauthorized user"
         def org = dataBuilder.organization().withName("Auth Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
-        def updated = new UpdateOrganizationCommand("Hacked Name", "https://hacked.com", null, true)
+        def updated = new UpdateOrganizationRequest("Hacked Name", "https://hacked.com", null, true)
 
         when: "unauthorized user attempts to update the organization"
         client.exchange(asVolunteer(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.VICTOR_VOLUNTEER), Organization)
@@ -1109,12 +1097,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "AUTHORIZATION | should allow organization admin to update and delete organization"() {
+    def "AUTHORIZATION | allows organization admin to update their organization"() {
         given: "an organization and an ORG_ADMIN for that organization"
         def org = dataBuilder.organization().withName("Allowed Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
         dataBuilder.organizationUser().asOrgAdmin(TestPersonas.LEO_LOCAL_ADMIN.id, org.id()).persist()
 
-        def updated = new UpdateOrganizationCommand("Updated By Admin", "https://example.com", null, true)
+        def updated = new UpdateOrganizationRequest("Updated By Admin", "https://example.com", null, true)
 
         when: "org admin updates the organization via HTTP PUT"
         def response = client.exchange(asOrgAdmin(HttpRequest.PUT("/organizations/${org.id()}", updated), TestPersonas.LEO_LOCAL_ADMIN), Organization)
@@ -1124,6 +1112,12 @@ class OrganizationControllerSpec extends BaseControllerSpec {
             status == HttpStatus.OK
             body().name() == "Updated By Admin"
         }
+    }
+
+    def "AUTHORIZATION | allows organization admin to delete their organization"() {
+        given: "an organization and an ORG_ADMIN for that organization"
+        def org = dataBuilder.organization().withName("Allowed Org ${faker.company().name()}").withWebsiteUrl("https://example.com").unverified().persist()
+        dataBuilder.organizationUser().asOrgAdmin(TestPersonas.LEO_LOCAL_ADMIN.id, org.id()).persist()
 
         when: "org admin deletes the organization via HTTP DELETE"
         def delResponse = client.exchange(asOrgAdmin(HttpRequest.DELETE("/organizations/${org.id()}"), TestPersonas.LEO_LOCAL_ADMIN))

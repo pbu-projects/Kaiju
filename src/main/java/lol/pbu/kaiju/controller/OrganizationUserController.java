@@ -18,11 +18,11 @@ import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.OrganizationUser;
 import lol.pbu.kaiju.domain.OrganizationUserId;
-import lol.pbu.kaiju.dto.CreateOrganizationUserCommand;
-import lol.pbu.kaiju.dto.UpdateOrganizationUserCommand;
+import lol.pbu.kaiju.dto.CreateOrganizationUserRequest;
+import lol.pbu.kaiju.dto.UpdateOrganizationUserRequest;
 import lol.pbu.kaiju.repository.OrganizationUserRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.util.Optional;
@@ -39,20 +39,20 @@ public class OrganizationUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final OrganizationUserRepository organizationUserRepository;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public OrganizationUserController(
             OrganizationUserRepository organizationUserRepository,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.organizationUserRepository = organizationUserRepository;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<OrganizationUser> getOrganizationUsers(@Nullable @Valid CursoredPageable pageable) {
-        return organizationUserRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationUserRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{userId}/{organizationId}")
@@ -62,29 +62,29 @@ public class OrganizationUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeOrganizationUserView(actorId, userId, organizationId);
+        authorizationService.authorizeOrganizationUserView(actorId, userId, organizationId);
         return organizationUserRepository.findById(new OrganizationUserId(userId, organizationId));
     }
 
     @Post
-    public OrganizationUser addOrganizationUser(@Valid @Body CreateOrganizationUserCommand command, Principal principal) {
-        verifyOrgAdminAuthority(principal, command.organizationId());
-        OrganizationUserId id = new OrganizationUserId(command.userId(), command.organizationId());
-        return organizationUserRepository.save(new OrganizationUser(id, command.role()));
+    public OrganizationUser addOrganizationUser(@Valid @Body CreateOrganizationUserRequest request, Principal principal) {
+        verifyOrgAdminAuthority(principal, request.organizationId());
+        OrganizationUserId id = new OrganizationUserId(request.userId(), request.organizationId());
+        return organizationUserRepository.save(new OrganizationUser(id, request.role()));
     }
 
     @Put("/{userId}/{organizationId}")
     public OrganizationUser updateOrganizationUser(
             @PathVariable UUID userId,
             @PathVariable UUID organizationId,
-            @Valid @Body UpdateOrganizationUserCommand command,
+            @Valid @Body UpdateOrganizationUserRequest request,
             Principal principal
     ) {
         verifyOrgAdminAuthority(principal, organizationId);
         OrganizationUserId id = new OrganizationUserId(userId, organizationId);
         organizationUserRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found"));
-        return organizationUserRepository.update(new OrganizationUser(id, command.role()));
+        return organizationUserRepository.update(new OrganizationUser(id, request.role()));
     }
 
     @Delete("/{userId}/{organizationId}")
@@ -103,6 +103,6 @@ public class OrganizationUserController {
 
     private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
         UUID callerId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeOrganizationAdmin(callerId, organizationId, true);
+        authorizationService.authorizeOrganizationAdmin(callerId, organizationId, true);
     }
 }

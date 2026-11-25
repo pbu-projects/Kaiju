@@ -18,7 +18,7 @@ import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.repository.LocationRepository
 import lol.pbu.kaiju.repository.OrganizationRepository
 import lol.pbu.kaiju.repository.ProjectRepository
-import lol.pbu.kaiju.repository.SecurityQueryRepository
+import lol.pbu.kaiju.repository.PermissionQueryRepository
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
@@ -40,7 +40,7 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
     LocationRepository locationRepository
 
     @Inject
-    SecurityQueryRepository securityQueryRepository
+    PermissionQueryRepository permissionQueryRepository
 
     @Shared
     GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(), 4326)
@@ -251,7 +251,7 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
                 Map
         )
         verifyAll {
-            !securityQueryRepository.isOrgVerified(expiredOrg.id())
+            !permissionQueryRepository.isOrgVerified(expiredOrg.id())
             !(searchRes.body().content as List).any { it.id == expiredOrg.id().toString() }
         }
     }

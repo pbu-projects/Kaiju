@@ -10,8 +10,8 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.OrganizationUser
 import lol.pbu.kaiju.domain.OrganizationUserId
-import lol.pbu.kaiju.dto.CreateOrganizationUserCommand
-import lol.pbu.kaiju.dto.UpdateOrganizationUserCommand
+import lol.pbu.kaiju.dto.CreateOrganizationUserRequest
+import lol.pbu.kaiju.dto.UpdateOrganizationUserRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.OrganizationUserRole
 import lol.pbu.kaiju.repository.OrganizationUserRepository
@@ -35,11 +35,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         UUID userId = TestPersonas.VICTOR_VOLUNTEER.id
         UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
-        def command = new CreateOrganizationUserCommand(userId, orgId, OrganizationUserRole.ORG_ADMIN)
+        def request = new CreateOrganizationUserRequest(userId, orgId, OrganizationUserRole.ORG_ADMIN)
 
         when: "the organization user is added by org admin via HTTP POST"
         def response = client.exchange(
-                asOrgAdmin(HttpRequest.POST("/organization-users", command), TestPersonas.LEO_LOCAL_ADMIN),
+                asOrgAdmin(HttpRequest.POST("/organization-users", request), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
         OrganizationUser saved = track(response.body())
@@ -65,11 +65,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
         UUID targetUserId = TestPersonas.VALERIE_VOLUNTEER.id
 
-        def command = new CreateOrganizationUserCommand(targetUserId, orgId, OrganizationUserRole.ORG_ADMIN)
+        def request = new CreateOrganizationUserRequest(targetUserId, orgId, OrganizationUserRole.ORG_ADMIN)
 
         when: "the standard user attempts to add org user via HTTP POST"
         client.exchange(
-                asVolunteer(HttpRequest.POST("/organization-users", command), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.POST("/organization-users", request), TestPersonas.VICTOR_VOLUNTEER),
                 OrganizationUser
         )
 
@@ -80,7 +80,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should reject cross-org admin attempting to add user to another organization with 403 FORBIDDEN"() {
         given: "an org admin of Denver Metro Branch targeting Utah State Chapter"
-        def command = new CreateOrganizationUserCommand(
+        def request = new CreateOrganizationUserRequest(
                 TestPersonas.VICTOR_VOLUNTEER.id,
                 TestPersonas.UTAH_STATE_CHAPTER_ID,
                 OrganizationUserRole.ORG_MEMBER
@@ -88,7 +88,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
         when: "the Denver org admin attempts to add a member to Utah State Chapter"
         client.exchange(
-                asOrgAdmin(HttpRequest.POST("/organization-users", command), TestPersonas.LEO_LOCAL_ADMIN),
+                asOrgAdmin(HttpRequest.POST("/organization-users", request), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
 
@@ -115,7 +115,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should reject unauthenticated POST /organization-users with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to add org user"
-        client.exchange(HttpRequest.POST("/organization-users", new CreateOrganizationUserCommand(UUID.randomUUID(), UUID.randomUUID(), OrganizationUserRole.ORG_ADMIN)))
+        client.exchange(HttpRequest.POST("/organization-users", new CreateOrganizationUserRequest(UUID.randomUUID(), UUID.randomUUID(), OrganizationUserRole.ORG_ADMIN)))
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -214,11 +214,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         UUID userId = TestPersonas.LUKE_LOCAL_MEMBER.id
         UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
-        def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)
+        def request = new UpdateOrganizationUserRequest(OrganizationUserRole.ORG_ADMIN)
 
         when: "the organization user is updated by org admin via HTTP PUT"
         def response = client.exchange(
-                asOrgAdmin(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), TestPersonas.LEO_LOCAL_ADMIN),
+                asOrgAdmin(HttpRequest.PUT("/organization-users/${userId}/${orgId}", request), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
         OrganizationUser updated = response.body()
@@ -242,11 +242,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         UUID userId = TestPersonas.LUKE_LOCAL_MEMBER.id
         UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
-        def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)
+        def request = new UpdateOrganizationUserRequest(OrganizationUserRole.ORG_ADMIN)
 
         when: "the standard user attempts to update org user via HTTP PUT"
         client.exchange(
-                asVolunteer(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.PUT("/organization-users/${userId}/${orgId}", request), TestPersonas.VICTOR_VOLUNTEER),
                 OrganizationUser
         )
 
@@ -259,11 +259,11 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         given: "a Denver org admin targeting a Utah State Chapter membership"
         UUID userId = TestPersonas.URSULA_UTAH_ADMIN.id
         UUID orgId = TestPersonas.UTAH_STATE_CHAPTER_ID
-        def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_MEMBER)
+        def request = new UpdateOrganizationUserRequest(OrganizationUserRole.ORG_MEMBER)
 
         when: "the Denver org admin attempts to update the Utah membership"
         client.exchange(
-                asOrgAdmin(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), TestPersonas.LEO_LOCAL_ADMIN),
+                asOrgAdmin(HttpRequest.PUT("/organization-users/${userId}/${orgId}", request), TestPersonas.LEO_LOCAL_ADMIN),
                 OrganizationUser
         )
 
@@ -276,10 +276,10 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         given: "a non-existent user and organization ID"
         def nonExistentUserId = UUID.randomUUID()
         def nonExistentOrgId = UUID.randomUUID()
-        def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)
+        def request = new UpdateOrganizationUserRequest(OrganizationUserRole.ORG_ADMIN)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organization-users/${nonExistentUserId}/${nonExistentOrgId}", command)), OrganizationUser)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/organization-users/${nonExistentUserId}/${nonExistentOrgId}", request)), OrganizationUser)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -288,7 +288,7 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject unauthenticated PUT /organization-users/{userId}/{orgId} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to update an organization user"
-        client.exchange(HttpRequest.PUT("/organization-users/${UUID.randomUUID()}/${UUID.randomUUID()}", new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_ADMIN)))
+        client.exchange(HttpRequest.PUT("/organization-users/${UUID.randomUUID()}/${UUID.randomUUID()}", new UpdateOrganizationUserRequest(OrganizationUserRole.ORG_ADMIN)))
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)

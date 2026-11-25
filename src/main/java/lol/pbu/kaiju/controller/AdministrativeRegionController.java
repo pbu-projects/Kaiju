@@ -17,15 +17,15 @@ import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.authentication.Authentication;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
-import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand;
-import lol.pbu.kaiju.dto.IngestBoundaryCommand;
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest;
+import lol.pbu.kaiju.dto.IngestBoundaryRequest;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
-import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand;
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest;
 import lol.pbu.kaiju.dto.UsSyncResult;
 import lol.pbu.kaiju.service.AdministrativeRegionService;
 import lol.pbu.kaiju.service.BoundaryIngestionService;
 import lol.pbu.kaiju.service.UsBoundarySyncService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 import org.jspecify.annotations.NonNull;
 
 import java.util.Optional;
@@ -70,7 +70,7 @@ public class AdministrativeRegionController {
      */
     @Get
     public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@Nullable @Valid CursoredPageable pageable) {
-        return administrativeRegionService.getAdministrativeRegions(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return administrativeRegionService.getAdministrativeRegions(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -89,18 +89,18 @@ public class AdministrativeRegionController {
      * Creates and persists a new administrative region polygon.
      * Restricted to platform administrators.
      *
-     * @param command        the administrative region creation command
+     * @param request        the administrative region creation request
      * @param authentication the authenticated user making the request
      * @return the persisted administrative region
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Post
     public AdministrativeRegion addAdministrativeRegion(
-            @Valid @Body CreateAdministrativeRegionCommand command,
+            @Valid @Body CreateAdministrativeRegionRequest request,
             @NonNull Authentication authentication
     ) {
         UUID actorUserId = UUID.fromString(authentication.getName());
-        return administrativeRegionService.createAdministrativeRegion(command, actorUserId);
+        return administrativeRegionService.createAdministrativeRegion(request, actorUserId);
     }
 
     /**
@@ -108,7 +108,7 @@ public class AdministrativeRegionController {
      * Restricted to platform administrators.
      *
      * @param id             the unique UUID of the administrative region to update
-     * @param command        the updated region command data
+     * @param request        the updated region request data
      * @param authentication the authenticated user making the request
      * @return the updated administrative region
      */
@@ -116,11 +116,11 @@ public class AdministrativeRegionController {
     @Put("/{id}")
     public AdministrativeRegion updateAdministrativeRegion(
             @PathVariable UUID id,
-            @Valid @Body UpdateAdministrativeRegionCommand command,
+            @Valid @Body UpdateAdministrativeRegionRequest request,
             @NonNull Authentication authentication
     ) {
         UUID actorUserId = UUID.fromString(authentication.getName());
-        return administrativeRegionService.updateAdministrativeRegion(id, command, actorUserId);
+        return administrativeRegionService.updateAdministrativeRegion(id, request, actorUserId);
     }
 
     /**
@@ -146,7 +146,7 @@ public class AdministrativeRegionController {
      * Restricted strictly to platform administrators.
      *
      * @param id             the unique UUID of the administrative region to update
-     * @param command        the boundary ingestion command
+     * @param request        the boundary ingestion request
      * @param authentication the authenticated user making the request
      * @return the ingestion summary response
      */
@@ -154,11 +154,11 @@ public class AdministrativeRegionController {
     @Post("/{id}/boundary/ingest")
     public IngestBoundaryResponse ingestBoundary(
             @PathVariable UUID id,
-            @Valid @Body IngestBoundaryCommand command,
+            @Valid @Body IngestBoundaryRequest request,
             @NonNull Authentication authentication
     ) {
         UUID actorUserId = UUID.fromString(authentication.getName());
-        return boundaryIngestionService.ingestBoundary(id, command, actorUserId);
+        return boundaryIngestionService.ingestBoundary(id, request, actorUserId);
     }
 
     /**

@@ -22,12 +22,12 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.Organization;
-import lol.pbu.kaiju.dto.CreateOrganizationCommand;
-import lol.pbu.kaiju.dto.UpdateOrganizationCommand;
+import lol.pbu.kaiju.dto.CreateOrganizationRequest;
+import lol.pbu.kaiju.dto.UpdateOrganizationRequest;
 import lol.pbu.kaiju.repository.OrganizationRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
+import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.OrganizationService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -48,24 +48,24 @@ public class OrganizationController {
     private final OrganizationService organizationService;
     private final OrganizationRepository organizationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public OrganizationController(
             OrganizationService organizationService,
             OrganizationRepository organizationRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.organizationService = organizationService;
         this.organizationRepository = organizationRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Get
     public CursoredPage<Organization> getOrganizations(@Nullable @Valid CursoredPageable pageable) {
-        return organizationService.getOrganizations(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return organizationService.getOrganizations(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     /**
@@ -171,9 +171,9 @@ public class OrganizationController {
 
     private @NonNull Pageable normalizePageable(@Nullable Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
-            return Pageable.from(0, PageableUtils.DEFAULT_PAGE_SIZE);
+            return Pageable.from(0, PageRequests.DEFAULT_PAGE_SIZE);
         }
-        int cappedSize = Math.min(pageable.getSize(), PageableUtils.MAX_PAGE_SIZE);
+        int cappedSize = Math.min(pageable.getSize(), PageRequests.MAX_PAGE_SIZE);
         if (!pageable.getSort().getOrderBy().isEmpty() || cappedSize != pageable.getSize()) {
             return Pageable.from(pageable.getNumber(), cappedSize);
         }
@@ -195,48 +195,50 @@ public class OrganizationController {
         UUID callerId = UUID.fromString(principal.getName());
         return organizationService.getOrganizationById(id)
                 .map(org -> {
-                    projectSecurityService.authorizeOrganizationView(callerId, org);
+                    authorizationService.authorizeOrganizationView(callerId, org);
                     return org;
                 });
     }
 
     @Post
-    public Organization addOrganization(@Valid @Body CreateOrganizationCommand command, Principal principal) {
+    public Organization addOrganization(@Valid @Body CreateOrganizationRequest request, Principal principal) {
         UUID creatorUserId = UUID.fromString(principal.getName());
         Organization organization = Organization.forCreation(
-                command.name(),
-                command.websiteUrl(),
-                command.parentId(),
-                command.isPublic()
+                request.name(),
+                request.websiteUrl(),
+                request.parentId(),
+                request.isPublic()
         );
         return organizationService.createOrganization(organization, creatorUserId);
     }
 
     /**
-     * Updates an existing organization by its ID after validating that it exists.
-     * Throws 404 NOT_FOUND if the organization does not exist.
+     * Updates an existing organization by ID.
+     * Verifies that the caller is a global admin or organization manager before checking if the organization exists.
+     * Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id        the ID of the organization to update
-     * @param command   the updated organization command
+     * @param request   the updated organization request
      * @param principal the authenticated principal
      * @return the updated organization
      */
     @Put("/{id}")
-    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationCommand command, Principal principal) {
+    public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationRequest request, Principal principal) {
         Organization candidate = Organization.forUpdate(
                 id,
-                command.name(),
-                command.websiteUrl(),
-                command.parentId(),
-                command.isPublic()
+                request.name(),
+                request.websiteUrl(),
+                request.parentId(),
+                request.isPublic()
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return organizationService.updateOrganization(id, candidate, actorUserId);
     }
 
     /**
-     * Deletes an organization by its ID after validating that it exists.
-     * Throws 404 NOT_FOUND if the organization does not exist.
+     * Deletes an organization by ID.
+     * Verifies that the caller is an organization admin or system admin before deleting the organization.
+     * Throws 403 FORBIDDEN if unauthorized, or 404 NOT_FOUND if the organization does not exist.
      *
      * @param id        the ID of the organization to delete
      * @param principal the authenticated principal

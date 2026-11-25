@@ -11,10 +11,10 @@ import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
-import lol.pbu.kaiju.dto.CoordinateDto
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.UpdateBoundaryCommand
-import lol.pbu.kaiju.dto.UpdateLocationCommand
+import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.UpdateBoundaryRequest
+import lol.pbu.kaiju.dto.UpdateLocationRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
@@ -38,7 +38,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
     OrganizationService organizationService
 
     @Inject
-    ProjectSecurityService projectSecurityService
+    AuthorizationService authorizationService
 
     def "org manager can view own draft project while outsider gets 403 and deleted project returns 404"() {
         given: "a draft project and a soft-deleted active project for Denver Metro Branch"
@@ -358,7 +358,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
 
         when: "the org manager creates a shift on the DRAFT project"
         client.exchange(
-                asOrgManager(HttpRequest.POST("/shifts", new CreateShiftCommand(draft.id(), true, null, start, end, null)), TestPersonas.LAURA_LOCAL_MANAGER),
+                asOrgManager(HttpRequest.POST("/shifts", new CreateShiftRequest(draft.id(), true, null, start, end, null)), TestPersonas.LAURA_LOCAL_MANAGER),
                 Shift
         )
 
@@ -368,7 +368,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
 
         when: "the org manager creates a shift on the soft-deleted project"
         client.exchange(
-                asOrgManager(HttpRequest.POST("/shifts", new CreateShiftCommand(deleted.id(), true, null, start, end, null)), TestPersonas.LAURA_LOCAL_MANAGER),
+                asOrgManager(HttpRequest.POST("/shifts", new CreateShiftRequest(deleted.id(), true, null, start, end, null)), TestPersonas.LAURA_LOCAL_MANAGER),
                 Shift
         )
 
@@ -378,7 +378,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
 
         when: "the org manager creates a shift using a location not in project.locations()"
         client.exchange(
-                asOrgManager(HttpRequest.POST("/shifts", new CreateShiftCommand(activeWithLoc.id(), false, otherLocation.id(), start, end, null)), TestPersonas.LAURA_LOCAL_MANAGER),
+                asOrgManager(HttpRequest.POST("/shifts", new CreateShiftRequest(activeWithLoc.id(), false, otherLocation.id(), start, end, null)), TestPersonas.LAURA_LOCAL_MANAGER),
                 Shift
         )
 
@@ -397,7 +397,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 .build()
 
         expect: "region location check returns false"
-        !projectSecurityService.areAllLocationsInRegion(emptyLocProject, TestPersonas.DENVER_COUNTY_REGION_ID)
+        !authorizationService.areAllLocationsInRegion(emptyLocProject, TestPersonas.DENVER_COUNTY_REGION_ID)
     }
 
     def "organization service blocks self-parenting, missing parent orgs, and restoring revoked verification"() {
@@ -456,7 +456,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 .withGeometry(denverPolygon)
                 .persist()
 
-        def moveLocationCmd = new UpdateLocationCommand(
+        def moveLocationRequest = new UpdateLocationRequest(
                 "Moved to Boulder",
                 "1777 Broadway",
                 "Boulder",
@@ -466,20 +466,20 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 -105.2705,
                 40.0150
         )
-        def moveBoundaryCmd = new UpdateBoundaryCommand(
+        def moveBoundaryRequest = new UpdateBoundaryRequest(
                 "Moved to Boulder",
                 [
-                        new CoordinateDto(-105.2805, 40.0050),
-                        new CoordinateDto(-105.2605, 40.0050),
-                        new CoordinateDto(-105.2605, 40.0250),
-                        new CoordinateDto(-105.2805, 40.0250),
-                        new CoordinateDto(-105.2805, 40.0050)
+                        new Coordinates(-105.2805, 40.0050),
+                        new Coordinates(-105.2605, 40.0050),
+                        new Coordinates(-105.2605, 40.0250),
+                        new Coordinates(-105.2805, 40.0250),
+                        new Coordinates(-105.2805, 40.0050)
                 ]
         )
 
         when: "Denver County director tries to move the Denver location to Boulder"
         client.exchange(
-                asRegionDirector(HttpRequest.PUT("/locations/${denverLocation.id()}", moveLocationCmd), TestPersonas.DANIEL_COUNTY_DIRECTOR),
+                asRegionDirector(HttpRequest.PUT("/locations/${denverLocation.id()}", moveLocationRequest), TestPersonas.DANIEL_COUNTY_DIRECTOR),
                 Map
         )
 
@@ -489,7 +489,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
 
         when: "Denver County director tries to move the Denver boundary to Boulder"
         client.exchange(
-                asRegionDirector(HttpRequest.PUT("/boundaries/${denverBoundary.id()}", moveBoundaryCmd), TestPersonas.DANIEL_COUNTY_DIRECTOR),
+                asRegionDirector(HttpRequest.PUT("/boundaries/${denverBoundary.id()}", moveBoundaryRequest), TestPersonas.DANIEL_COUNTY_DIRECTOR),
                 Map
         )
 

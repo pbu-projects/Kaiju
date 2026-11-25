@@ -6,7 +6,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.repository.PageableRepository;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
-import lol.pbu.kaiju.dto.CoveringRegionDto;
+import lol.pbu.kaiju.dto.CoveringRegion;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
@@ -29,7 +29,7 @@ public interface AdministrativeRegionRepository extends PageableRepository<Admin
         WHERE ST_Covers(geom, ST_SetSRID(ST_Point(:lon, :lat), 4326)::geography)
         ORDER BY level DESC NULLS LAST, COALESCE(area_sq_m, ST_Area(geom)) ASC
     """, nativeQuery = true)
-    List<CoveringRegionDto> findCoveringRegions(double lat, double lon);
+    List<CoveringRegion> findCoveringRegions(double lat, double lon);
 
     List<AdministrativeRegion> findByLevelOrderByNameAsc(int level);
 

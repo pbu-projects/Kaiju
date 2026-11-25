@@ -454,9 +454,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         usersResponse.status == HttpStatus.OK
 
         when: "Sarah calls POST /administrative-regions to create an administrative boundary"
-        def regionCommand = data.region().withName("Sarah Admin Region " + UUID.randomUUID()).asCommand()
+        def regionRequest = data.region().withName("Sarah Admin Region " + UUID.randomUUID()).asRequest()
         def regionResponse = client.exchange(
-                HttpRequest.POST("/administrative-regions", regionCommand)
+                HttpRequest.POST("/administrative-regions", regionRequest)
                         .header("Authorization", "Bearer ${tokens.idToken}"),
                 AdministrativeRegion
         )
@@ -526,9 +526,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         projectsResponse.status == HttpStatus.OK
 
         when: "Nathan attempts to create an administrative region via POST /administrative-regions"
-        def regionCommand = data.region().withName("Nathan Region Attempt").asCommand()
+        def regionRequest = data.region().withName("Nathan Region Attempt").asRequest()
         client.exchange(
-                HttpRequest.POST("/administrative-regions", regionCommand)
+                HttpRequest.POST("/administrative-regions", regionRequest)
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
@@ -561,9 +561,9 @@ class AuthentikOidcIntegrationSpec extends Specification {
         projectsResponse.status == HttpStatus.OK
 
         when: "Victor attempts to create an administrative region via POST /administrative-regions"
-        def regionCommand = data.region().withName("Victor Region Attempt").asCommand()
+        def regionRequest = data.region().withName("Victor Region Attempt").asRequest()
         client.exchange(
-                HttpRequest.POST("/administrative-regions", regionCommand)
+                HttpRequest.POST("/administrative-regions", regionRequest)
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
@@ -581,7 +581,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         UUID createdRegionId = null
 
         when: "Victor calls POST /administrative-regions with his initial STANDARD_USER role"
-        def preRegion = data.region().withName("Victor Pre-Promotion Region").asCommand()
+        def preRegion = data.region().withName("Victor Pre-Promotion Region").asRequest()
         client.exchange(
                 HttpRequest.POST("/administrative-regions", preRegion)
                         .header("Authorization", "Bearer ${tokens.idToken}")
@@ -595,7 +595,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         userService.updateRole(victor.id(), UserRole.GLOBAL_ADMIN, TestPersonas.SARAH_ADMIN.id)
 
         and: "Victor presents the exact same live Authentik token to POST /administrative-regions"
-        def promotedRegion = data.region().withName("Victor Promoted Region").asCommand()
+        def promotedRegion = data.region().withName("Victor Promoted Region").asRequest()
         def elevatedResponse = client.exchange(
                 HttpRequest.POST("/administrative-regions", promotedRegion)
                         .header("Authorization", "Bearer ${tokens.idToken}"),
@@ -613,7 +613,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         userService.updateRole(victor.id(), UserRole.STANDARD_USER, TestPersonas.SARAH_ADMIN.id)
 
         and: "Victor presents the exact same live Authentik token once again"
-        def demotedRegion = data.region().withName("Victor Demoted Region").asCommand()
+        def demotedRegion = data.region().withName("Victor Demoted Region").asRequest()
         client.exchange(
                 HttpRequest.POST("/administrative-regions", demotedRegion)
                         .header("Authorization", "Bearer ${tokens.idToken}")

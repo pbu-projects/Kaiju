@@ -12,12 +12,20 @@ import io.micronaut.serde.ObjectMapper
 import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.validation.validator.Validator as MicronautValidator
 import jakarta.validation.Validator
-import lol.pbu.kaiju.dto.CoordinateDto
-import lol.pbu.kaiju.dto.CreateOrganizationCommand
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.IngestBoundaryCommand
-import lol.pbu.kaiju.dto.UpdateOrganizationCommand
-import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CreateOrganizationAuditLogRequest
+import lol.pbu.kaiju.dto.CreateOrganizationRequest
+import lol.pbu.kaiju.dto.CreateProjectAuditLogRequest
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.IngestBoundaryRequest
+import lol.pbu.kaiju.dto.ShiftTimeRange
+import lol.pbu.kaiju.dto.UpdateOrganizationAuditLogRequest
+import lol.pbu.kaiju.dto.UpdateOrganizationRequest
+import lol.pbu.kaiju.dto.UpdateProjectAuditLogRequest
+import lol.pbu.kaiju.dto.UpdateShiftRequest
+import lol.pbu.kaiju.dto.ValidShiftLocationValidator
+import lol.pbu.kaiju.dto.ValidTimeRangeValidator
+import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.model.JtsPointConverter
 import lol.pbu.kaiju.model.JtsPolygonConverter
 import lol.pbu.kaiju.serde.JtsGeometrySerde
@@ -34,6 +42,7 @@ import org.locationtech.jts.geom.PrecisionModel
 import org.postgresql.util.PGobject
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -57,15 +66,15 @@ class SpatialAndInputValidationSpec extends Specification {
     JtsPointConverter pointConverter = new JtsPointConverter()
     JtsPolygonConverter polygonConverter = new JtsPolygonConverter()
 
-    // --- PageableUtils tests ---
+    // --- PageRequests tests ---
 
     def "null pageable defaults to size 20 and sorts by given field"() {
         when:
-        CursoredPageable resolved = PageableUtils.resolvePageable(null, "name")
+        CursoredPageable resolved = PageRequests.resolvePageable(null, "name")
 
         then:
         verifyAll(resolved) {
-            size == PageableUtils.DEFAULT_PAGE_SIZE
+            size == PageRequests.DEFAULT_PAGE_SIZE
             size == 20
             sort.orderBy.size() == 1
             sort.orderBy[0].property == "name"
@@ -87,11 +96,11 @@ class SpatialAndInputValidationSpec extends Specification {
         )
 
         when:
-        CursoredPageable resolved = PageableUtils.resolvePageable(oversized, "name")
+        CursoredPageable resolved = PageRequests.resolvePageable(oversized, "name")
 
         then:
         verifyAll(resolved) {
-            size == PageableUtils.MAX_PAGE_SIZE
+            size == PageRequests.MAX_PAGE_SIZE
             size == 100
             number == 3
             mode == Pageable.Mode.CURSOR_NEXT
@@ -114,7 +123,7 @@ class SpatialAndInputValidationSpec extends Specification {
         )
 
         when:
-        CursoredPageable resolved = PageableUtils.resolvePageable(requested, "name")
+        CursoredPageable resolved = PageRequests.resolvePageable(requested, "name")
 
         then:
         verifyAll(resolved) {
@@ -126,7 +135,8 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- JtsGeometrySerde tests ---
 
-    def "geometry serde rejects NaN and Infinity numbers in coordinates"() {
+    @Unroll
+    def "geometry serde rejects NaN and Infinity numbers in coordinates (#lon, #lat)"() {
         given:
         JsonNode pointNode = JsonNode.createObjectNode([
                 type       : JsonNode.createStringNode("Point"),
@@ -151,7 +161,8 @@ class SpatialAndInputValidationSpec extends Specification {
         -105.0d                  | Double.NEGATIVE_INFINITY
     }
 
-    def "geometry serde rejects coordinates outside WGS84 bounds"() {
+    @Unroll
+    def "geometry serde rejects coordinates outside WGS84 bounds (#lon, #lat)"() {
         given:
         JsonNode pointNode = JsonNode.createObjectNode([
                 type       : JsonNode.createStringNode("Point"),
@@ -180,7 +191,8 @@ class SpatialAndInputValidationSpec extends Specification {
         -105.0d | 91.0d
     }
 
-    def "geometry serde rejects null elements inside coordinates and polygon rings"() {
+    @Unroll
+    def "geometry serde rejects null elements inside #jsonPayload"() {
         given:
         JsonNode node = objectMapper.readValue(jsonPayload, JsonNode)
 
@@ -223,7 +235,8 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- SpatialMappingService tests ---
 
-    def "toPoint rejects NaN, Infinity, and out-of-range WGS84 coordinates"() {
+    @Unroll
+    def "toPoint rejects invalid WGS84 coordinates (#lon, #lat)"() {
         when:
         spatialMappingService.toPoint(lon, lat)
 
@@ -242,12 +255,13 @@ class SpatialAndInputValidationSpec extends Specification {
         -105.0d                  | -91.0d
     }
 
-    def "toPolygon rejects NaN, Infinity, and out-of-range WGS84 coordinates"() {
+    @Unroll
+    def "toPolygon rejects invalid WGS84 coordinates (#badLon, #badLat)"() {
         given:
-        List<CoordinateDto> coords = [
-                new CoordinateDto(0.0d, 0.0d),
-                new CoordinateDto(1.0d, 0.0d),
-                new CoordinateDto(badLon, badLat)
+        List<Coordinates> coords = [
+                new Coordinates(0.0d, 0.0d),
+                new Coordinates(1.0d, 0.0d),
+                new Coordinates(badLon, badLat)
         ]
 
         when:
@@ -268,7 +282,8 @@ class SpatialAndInputValidationSpec extends Specification {
         1.0d                     | -91.0d
     }
 
-    def "toPolygon rejects null coordinate entries and null longitude or latitude values"() {
+    @Unroll
+    def "toPolygon rejects null coordinate entries and values (#coords)"() {
         when:
         spatialMappingService.toPolygon(coords)
 
@@ -277,17 +292,17 @@ class SpatialAndInputValidationSpec extends Specification {
 
         where:
         coords << [
-                [new CoordinateDto(0.0d, 0.0d), null, new CoordinateDto(1.0d, 1.0d)],
-                [new CoordinateDto(0.0d, 0.0d), new CoordinateDto(null, 0.0d), new CoordinateDto(1.0d, 1.0d)],
-                [new CoordinateDto(0.0d, 0.0d), new CoordinateDto(1.0d, null), new CoordinateDto(1.0d, 1.0d)]
+                [new Coordinates(0.0d, 0.0d), null, new Coordinates(1.0d, 1.0d)],
+                [new Coordinates(0.0d, 0.0d), new Coordinates(null, 0.0d), new Coordinates(1.0d, 1.0d)],
+                [new Coordinates(0.0d, 0.0d), new Coordinates(1.0d, null), new Coordinates(1.0d, 1.0d)]
         ]
     }
 
     def "toPolygon rejects polygons with more than 10000 vertices"() {
         given:
-        List<CoordinateDto> coords = (0..<10_001).collect { int i ->
+        List<Coordinates> coords = (0..<10_001).collect { int i ->
             double angle = (2.0d * Math.PI * i) / 10_001.0d
-            new CoordinateDto(Math.cos(angle), Math.sin(angle))
+            new Coordinates(Math.cos(angle), Math.sin(angle))
         }
 
         when:
@@ -319,10 +334,9 @@ class SpatialAndInputValidationSpec extends Specification {
         ex.message.contains("Expected Point geometry")
     }
 
-    def "JtsPolygonConverter rejects Point values on both write and read"() {
+    def "JtsPolygonConverter rejects Point values on write"() {
         given:
         Point point = geometryFactory.createPoint(new Coordinate(-105.0d, 39.0d))
-        PGobject pointWkb = pointConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
 
         when:
         polygonConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
@@ -330,6 +344,12 @@ class SpatialAndInputValidationSpec extends Specification {
         then:
         def writeEx = thrown(IllegalArgumentException)
         writeEx.message.contains("Expected Polygon or MultiPolygon")
+    }
+
+    def "JtsPolygonConverter rejects Point WKB values on read"() {
+        given:
+        Point point = geometryFactory.createPoint(new Coordinate(-105.0d, 39.0d))
+        PGobject pointWkb = pointConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
 
         when:
         polygonConverter.convertToEntityValue(pointWkb, ConversionContext.DEFAULT)
@@ -341,65 +361,46 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- DTO Bean Validation tests ---
 
-    def "organization commands reject javascript URLs for websiteUrl"() {
+    @Unroll
+    def "#requestType rejects javascript URLs for websiteUrl"() {
         given:
-        CreateOrganizationCommand createCmd = new CreateOrganizationCommand(
-                "Mutual Aid Group",
-                "javascript:alert(1)",
-                null,
-                true
-        )
-        UpdateOrganizationCommand updateCmd = new UpdateOrganizationCommand(
-                "Mutual Aid Group",
-                "javascript:alert(1)",
-                null,
-                true
-        )
+        def request = requestType == "CreateOrganizationRequest"
+                ? new CreateOrganizationRequest("Mutual Aid Group", "javascript:alert(1)", null, true)
+                : new UpdateOrganizationRequest("Mutual Aid Group", "javascript:alert(1)", null, true)
 
         when:
-        def createViolations = validator.validate(createCmd)
-        def updateViolations = validator.validate(updateCmd)
+        def violations = validator.validate(request)
 
         then:
         verifyAll {
-            createViolations.size() == 1
-            createViolations[0].propertyPath.toString() == "websiteUrl"
-            updateViolations.size() == 1
-            updateViolations[0].propertyPath.toString() == "websiteUrl"
+            violations.size() == 1
+            violations[0].propertyPath.toString() == "websiteUrl"
         }
+
+        where:
+        requestType << ["CreateOrganizationRequest", "UpdateOrganizationRequest"]
     }
 
-    def "shift commands reject endTime before startTime"() {
+    @Unroll
+    def "#requestType rejects endTime before startTime"() {
         given:
         OffsetDateTime start = OffsetDateTime.of(2026, 6, 15, 14, 0, 0, 0, ZoneOffset.UTC)
         OffsetDateTime end = start.minusHours(2)
-        CreateShiftCommand createCmd = new CreateShiftCommand(
-                UUID.randomUUID(),
-                true,
-                null,
-                start,
-                end,
-                []
-        )
-        UpdateShiftCommand updateCmd = new UpdateShiftCommand(
-                true,
-                null,
-                start,
-                end,
-                []
-        )
+        def request = requestType == "CreateShiftRequest"
+                ? new CreateShiftRequest(UUID.randomUUID(), true, null, start, end, [])
+                : new UpdateShiftRequest(true, null, start, end, [])
 
         when:
-        def createViolations = validator.validate(createCmd)
-        def updateViolations = validator.validate(updateCmd)
+        def violations = validator.validate(request)
 
         then:
         verifyAll {
-            createViolations.size() == 1
-            createViolations[0].message == "Shift start time must be before end time."
-            updateViolations.size() == 1
-            updateViolations[0].message == "Shift start time must be before end time."
+            violations.size() == 1
+            violations[0].message == "Shift start time must be before end time."
         }
+
+        where:
+        requestType << ["CreateShiftRequest", "UpdateShiftRequest"]
     }
 
     // --- BoundaryIngestionService audit guard test ---
@@ -436,17 +437,111 @@ class SpatialAndInputValidationSpec extends Specification {
                 "/arcgis/rest/services/TIGERweb/"
         )
         UUID regionId = UUID.randomUUID()
-        IngestBoundaryCommand command = new IngestBoundaryCommand(
+        IngestBoundaryRequest request = new IngestBoundaryRequest(
                 "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/query",
                 0.001d
         )
 
         when:
-        ingestionService.ingestBoundary(regionId, command, null)
+        ingestionService.ingestBoundary(regionId, request, null)
 
         then:
         def ex = thrown(IllegalArgumentException)
         ex.message.contains("actorUserId must not be null")
         0 * regionService.applyIngestedBoundary(*_)
+    }
+
+    // --- Validator null-input and AuditLogRequest DTO tests ---
+
+    @Unroll
+    def "ValidTimeRangeValidator accepts #caseLabel"() {
+        given:
+        ValidTimeRangeValidator rangeValidator = new ValidTimeRangeValidator()
+
+        expect:
+        rangeValidator.isValid(range, null)
+
+        where:
+        caseLabel                       | range
+        "null range"                    | null
+        "range with missing start time" | ([startTime: { null }, endTime: { OffsetDateTime.of(2026, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC) }] as ShiftTimeRange)
+        "range with missing end time"   | ([startTime: { OffsetDateTime.of(2026, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC) }, endTime: { null }] as ShiftTimeRange)
+    }
+
+    def "ValidShiftLocationValidator accepts null ShiftLocation"() {
+        given:
+        ValidShiftLocationValidator locationValidator = new ValidShiftLocationValidator()
+
+        expect:
+        locationValidator.isValid(null, null)
+    }
+
+    def "CreateOrganizationAuditLogRequest stores fields and passes validation"() {
+        given:
+        UUID orgId = UUID.randomUUID()
+        UUID actorId = UUID.randomUUID()
+        def request = new CreateOrganizationAuditLogRequest(orgId, actorId, "UNVERIFIED", "VERIFIED", "Reviewed docs")
+
+        expect:
+        verifyAll {
+            validator.validate(request).isEmpty()
+            request.organizationId() == orgId
+            request.actorId() == actorId
+            request.previousStatus() == "UNVERIFIED"
+            request.newStatus() == "VERIFIED"
+            request.reason() == "Reviewed docs"
+        }
+    }
+
+    def "CreateProjectAuditLogRequest stores fields and passes validation"() {
+        given:
+        UUID projectId = UUID.randomUUID()
+        UUID actorId = UUID.randomUUID()
+        def request = new CreateProjectAuditLogRequest(projectId, actorId, AuditAction.APPROVED)
+
+        expect:
+        verifyAll {
+            validator.validate(request).isEmpty()
+            request.projectId() == projectId
+            request.actorId() == actorId
+            request.action() == AuditAction.APPROVED
+        }
+    }
+
+    def "UpdateOrganizationAuditLogRequest stores fields and passes validation"() {
+        given:
+        def request = new UpdateOrganizationAuditLogRequest("VERIFIED", "SUSPENDED", "Expired")
+
+        expect:
+        verifyAll(request) {
+            validator.validate(it).isEmpty()
+            previousStatus() == "VERIFIED"
+            newStatus() == "SUSPENDED"
+            reason() == "Expired"
+        }
+    }
+
+    def "UpdateProjectAuditLogRequest stores fields and passes validation"() {
+        given:
+        def request = new UpdateProjectAuditLogRequest(AuditAction.EDITED)
+
+        expect:
+        verifyAll(request) {
+            validator.validate(it).isEmpty()
+            action() == AuditAction.EDITED
+        }
+    }
+
+    @Unroll
+    def "#requestName reports #expectedViolations violations when required fields are invalid"() {
+        expect:
+        validator.validate(request).size() == expectedViolations
+
+        where:
+        requestName                         | request                                                             | expectedViolations
+        "CreateOrganizationAuditLogRequest" | new CreateOrganizationAuditLogRequest(null, null, "", " ", null)    | 4
+        "CreateProjectAuditLogRequest"      | new CreateProjectAuditLogRequest(null, null, null)                  | 3
+        "UpdateOrganizationAuditLogRequest" | new UpdateOrganizationAuditLogRequest("", " ", null)                | 2
+        "UpdateProjectAuditLogRequest"      | new UpdateProjectAuditLogRequest(null)                              | 1
     }
 }

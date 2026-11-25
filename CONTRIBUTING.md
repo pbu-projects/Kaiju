@@ -6,60 +6,30 @@ Guidelines for contributing to the Kaiju backend service.
 
 ## 1. Standards & References
 
-Do not rewrite or reinvent established patterns. Follow the canonical documentation:
+Follow these guides instead of inventing new patterns:
 
-* **Architecture & DTO Standards:** Refer to the internal Field Guide specification for guidelines on Java 25 records, reflection-free AOT compilation, and DTO boundaries.
-* **Testing Guidelines:** See [Testing Guidelines](TESTING.md) and refer to the internal Field Guide specification for Spock, Testcontainers, and PostGIS boundary test rules.
-* **Security & Access Controls:** Refer to [Testing Guidelines](TESTING.md) and the internal Field Guide security matrix.
-* **Personas & User Journeys:** Refer to the internal Field Guide specification for canonical Personas and Key User Journeys.
+* **Code Style, Naming & DTOs:** See [Style Guide](STYLEGUIDE.md) for naming rules, DTO boundaries, import hygiene, and SonarClean quality standards.
+* **Testing, Security & Personas:** See [Testing Guidelines](TESTING.md) for Spock and Testcontainers conventions, PostGIS boundary checks, access control rules, and canonical personas.
 
 ---
 
-## 2. Code Style & Import Standards
+## 2. Local Testing
 
-We follow the [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html) with strict enforcement of import hygiene and clean code practices:
-
-* **Explicit Imports (Google Java Style §3.3):**
-  - **No Wildcard Imports:** Wildcard imports (`import foo.bar.*`) are strictly prohibited (Google Java Style §3.3.1).
-  - **No Inline FQDNs / FQCNs:** **NEVER** use fully qualified domain/class names (e.g., `java.util.List`, `jakarta.validation.constraints.NotNull`, `org.slf4j.Logger`) inline within Java or Groovy code bodies, method signatures, return types, field definitions, or annotations.
-  - **Always Declare Explicit Imports:** Always declare appropriate, explicit `import` statements at the top of the file.
-  - **Name Collisions Exception:** The *only* exception to inline FQCN usage is resolving an unavoidable simple-name collision between two imported types in the same file (e.g., `java.util.Date` vs `java.sql.Date`).
-* **Quality & Reliability Standards (SonarClean):**
-  - **Thread-Safety & Lifecycle:** Avoid unmanaged `ThreadLocal` allocations in singleton beans (Sonar rule `java:S5164`). Prefer lightweight direct instantiation or managed container lifecycles.
-  - **Control Flow:** Avoid nested ternary operators (Sonar rule `java:S3358`) and collapsible nested `if` statements (Sonar rule `java:S1066`).
-  - **Null Safety:** Return empty collections or empty arrays rather than `null` from query and builder methods.
+All tests must pass locally before opening or updating a Pull Request. See [Testing Guidelines](TESTING.md#6-running-tests-locally) for setup steps and `./gradlew test` commands.
 
 ---
 
-## 3. Local Testing
-
-All tests run against live PostgreSQL + PostGIS containers managed by Testcontainers.
-
-```bash
-# Start local Authentik identity provider
-docker compose -f database/compose.yml up -d authentik-server authentik-worker
-
-# Run the test suite
-./gradlew test
-```
-
-* All tests must pass locally before opening or updating a Pull Request.
-* Avoid mocking when real database/service containers can be used.
-* See [TESTING.md](TESTING.md) for full details on test fixtures, personas, and boundary checks.
-
----
-
-## 4. Pull Request Expectations
+## 3. Pull Request Expectations
 
 Pull requests must follow [`.github/pull_request_template.md`](.github/pull_request_template.md) and include:
 
-1. **Why the Change is Proposed:** State the overarching problem, goal, or issue being resolved.
-2. **File-by-File Breakdown:** Explicitly explain *why* each file was changed and *what* changed.
-3. **Test Validation (Journeys & Personas):** Detail the new or updated tests validating the change, framed against the relevant project Personas and User Journeys (from internal Field Guide specifications). Include negative authorization checks (`401`/`403`) and client context where applicable.
+1. **Why the Change is Proposed:** State the problem, goal, or issue being solved.
+2. **File-by-File Breakdown:** Explain *why* each file changed and *what* changed.
+3. **Test Validation (Journeys & Personas):** Describe the new or updated tests using the personas and user journeys in [Testing Guidelines](TESTING.md). Include negative authorization checks (`401`/`403`) and client context where needed.
 
 ---
 
-## 5. Git Workflow
+## 4. Git Workflow
 
 * Stage exact files explicitly with `git add <file>`. Do not use `git commit -a` or `git commit -am`.
 * Ensure `./gradlew test` passes locally before committing.

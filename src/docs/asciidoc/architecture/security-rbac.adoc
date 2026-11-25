@@ -62,7 +62,7 @@ We do not just check your title. We check if your title gives you the exact perm
 | Every permission, including `system:user-manage` and `system:admin`
 |===
 
-When a new user signs in for the first time, a helper class called `IdpRoleMapper` reads the groups on their token and sets their starting role:
+When a new user signs in for the first time, a helper class called `IdentityProviderRoleMapper` reads the groups on their token and sets their starting role:
 
 [source,java]
 ----

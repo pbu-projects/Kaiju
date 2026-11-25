@@ -12,6 +12,7 @@ import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.UserService
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.text.ParseException
 
@@ -28,7 +29,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     UserService userService
 
     @Inject
-    IdpRoleMapper idpRoleMapper
+    IdentityProviderRoleMapper identityProviderRoleMapper
 
     @Inject
     UserRepository userRepository
@@ -36,7 +37,7 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
     KaijuJwtAuthenticationFactory factory
 
     def setup() {
-        factory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, userService, idpRoleMapper)
+        factory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, userService, identityProviderRoleMapper)
     }
 
     def "createAuthentication | should successfully authenticate and map permissions when valid email claim is present"() {
@@ -53,11 +54,13 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
 
-        then: "authentication is present"
-        authOpt.isPresent()
-        def auth = authOpt.get()
+        then: "authentication and user are present"
         Optional<User> userOpt = userRepository.findByEmail(email)
-        userOpt.isPresent()
+        verifyAll {
+            authOpt.isPresent()
+            userOpt.isPresent()
+        }
+        def auth = authOpt.get()
         def user = userOpt.get()
 
         and: "the principal name, permissions, and attributes match"
@@ -84,11 +87,13 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
 
-        then: "authentication is present"
-        authOpt.isPresent()
-        def auth = authOpt.get()
+        then: "authentication and user are present"
         Optional<User> userOpt = userRepository.findByEmail(email)
-        userOpt.isPresent()
+        verifyAll {
+            authOpt.isPresent()
+            userOpt.isPresent()
+        }
+        def auth = authOpt.get()
         def user = userOpt.get()
 
         and: "the newly provisioned user in database has GLOBAL_ADMIN role"
@@ -114,8 +119,10 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
 
         then: "authentication is created under the normalized lowercase email"
         Optional<User> userOpt = userRepository.findByEmail(expectedEmail)
-        authOpt.isPresent()
-        userOpt.isPresent()
+        verifyAll {
+            authOpt.isPresent()
+            userOpt.isPresent()
+        }
         verifyAll(authOpt.get()) {
             name == userOpt.get().id().toString()
         }
@@ -151,7 +158,8 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         authOpt.isEmpty()
     }
 
-    def "createAuthentication | should return empty when email_verified claim is missing, false, or invalid"() {
+    @Unroll
+    def "createAuthentication | returns empty when email_verified claim is '#verifiedClaim'"() {
         given: "a JWT with unverified or missing email_verified claim"
         def builder = new JWTClaimsSet.Builder()
                 .subject("unverified-user")
@@ -171,11 +179,35 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         verifiedClaim << ["MISSING", null, false, "false", "FALSE", "unverified", "no", 0]
     }
 
+    @Unroll
+    def "createAuthentication | accepts string email_verified value '#claimValue' like true with whitespace"() {
+        given: "a JWT where email_verified is a string true value"
+        String email = "jwt.string.verified@kaiju.local"
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("string-verified-user")
+                .claim("email", email)
+                .claim("email_verified", claimValue)
+                .build()
+        JWT token = new PlainJWT(claimsSet)
+
+        when: "the factory creates authentication"
+        def authOpt = factory.createAuthentication(token)
+
+        then: "authentication succeeds"
+        verifyAll {
+            authOpt.isPresent()
+            userRepository.findByEmail(email).isPresent()
+        }
+
+        where:
+        claimValue << ["true", " TRUE "]
+    }
+
     def "createAuthentication | should return empty when database lookup fails gracefully"() {
         given: "a factory with a user service that throws an exception"
         UserService failingUserService = Mock(UserService)
         failingUserService.provisionOrGetUser(*_) >> { throw new RuntimeException("DB connection error") }
-        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService, idpRoleMapper)
+        KaijuJwtAuthenticationFactory failingFactory = new KaijuJwtAuthenticationFactory(tokenConfiguration, rolesFinder, failingUserService, identityProviderRoleMapper)
 
         and: "a JWT with a valid email claim"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()

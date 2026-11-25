@@ -6,7 +6,7 @@ import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.serde.ObjectMapper
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import lol.pbu.kaiju.dto.IngestBoundaryCommand
+import lol.pbu.kaiju.dto.IngestBoundaryRequest
 import lol.pbu.kaiju.dto.UsSyncResult
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -107,7 +107,7 @@ class BoundaryAndSyncEdgeCasesSpec extends Specification {
         BoundaryIngestionService service = buildIngestionService(stubClient, mockJdbc)
 
         when: "ingestBoundary is called with a disallowed URL"
-        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand(badUrl, 0.001d))
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest(badUrl, 0.001d))
 
         then: "it throws 400 Bad Request without calling HTTP or the database"
         def ex = thrown(HttpStatusException)
@@ -152,7 +152,7 @@ class BoundaryAndSyncEdgeCasesSpec extends Specification {
         BoundaryIngestionService service = buildIngestionService(stubClient)
 
         when: "boundary ingestion hits the upstream 5xx error"
-        service.ingestBoundary(regionId, new IngestBoundaryCommand(VALID_QUERY_URL, 0.001d))
+        service.ingestBoundary(regionId, new IngestBoundaryRequest(VALID_QUERY_URL, 0.001d))
 
         then: "it throws 502 Bad Gateway and leaves the stored region untouched"
         def ex = thrown(HttpStatusException)
@@ -204,7 +204,7 @@ class BoundaryAndSyncEdgeCasesSpec extends Specification {
         BoundaryIngestionService service = buildIngestionService(stubClient, mockJdbc)
 
         when: "ingestBoundary downloads the oversized response"
-        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand(VALID_QUERY_URL, 0.001d))
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest(VALID_QUERY_URL, 0.001d))
 
         then: "it stops with 413 Payload Too Large and never writes to the database"
         def ex = thrown(HttpStatusException)
@@ -225,7 +225,7 @@ class BoundaryAndSyncEdgeCasesSpec extends Specification {
         BoundaryIngestionService service = buildIngestionService(stubClient, mockJdbc)
 
         when: "ingestBoundary validates the downloaded payload"
-        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryCommand(VALID_QUERY_URL, 0.001d))
+        service.ingestBoundary(UUID.randomUUID(), new IngestBoundaryRequest(VALID_QUERY_URL, 0.001d))
 
         then: "it fails with the expected HTTP error and skips database updates"
         def ex = thrown(HttpStatusException)

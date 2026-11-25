@@ -9,10 +9,10 @@ import lol.pbu.kaiju.domain.RegionUser
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.domain.Tag
 import lol.pbu.kaiju.domain.User
-import lol.pbu.kaiju.dto.CreateProjectCommand
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.UpdateProjectCommand
-import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.CreateProjectRequest
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.UpdateProjectRequest
+import lol.pbu.kaiju.dto.UpdateShiftRequest
 import lol.pbu.kaiju.dto.ValidShiftLocationValidator
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.OrganizationUserRole
@@ -224,7 +224,7 @@ class DataBuilderSpec extends Specification {
         }
     }
 
-    def "ProjectBuilder | should apply custom configurations and generate valid commands"() {
+    def "ProjectBuilder | should apply custom configurations and generate valid requests"() {
         given: "a project builder with customized properties"
         UUID projectId = UUID.randomUUID()
         Organization org = new Organization(UUID.randomUUID(), "Custom Org", "https://custom.org", null, true, VerificationStatus.VERIFIED, null, [])
@@ -259,8 +259,8 @@ class DataBuilderSpec extends Specification {
             locations[0].id() == loc.id()
         }
 
-        when: "generating create command"
-        CreateProjectCommand createCmd = new ProjectBuilder(null, null, faker)
+        when: "generating create request"
+        CreateProjectRequest createRequest = new ProjectBuilder(null, null, faker)
                 .forOrg(org)
                 .inRegion(region)
                 .withTitle("Custom Project")
@@ -268,10 +268,10 @@ class DataBuilderSpec extends Specification {
                 .withType(ProjectType.OPEN_DOOR)
                 .withStatus(ProjectStatus.PENDING)
                 .atLocation(loc)
-                .asCommand()
+                .asRequest()
 
-        then: "command has valid attributes and default boundary"
-        verifyAll(createCmd) {
+        then: "request has valid attributes and default boundary"
+        verifyAll(createRequest) {
             organizationId == org.id()
             managingRegionId == region.id()
             title == "Custom Project"
@@ -283,17 +283,17 @@ class DataBuilderSpec extends Specification {
             boundaries[0].coordinates().size() >= 3
         }
 
-        when: "generating update command"
-        UpdateProjectCommand updateCmd = new ProjectBuilder(null, null, faker)
+        when: "generating update request"
+        UpdateProjectRequest updateRequest = new ProjectBuilder(null, null, faker)
                 .forOrg(org)
                 .inRegion(region)
                 .withTitle("Updated Project")
                 .withDescription("Updated description exceeding the required twenty characters minimum")
                 .withType(ProjectType.REGIONAL)
-                .asUpdateCommand()
+                .asUpdateRequest()
 
-        then: "update command matches attributes"
-        verifyAll(updateCmd) {
+        then: "update request matches attributes"
+        verifyAll(updateRequest) {
             organizationId == org.id()
             managingRegionId == region.id()
             title == "Updated Project"
@@ -324,7 +324,7 @@ class DataBuilderSpec extends Specification {
         builder.getCapacity() == 10
     }
 
-    def "ShiftBuilder | should apply custom configurations and generate valid commands"() {
+    def "ShiftBuilder | should apply custom configurations and generate valid requests"() {
         given: "custom shift settings"
         UUID shiftId = UUID.randomUUID()
         UUID projId = UUID.randomUUID()
@@ -369,39 +369,39 @@ class DataBuilderSpec extends Specification {
             location == null
         }
 
-        when: "generating create shift command for physical shift"
-        CreateShiftCommand createCmd = new ShiftBuilder(null, null, faker)
+        when: "generating create shift request for physical shift"
+        CreateShiftRequest createRequest = new ShiftBuilder(null, null, faker)
                 .forProject(projId)
                 .atLocation(loc)
                 .withTimes(start, end)
                 .withTag(tag)
-                .asCommand()
+                .asRequest()
 
-        then: "create command has valid attributes and location logic"
+        then: "create request has valid attributes and location logic"
         def locationValidator = new ValidShiftLocationValidator()
-        verifyAll(createCmd) {
+        verifyAll(createRequest) {
             projectId() == projId
             !isVirtual()
             locationId() == loc.id()
             startTime() == start
             endTime() == end
             tagIds() == [tag.id()]
-            locationValidator.isValid(createCmd, null)
+            locationValidator.isValid(createRequest, null)
         }
 
-        when: "generating update shift command for virtual shift"
-        UpdateShiftCommand updateCmd = new ShiftBuilder(null, null, faker)
+        when: "generating update shift request for virtual shift"
+        UpdateShiftRequest updateRequest = new ShiftBuilder(null, null, faker)
                 .asVirtual()
                 .withTimes(start, end)
-                .asUpdateCommand()
+                .asUpdateRequest()
 
-        then: "update command is valid"
-        verifyAll(updateCmd) {
+        then: "update request is valid"
+        verifyAll(updateRequest) {
             isVirtual()
             locationId() == null
             startTime() == start
             endTime() == end
-            locationValidator.isValid(updateCmd, null)
+            locationValidator.isValid(updateRequest, null)
         }
     }
 

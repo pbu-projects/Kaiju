@@ -30,7 +30,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
     UserService userService
 
     @Inject
-    IdpRoleMapper idpRoleMapper
+    IdentityProviderRoleMapper identityProviderRoleMapper
 
     @Inject
     AuthentikAuthenticationMapper mapper
@@ -177,7 +177,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         User mockUser = new User(UUID.randomUUID(), email, UserRole.STANDARD_USER, OffsetDateTime.now())
 
         and: "a mapper using the mock UserService"
-        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService, idpRoleMapper)
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService, identityProviderRoleMapper)
         OpenIdClaims claims = [
                 getEmail: { -> email },
                 get: { String k -> k == "email_verified" ? true : null }
@@ -206,7 +206,7 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         User mockUser = new User(UUID.randomUUID(), canonicalEmail, UserRole.STANDARD_USER, OffsetDateTime.now())
 
         and: "a mapper using the mock UserService"
-        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService, idpRoleMapper)
+        AuthentikAuthenticationMapper testMapper = new AuthentikAuthenticationMapper(mockUserService, identityProviderRoleMapper)
         OpenIdClaims claims = [
                 getEmail: { -> rawEmail },
                 get: { String k -> k == "email_verified" ? true : null }

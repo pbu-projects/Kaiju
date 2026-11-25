@@ -16,11 +16,11 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.Location;
-import lol.pbu.kaiju.dto.CreateLocationCommand;
-import lol.pbu.kaiju.dto.UpdateLocationCommand;
+import lol.pbu.kaiju.dto.CreateLocationRequest;
+import lol.pbu.kaiju.dto.UpdateLocationRequest;
 import lol.pbu.kaiju.repository.LocationRepository;
-import lol.pbu.kaiju.security.ProjectSecurityService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.util.PageRequests;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
@@ -46,21 +46,21 @@ public class LocationController {
 
     private final LocationRepository locationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final ProjectSecurityService projectSecurityService;
+    private final AuthorizationService authorizationService;
 
     public LocationController(
             LocationRepository locationRepository,
             SpatialMappingService spatialMappingService,
-            ProjectSecurityService projectSecurityService
+            AuthorizationService authorizationService
     ) {
         this.locationRepository = locationRepository;
         this.spatialMappingService = spatialMappingService;
-        this.projectSecurityService = projectSecurityService;
+        this.authorizationService = authorizationService;
     }
 
     @Get
     public CursoredPage<Location> getLocations(@Nullable @Valid CursoredPageable pageable) {
-        return locationRepository.findAll(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return locationRepository.findAll(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -72,33 +72,33 @@ public class LocationController {
      * Creates a new location.
      * Restricted to platform administrators and directors of the enclosing region.
      *
-     * @param command   the payload containing location details
+     * @param request   the payload containing location details
      * @param principal the authenticated caller
      * @return the persisted location
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Post
-    public Location addLocation(@Valid @Body CreateLocationCommand command, Principal principal) {
-        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        projectSecurityService.authorizeLocationCreate(UUID.fromString(principal.getName()), point);
+    public Location addLocation(@Valid @Body CreateLocationRequest request, Principal principal) {
+        Point point = spatialMappingService.toPoint(request.longitude(), request.latitude());
+        authorizationService.authorizeLocationCreate(UUID.fromString(principal.getName()), point);
         Location location = Location.forCreation(
-                command.name(),
-                command.addressLine(),
-                command.city(),
-                command.stateProvince(),
-                command.postalCode(),
-                command.countryCode(),
+                request.name(),
+                request.addressLine(),
+                request.city(),
+                request.stateProvince(),
+                request.postalCode(),
+                request.countryCode(),
                 point,
-                resolveTimezone(point, command.timezone())
+                resolveTimezone(point, request.timezone())
         );
         return locationRepository.save(location);
     }
 
     /**
-     * Updates an existing location by its ID after validating that it exists and is within caller jurisdiction.
+     * Updates an existing location after checking caller permission and region access.
      *
      * @param id        the ID of the location to update
-     * @param command   the updated location details
+     * @param request   the updated location details
      * @param principal the authenticated caller
      * @return the updated location
      */
@@ -106,21 +106,21 @@ public class LocationController {
     @Put("/{id}")
     public Location updateLocation(
             @PathVariable UUID id,
-            @Valid @Body UpdateLocationCommand command,
+            @Valid @Body UpdateLocationRequest request,
             Principal principal
     ) {
-        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        projectSecurityService.authorizeLocationUpdate(UUID.fromString(principal.getName()), id, point);
+        Point point = spatialMappingService.toPoint(request.longitude(), request.latitude());
+        authorizationService.authorizeLocationUpdate(UUID.fromString(principal.getName()), id, point);
         Location existing = locationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND));
-        String timezone = resolveUpdatedTimezone(existing, point, command.timezone());
+        String timezone = resolveUpdatedTimezone(existing, point, request.timezone());
         Location location = existing.withUpdatedDetails(
-                command.name(),
-                command.addressLine(),
-                command.city(),
-                command.stateProvince(),
-                command.postalCode(),
-                command.countryCode(),
+                request.name(),
+                request.addressLine(),
+                request.city(),
+                request.stateProvince(),
+                request.postalCode(),
+                request.countryCode(),
                 point,
                 timezone
         );
@@ -128,7 +128,7 @@ public class LocationController {
     }
 
     /**
-     * Deletes a location by its ID after validating that it exists and is within caller jurisdiction.
+     * Deletes a location by its ID after checking caller permission and region access.
      *
      * @param id        the ID of the location to delete
      * @param principal the authenticated caller
@@ -137,7 +137,7 @@ public class LocationController {
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
-        projectSecurityService.authorizeLocationDelete(actorId, id);
+        authorizationService.authorizeLocationDelete(actorId, id);
         long deletedCount = locationRepository.removeById(id);
         if (deletedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND);

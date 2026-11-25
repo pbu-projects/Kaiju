@@ -15,11 +15,11 @@ import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.User;
-import lol.pbu.kaiju.dto.CreateUserCommand;
-import lol.pbu.kaiju.dto.UpdateUserCommand;
+import lol.pbu.kaiju.dto.CreateUserRequest;
+import lol.pbu.kaiju.dto.UpdateUserRequest;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.service.UserService;
-import lol.pbu.kaiju.util.PageableUtils;
+import lol.pbu.kaiju.util.PageRequests;
 
 import java.security.Principal;
 import java.time.OffsetDateTime;
@@ -52,7 +52,7 @@ public class UserController {
     @Get
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     public CursoredPage<User> getUsers(@Nullable @Valid CursoredPageable pageable) {
-        return userService.getUsers(PageableUtils.resolvePageable(pageable, DEFAULT_SORT_FIELD));
+        return userService.getUsers(PageRequests.resolvePageable(pageable, DEFAULT_SORT_FIELD));
     }
 
     @Get("/{id}")
@@ -63,11 +63,11 @@ public class UserController {
 
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     @Post
-    public User addUser(@Valid @Body CreateUserCommand command, Principal principal) {
+    public User addUser(@Valid @Body CreateUserRequest request, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
-        UserRole targetRole = command.role() != null ? command.role() : UserRole.STANDARD_USER;
+        UserRole targetRole = request.role() != null ? request.role() : UserRole.STANDARD_USER;
         User safeUser = User.forCreation(
-                command.email(),
+                request.email(),
                 targetRole,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
@@ -75,28 +75,28 @@ public class UserController {
     }
 
     /**
-     * Updates an existing user by its ID.
-     * Prevents Mass Assignment by explicitly retaining the existing user's role and createdAt timestamp.
-     * Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.
-     * Throws 403 FORBIDDEN if the user attempts to modify another account without system manage privileges.
+     * Updates an existing user by ID.
+     * Keeps the existing user's role and createdAt timestamp unchanged.
+     * Only the user themselves or a user manager can update an account.
+     * Throws 403 FORBIDDEN if the caller tries to change another account without user management permission.
      * Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id        the ID of the user to update
-     * @param command   the updated user details
+     * @param request   the updated user details
      * @param principal the authenticated principal
      * @return the updated user
      */
     @Put("/{id}")
-    public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserCommand command, Principal principal) {
+    public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserRequest request, Principal principal) {
         UUID actorUserId = UUID.fromString(principal.getName());
-        User candidate = User.forEmailUpdate(id, command.email());
+        User candidate = User.forEmailUpdate(id, request.email());
         return userService.updateUser(id, candidate, actorUserId);
     }
 
     /**
-     * Deletes a user by its ID after validating that it exists.
-     * Enforces horizontal authorization (IDOR): caller must match id or hold SYSTEM_USER_MANAGE.
-     * Throws 403 FORBIDDEN if the user attempts to delete another account without system manage privileges.
+     * Deletes a user by ID after checking that it exists.
+     * Only the user themselves or a user manager can delete an account.
+     * Throws 403 FORBIDDEN if the caller tries to delete another account without user management permission.
      * Throws 404 NOT_FOUND if the user does not exist.
      *
      * @param id        the ID of the user to delete

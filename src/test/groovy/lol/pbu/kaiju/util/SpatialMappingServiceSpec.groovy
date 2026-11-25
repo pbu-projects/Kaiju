@@ -1,6 +1,6 @@
 package lol.pbu.kaiju.util
 
-import lol.pbu.kaiju.dto.CoordinateDto
+import lol.pbu.kaiju.dto.Coordinates
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Specification
@@ -40,7 +40,7 @@ class SpatialMappingServiceSpec extends Specification {
         thrown(IllegalArgumentException)
 
         when:
-        service.toPolygon([new CoordinateDto(0.0, 0.0), new CoordinateDto(1.0, 1.0)])
+        service.toPolygon([new Coordinates(0.0, 0.0), new Coordinates(1.0, 1.0)])
 
         then:
         thrown(IllegalArgumentException)
@@ -49,9 +49,9 @@ class SpatialMappingServiceSpec extends Specification {
     def "toPolygon automatically closes open ring"() {
         given:
         def coords = [
-                new CoordinateDto(0.0, 0.0),
-                new CoordinateDto(1.0, 0.0),
-                new CoordinateDto(1.0, 1.0)
+                new Coordinates(0.0, 0.0),
+                new Coordinates(1.0, 0.0),
+                new Coordinates(1.0, 1.0)
         ]
 
         when:
@@ -72,10 +72,10 @@ class SpatialMappingServiceSpec extends Specification {
     def "toPolygon does not duplicate closing coordinate if already closed"() {
         given:
         def coords = [
-                new CoordinateDto(0.0, 0.0),
-                new CoordinateDto(1.0, 0.0),
-                new CoordinateDto(1.0, 1.0),
-                new CoordinateDto(0.0, 0.0)
+                new Coordinates(0.0, 0.0),
+                new Coordinates(1.0, 0.0),
+                new Coordinates(1.0, 1.0),
+                new Coordinates(0.0, 0.0)
         ]
 
         when:

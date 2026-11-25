@@ -1,0 +1,460 @@
+package lol.pbu.kaiju.service;
+
+import io.micronaut.data.jdbc.runtime.JdbcOperations;
+import io.micronaut.data.model.CursoredPage;
+import io.micronaut.data.model.CursoredPageable;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.serde.ObjectMapper;
+import io.micronaut.transaction.annotation.Transactional;
+import jakarta.inject.Singleton;
+import lol.pbu.kaiju.domain.AdministrativeRegion;
+import lol.pbu.kaiju.domain.User;
+import lol.pbu.kaiju.dto.CoveringRegion;
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest;
+import lol.pbu.kaiju.dto.IngestBoundaryResponse;
+import lol.pbu.kaiju.dto.RegionCoordinateResolution;
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest;
+import lol.pbu.kaiju.model.RegionAuditAction;
+import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
+import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.util.SpatialMappingService;
+import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.locationtech.jts.geom.Polygon;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+@Singleton
+public class DefaultAdministrativeRegionService implements AdministrativeRegionService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultAdministrativeRegionService.class);
+
+    private static final String ACTOR_NOT_FOUND = "Actor user not found";
+    private static final String REGION_NOT_FOUND = "Administrative region not found";
+    private static final String PARENT_NOT_FOUND = "Parent administrative region does not exist";
+    private static final String INVALID_GEOMETRY = "Region geometry is topologically invalid";
+
+    private static final Pattern CITY_SUFFIX_PATTERN =
+            Pattern.compile("(?i)\\s+(Downtown Core|Downtown|City Core)$");
+    private static final Pattern COUNTY_SUFFIX_PATTERN =
+            Pattern.compile("(?i)\\s+Region$");
+    private static final Pattern STATE_SUFFIX_PATTERN =
+            Pattern.compile("(?i)\\s+(State Region|State|Region)$");
+
+    private static final Map<String, String> STATE_NAME_TO_CODE = Map.ofEntries(
+            Map.entry("alabama", "AL"),
+            Map.entry("alaska", "AK"),
+            Map.entry("arizona", "AZ"),
+            Map.entry("arkansas", "AR"),
+            Map.entry("california", "CA"),
+            Map.entry("colorado", "CO"),
+            Map.entry("connecticut", "CT"),
+            Map.entry("delaware", "DE"),
+            Map.entry("florida", "FL"),
+            Map.entry("georgia", "GA"),
+            Map.entry("hawaii", "HI"),
+            Map.entry("idaho", "ID"),
+            Map.entry("illinois", "IL"),
+            Map.entry("indiana", "IN"),
+            Map.entry("iowa", "IA"),
+            Map.entry("kansas", "KS"),
+            Map.entry("kentucky", "KY"),
+            Map.entry("louisiana", "LA"),
+            Map.entry("maine", "ME"),
+            Map.entry("maryland", "MD"),
+            Map.entry("massachusetts", "MA"),
+            Map.entry("michigan", "MI"),
+            Map.entry("minnesota", "MN"),
+            Map.entry("mississippi", "MS"),
+            Map.entry("missouri", "MO"),
+            Map.entry("montana", "MT"),
+            Map.entry("nebraska", "NE"),
+            Map.entry("nevada", "NV"),
+            Map.entry("new hampshire", "NH"),
+            Map.entry("new jersey", "NJ"),
+            Map.entry("new mexico", "NM"),
+            Map.entry("new york", "NY"),
+            Map.entry("north carolina", "NC"),
+            Map.entry("north dakota", "ND"),
+            Map.entry("ohio", "OH"),
+            Map.entry("oklahoma", "OK"),
+            Map.entry("oregon", "OR"),
+            Map.entry("pennsylvania", "PA"),
+            Map.entry("rhode island", "RI"),
+            Map.entry("south carolina", "SC"),
+            Map.entry("south dakota", "SD"),
+            Map.entry("tennessee", "TN"),
+            Map.entry("texas", "TX"),
+            Map.entry("utah", "UT"),
+            Map.entry("vermont", "VT"),
+            Map.entry("virginia", "VA"),
+            Map.entry("washington", "WA"),
+            Map.entry("west virginia", "WV"),
+            Map.entry("wisconsin", "WI"),
+            Map.entry("wyoming", "WY"),
+            Map.entry("district of columbia", "DC"),
+            Map.entry("puerto rico", "PR"),
+            Map.entry("united states virgin islands", "VI"),
+            Map.entry("u.s. virgin islands", "VI"),
+            Map.entry("virgin islands", "VI"),
+            Map.entry("guam", "GU"),
+            Map.entry("american samoa", "AS"),
+            Map.entry("commonwealth of the northern mariana islands", "MP"),
+            Map.entry("northern mariana islands", "MP")
+    );
+
+    private final AdministrativeRegionRepository regionRepository;
+    private final UserRepository userRepository;
+    private final SpatialMappingService spatialMappingService;
+    private final AuditService auditService;
+    private final JdbcOperations jdbcOperations;
+    private final ObjectMapper objectMapper;
+
+    public DefaultAdministrativeRegionService(
+            AdministrativeRegionRepository regionRepository,
+            UserRepository userRepository,
+            SpatialMappingService spatialMappingService,
+            AuditService auditService,
+            JdbcOperations jdbcOperations,
+            ObjectMapper objectMapper
+    ) {
+        this.regionRepository = regionRepository;
+        this.userRepository = userRepository;
+        this.spatialMappingService = spatialMappingService;
+        this.auditService = auditService;
+        this.jdbcOperations = jdbcOperations;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public CursoredPage<AdministrativeRegion> getAdministrativeRegions(@NonNull CursoredPageable pageable) {
+        return regionRepository.findAll(pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public Optional<AdministrativeRegion> getAdministrativeRegionById(@NonNull UUID id) {
+        return regionRepository.findById(id);
+    }
+
+    @Override
+    @Transactional
+    @NonNull
+    public AdministrativeRegion createAdministrativeRegion(
+            @NonNull CreateAdministrativeRegionRequest request,
+            @NonNull UUID actorUserId
+    ) {
+        User actor = resolveActor(actorUserId);
+
+        AdministrativeRegion parent = null;
+        if (request.parentRegionId() != null) {
+            parent = regionRepository.findById(request.parentRegionId())
+                    .orElseThrow(() -> new HttpStatusException(HttpStatus.BAD_REQUEST, PARENT_NOT_FOUND));
+        }
+
+        Polygon polygon = spatialMappingService.toPolygon(request.coordinates());
+        if (!polygon.isValid()) {
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
+        }
+
+        Integer level = determineLevel(parent);
+        String countryCode = parent != null ? parent.countryCode() : "US";
+        String stateCode = parent != null ? parent.stateCode() : null;
+        String timeZone = parent != null ? parent.timeZone() : null;
+
+        AdministrativeRegion region = AdministrativeRegion.forCreation(
+                request.name(),
+                request.parentRegionId(),
+                polygon,
+                level,
+                countryCode,
+                stateCode,
+                timeZone
+        );
+        AdministrativeRegion saved = regionRepository.save(region);
+
+        String metadata = buildMetadata(Map.of("name", saved.name()));
+        auditService.recordAdministrativeRegionAudit(saved.id(), actor, RegionAuditAction.CREATE, metadata);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    @NonNull
+    public AdministrativeRegion updateAdministrativeRegion(
+            @NonNull UUID id,
+            @NonNull UpdateAdministrativeRegionRequest request,
+            @NonNull UUID actorUserId
+    ) {
+        User actor = resolveActor(actorUserId);
+
+        if (request.parentRegionId() != null && id.equals(request.parentRegionId())) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "An administrative region cannot be its own parent");
+        }
+
+        if (request.parentRegionId() != null && !regionRepository.existsById(request.parentRegionId())) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, PARENT_NOT_FOUND);
+        }
+
+        AdministrativeRegion existing = regionRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND));
+
+        Polygon polygon = spatialMappingService.toPolygon(request.coordinates());
+        if (!polygon.isValid()) {
+            throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, INVALID_GEOMETRY);
+        }
+
+        AdministrativeRegion updated = existing.withUpdatedDetails(
+                request.name(),
+                request.parentRegionId(),
+                polygon
+        );
+        AdministrativeRegion saved = regionRepository.update(updated);
+
+        String metadata = buildMetadata(Map.of("previousName", existing.name(), "newName", saved.name()));
+        auditService.recordAdministrativeRegionAudit(id, actor, RegionAuditAction.UPDATE, metadata);
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public void deleteAdministrativeRegion(@NonNull UUID id, @NonNull UUID actorUserId) {
+        User actor = resolveActor(actorUserId);
+
+        AdministrativeRegion existing = regionRepository.findById(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND));
+
+        String metadata = buildMetadata(Map.of("deletedName", existing.name()));
+        auditService.recordAdministrativeRegionAudit(id, actor, RegionAuditAction.DELETE, metadata);
+
+        long deleted = regionRepository.removeById(id);
+        if (deleted == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND);
+        }
+    }
+
+    @Override
+    @Transactional
+    @NonNull
+    public IngestBoundaryResponse applyIngestedBoundary(
+            @NonNull UUID regionId,
+            @NonNull String geomJson,
+            double tolerance,
+            @NonNull String sourceUrl,
+            @NonNull UUID actorUserId
+    ) {
+        User actor = resolveActor(actorUserId);
+
+        IngestBoundaryResponse response = BoundaryIngestionService.executeBoundaryUpdate(
+                jdbcOperations,
+                regionId,
+                geomJson,
+                tolerance
+        );
+
+        String metadata = buildMetadata(Map.of(
+                "sourceUrl", sourceUrl,
+                "tolerance", tolerance,
+                "originalPoints", response.originalPoints(),
+                "simplifiedPoints", response.simplifiedPoints(),
+                "reductionRatio", response.reductionRatio()
+        ));
+        auditService.recordAdministrativeRegionAudit(regionId, actor, RegionAuditAction.BOUNDARY_INGEST, metadata);
+
+        return response;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public Optional<RegionCoordinateResolution> resolveCoordinates(double lat, double lon) {
+        if (Double.isNaN(lat) || Double.isNaN(lon) || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) {
+            return Optional.empty();
+        }
+
+        List<CoveringRegion> regions = regionRepository.findCoveringRegions(lat, lon);
+        if (regions == null || regions.isEmpty()) {
+            return Optional.empty();
+        }
+
+        String city = regions.stream()
+                .filter(r -> r.level() != null && r.level() >= 3)
+                .map(CoveringRegion::name)
+                .map(this::normalizeCityName)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+
+        String county = regions.stream()
+                .filter(r -> r.level() != null && r.level() == 2)
+                .map(CoveringRegion::name)
+                .map(this::normalizeCountyName)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+
+        String state = regions.stream()
+                .filter(r -> r.level() != null && r.level() == 1)
+                .map(this::normalizeState)
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
+
+        String timeZone = regions.stream()
+                .map(CoveringRegion::timeZone)
+                .filter(tz -> tz != null && !tz.isBlank())
+                .findFirst()
+                .orElse(null);
+
+        if (city == null && county == null && state == null && timeZone == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new RegionCoordinateResolution(state, county, city, timeZone));
+    }
+
+    private String normalizeCityName(@Nullable String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        return CITY_SUFFIX_PATTERN.matcher(name).replaceAll("").trim();
+    }
+
+    private String normalizeCountyName(@Nullable String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        return COUNTY_SUFFIX_PATTERN.matcher(name).replaceAll("").trim();
+    }
+
+    private String normalizeState(CoveringRegion region) {
+        if (region.stateCode() != null && !region.stateCode().isBlank()) {
+            return region.stateCode().trim();
+        }
+        if (region.name() == null || region.name().isBlank()) {
+            return null;
+        }
+        String stripped = STATE_SUFFIX_PATTERN.matcher(region.name()).replaceAll("").trim();
+        if (stripped.length() == 2) {
+            return stripped.toUpperCase(Locale.ROOT);
+        }
+        String lookup = STATE_NAME_TO_CODE.get(stripped.toLowerCase(Locale.ROOT));
+        return lookup != null ? lookup : stripped;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public List<AdministrativeRegion> getStates() {
+        return regionRepository.findByLevelOrderByNameAsc(1);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public Optional<AdministrativeRegion> findState(@Nullable String state) {
+        if (state == null || state.isBlank()) {
+            return Optional.empty();
+        }
+        String term = state.trim();
+        String code = term.length() == 2 ? term : STATE_NAME_TO_CODE.get(term.toLowerCase(Locale.ROOT));
+        if (code != null) {
+            Optional<AdministrativeRegion> byCode = regionRepository.findFirstByLevelAndStateCodeIgnoreCase(1, code);
+            if (byCode.isPresent()) {
+                return byCode;
+            }
+        }
+        return getStates().stream()
+                .filter(r -> term.equalsIgnoreCase(r.stateCode())
+                        || term.equalsIgnoreCase(r.name())
+                        || (r.name() != null && r.name().toLowerCase(Locale.ROOT).startsWith(term.toLowerCase(Locale.ROOT))))
+                .findFirst();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public List<AdministrativeRegion> getCounties(@Nullable String state) {
+        if (state == null || state.isBlank()) {
+            return regionRepository.findByLevelOrderByNameAsc(2);
+        }
+        return findState(state)
+                .map(s -> regionRepository.findByLevelAndParentRegionIdOrderByNameAsc(2, s.id()))
+                .orElseGet(List::of);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public List<AdministrativeRegion> getCities(@Nullable String state, @Nullable String county) {
+        if (county != null && !county.isBlank()) {
+            String trimmedCounty = county.trim();
+            List<AdministrativeRegion> candidateCounties = (state != null && !state.isBlank())
+                    ? getCounties(state)
+                    : regionRepository.findByLevelOrderByNameAsc(2);
+
+            return candidateCounties.stream()
+                    .filter(c -> matchesCounty(c, trimmedCounty))
+                    .findFirst()
+                    .map(c -> regionRepository.findCitiesInCounty(c.id()))
+                    .orElseGet(List::of);
+        }
+        if (state != null && !state.isBlank()) {
+            String stateCode = findState(state).map(AdministrativeRegion::stateCode).orElse(state.trim());
+            return regionRepository.findByLevelAndStateCodeIgnoreCaseOrderByNameAsc(3, stateCode);
+        }
+        return regionRepository.findByLevelOrderByNameAsc(3);
+    }
+
+    private Integer determineLevel(@Nullable AdministrativeRegion parent) {
+        if (parent == null) {
+            return 1;
+        }
+        if (parent.level() != null) {
+            return parent.level() + 1;
+        }
+        return 2;
+    }
+
+    private boolean matchesCounty(AdministrativeRegion candidate, String queryCounty) {
+        if (candidate.name() == null) {
+            return false;
+        }
+        String candName = candidate.name();
+        if (candName.equalsIgnoreCase(queryCounty)) {
+            return true;
+        }
+        String normalizedCand = normalizeCountyName(candName);
+        if (normalizedCand != null && normalizedCand.equalsIgnoreCase(queryCounty)) {
+            return true;
+        }
+        return candName.toLowerCase(Locale.ROOT).startsWith(queryCounty.toLowerCase(Locale.ROOT))
+                || (normalizedCand != null && normalizedCand.toLowerCase(Locale.ROOT).startsWith(queryCounty.toLowerCase(Locale.ROOT)));
+    }
+
+    private User resolveActor(UUID actorUserId) {
+        return userRepository.findById(actorUserId)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_NOT_FOUND));
+    }
+
+    private String buildMetadata(Map<String, ?> data) {
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (IOException e) {
+            LOG.error("Failed to serialize audit log metadata: {}", e.getMessage(), e);
+            throw new HttpStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to serialize audit metadata");
+        }
+    }
+}

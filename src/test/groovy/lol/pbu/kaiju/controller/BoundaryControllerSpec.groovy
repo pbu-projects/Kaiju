@@ -6,9 +6,9 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Boundary
-import lol.pbu.kaiju.dto.CoordinateDto
-import lol.pbu.kaiju.dto.CreateBoundaryCommand
-import lol.pbu.kaiju.dto.UpdateBoundaryCommand
+import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CreateBoundaryRequest
+import lol.pbu.kaiju.dto.UpdateBoundaryRequest
 import lol.pbu.kaiju.repository.BoundaryRepository
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
@@ -45,13 +45,13 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         geometryFactory.createPolygon(coords)
     }
 
-    private List<CoordinateDto> createCoordinateDtos() {
+    private List<Coordinates> createCoordinates() {
         [
-                new CoordinateDto(0.0, 0.0),
-                new CoordinateDto(0.0, 1.0),
-                new CoordinateDto(1.0, 1.0),
-                new CoordinateDto(1.0, 0.0),
-                new CoordinateDto(0.0, 0.0)
+                new Coordinates(0.0, 0.0),
+                new Coordinates(0.0, 1.0),
+                new Coordinates(1.0, 1.0),
+                new Coordinates(1.0, 0.0),
+                new Coordinates(0.0, 0.0)
         ]
     }
 
@@ -66,13 +66,13 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         geometryFactory.createPolygon(coords)
     }
 
-    private List<CoordinateDto> createDenverCoordinateDtos() {
+    private List<Coordinates> createDenverCoordinates() {
         [
-                new CoordinateDto(-105.00, 39.73),
-                new CoordinateDto(-104.98, 39.73),
-                new CoordinateDto(-104.98, 39.75),
-                new CoordinateDto(-105.00, 39.75),
-                new CoordinateDto(-105.00, 39.73)
+                new Coordinates(-105.00, 39.73),
+                new Coordinates(-104.98, 39.73),
+                new Coordinates(-104.98, 39.75),
+                new Coordinates(-105.00, 39.75),
+                new Coordinates(-105.00, 39.73)
         ]
     }
 
@@ -91,12 +91,12 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid boundary"() {
-        given: "a new valid boundary command"
+        given: "a new valid boundary request"
         String name = "Test Boundary ${faker.address().city()}"
-        def command = new CreateBoundaryCommand(name, createCoordinateDtos())
+        def request = new CreateBoundaryRequest(name, createCoordinates())
 
         when: "the boundary is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/boundaries", command)), Boundary)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/boundaries", request)), Boundary)
         Boundary saved = track(response.body())
 
         then: "the boundary is persisted with 200 OK and generated ID"
@@ -117,12 +117,12 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should allow regional director with region:manage claim to create a boundary"() {
-        given: "a new valid boundary command within Denver County"
+        given: "a new valid boundary request within Denver County"
         String name = "Director Boundary ${faker.address().city()}"
-        def command = new CreateBoundaryCommand(name, createDenverCoordinateDtos())
+        def request = new CreateBoundaryRequest(name, createDenverCoordinates())
 
         when: "the boundary is added by a regional director via HTTP POST"
-        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Boundary)
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, request)), Boundary)
         Boundary saved = track(response.body())
 
         then: "the boundary is persisted with 200 OK and generated ID"
@@ -143,11 +143,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject standard user attempting POST /boundaries with 403 FORBIDDEN"() {
-        given: "a valid boundary command"
-        def command = new CreateBoundaryCommand("Standard User Boundary", createCoordinateDtos())
+        given: "a valid boundary request"
+        def request = new CreateBoundaryRequest("Standard User Boundary", createCoordinates())
 
         when: "a standard user attempts to create a boundary via HTTP POST"
-        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), Boundary)
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, request)), Boundary)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -155,11 +155,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject regional agent without region:manage claim attempting POST /boundaries with 403 FORBIDDEN"() {
-        given: "a valid boundary command"
-        def command = new CreateBoundaryCommand("Agent Boundary", createCoordinateDtos())
+        given: "a valid boundary request"
+        def request = new CreateBoundaryRequest("Agent Boundary", createCoordinates())
 
         when: "a regional agent attempts to create a boundary via HTTP POST"
-        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), Boundary)
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, request)), Boundary)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -241,10 +241,10 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         def boundary = dataBuilder.boundary().withName("Original Boundary Name").withGeometry(createPolygon()).persist()
         UUID id = boundary.id()
         def newName = "Updated Boundary ${faker.address().city()}"
-        def updateCommand = new UpdateBoundaryCommand(newName, createCoordinateDtos())
+        def updateRequest = new UpdateBoundaryRequest(newName, createCoordinates())
 
         when: "the boundary is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${id}", updateCommand)), Boundary)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${id}", updateRequest)), Boundary)
         Boundary updated = response.body()
 
         then: "the returned boundary contains the updated data with 200 OK"
@@ -263,12 +263,12 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent boundary"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateBoundaryCommand("Test Boundary", createCoordinateDtos())
+        def updateRequest = new UpdateBoundaryRequest("Test Boundary", createCoordinates())
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${nonExistentId}", updateCommand)), Boundary)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/boundaries/${nonExistentId}", updateRequest)), Boundary)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -310,10 +310,10 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         def boundary = dataBuilder.boundary().withName("Test Boundary Director Update").withGeometry(createDenverPolygon()).persist()
         UUID id = boundary.id()
         def newName = "Director Boundary Update ${faker.address().city()}"
-        def updateCommand = new UpdateBoundaryCommand(newName, createDenverCoordinateDtos())
+        def updateRequest = new UpdateBoundaryRequest(newName, createDenverCoordinates())
 
         when: "the boundary is updated by a regional director via HTTP PUT"
-        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Boundary)
         Boundary updated = response.body()
 
         then: "the returned boundary contains the updated data with 200 OK"
@@ -332,11 +332,11 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject regional director updating non-existent boundary with 403 FORBIDDEN (no existence oracle)"() {
-        given: "an update command targeting a non-existent boundary ID"
-        def updateCommand = new UpdateBoundaryCommand("Missing Update", createDenverCoordinateDtos())
+        given: "an update request targeting a non-existent boundary ID"
+        def updateRequest = new UpdateBoundaryRequest("Missing Update", createDenverCoordinates())
 
         when: "a regional director attempts to update a non-existent boundary"
-        client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}", updateCommand)), Boundary)
+        client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}", updateRequest)), Boundary)
 
         then: "a 403 FORBIDDEN response is returned instead of 404"
         def e = thrown(HttpClientResponseException)
@@ -344,12 +344,12 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject standard user attempting PUT /boundaries/{id} with 403 FORBIDDEN"() {
-        given: "an update command and target boundary ID"
-        def updateCommand = new UpdateBoundaryCommand("Unauthorized Update", createCoordinateDtos())
+        given: "an update request and target boundary ID"
+        def updateRequest = new UpdateBoundaryRequest("Unauthorized Update", createCoordinates())
         UUID id = UUID.randomUUID()
 
         when: "a standard user attempts to update a boundary via HTTP PUT"
-        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Boundary)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -357,12 +357,12 @@ class BoundaryControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject regional agent without region:manage claim attempting PUT /boundaries/{id} with 403 FORBIDDEN"() {
-        given: "an update command and target boundary ID"
-        def updateCommand = new UpdateBoundaryCommand("Unauthorized Update", createCoordinateDtos())
+        given: "an update request and target boundary ID"
+        def updateRequest = new UpdateBoundaryRequest("Unauthorized Update", createCoordinates())
         UUID id = UUID.randomUUID()
 
         when: "a regional agent attempts to update a boundary via HTTP PUT"
-        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Boundary)
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Boundary)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)

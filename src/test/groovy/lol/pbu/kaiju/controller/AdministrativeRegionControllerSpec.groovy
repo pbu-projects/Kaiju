@@ -7,9 +7,9 @@ import io.micronaut.test.annotation.MockBean
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.AdministrativeRegion
-import lol.pbu.kaiju.dto.CoordinateDto
-import lol.pbu.kaiju.dto.CreateAdministrativeRegionCommand
-import lol.pbu.kaiju.dto.UpdateAdministrativeRegionCommand
+import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest
+import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest
 import lol.pbu.kaiju.dto.UsSyncResult
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.service.UsBoundarySyncService
@@ -83,25 +83,25 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         return geometryFactory.createPolygon(coords)
     }
 
-    private List<CoordinateDto> createCoordinateDtos() {
+    private List<Coordinates> createCoordinates() {
         [
-                new CoordinateDto(-105.0, 39.0),
-                new CoordinateDto(-104.0, 39.0),
-                new CoordinateDto(-104.0, 40.0),
-                new CoordinateDto(-105.0, 40.0),
-                new CoordinateDto(-105.0, 39.0)
+                new Coordinates(-105.0, 39.0),
+                new Coordinates(-104.0, 39.0),
+                new Coordinates(-104.0, 40.0),
+                new Coordinates(-105.0, 40.0),
+                new Coordinates(-105.0, 39.0)
         ]
     }
 
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid administrative region"() {
-        given: "a new valid administrative region command"
+        given: "a new valid administrative region request"
         String regionName = "Region ${faker.address().state()}"
-        def command = new CreateAdministrativeRegionCommand(regionName, null, createCoordinateDtos())
+        def request = new CreateAdministrativeRegionRequest(regionName, null, createCoordinates())
 
         when: "the administrative region is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions", command)), AdministrativeRegion)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/administrative-regions", request)), AdministrativeRegion)
         AdministrativeRegion saved = track(response.body())
 
         then: "the administrative region is persisted with 200 OK and generated ID"
@@ -198,10 +198,10 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         def region = dataBuilder.region().withName("Original Region Name").withGeometry(geom).persist()
         UUID id = region.id()
         def newName = "Updated Region ${faker.address().state()}"
-        def updateCommand = new UpdateAdministrativeRegionCommand(newName, null, createCoordinateDtos())
+        def updateRequest = new UpdateAdministrativeRegionRequest(newName, null, createCoordinates())
 
         when: "the administrative region is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/administrative-regions/${id}", updateCommand)), AdministrativeRegion)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/administrative-regions/${id}", updateRequest)), AdministrativeRegion)
         AdministrativeRegion updated = response.body()
 
         then: "the returned administrative region contains the updated data with 200 OK"
@@ -220,12 +220,12 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent administrative region"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateAdministrativeRegionCommand("Test Region", null, createCoordinateDtos())
+        def updateRequest = new UpdateAdministrativeRegionRequest("Test Region", null, createCoordinates())
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/administrative-regions/${nonExistentId}", updateCommand)), AdministrativeRegion)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/administrative-regions/${nonExistentId}", updateRequest)), AdministrativeRegion)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)

@@ -10,8 +10,8 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.RegionUser
 import lol.pbu.kaiju.domain.RegionUserId
-import lol.pbu.kaiju.dto.CreateRegionUserCommand
-import lol.pbu.kaiju.dto.UpdateRegionUserCommand
+import lol.pbu.kaiju.dto.CreateRegionUserRequest
+import lol.pbu.kaiju.dto.UpdateRegionUserRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.RegionUserRole
 import lol.pbu.kaiju.model.UserRole
@@ -40,10 +40,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         UUID userId = user.id()
         UUID regionId = region.id()
 
-        def command = new CreateRegionUserCommand(userId, regionId, RegionUserRole.REGION_DIRECTOR)
+        def request = new CreateRegionUserRequest(userId, regionId, RegionUserRole.REGION_DIRECTOR)
 
         when: "the region user is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/region-users", command)), RegionUser)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/region-users", request)), RegionUser)
         RegionUser saved = track(response.body())
 
         then: "200 OK is returned and record is persisted"
@@ -80,7 +80,7 @@ class RegionUserControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should reject unauthenticated POST /region-users with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to add a region user"
-        client.exchange(HttpRequest.POST(BASE_PATH, new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_DIRECTOR)))
+        client.exchange(HttpRequest.POST(BASE_PATH, new CreateRegionUserRequest(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_DIRECTOR)))
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -88,11 +88,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject standard user attempting POST /region-users with 403 FORBIDDEN"() {
-        given: "a region user creation command"
-        def command = new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_AGENT)
+        given: "a region user creation request"
+        def request = new CreateRegionUserRequest(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_AGENT)
 
         when: "a standard user attempts to create a region user"
-        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), RegionUser)
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, request)), RegionUser)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -100,11 +100,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject regional agent without region:manage claim attempting POST /region-users with 403 FORBIDDEN"() {
-        given: "a region user creation command"
-        def command = new CreateRegionUserCommand(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_AGENT)
+        given: "a region user creation request"
+        def request = new CreateRegionUserRequest(UUID.randomUUID(), UUID.randomUUID(), RegionUserRole.REGION_AGENT)
 
         when: "a regional agent without region:manage attempts to create a region user"
-        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), RegionUser)
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, request)), RegionUser)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -121,10 +121,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         UUID directorId = director.id()
         dataBuilder.regionUser().asRegionDirector(directorId, targetRegionId).persist()
 
-        def command = new CreateRegionUserCommand(targetUserId, targetRegionId, RegionUserRole.REGION_AGENT)
+        def request = new CreateRegionUserRequest(targetUserId, targetRegionId, RegionUserRole.REGION_AGENT)
 
         when: "the regional director creates the region user via HTTP POST"
-        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command), directorId.toString()), RegionUser)
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, request), directorId.toString()), RegionUser)
         RegionUser saved = track(response.body())
 
         then: "200 OK is returned and record is persisted"
@@ -151,10 +151,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         def director = dataBuilder.user().withRole(UserRole.REGION_DIRECTOR).withEmail("cross-region-director@example.com").persist()
         dataBuilder.regionUser().asRegionDirector(director.id(), otherRegion.id()).persist()
 
-        def command = new CreateRegionUserCommand(targetUser.id(), targetRegion.id(), RegionUserRole.REGION_AGENT)
+        def request = new CreateRegionUserRequest(targetUser.id(), targetRegion.id(), RegionUserRole.REGION_AGENT)
 
         when: "the director attempts to add a user to the unassigned target region"
-        client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command), director.id().toString()), RegionUser)
+        client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, request), director.id().toString()), RegionUser)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -288,10 +288,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         UUID regionId = region.id()
         dataBuilder.regionUser().asRegionAgent(userId, regionId).persist()
 
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "the region user is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/region-users/${userId}/${regionId}", command)), RegionUser)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/region-users/${userId}/${regionId}", request)), RegionUser)
         RegionUser updated = response.body()
 
         then: "the update is reflected in the response"
@@ -306,11 +306,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent region user"() {
-        given: "a non-existent composite ID and command"
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        given: "a non-existent composite ID and request"
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/region-users/${UUID.randomUUID()}/${UUID.randomUUID()}", command)), RegionUser)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/region-users/${UUID.randomUUID()}/${UUID.randomUUID()}", request)), RegionUser)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -318,11 +318,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject unauthenticated PUT /region-users/{userId}/{regionId} with 401 UNAUTHORIZED"() {
-        given: "an update command"
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        given: "an update request"
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "an unauthenticated caller attempts to update a region user"
-        client.exchange(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", command))
+        client.exchange(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", request))
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -330,11 +330,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject standard user attempting PUT /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
-        given: "an update command"
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        given: "an update request"
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "a standard user attempts to update a region user"
-        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", command)), RegionUser)
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", request)), RegionUser)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -342,11 +342,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject regional agent without region:manage claim attempting PUT /region-users/{userId}/{regionId} with 403 FORBIDDEN"() {
-        given: "an update command"
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        given: "an update request"
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "a regional agent without region:manage attempts to update a region user"
-        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", command)), RegionUser)
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}/${UUID.randomUUID()}", request)), RegionUser)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -357,11 +357,11 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         given: "a Denver County membership and an El Paso County director"
         UUID targetUserId = TestPersonas.CONNIE_COUNTY_AGENT.id
         UUID regionId = TestPersonas.DENVER_COUNTY_REGION_ID
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "the El Paso County director attempts to update the Denver County membership"
         client.exchange(
-                asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${targetUserId}/${regionId}", command), TestPersonas.ETHAN_SIBLING_DIRECTOR),
+                asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${targetUserId}/${regionId}", request), TestPersonas.ETHAN_SIBLING_DIRECTOR),
                 RegionUser
         )
 
@@ -381,10 +381,10 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         dataBuilder.regionUser().asRegionAgent(targetUserId, targetRegionId).persist()
         dataBuilder.regionUser().asRegionDirector(directorId, targetRegionId).persist()
 
-        def command = new UpdateRegionUserCommand(RegionUserRole.REGION_DIRECTOR)
+        def request = new UpdateRegionUserRequest(RegionUserRole.REGION_DIRECTOR)
 
         when: "the regional director updates the role via HTTP PUT"
-        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${targetUserId}/${targetRegionId}", command), directorId.toString()), RegionUser)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${targetUserId}/${targetRegionId}", request), directorId.toString()), RegionUser)
         RegionUser updated = response.body()
 
         then: "200 OK is returned and update is reflected in response"

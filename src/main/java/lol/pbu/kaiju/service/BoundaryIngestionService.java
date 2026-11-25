@@ -9,7 +9,7 @@ import io.micronaut.json.tree.JsonNode;
 import io.micronaut.serde.ObjectMapper;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import lol.pbu.kaiju.dto.IngestBoundaryCommand;
+import lol.pbu.kaiju.dto.IngestBoundaryRequest;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
 import lol.pbu.kaiju.serde.JtsGeometrySerde;
 import org.locationtech.jts.geom.Coordinate;
@@ -230,30 +230,26 @@ public class BoundaryIngestionService {
         return jdbcOperations;
     }
 
-    public AdministrativeRegionService getAdministrativeRegionService() {
-        return administrativeRegionService;
-    }
-
     /**
      * Downloads boundary from authoritative Census Bureau endpoint, validates GeoJSON geometry,
      * simplifies geometry preserving topology, and updates administrative region in database.
      *
      * @param regionId    the administrative region UUID
-     * @param command     the ingest command containing source URL and optional tolerance
+     * @param request     the ingest request containing source URL and optional tolerance
      * @param actorUserId the user initiating boundary ingestion
      * @return response containing region summary and reduction metrics
      */
-    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryCommand command, @Nullable UUID actorUserId) {
+    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryRequest request, @Nullable UUID actorUserId) {
         if (regionId == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Region ID must not be null.");
         }
-        if (command == null || command.sourceUrl() == null || command.sourceUrl().isBlank()) {
+        if (request == null || request.sourceUrl() == null || request.sourceUrl().isBlank()) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Source URL must not be blank.");
         }
 
-        double tolerance = resolveTolerance(command.tolerance());
+        double tolerance = resolveTolerance(request.tolerance());
 
-        URI validatedUri = validateSourceUrl(command.sourceUrl());
+        URI validatedUri = validateSourceUrl(request.sourceUrl());
 
         byte[] payload = fetchPayload(validatedUri);
 
@@ -267,14 +263,14 @@ public class BoundaryIngestionService {
             if (actorUserId == null) {
                 throw new IllegalArgumentException("actorUserId must not be null when applying an audited boundary ingestion.");
             }
-            return administrativeRegionService.applyIngestedBoundary(regionId, geomJson, tolerance, command.sourceUrl(), actorUserId);
+            return administrativeRegionService.applyIngestedBoundary(regionId, geomJson, tolerance, request.sourceUrl(), actorUserId);
         }
 
         return updateRegionBoundary(regionId, geomJson, tolerance);
     }
 
-    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryCommand command) {
-        return ingestBoundary(regionId, command, null);
+    public IngestBoundaryResponse ingestBoundary(UUID regionId, IngestBoundaryRequest request) {
+        return ingestBoundary(regionId, request, null);
     }
 
     private URI validateSourceUrl(String sourceUrl) {

@@ -7,12 +7,12 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
-import lol.pbu.kaiju.dto.CoordinateDto
-import lol.pbu.kaiju.dto.CreateShiftCommand
-import lol.pbu.kaiju.dto.ProjectBoundaryCommand
-import lol.pbu.kaiju.dto.UpdateLocationCommand
-import lol.pbu.kaiju.dto.UpdateProjectCommand
-import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.Coordinates
+import lol.pbu.kaiju.dto.CreateShiftRequest
+import lol.pbu.kaiju.dto.ProjectBoundaryRequest
+import lol.pbu.kaiju.dto.UpdateLocationRequest
+import lol.pbu.kaiju.dto.UpdateProjectRequest
+import lol.pbu.kaiju.dto.UpdateShiftRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
@@ -155,8 +155,8 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         shiftBId = shiftB.id()
     }
 
-    private UpdateProjectCommand createUpdateProjectCommand(UUID orgId, String title, String description) {
-        new UpdateProjectCommand(
+    private UpdateProjectRequest createUpdateProjectRequest(UUID orgId, String title, String description) {
+        new UpdateProjectRequest(
                 orgId,
                 null,
                 title,
@@ -167,23 +167,23 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         )
     }
 
-    private List<ProjectBoundaryCommand> defaultBoundaries() {
+    private List<ProjectBoundaryRequest> defaultBoundaries() {
         [
-                new ProjectBoundaryCommand(
+                new ProjectBoundaryRequest(
                         "Denver Area Boundary",
                         [
-                                new CoordinateDto(-105.1099, 39.7891),
-                                new CoordinateDto(-104.7432, 39.7912),
-                                new CoordinateDto(-104.7528, 39.6158),
-                                new CoordinateDto(-105.0536, 39.6137),
-                                new CoordinateDto(-105.1099, 39.7891)
+                                new Coordinates(-105.1099, 39.7891),
+                                new Coordinates(-104.7432, 39.7912),
+                                new Coordinates(-104.7528, 39.6158),
+                                new Coordinates(-105.0536, 39.6137),
+                                new Coordinates(-105.1099, 39.7891)
                         ]
                 )
         ]
     }
 
-    private UpdateLocationCommand createUpdateLocationCommand() {
-        new UpdateLocationCommand(
+    private UpdateLocationRequest createUpdateLocationRequest() {
+        new UpdateLocationRequest(
                 "Attempted Updated Location",
                 "123 Infiltrator St",
                 "Boulder",
@@ -195,10 +195,10 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         )
     }
 
-    private CreateShiftCommand createShiftCommand(UUID projectId) {
+    private CreateShiftRequest createShiftRequest(UUID projectId) {
         def startTime = OffsetDateTime.now().plusDays(3)
         def endTime = startTime.plusHours(2)
-        new CreateShiftCommand(
+        new CreateShiftRequest(
                 projectId,
                 true,
                 null,
@@ -208,10 +208,10 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
         )
     }
 
-    private UpdateShiftCommand createUpdateShiftCommand() {
+    private UpdateShiftRequest createUpdateShiftRequest() {
         def startTime = OffsetDateTime.now().plusDays(4)
         def endTime = startTime.plusHours(3)
-        new UpdateShiftCommand(
+        new UpdateShiftRequest(
                 true,
                 null,
                 startTime,
@@ -223,8 +223,8 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     /********** Horizontal Isolation (IDOR) Mutation Rejections **********/
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to update Project B with 403 FORBIDDEN"() {
-        given: "an update command targeting Project B"
-        def command = createUpdateProjectCommand(
+        given: "an update request targeting Project B"
+        def request = createUpdateProjectRequest(
                 orgBId,
                 "Malicious Update Project B Title",
                 "Malicious update attempt on Project B description exceeding twenty characters."
@@ -232,7 +232,7 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
         when: "User A attempts to update Project B via HTTP PUT"
         client.exchange(asOrgManager(
-                HttpRequest.PUT("${PROJECTS_PATH}/${projectBId}", command),
+                HttpRequest.PUT("${PROJECTS_PATH}/${projectBId}", request),
                 userA
         ), Project)
 
@@ -254,12 +254,12 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to create a shift linked to Project B with 403 FORBIDDEN"() {
-        given: "a shift creation command linked to active Project B"
-        def command = createShiftCommand(activeProjectBId)
+        given: "a shift creation request linked to active Project B"
+        def request = createShiftRequest(activeProjectBId)
 
         when: "User A attempts to create a shift for Project B via HTTP POST"
         client.exchange(asOrgManager(
-                HttpRequest.POST(SHIFTS_PATH, command),
+                HttpRequest.POST(SHIFTS_PATH, request),
                 userA
         ), Shift)
 
@@ -269,12 +269,12 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to update Shift B with 403 FORBIDDEN"() {
-        given: "a shift update command"
-        def command = createUpdateShiftCommand()
+        given: "a shift update request"
+        def request = createUpdateShiftRequest()
 
         when: "User A attempts to update Shift B via HTTP PUT"
         client.exchange(asOrgManager(
-                HttpRequest.PUT("${SHIFTS_PATH}/${shiftBId}", command),
+                HttpRequest.PUT("${SHIFTS_PATH}/${shiftBId}", request),
                 userA
         ), Shift)
 
@@ -296,12 +296,12 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HORIZONTAL ISOLATION | should reject User A attempting to update Location B with 403 FORBIDDEN"() {
-        given: "a location update command"
-        def command = createUpdateLocationCommand()
+        given: "a location update request"
+        def request = createUpdateLocationRequest()
 
         when: "User A attempts to update Location B via HTTP PUT"
         client.exchange(asOrgManager(
-                HttpRequest.PUT("${LOCATIONS_PATH}/${locationBId}", command),
+                HttpRequest.PUT("${LOCATIONS_PATH}/${locationBId}", request),
                 userA
         ))
 
@@ -339,8 +339,8 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     /********** Contrast / Happy Path Scenarios **********/
 
     def "HAPPY PATH | should allow User A to successfully update Project A with 200 OK"() {
-        given: "a valid update command for Project A"
-        def command = createUpdateProjectCommand(
+        given: "a valid update request for Project A"
+        def request = createUpdateProjectRequest(
                 orgAId,
                 "Updated Project Alpha Title",
                 "Legitimate update on Project Alpha description exceeding twenty characters."
@@ -348,7 +348,7 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
 
         when: "User A updates Project A via HTTP PUT"
         def response = client.exchange(asOrgManager(
-                HttpRequest.PUT("${PROJECTS_PATH}/${projectAId}", command),
+                HttpRequest.PUT("${PROJECTS_PATH}/${projectAId}", request),
                 userA
         ), Project)
 
@@ -360,12 +360,12 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HAPPY PATH | should allow User A to successfully create a shift for Project A with 200 OK"() {
-        given: "a valid shift creation command for active Project A"
-        def command = createShiftCommand(activeProjectAId)
+        given: "a valid shift creation request for active Project A"
+        def request = createShiftRequest(activeProjectAId)
 
         when: "User A creates a shift for Project A via HTTP POST"
         def response = client.exchange(asOrgManager(
-                HttpRequest.POST(SHIFTS_PATH, command),
+                HttpRequest.POST(SHIFTS_PATH, request),
                 userA
         ), Shift)
         track(response.body())
@@ -379,12 +379,12 @@ class OrganizationPrivacyAndJurisdictionSpec extends BaseControllerSpec {
     }
 
     def "HAPPY PATH | should allow User A to successfully update Shift A with 200 OK"() {
-        given: "a valid shift update command for Shift A"
-        def command = createUpdateShiftCommand()
+        given: "a valid shift update request for Shift A"
+        def request = createUpdateShiftRequest()
 
         when: "User A updates Shift A via HTTP PUT"
         def response = client.exchange(asOrgManager(
-                HttpRequest.PUT("${SHIFTS_PATH}/${shiftAId}", command),
+                HttpRequest.PUT("${SHIFTS_PATH}/${shiftAId}", request),
                 userA
         ), Shift)
 

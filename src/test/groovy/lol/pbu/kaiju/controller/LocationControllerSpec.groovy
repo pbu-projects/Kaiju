@@ -6,9 +6,12 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Location
-import lol.pbu.kaiju.dto.CreateLocationCommand
-import lol.pbu.kaiju.dto.UpdateLocationCommand
+import lol.pbu.kaiju.dto.CreateLocationRequest
+import lol.pbu.kaiju.dto.UpdateLocationRequest
+import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.repository.LocationRepository
+import lol.pbu.kaiju.security.AuthorizationService
+import lol.pbu.kaiju.util.SpatialMappingService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -30,6 +33,9 @@ class LocationControllerSpec extends BaseControllerSpec {
     @Inject
     LocationController locationController
 
+    @Inject
+    AuthorizationService authorizationService
+
     @Shared
     Faker faker = new Faker()
 
@@ -44,12 +50,12 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     @Unroll
     def "CREATE | should successfully save a valid location: #country"(String country, String address, String city, String stateProvince, String postalCode, String countryCode, double lon, double lat) {
-        given: "a new valid location command"
+        given: "a new valid location request"
         String name = "Test ${faker.company().name()}"
-        def command = new CreateLocationCommand(name, address, city, stateProvince, postalCode, countryCode, lon, lat)
+        def request = new CreateLocationRequest(name, address, city, stateProvince, postalCode, countryCode, lon, lat)
 
         when: "the location is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/locations", command)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/locations", request)), Location)
         Location saved = track(response.body())
 
         then: "the location is persisted with 200 OK and generated ID"
@@ -140,12 +146,12 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should allow regional director with region:manage claim to create a location"() {
-        given: "a new valid location command"
+        given: "a new valid location request"
         String name = "Director Location ${faker.company().name()}"
-        def command = new CreateLocationCommand(name, "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        def request = new CreateLocationRequest(name, "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
 
         when: "the location is added by a regional director via HTTP POST"
-        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Location)
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, request)), Location)
         Location saved = track(response.body())
 
         then: "the location is persisted with 200 OK and generated ID"
@@ -167,11 +173,11 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject standard user attempting POST /locations with 403 FORBIDDEN"() {
-        given: "a valid location command"
-        def command = new CreateLocationCommand("Standard User Location", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        given: "a valid location request"
+        def request = new CreateLocationRequest("Standard User Location", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
 
         when: "a standard user attempts to create a location via HTTP POST"
-        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), Location)
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, request)), Location)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -179,11 +185,11 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject regional agent without region:manage claim attempting POST /locations with 403 FORBIDDEN"() {
-        given: "a valid location command"
-        def command = new CreateLocationCommand("Agent Location", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        given: "a valid location request"
+        def request = new CreateLocationRequest("Agent Location", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
 
         when: "a regional agent attempts to create a location via HTTP POST"
-        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), Location)
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, request)), Location)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -193,10 +199,10 @@ class LocationControllerSpec extends BaseControllerSpec {
     def "CREATE | should automatically resolve timezone for coordinates inside known boundary"() {
         given: "a location in Denver"
         String name = "Test Denver Location ${faker.company().name()}"
-        def command = new CreateLocationCommand(name, "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        def request = new CreateLocationRequest(name, "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
 
         when: "the location is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location)
         Location saved = track(response.body())
 
         then: "the location is persisted with timezone America/Denver"
@@ -216,10 +222,10 @@ class LocationControllerSpec extends BaseControllerSpec {
     def "CREATE | should leave timezone null gracefully when coordinates are outside known boundaries"() {
         given: "a location outside known boundaries"
         String name = "Test London Location ${faker.company().name()}"
-        def command = new CreateLocationCommand(name, "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+        def request = new CreateLocationRequest(name, "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
 
         when: "the location is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location)
         Location saved = track(response.body())
 
         then: "the location is persisted with null timezone without error"
@@ -239,7 +245,7 @@ class LocationControllerSpec extends BaseControllerSpec {
     def "CREATE | should persist explicit fallback timezone when coordinates are outside boundary polygons"() {
         given: "a location outside known boundaries with an explicit fallback timezone"
         String name = "Test London With Fallback ${faker.company().name()}"
-        def command = new CreateLocationCommand(
+        def request = new CreateLocationRequest(
                 name,
                 "10 Downing St",
                 "London",
@@ -252,7 +258,7 @@ class LocationControllerSpec extends BaseControllerSpec {
         )
 
         when: "the location is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location)
         Location saved = track(response.body())
 
         then: "the location is persisted with the fallback timezone"
@@ -289,8 +295,8 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "READ | should include timezone when retrieving location by ID"() {
         given: "an existing location with timezone in Denver"
-        def command = new CreateLocationCommand("Test Denver Read ${faker.company().name()}", "1600 Glenarm Pl", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
-        def created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest("Test Denver Read ${faker.company().name()}", "1600 Glenarm Pl", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        def created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
         when: "the location is requested by its ID via HTTP GET"
@@ -329,10 +335,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         UUID id = location.id()
         def newName = "Updated ${faker.commerce().productName()}"
         def newCity = faker.address().city()
-        def updateCommand = new UpdateLocationCommand(newName, "Updated Address", newCity, "UT", "84000", "US", -105.0, 40.0)
+        def updateRequest = new UpdateLocationRequest(newName, "Updated Address", newCity, "UT", "84000", "US", -105.0, 40.0)
 
         when: "the location is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/locations/${id}", updateCommand)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/locations/${id}", updateRequest)), Location)
         Location updated = response.body()
 
         then: "the returned location contains the updated data with 200 OK"
@@ -354,12 +360,12 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should update resolved timezone when coordinates change"() {
         given: "an existing location in Denver"
-        def command = new CreateLocationCommand("Test TZ Move ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
-        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest("Test TZ Move ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
         when: "updating the location coordinates to Chicago"
-        def updateToChicago = new UpdateLocationCommand(
+        def updateToChicago = new UpdateLocationRequest(
                 created.name(),
                 created.addressLine(),
                 "Chicago",
@@ -386,7 +392,7 @@ class LocationControllerSpec extends BaseControllerSpec {
         }
 
         when: "updating coordinates to an unknown boundary area"
-        def updateToLondon = new UpdateLocationCommand(
+        def updateToLondon = new UpdateLocationRequest(
                 created.name(),
                 created.addressLine(),
                 "London",
@@ -415,13 +421,13 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should preserve existing timezone when updating non-coordinate fields"() {
         given: "an existing location in Denver with resolved timezone"
-        def command = new CreateLocationCommand("Denver Original ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
-        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest("Denver Original ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
         when: "updating only the location name without altering coordinates"
         def newName = "Denver Renamed ${faker.company().name()}"
-        def updateCommand = new UpdateLocationCommand(
+        def updateRequest = new UpdateLocationRequest(
                 newName,
                 created.addressLine(),
                 created.city(),
@@ -431,7 +437,7 @@ class LocationControllerSpec extends BaseControllerSpec {
                 -104.9903,
                 39.7392
         )
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
         Location updated = response.body()
 
         then: "the name is updated and the timezone is preserved"
@@ -451,12 +457,12 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should apply explicit fallback timezone when moving to unmapped coordinates"() {
         given: "an existing location in Denver"
-        def command = new CreateLocationCommand("Denver To London ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
-        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest("Denver To London ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
         when: "updating to London coordinates with an explicit fallback timezone"
-        def updateCommand = new UpdateLocationCommand(
+        def updateRequest = new UpdateLocationRequest(
                 created.name(),
                 "10 Downing St",
                 "London",
@@ -467,7 +473,7 @@ class LocationControllerSpec extends BaseControllerSpec {
                 51.5072,
                 "Europe/London"
         )
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
         Location updated = response.body()
 
         then: "the timezone is set to the provided fallback"
@@ -486,12 +492,12 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should override timezone when explicit timezone is passed with unchanged coordinates"() {
         given: "an existing location in Denver"
-        def command = new CreateLocationCommand("Denver Override ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
-        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest("Denver Override ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
         when: "updating with the same coordinates but an explicit timezone override"
-        def updateCommand = new UpdateLocationCommand(
+        def updateRequest = new UpdateLocationRequest(
                 created.name(),
                 created.addressLine(),
                 created.city(),
@@ -502,7 +508,7 @@ class LocationControllerSpec extends BaseControllerSpec {
                 39.7392,
                 "America/Boise"
         )
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
         Location updated = response.body()
 
         then: "the explicit timezone override is applied"
@@ -521,12 +527,12 @@ class LocationControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should resolve timezone when updating an existing location that had null timezone"() {
         given: "an existing location outside boundaries with null timezone"
-        def command = new CreateLocationCommand("London Original ${faker.company().name()}", "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
-        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest("London Original ${faker.company().name()}", "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == null
 
         when: "updating the location to Denver coordinates"
-        def updateCommand = new UpdateLocationCommand(
+        def updateRequest = new UpdateLocationRequest(
                 created.name(),
                 "1600 Glenarm Pl",
                 "Denver",
@@ -536,7 +542,7 @@ class LocationControllerSpec extends BaseControllerSpec {
                 -104.9903,
                 39.7392
         )
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateCommand)), Location)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
         Location updated = response.body()
 
         then: "the timezone is resolved to America/Denver"
@@ -554,13 +560,64 @@ class LocationControllerSpec extends BaseControllerSpec {
         result == "UTC"
     }
 
+    def "UPDATE | applies fallback timezone when existing location had null timezone and coordinates stay the same"() {
+        given: "an existing location outside known boundaries with null timezone"
+        def createRequest = new CreateLocationRequest("London Null TZ ${faker.company().name()}", "10 Downing St", "London", null, "SW1A 2AA", "GB", -0.1276, 51.5072)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, createRequest)), Location).body())
+        assert created.timezone() == null
+
+        when: "updating the location with identical coordinates and an explicit timezone"
+        def updateRequest = new UpdateLocationRequest(
+                created.name(),
+                created.addressLine(),
+                created.city(),
+                created.stateProvince(),
+                created.postalCode(),
+                created.countryCode(),
+                -0.1276,
+                51.5072,
+                "Europe/London"
+        )
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
+        Location updated = response.body()
+
+        then: "the fallback timezone is applied"
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.timezone() == "Europe/London"
+        }
+    }
+
+    def "UNIT | updateLocation resolves timezone when existing location has null geometry"() {
+        given: "a controller with a mocked repository returning a location with null geometry"
+        UUID locId = UUID.randomUUID()
+        Location existingNoGeom = new Location(locId, "Legacy Site", "1 Main St", "Denver", "CO", "80202", "US", null, "America/Denver")
+        LocationRepository mockRepo = Mock(LocationRepository) {
+            findById(locId) >> Optional.of(existingNoGeom)
+            findTimezoneByPoint(_ as Point) >> Optional.of("America/Chicago")
+            update(_ as Location) >> { Location loc -> loc }
+        }
+        LocationController controller = new LocationController(mockRepo, new SpatialMappingService(geometryFactory), authorizationService)
+        UpdateLocationRequest updateRequest = new UpdateLocationRequest("Legacy Site", "1 Main St", "Chicago", "IL", "60601", "US", -87.6298, 41.8781)
+
+        when: "updating the location as a global admin"
+        Location updated = controller.updateLocation(locId, updateRequest, createPrincipal(TestPersonas.SARAH_ADMIN.id))
+
+        then: "timezone is resolved from the new point instead of reading existing null geometry"
+        verifyAll(updated) {
+            id() == locId
+            timezone() == "America/Chicago"
+            geom() != null
+        }
+    }
+
     def "UPDATE | should fail to update a non-existent location"() {
         given: "a random non-existent ID"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateLocationCommand("Test", "Addr", "City", "ST", "12345", "US", 0.0, 0.0)
+        def updateRequest = new UpdateLocationRequest("Test", "Addr", "City", "ST", "12345", "US", 0.0, 0.0)
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/locations/${nonExistentId}", updateCommand)), Location)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/locations/${nonExistentId}", updateRequest)), Location)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -606,10 +663,10 @@ class LocationControllerSpec extends BaseControllerSpec {
         def location = dataBuilder.location().withName("Original Location Director").withAddress("123 Main St", "Denver", "CO", "80202", "US").withGeometry(createPoint(-104.9903, 39.7392)).persist()
         UUID id = location.id()
         def newName = "Director Location Update ${faker.company().name()}"
-        def updateCommand = new UpdateLocationCommand(newName, "456 Update Ave", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        def updateRequest = new UpdateLocationRequest(newName, "456 Update Ave", "Denver", "CO", "80202", "US", -104.99, 39.74)
 
         when: "the location is updated by a regional director via HTTP PUT"
-        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Location)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Location)
         Location updated = response.body()
 
         then: "the returned location contains the updated data with 200 OK"
@@ -630,11 +687,11 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject regional director updating non-existent location with 403 FORBIDDEN (no existence oracle)"() {
-        given: "an update command targeting a non-existent location ID"
-        def updateCommand = new UpdateLocationCommand("Missing Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        given: "an update request targeting a non-existent location ID"
+        def updateRequest = new UpdateLocationRequest("Missing Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
 
         when: "a regional director attempts to update a non-existent location"
-        client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}", updateCommand)), Location)
+        client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${UUID.randomUUID()}", updateRequest)), Location)
 
         then: "a 403 FORBIDDEN response is returned instead of 404"
         def e = thrown(HttpClientResponseException)
@@ -642,12 +699,12 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject standard user attempting PUT /locations/{id} with 403 FORBIDDEN"() {
-        given: "an update command and target location ID"
-        def updateCommand = new UpdateLocationCommand("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        given: "an update request and target location ID"
+        def updateRequest = new UpdateLocationRequest("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
         UUID id = UUID.randomUUID()
 
         when: "a standard user attempts to update a location via HTTP PUT"
-        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Location)
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Location)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -655,12 +712,12 @@ class LocationControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject regional agent without region:manage claim attempting PUT /locations/{id} with 403 FORBIDDEN"() {
-        given: "an update command and target location ID"
-        def updateCommand = new UpdateLocationCommand("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
+        given: "an update request and target location ID"
+        def updateRequest = new UpdateLocationRequest("Unauthorized Update", "123 Main St", "Denver", "CO", "80202", "US", -104.99, 39.74)
         UUID id = UUID.randomUUID()
 
         when: "a regional agent attempts to update a location via HTTP PUT"
-        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Location)
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Location)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -777,8 +834,8 @@ class LocationControllerSpec extends BaseControllerSpec {
     def "LIST | should include timezone field in location list items"() {
         given: "a persisted location in Denver"
         String denverName = "AAAA Denver List ${UUID.randomUUID().toString().substring(0, 8)}"
-        def command = new CreateLocationCommand(denverName, "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
-        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, command)), Location).body())
+        def request = new CreateLocationRequest(denverName, "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
+        Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
         when: "requesting locations via HTTP GET"

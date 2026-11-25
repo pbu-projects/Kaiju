@@ -29,11 +29,11 @@ import java.util.Map;
 public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper {
 
     private final UserService userService;
-    private final IdpRoleMapper idpRoleMapper;
+    private final IdentityProviderRoleMapper identityProviderRoleMapper;
 
-    public AuthentikAuthenticationMapper(@NonNull UserService userService, @NonNull IdpRoleMapper idpRoleMapper) {
+    public AuthentikAuthenticationMapper(@NonNull UserService userService, @NonNull IdentityProviderRoleMapper identityProviderRoleMapper) {
         this.userService = userService;
-        this.idpRoleMapper = idpRoleMapper;
+        this.identityProviderRoleMapper = identityProviderRoleMapper;
     }
 
     @Override
@@ -56,8 +56,8 @@ public class AuthentikAuthenticationMapper implements OpenIdAuthenticationMapper
         }
 
         String canonicalEmail = email.toLowerCase(Locale.ROOT).trim();
-        Object groupsObj = openIdClaims.get(IdpRoleMapper.CLAIMS_GROUPS_KEY);
-        UserRole initialRole = idpRoleMapper.resolveRoleFromGroupObject(groupsObj);
+        Object groupsObj = openIdClaims.get(IdentityProviderRoleMapper.CLAIMS_GROUPS_KEY);
+        UserRole initialRole = identityProviderRoleMapper.resolveRoleFromGroupObject(groupsObj);
         User user = userService.provisionOrGetUser(canonicalEmail, initialRole);
 
         // Map database role to Micronaut Security Context

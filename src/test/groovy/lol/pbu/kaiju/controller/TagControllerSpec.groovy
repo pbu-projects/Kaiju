@@ -6,8 +6,8 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.domain.Tag
-import lol.pbu.kaiju.dto.CreateTagCommand
-import lol.pbu.kaiju.dto.UpdateTagCommand
+import lol.pbu.kaiju.dto.CreateTagRequest
+import lol.pbu.kaiju.dto.UpdateTagRequest
 import lol.pbu.kaiju.repository.TagRepository
 import net.datafaker.Faker
 import spock.lang.Shared
@@ -34,12 +34,12 @@ class TagControllerSpec extends BaseControllerSpec {
     /********** CREATE Tests **********/
 
     def "CREATE | should successfully save a valid tag"() {
-        given: "a valid create tag command"
+        given: "a valid create tag request"
         String tagName = "tag-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
-        def command = new CreateTagCommand(tagName)
+        def request = new CreateTagRequest(tagName)
 
         when: "the tag is added via HTTP POST"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/tags", command)), Tag)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/tags", request)), Tag)
         Tag saved = track(response.body())
 
         then: "the tag is persisted with 200 OK and generated ID"
@@ -76,7 +76,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "CREATE | should reject unauthenticated POST /tags with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to create a tag"
-        client.exchange(HttpRequest.POST("/tags", new CreateTagCommand("unauth-tag")), Tag)
+        client.exchange(HttpRequest.POST("/tags", new CreateTagRequest("unauth-tag")), Tag)
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -84,12 +84,12 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should allow regional director with region:manage claim to create a tag"() {
-        given: "a valid create tag command"
+        given: "a valid create tag request"
         String tagName = "director-tag-${UUID.randomUUID().toString().substring(0, 8)}"
-        def command = new CreateTagCommand(tagName)
+        def request = new CreateTagRequest(tagName)
 
         when: "the tag is added by a regional director via HTTP POST"
-        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, command)), Tag)
+        def response = client.exchange(asRegionDirector(HttpRequest.POST(BASE_PATH, request)), Tag)
         Tag saved = track(response.body())
 
         then: "the tag is persisted with 200 OK and generated ID"
@@ -109,11 +109,11 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject standard user attempting POST /tags with 403 FORBIDDEN"() {
-        given: "a valid tag command"
-        def command = new CreateTagCommand("standard-user-tag")
+        given: "a valid tag request"
+        def request = new CreateTagRequest("standard-user-tag")
 
         when: "a standard user attempts to create a tag via HTTP POST"
-        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, command)), Tag)
+        client.exchange(asStandardUser(HttpRequest.POST(BASE_PATH, request)), Tag)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -121,11 +121,11 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "CREATE | should reject regional agent without region:manage claim attempting POST /tags with 403 FORBIDDEN"() {
-        given: "a valid tag command"
-        def command = new CreateTagCommand("agent-tag")
+        given: "a valid tag request"
+        def request = new CreateTagRequest("agent-tag")
 
         when: "a regional agent attempts to create a tag via HTTP POST"
-        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, command)), Tag)
+        client.exchange(asRegionAgent(HttpRequest.POST(BASE_PATH, request)), Tag)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -175,10 +175,10 @@ class TagControllerSpec extends BaseControllerSpec {
         def tag = dataBuilder.tag().withName("original-tag-${faker.number().digits(5)}").persist()
         UUID id = tag.id()
         def newName = "updated-${faker.lorem().word()}-${UUID.randomUUID().toString().substring(0, 8)}"
-        def updateCommand = new UpdateTagCommand(newName)
+        def updateRequest = new UpdateTagRequest(newName)
 
         when: "the tag is updated via HTTP PUT"
-        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${id}", updateCommand)), Tag)
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${id}", updateRequest)), Tag)
         Tag updated = response.body()
 
         then: "200 OK is returned with updated data"
@@ -197,12 +197,12 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should fail to update a non-existent tag"() {
-        given: "a random non-existent ID and an update command"
+        given: "a random non-existent ID and an update request"
         def nonExistentId = UUID.randomUUID()
-        def updateCommand = new UpdateTagCommand("new-tag")
+        def updateRequest = new UpdateTagRequest("new-tag")
 
         when: "an update is attempted via HTTP PUT"
-        client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${nonExistentId}", updateCommand)), Tag)
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/tags/${nonExistentId}", updateRequest)), Tag)
 
         then: "a 404 NOT FOUND status is thrown"
         def e = thrown(HttpClientResponseException)
@@ -229,7 +229,7 @@ class TagControllerSpec extends BaseControllerSpec {
 
     def "UPDATE | should reject unauthenticated PUT /tags/{id} with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to update a tag"
-        client.exchange(HttpRequest.PUT("/tags/${UUID.randomUUID()}", new UpdateTagCommand("test")), Tag)
+        client.exchange(HttpRequest.PUT("/tags/${UUID.randomUUID()}", new UpdateTagRequest("test")), Tag)
 
         then: "a 401 UNAUTHORIZED response is returned"
         def e = thrown(HttpClientResponseException)
@@ -241,10 +241,10 @@ class TagControllerSpec extends BaseControllerSpec {
         def tag = dataBuilder.tag().withName("original-tag-${faker.number().digits(5)}").persist()
         UUID id = tag.id()
         def newName = "director-updated-${UUID.randomUUID().toString().substring(0, 8)}"
-        def updateCommand = new UpdateTagCommand(newName)
+        def updateRequest = new UpdateTagRequest(newName)
 
         when: "the tag is updated by a regional director via HTTP PUT"
-        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Tag)
+        def response = client.exchange(asRegionDirector(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Tag)
         Tag updated = response.body()
 
         then: "200 OK is returned with updated data"
@@ -263,12 +263,12 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject standard user attempting PUT /tags/{id} with 403 FORBIDDEN"() {
-        given: "an update command and target tag ID"
-        def updateCommand = new UpdateTagCommand("unauthorized-update")
+        given: "an update request and target tag ID"
+        def updateRequest = new UpdateTagRequest("unauthorized-update")
         UUID id = UUID.randomUUID()
 
         when: "a standard user attempts to update a tag via HTTP PUT"
-        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Tag)
+        client.exchange(asStandardUser(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Tag)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)
@@ -276,12 +276,12 @@ class TagControllerSpec extends BaseControllerSpec {
     }
 
     def "UPDATE | should reject regional agent without region:manage claim attempting PUT /tags/{id} with 403 FORBIDDEN"() {
-        given: "an update command and target tag ID"
-        def updateCommand = new UpdateTagCommand("unauthorized-update")
+        given: "an update request and target tag ID"
+        def updateRequest = new UpdateTagRequest("unauthorized-update")
         UUID id = UUID.randomUUID()
 
         when: "a regional agent attempts to update a tag via HTTP PUT"
-        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateCommand)), Tag)
+        client.exchange(asRegionAgent(HttpRequest.PUT("${BASE_PATH}/${id}", updateRequest)), Tag)
 
         then: "a 403 FORBIDDEN response is returned"
         def e = thrown(HttpClientResponseException)

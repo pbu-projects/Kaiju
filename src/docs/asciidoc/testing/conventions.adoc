@@ -7,7 +7,7 @@ A practical guide for QA engineers and developers explaining our core testing de
 
 == Test Design: Data-Driven Testing (DDT)
 
-Both developers and QA teams need tests that are thorough without being messy or repetitive. We use https://spockframework.org/[Spock Framework] Data-Driven Testing (DDT) with `@Unroll` and `where:` blocks.
+Each test method should test only one behavior so that when a test fails, anyone reading the report sees the exact case that broke without having to debug a bundled test. When you need to check multiple inputs or edge cases for the same behavior, use https://spockframework.org/[Spock Framework] Data-Driven Testing (DDT) with `@Unroll` and `where:` blocks instead of putting multiple scenarios in one test body.
 
 Data-driven testing separates the test logic from the test inputs. 
 
