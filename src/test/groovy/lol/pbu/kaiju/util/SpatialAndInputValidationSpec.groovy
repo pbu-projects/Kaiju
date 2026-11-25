@@ -12,27 +12,28 @@ import io.micronaut.serde.ObjectMapper
 import io.micronaut.serde.exceptions.SerdeException
 import io.micronaut.validation.validator.Validator as MicronautValidator
 import jakarta.validation.Validator
+import lol.pbu.kaiju.converter.JtsPointConverter
+import lol.pbu.kaiju.converter.JtsPolygonConverter
 import lol.pbu.kaiju.dto.Coordinates
 import lol.pbu.kaiju.dto.CreateOrganizationAuditLogRequest
 import lol.pbu.kaiju.dto.CreateOrganizationRequest
 import lol.pbu.kaiju.dto.CreateProjectAuditLogRequest
 import lol.pbu.kaiju.dto.CreateShiftRequest
 import lol.pbu.kaiju.dto.IngestBoundaryRequest
-import lol.pbu.kaiju.dto.ShiftTimeRange
 import lol.pbu.kaiju.dto.UpdateOrganizationAuditLogRequest
 import lol.pbu.kaiju.dto.UpdateOrganizationRequest
 import lol.pbu.kaiju.dto.UpdateProjectAuditLogRequest
 import lol.pbu.kaiju.dto.UpdateShiftRequest
-import lol.pbu.kaiju.dto.ValidShiftLocationValidator
-import lol.pbu.kaiju.dto.ValidTimeRangeValidator
 import lol.pbu.kaiju.model.AuditAction
-import lol.pbu.kaiju.model.JtsPointConverter
-import lol.pbu.kaiju.model.JtsPolygonConverter
 import lol.pbu.kaiju.serde.JtsGeometrySerde
 import lol.pbu.kaiju.service.AdministrativeRegionService
 import lol.pbu.kaiju.service.BoundaryIngestionService
+import lol.pbu.kaiju.service.SpatialMappingService
 import lol.pbu.kaiju.service.StubHttpClient
 import lol.pbu.kaiju.service.StubHttpResponse
+import lol.pbu.kaiju.validation.ShiftTimeRange
+import lol.pbu.kaiju.validation.ValidShiftLocationValidator
+import lol.pbu.kaiju.validation.ValidTimeRangeValidator
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.GeometryFactory
@@ -359,7 +360,7 @@ class SpatialAndInputValidationSpec extends Specification {
         readEx.message.contains("Expected Polygon or MultiPolygon")
     }
 
-    // --- DTO Bean Validation tests ---
+    // --- Bean Validation tests ---
 
     @Unroll
     def "#requestType rejects javascript URLs for websiteUrl"() {
@@ -451,7 +452,7 @@ class SpatialAndInputValidationSpec extends Specification {
         0 * regionService.applyIngestedBoundary(*_)
     }
 
-    // --- Validator null-input and AuditLogRequest DTO tests ---
+    // --- Validator null-input and AuditLogRequest tests ---
 
     @Unroll
     def "ValidTimeRangeValidator accepts #caseLabel"() {

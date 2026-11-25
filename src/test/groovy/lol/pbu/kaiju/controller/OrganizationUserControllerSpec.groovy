@@ -163,30 +163,26 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "READ | should reject outsider and cross-org admin viewing another user's organization membership with 403 FORBIDDEN"() {
+    @Unroll
+    def "READ | should reject #callerLabel viewing another user's organization membership with 403 FORBIDDEN"(String callerLabel, TestPersonas.Persona caller) {
         given: "a membership in Denver Metro Branch"
         UUID targetUserId = TestPersonas.LEO_LOCAL_ADMIN.id
         UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
 
-        when: "an unaffiliated volunteer requests the membership"
+        when: "an unauthorized caller requests the membership"
         client.exchange(
-                asVolunteer(HttpRequest.GET("/organization-users/${targetUserId}/${orgId}"), TestPersonas.VICTOR_VOLUNTEER),
+                asPersona(HttpRequest.GET("/organization-users/${targetUserId}/${orgId}"), caller),
                 OrganizationUser
         )
 
         then: "403 Forbidden is thrown"
-        def outsiderErr = thrown(HttpClientResponseException)
-        outsiderErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
 
-        when: "an org admin from Utah State Chapter requests the Denver membership"
-        client.exchange(
-                asOrgAdmin(HttpRequest.GET("/organization-users/${targetUserId}/${orgId}"), TestPersonas.URSULA_UTAH_ADMIN),
-                OrganizationUser
-        )
-
-        then: "403 Forbidden is thrown"
-        def crossOrgErr = thrown(HttpClientResponseException)
-        crossOrgErr.status == HttpStatus.FORBIDDEN
+        where:
+        callerLabel              | caller
+        "unaffiliated volunteer" | TestPersonas.VICTOR_VOLUNTEER
+        "cross-org admin"        | TestPersonas.URSULA_UTAH_ADMIN
     }
 
     def "READ | should return 404 for a non-existent composite ID"() {

@@ -270,30 +270,7 @@ class JtsSerdeSpec extends Specification {
 
     /********** 3D Coordinates & Holes Tests **********/
 
-    def "JtsGeometrySerde | should serialize and deserialize 3D Point with Z coordinate"() {
-        given: "a 3D Point with Z coordinate"
-        Point point3d = geometryFactory.createPoint(new Coordinate(-105.0, 39.0, 1600.0))
-
-        when: "serialized to JSON"
-        String json = jsonMapper.writeValueAsString(point3d)
-
-        then: "Z coordinate is preserved in JSON"
-        json.contains('"coordinates":[-105.0,39.0,1600.0]')
-
-        when: "deserialized back to Geometry"
-        Geometry deserialized = jsonMapper.readValue(json, Geometry)
-
-        then: "Z coordinate is preserved on deserialized Point"
-        verifyAll {
-            deserialized instanceof Point
-            deserialized.coordinate.x == -105.0
-            deserialized.coordinate.y == 39.0
-            deserialized.coordinate.z == 1600.0
-        }
-    }
-
-    def "JtsGeometrySerde | should serialize and deserialize Polygon with interior ring (hole)"() {
-        given: "a Polygon with an exterior shell and an interior hole"
+    private Polygon createPolygonWithHole() {
         Coordinate[] shellCoords = [
                 new Coordinate(-105.0, 39.0),
                 new Coordinate(-103.0, 39.0),
@@ -308,18 +285,61 @@ class JtsSerdeSpec extends Specification {
                 new Coordinate(-104.5, 40.5),
                 new Coordinate(-104.5, 39.5)
         ]
-        Polygon polygonWithHole = geometryFactory.createPolygon(
+        return geometryFactory.createPolygon(
                 geometryFactory.createLinearRing(shellCoords),
                 [geometryFactory.createLinearRing(holeCoords)] as LinearRing[]
         )
+    }
+
+    def "JtsGeometrySerde | should serialize 3D Point with Z coordinate in JSON"() {
+        given: "a 3D Point with Z coordinate"
+        Point point3d = geometryFactory.createPoint(new Coordinate(-105.0, 39.0, 1600.0))
+
+        when: "serialized to JSON"
+        String json = jsonMapper.writeValueAsString(point3d)
+
+        then: "Z coordinate is preserved in JSON"
+        json.contains('"coordinates":[-105.0,39.0,1600.0]')
+    }
+
+    def "JtsGeometrySerde | should serialize and deserialize 3D Point with Z coordinate"() {
+        given: "a 3D Point with Z coordinate"
+        Point point3d = geometryFactory.createPoint(new Coordinate(-105.0, 39.0, 1600.0))
+
+        when: "serialized and deserialized"
+        String json = jsonMapper.writeValueAsString(point3d)
+        Geometry deserialized = jsonMapper.readValue(json, Geometry)
+
+        then: "Z coordinate is preserved on deserialized Point"
+        verifyAll {
+            deserialized instanceof Point
+            deserialized.coordinate.x == -105.0
+            deserialized.coordinate.y == 39.0
+            deserialized.coordinate.z == 1600.0
+        }
+    }
+
+    def "JtsGeometrySerde | should serialize Polygon with interior ring (hole) in JSON"() {
+        given: "a Polygon with an exterior shell and an interior hole"
+        Polygon polygonWithHole = createPolygonWithHole()
 
         when: "serialized to JSON"
         String json = jsonMapper.writeValueAsString(polygonWithHole)
 
         then: "both shell and hole rings are serialized"
-        json.contains('"type":"Polygon"')
+        JsonNode node = jsonMapper.readValue(json, JsonNode)
+        verifyAll {
+            node.get("type").stringValue == "Polygon"
+            node.get("coordinates").size() == 2
+        }
+    }
 
-        when: "deserialized back to Geometry"
+    def "JtsGeometrySerde | should serialize and deserialize Polygon with interior ring (hole)"() {
+        given: "a Polygon with an exterior shell and an interior hole"
+        Polygon polygonWithHole = createPolygonWithHole()
+
+        when: "serialized and deserialized"
+        String json = jsonMapper.writeValueAsString(polygonWithHole)
         Geometry deserialized = jsonMapper.readValue(json, Geometry)
 
         then: "polygon retains its interior ring"

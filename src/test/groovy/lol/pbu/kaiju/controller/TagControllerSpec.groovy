@@ -209,6 +209,7 @@ class TagControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    @Unroll
     def "UPDATE | should fail to update tag with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing tag"
         def tag = dataBuilder.tag().withName("tag-for-invalid-update").persist()

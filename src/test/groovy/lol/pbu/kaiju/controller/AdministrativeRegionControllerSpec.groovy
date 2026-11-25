@@ -232,6 +232,7 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    @Unroll
     def "UPDATE | should fail to update administrative region with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing administrative region"
         def region = dataBuilder.region().withName("Test Update Invalid").withGeometry(createTestPolygon()).persist()
@@ -378,41 +379,33 @@ class AdministrativeRegionControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "SYNC | global admin can sync US places with and without includeCdps"() {
-        given: "stubbed place sync results"
-        def defaultResult = new UsSyncResult("CO", 3, 270, 0, 0, 0, [])
-        def cdpResult = new UsSyncResult("CO", 3, 270, 200, 0, 0, [])
+    @Unroll
+    def "SYNC | global admin can sync US places when #scenario"() {
+        given: "a stubbed place sync result"
+        def expected = new UsSyncResult("CO", 3, 270, expectedCdpsCount, 0, 0, [])
         Boolean capturedIncludeCdps = null
         syncStub.syncPlacesHandler = { String stateCode, boolean includeCdps, UUID actorId ->
             capturedIncludeCdps = includeCdps
-            return includeCdps ? cdpResult : defaultResult
+            return expected
         }
 
-        when: "a global admin triggers place sync without includeCdps"
-        def defaultResponse = client.exchange(
-                asGlobalAdmin(HttpRequest.POST("/administrative-regions/sync/us/states/CO/places", "")),
+        when: "a global admin triggers place sync"
+        def response = client.exchange(
+                asGlobalAdmin(HttpRequest.POST(path, "")),
                 UsSyncResult
         )
 
-        then: "includeCdps defaults to false"
-        verifyAll(defaultResponse) {
+        then: "includeCdps matches the query parameter and 200 OK is returned"
+        verifyAll(response) {
             status == HttpStatus.OK
-            body() == defaultResult
-            capturedIncludeCdps == false
+            body() == expected
+            capturedIncludeCdps == expectedIncludeCdps
         }
 
-        when: "a global admin triggers place sync with includeCdps=true"
-        def cdpResponse = client.exchange(
-                asGlobalAdmin(HttpRequest.POST("/administrative-regions/sync/us/states/CO/places?includeCdps=true", "")),
-                UsSyncResult
-        )
-
-        then: "includeCdps is passed as true"
-        verifyAll(cdpResponse) {
-            status == HttpStatus.OK
-            body() == cdpResult
-            capturedIncludeCdps == true
-        }
+        where:
+        scenario                     | path                                                               | expectedIncludeCdps | expectedCdpsCount
+        "includeCdps is omitted"     | "/administrative-regions/sync/us/states/CO/places"                 | false               | 0
+        "includeCdps=true is passed" | "/administrative-regions/sync/us/states/CO/places?includeCdps=true" | true               | 200
     }
 
     def "SYNC | non-admin cannot trigger US boundary sync"() {

@@ -1,4 +1,4 @@
-package lol.pbu.kaiju.dto;
+package lol.pbu.kaiju.model;
 
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Nullable;

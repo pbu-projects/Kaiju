@@ -9,7 +9,7 @@ import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lol.pbu.kaiju.model.JtsPolygonConverter;
+import lol.pbu.kaiju.converter.JtsPolygonConverter;
 import org.locationtech.jts.geom.Geometry;
 
 import java.util.UUID;

@@ -59,7 +59,7 @@ We do not just check your title. We check if your title gives you the exact perm
 
 | *Sarah Platform Admin*
 | `GLOBAL_ADMIN`
-| Every permission, including `system:user-manage` and `system:admin`
+| Every permission, including `system:user:manage` and `system:admin`
 |===
 
 When a new user signs in for the first time, a helper class called `IdentityProviderRoleMapper` reads the groups on their token and sets their starting role:
@@ -72,6 +72,9 @@ if (groups.contains("Kaiju Global Admins")) {
 if (groups.contains("Kaiju Region Directors")) {
     return UserRole.REGION_DIRECTOR;
 }
+if (groups.contains("Kaiju Region Agents")) {
+    return UserRole.REGION_AGENT;
+}
 return UserRole.STANDARD_USER;
 ----
 
@@ -81,22 +84,23 @@ Every web action in Kaiju is protected by a rule using https://micronaut-project
 The rule names the exact permission needed.
 
 === Adding an Administrative Region
-Creating a new regional boundary requires the `region:manage` permission:
+Creating a new regional boundary requires the `system:admin` permission:
 
 [source,java]
 ----
-@Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
+@Secured(SYSTEM_ADMIN_CLAIM)
 @Post
 public AdministrativeRegion addAdministrativeRegion(...) {
-    return administrativeRegionRepository.save(region);
+    UUID actorUserId = UUID.fromString(principal.getName());
+    return administrativeRegionService.createAdministrativeRegion(request, actorUserId);
 }
 ----
 
-* When **Rachel Regional Director** sends this request, she has `region:manage`. The app says yes and returns **200 OK**.
-* When **Victor Volunteer** tries to send this request, he does not have that permission. The app stops him and returns **403 Forbidden**.
+* When **Sarah Platform Admin** sends this request, she has `system:admin`. The app says yes and returns **200 OK**.
+* If **Rachel Regional Director** or **Victor Volunteer** tries to send this request, neither has that permission. The app stops them and returns **403 Forbidden**.
 
 === Viewing the Full User List
-Looking at all user accounts across the entire platform requires the `system:user-manage` permission:
+Looking at all user accounts across the entire platform requires the `system:user:manage` permission:
 
 [source,java]
 ----
@@ -107,7 +111,7 @@ public CursoredPage<User> getUsers(...) {
 }
 ----
 
-* When **Sarah Platform Admin** calls this, she has `system:user-manage`. The app returns the list with **200 OK**.
+* When **Sarah Platform Admin** calls this, she has `system:user:manage`. The app returns the list with **200 OK**.
 * If **Rachel Regional Director** or **Victor Volunteer** tries to call this, neither has that permission. The app stops them with **403 Forbidden**.
 
 == Instant Updates Without Logging Out

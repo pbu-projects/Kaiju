@@ -1,4 +1,4 @@
-package lol.pbu.kaiju.dto;
+package lol.pbu.kaiju.validation;
 
 import io.micronaut.core.annotation.Introspected;
 import jakarta.validation.ConstraintValidator;

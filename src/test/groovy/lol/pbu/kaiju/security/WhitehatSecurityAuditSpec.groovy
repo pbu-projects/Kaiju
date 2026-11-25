@@ -23,6 +23,7 @@ import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
+import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -112,67 +113,49 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "anonymous visitor cannot read draft or soft-deleted projects by ID"() {
-        given: "a draft project and a soft-deleted active project"
+    @Unroll
+    def "anonymous visitor cannot read #caseLabel project by ID"(String caseLabel, ProjectStatus status, boolean isDeleted) {
+        given: "a hidden project"
         def org = organizationRepository.findById(TestPersonas.NATIONAL_RELIEF_NETWORK_ID).orElseThrow()
         def now = OffsetDateTime.now(ZoneOffset.UTC)
-        def draft = projectRepository.save(new Project(
-                null, org, null, "Secret Draft Project",
-                "This draft project should never be readable by anonymous visitors.",
-                ProjectType.STANDARD, ProjectStatus.DRAFT,
-                now, null, null, null, null
+        def project = projectRepository.save(new Project(
+                null, org, null, "Hidden ${caseLabel} Project",
+                "This ${caseLabel} project should never be readable by anonymous visitors.",
+                ProjectType.STANDARD, status,
+                now, isDeleted ? now : null, null, null, null
         ))
-        trackProject(draft.id())
+        trackProject(project.id())
 
-        def deleted = projectRepository.save(new Project(
-                null, org, null, "Deleted Project",
-                "This soft-deleted project should never be readable by anonymous visitors.",
-                ProjectType.STANDARD, ProjectStatus.ACTIVE,
-                now, now, null, null, null
-        ))
-        trackProject(deleted.id())
-
-        when: "an anonymous visitor requests the draft project by ID"
-        client.exchange(HttpRequest.GET("/projects/${draft.id()}").accept(MediaType.APPLICATION_JSON_TYPE), Map)
+        when: "an anonymous visitor requests the project by ID"
+        client.exchange(HttpRequest.GET("/projects/${project.id()}").accept(MediaType.APPLICATION_JSON_TYPE), Map)
 
         then: "access should be denied or hidden"
-        def e1 = thrown(HttpClientResponseException)
-        e1.status in [HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
+        def e = thrown(HttpClientResponseException)
+        e.status in [HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
 
-        when: "an anonymous visitor requests the soft-deleted project by ID"
-        client.exchange(HttpRequest.GET("/projects/${deleted.id()}").accept(MediaType.APPLICATION_JSON_TYPE), Map)
-
-        then: "access should be denied or hidden"
-        def e2 = thrown(HttpClientResponseException)
-        e2.status in [HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
+        where:
+        caseLabel      | status               | isDeleted
+        "draft"        | ProjectStatus.DRAFT  | false
+        "soft-deleted" | ProjectStatus.ACTIVE | true
     }
 
-    def "standard user cannot read organization, project, or region audit logs"() {
+    @Unroll
+    def "standard user cannot read #logLabel audit logs"(String logLabel, String endpoint) {
         given: "a standard volunteer account"
-        def orgLogReq = asStandardUser(HttpRequest.GET("/organization-audit-logs").accept(MediaType.APPLICATION_JSON_TYPE))
-        def projLogReq = asStandardUser(HttpRequest.GET("/project-audit-logs").accept(MediaType.APPLICATION_JSON_TYPE))
-        def regLogReq = asStandardUser(HttpRequest.GET("/administrative-region-audit-logs").accept(MediaType.APPLICATION_JSON_TYPE))
+        def request = asStandardUser(HttpRequest.GET(endpoint).accept(MediaType.APPLICATION_JSON_TYPE))
 
-        when: "they request organization audit logs"
-        client.exchange(orgLogReq, Map)
+        when: "they request audit logs"
+        client.exchange(request, Map)
 
         then: "access should be denied"
-        def e1 = thrown(HttpClientResponseException)
-        e1.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
 
-        when: "they request project audit logs"
-        client.exchange(projLogReq, Map)
-
-        then: "access should be denied"
-        def e2 = thrown(HttpClientResponseException)
-        e2.status == HttpStatus.FORBIDDEN
-
-        when: "they request region audit logs"
-        client.exchange(regLogReq, Map)
-
-        then: "access should be denied"
-        def e3 = thrown(HttpClientResponseException)
-        e3.status == HttpStatus.FORBIDDEN
+        where:
+        logLabel       | endpoint
+        "organization" | "/organization-audit-logs"
+        "project"      | "/project-audit-logs"
+        "region"       | "/administrative-region-audit-logs"
     }
 
     def "standard user cannot create a project under an organization they do not belong to"() {
@@ -202,7 +185,16 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "standard user cannot list org memberships, view private orgs, or create new users"() {
+    def "standard user cannot list organization memberships"() {
+        when: "a standard user lists all organization memberships"
+        client.exchange(asStandardUser(HttpRequest.GET("/organization-users").accept(MediaType.APPLICATION_JSON_TYPE)), Map)
+
+        then: "access should be denied"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "standard user cannot view private unverified organization by ID"() {
         given: "a private unverified organization"
         def privateOrg = organizationRepository.save(new Organization(
                 null, "Private Secret Org", null, null,
@@ -210,29 +202,26 @@ class WhitehatSecurityAuditSpec extends BaseControllerSpec {
         ))
         trackOrganization(privateOrg.id())
 
-        when: "a standard user lists all organization memberships"
-        client.exchange(asStandardUser(HttpRequest.GET("/organization-users").accept(MediaType.APPLICATION_JSON_TYPE)), Map)
-
-        then: "access should be denied"
-        def e1 = thrown(HttpClientResponseException)
-        e1.status == HttpStatus.FORBIDDEN
-
         when: "a standard user looks up the private organization by ID"
         client.exchange(asStandardUser(HttpRequest.GET("/organizations/${privateOrg.id()}").accept(MediaType.APPLICATION_JSON_TYPE)), Map)
 
         then: "access should be denied or hidden"
-        def e2 = thrown(HttpClientResponseException)
-        e2.status in [HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
+        def e = thrown(HttpClientResponseException)
+        e.status in [HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
+    }
 
-        when: "a standard user tries to create a brand new user account"
+    def "standard user cannot create new user accounts"() {
+        given: "a new user request sent by a standard user"
         def createUserReq = asStandardUser(HttpRequest.POST("/users", [
                 email: "spam-account-${UUID.randomUUID()}@example.com".toString()
         ]).accept(MediaType.APPLICATION_JSON_TYPE))
+
+        when: "a standard user tries to create a brand new user account"
         client.exchange(createUserReq, Map)
 
         then: "access should be denied"
-        def e3 = thrown(HttpClientResponseException)
-        e3.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     def "expired organization verification must not be treated as verified"() {

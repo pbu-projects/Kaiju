@@ -7,8 +7,8 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.model.DataType;
 import io.micronaut.data.repository.PageableRepository;
+import lol.pbu.kaiju.converter.JtsPolygonConverter;
 import lol.pbu.kaiju.domain.Boundary;
-import lol.pbu.kaiju.model.JtsPolygonConverter;
 import org.jspecify.annotations.NonNull;
 import org.locationtech.jts.geom.Geometry;
 

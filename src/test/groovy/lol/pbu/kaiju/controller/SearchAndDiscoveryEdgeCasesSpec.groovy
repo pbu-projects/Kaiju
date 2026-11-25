@@ -15,6 +15,7 @@ import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.repository.LocationRepository
 import org.locationtech.jts.geom.Coordinate
+import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -243,38 +244,30 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
         }
     }
 
-    def "locations endpoint rejects out-of-bounds coordinates with 400 BAD_REQUEST"() {
-        when: "creating a location with longitude 181"
+    @Unroll
+    def "locations endpoint rejects out-of-bounds #coordLabel with 400 BAD_REQUEST"(String coordLabel, double longitude, double latitude) {
+        when: "creating a location with invalid coordinates"
         client.exchange(asGlobalAdmin(HttpRequest.POST("/locations", [
-                name       : "Invalid Lon Site",
+                name       : "Invalid Coord Site",
                 addressLine: "100 Main St",
                 city       : "Denver",
                 countryCode: "US",
-                longitude  : 181.0,
-                latitude   : 39.74
+                longitude  : longitude,
+                latitude   : latitude
         ])), Location)
 
         then: "it fails with 400 BAD_REQUEST"
-        def lonError = thrown(HttpClientResponseException)
-        lonError.status == HttpStatus.BAD_REQUEST
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
 
-        when: "creating a location with latitude -91"
-        client.exchange(asGlobalAdmin(HttpRequest.POST("/locations", [
-                name       : "Invalid Lat Site",
-                addressLine: "100 Main St",
-                city       : "Denver",
-                countryCode: "US",
-                longitude  : -104.99,
-                latitude   : -91.0
-        ])), Location)
-
-        then: "it fails with 400 BAD_REQUEST"
-        def latError = thrown(HttpClientResponseException)
-        latError.status == HttpStatus.BAD_REQUEST
+        where:
+        coordLabel      | longitude | latitude
+        "longitude 181" | 181.0     | 39.74
+        "latitude -91"  | -104.99   | -91.0
     }
 
-    def "region director can create and update a location inside their region while standard user is blocked"() {
-        given: "valid create and update requests inside Denver County"
+    def "region director can create a location inside their region"() {
+        given: "a valid create request inside Denver County"
         def createRequest = new CreateLocationRequest(
                 "Denver Director Center",
                 "1437 Bannock St",
@@ -301,8 +294,15 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
             created.name() == "Denver Director Center"
             created.city() == "Denver"
         }
+    }
 
-        when: "the same region director updates that location inside their assigned region"
+    def "region director can update a location inside their region"() {
+        given: "an existing location inside Denver County and a valid update request"
+        Location existing = dataBuilder.location()
+                .withName("Denver Director Center")
+                .withAddress("1437 Bannock St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
         def updateRequest = new UpdateLocationRequest(
                 "Denver Director Center Updated",
                 "1437 Bannock St",
@@ -313,21 +313,37 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
                 -104.9900,
                 39.7400
         )
+
+        when: "the region director updates that location inside their assigned region"
         HttpResponse<Location> updateResponse = client.exchange(
-                asRegionDirector(HttpRequest.PUT("/locations/${created.id()}", updateRequest)),
+                asRegionDirector(HttpRequest.PUT("/locations/${existing.id()}", updateRequest)),
                 Location
         )
         Location updated = updateResponse.body()
 
         then: "the location is updated in the database"
-        Location saved = locationRepository.findById(created.id()).orElse(null)
+        Location saved = locationRepository.findById(existing.id()).orElse(null)
         verifyAll {
             updateResponse.status == HttpStatus.OK
-            updated.id() == created.id()
+            updated.id() == existing.id()
             updated.name() == "Denver Director Center Updated"
             saved != null
             saved.name() == "Denver Director Center Updated"
         }
+    }
+
+    def "standard user is blocked from creating a location with 403 FORBIDDEN"() {
+        given: "a valid create request inside Denver County"
+        def createRequest = new CreateLocationRequest(
+                "Denver Director Center",
+                "1437 Bannock St",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9903,
+                39.7392
+        )
 
         when: "a standard user attempts to create a location"
         client.exchange(
@@ -336,17 +352,36 @@ class SearchAndDiscoveryEdgeCasesSpec extends BaseControllerSpec {
         )
 
         then: "the request is blocked with 403 FORBIDDEN"
-        def createForbidden = thrown(HttpClientResponseException)
-        createForbidden.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "standard user is blocked from updating a location with 403 FORBIDDEN"() {
+        given: "an existing location and an update request"
+        Location existing = dataBuilder.location()
+                .withName("Denver Director Center")
+                .withAddress("1437 Bannock St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def updateRequest = new UpdateLocationRequest(
+                "Denver Director Center Updated",
+                "1437 Bannock St",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9900,
+                39.7400
+        )
 
         when: "a standard user attempts to update the location"
         client.exchange(
-                asStandardUser(HttpRequest.PUT("/locations/${created.id()}", updateRequest)),
+                asStandardUser(HttpRequest.PUT("/locations/${existing.id()}", updateRequest)),
                 Location
         )
 
         then: "the request is blocked with 403 FORBIDDEN"
-        def updateForbidden = thrown(HttpClientResponseException)
-        updateForbidden.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 }

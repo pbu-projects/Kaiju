@@ -332,20 +332,19 @@ class TigerwebContractValidatorSpec extends Specification {
         e.message.contains("Response body must not be null")
     }
 
-    def "REJECT | should reject empty or non-JSON payload"() {
+    @Unroll
+    def "REJECT | should reject #caseLabel payload"(String caseLabel, String payload, String expectedMessage) {
         when:
-        validator.validateResponseSchema("")
+        validator.validateResponseSchema(payload)
 
         then:
-        def e1 = thrown(SchemaDriftException)
-        e1.message.contains("must not be empty")
+        def e = thrown(SchemaDriftException)
+        e.message.contains(expectedMessage)
 
-        when:
-        validator.validateResponseSchema("this is not json at all")
-
-        then:
-        def e2 = thrown(SchemaDriftException)
-        e2.message.contains("not valid JSON")
+        where:
+        caseLabel  | payload                   | expectedMessage
+        "empty"    | ""                        | "must not be empty"
+        "non-JSON" | "this is not json at all" | "not valid JSON"
     }
 
     def "REJECT | should reject non-FeatureCollection root"() {

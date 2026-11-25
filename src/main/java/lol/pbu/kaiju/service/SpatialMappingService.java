@@ -1,4 +1,4 @@
-package lol.pbu.kaiju.util;
+package lol.pbu.kaiju.service;
 
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.dto.Coordinates;

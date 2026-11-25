@@ -20,8 +20,8 @@ import lol.pbu.kaiju.dto.CreateLocationRequest;
 import lol.pbu.kaiju.dto.UpdateLocationRequest;
 import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.service.SpatialMappingService;
 import lol.pbu.kaiju.util.PageRequests;
-import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
@@ -135,7 +135,7 @@ public class LocationController {
      */
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Delete("/{id}")
-    public void deleteById(@PathVariable UUID id, Principal principal) {
+    public void deleteLocation(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
         authorizationService.authorizeLocationDelete(actorId, id);
         long deletedCount = locationRepository.removeById(id);

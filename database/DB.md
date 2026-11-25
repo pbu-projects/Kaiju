@@ -76,8 +76,8 @@ opportunities.
 Holds the application-level profile data and authorization roles, completely decoupled from the external IAM
 authentication database.
 
-- The application-layer user record. Strictly defines the role hierarchy (`SUPER_ADMIN`, `MODERATOR`,
-  `ORGANIZATION_LEADER`, `VOLUNTEER`) for Micronaut @Secured enforcement.
+- The application-layer user record. Strictly defines the role hierarchy (`GLOBAL_ADMIN`, `REGION_DIRECTOR`,
+  `REGION_AGENT`, `STANDARD_USER`) for Micronaut @Secured enforcement.
 
 ### `project_audit_logs` Table
 

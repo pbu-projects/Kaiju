@@ -1,9 +1,10 @@
-package lol.pbu.kaiju.util
+package lol.pbu.kaiju.service
 
 import lol.pbu.kaiju.dto.Coordinates
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Specification
+import spock.lang.Unroll
 
 class SpatialMappingServiceSpec extends Specification {
 
@@ -32,18 +33,18 @@ class SpatialMappingServiceSpec extends Specification {
         }
     }
 
-    def "toPolygon throws exception when coordinates are null or fewer than 3"() {
+    @Unroll
+    def "toPolygon throws exception when coordinates are #caseLabel"(String caseLabel, List<Coordinates> coords) {
         when:
-        service.toPolygon(null)
+        service.toPolygon(coords)
 
         then:
         thrown(IllegalArgumentException)
 
-        when:
-        service.toPolygon([new Coordinates(0.0, 0.0), new Coordinates(1.0, 1.0)])
-
-        then:
-        thrown(IllegalArgumentException)
+        where:
+        caseLabel      | coords
+        "null"         | null
+        "fewer than 3" | [new Coordinates(0.0, 0.0), new Coordinates(1.0, 1.0)]
     }
 
     def "toPolygon automatically closes open ring"() {

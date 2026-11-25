@@ -421,16 +421,18 @@ class PersonaAuthSpec extends Specification {
                 .collect { "${it.id().userId()}:${it.id().organizationId()}:${it.role().name()}".toString() }
                 .toSet()
 
-        then: "all regional persona bindings are present"
-        TestPersonas.SEEDED_PERSONAS.findAll { it.regionId != null }.each { persona ->
-            String expected = "${persona.id}:${persona.regionId}:${persona.regionRole.name()}".toString()
-            assert regionBindings.contains(expected): "Missing region binding for ${persona.displayName}: expected ${expected}"
-        }
-
-        and: "all organization persona bindings are present"
-        TestPersonas.SEEDED_PERSONAS.findAll { it.organizationId != null }.each { persona ->
-            String expected = "${persona.id}:${persona.organizationId}:${persona.organizationRole.name()}".toString()
-            assert orgBindings.contains(expected): "Missing org binding for ${persona.displayName}: expected ${expected}"
+        then: "all regional and organization persona bindings are present"
+        Set<String> expectedRegionBindings = TestPersonas.SEEDED_PERSONAS
+                .findAll { it.regionId != null }
+                .collect { "${it.id}:${it.regionId}:${it.regionRole.name()}".toString() }
+                .toSet()
+        Set<String> expectedOrgBindings = TestPersonas.SEEDED_PERSONAS
+                .findAll { it.organizationId != null }
+                .collect { "${it.id}:${it.organizationId}:${it.organizationRole.name()}".toString() }
+                .toSet()
+        verifyAll {
+            (expectedRegionBindings - regionBindings).isEmpty()
+            (expectedOrgBindings - orgBindings).isEmpty()
         }
     }
 

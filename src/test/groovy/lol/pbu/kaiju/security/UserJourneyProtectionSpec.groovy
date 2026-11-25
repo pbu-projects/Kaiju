@@ -22,6 +22,7 @@ import lol.pbu.kaiju.model.VerificationStatus
 import lol.pbu.kaiju.service.OrganizationService
 import lol.pbu.kaiju.service.ProjectService
 import org.locationtech.jts.geom.Coordinate
+import spock.lang.Unroll
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -40,21 +41,13 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
     @Inject
     AuthorizationService authorizationService
 
-    def "org manager can view own draft project while outsider gets 403 and deleted project returns 404"() {
-        given: "a draft project and a soft-deleted active project for Denver Metro Branch"
+    def "org manager can view own draft project"() {
+        given: "a draft project for Denver Metro Branch"
         def draft = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
                 .withTitle("Denver Draft ${UUID.randomUUID()}")
                 .withDescription("Draft project visible only to organization members and admins.")
                 .withStatus(ProjectStatus.DRAFT)
-                .persist()
-
-        def deleted = dataBuilder.project()
-                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
-                .withTitle("Denver Deleted ${UUID.randomUUID()}")
-                .withDescription("Deleted project that should not be returned to anyone.")
-                .withStatus(ProjectStatus.ACTIVE)
-                .deleted()
                 .persist()
 
         when: "the branch manager fetches their own draft project"
@@ -69,6 +62,16 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
             body().id() == draft.id()
             body().status() == ProjectStatus.DRAFT
         }
+    }
+
+    def "standard user gets 403 when viewing another org's draft project"() {
+        given: "a draft project for Denver Metro Branch"
+        def draft = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Denver Draft ${UUID.randomUUID()}")
+                .withDescription("Draft project visible only to organization members and admins.")
+                .withStatus(ProjectStatus.DRAFT)
+                .persist()
 
         when: "an unrelated standard user fetches the draft project"
         client.exchange(
@@ -77,8 +80,19 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "access is denied with 403 FORBIDDEN"
-        def outsiderErr = thrown(HttpClientResponseException)
-        outsiderErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "org manager gets 404 when viewing soft-deleted project"() {
+        given: "a soft-deleted active project for Denver Metro Branch"
+        def deleted = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Denver Deleted ${UUID.randomUUID()}")
+                .withDescription("Deleted project that should not be returned to anyone.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .deleted()
+                .persist()
 
         when: "the branch manager fetches the soft-deleted project"
         client.exchange(
@@ -87,8 +101,8 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "404 NOT_FOUND is returned"
-        def deletedErr = thrown(HttpClientResponseException)
-        deletedErr.status == HttpStatus.NOT_FOUND
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     def "global admin sees draft projects in project list while anonymous and standard users do not"() {
@@ -130,8 +144,9 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         }
     }
 
-    def "org member and global admin can view draft shift while outsider and deleted shift are blocked"() {
-        given: "a shift on a draft project and a shift on a soft-deleted project"
+    @Unroll
+    def "#callerLabel can view draft project shift"(String callerLabel, TestPersonas.Persona caller) {
+        given: "a shift on a draft project"
         def draftProject = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
                 .withTitle("Shift Draft Proj ${UUID.randomUUID()}")
@@ -143,6 +158,50 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 .asVirtual()
                 .persist()
 
+        when: "the authorized caller fetches the draft project's shift"
+        def response = client.exchange(
+                asPersona(HttpRequest.GET("/shifts/${draftShift.id()}").accept(MediaType.APPLICATION_JSON_TYPE), caller),
+                Shift
+        )
+
+        then: "200 OK is returned with the shift"
+        verifyAll(response) {
+            status == HttpStatus.OK
+            body().id() == draftShift.id()
+        }
+
+        where:
+        callerLabel    | caller
+        "org manager"  | TestPersonas.LAURA_LOCAL_MANAGER
+        "global admin" | TestPersonas.SARAH_ADMIN
+    }
+
+    def "standard user gets 403 when viewing draft project shift"() {
+        given: "a shift on a draft project"
+        def draftProject = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Shift Draft Proj ${UUID.randomUUID()}")
+                .withDescription("Draft project with a shift for visibility checks.")
+                .withStatus(ProjectStatus.DRAFT)
+                .persist()
+        def draftShift = dataBuilder.shift()
+                .forProject(draftProject)
+                .asVirtual()
+                .persist()
+
+        when: "an unrelated standard user fetches the draft project's shift"
+        client.exchange(
+                asStandardUser(HttpRequest.GET("/shifts/${draftShift.id()}").accept(MediaType.APPLICATION_JSON_TYPE), TestPersonas.VICTOR_VOLUNTEER),
+                Shift
+        )
+
+        then: "access is blocked with 403 FORBIDDEN"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "org manager gets 404 when viewing soft-deleted project shift"() {
+        given: "a shift on a soft-deleted project"
         def deletedProject = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
                 .withTitle("Shift Deleted Proj ${UUID.randomUUID()}")
@@ -155,34 +214,6 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 .asVirtual()
                 .persist()
 
-        when: "the org manager and global admin fetch the draft project's shift"
-        def managerRes = client.exchange(
-                asOrgManager(HttpRequest.GET("/shifts/${draftShift.id()}").accept(MediaType.APPLICATION_JSON_TYPE), TestPersonas.LAURA_LOCAL_MANAGER),
-                Shift
-        )
-        def adminRes = client.exchange(
-                asGlobalAdmin(HttpRequest.GET("/shifts/${draftShift.id()}").accept(MediaType.APPLICATION_JSON_TYPE)),
-                Shift
-        )
-
-        then: "both receive 200 OK"
-        verifyAll {
-            managerRes.status == HttpStatus.OK
-            managerRes.body().id() == draftShift.id()
-            adminRes.status == HttpStatus.OK
-            adminRes.body().id() == draftShift.id()
-        }
-
-        when: "an unrelated standard user fetches the draft project's shift"
-        client.exchange(
-                asStandardUser(HttpRequest.GET("/shifts/${draftShift.id()}").accept(MediaType.APPLICATION_JSON_TYPE), TestPersonas.VICTOR_VOLUNTEER),
-                Shift
-        )
-
-        then: "access is blocked with 403 FORBIDDEN"
-        def outsiderErr = thrown(HttpClientResponseException)
-        outsiderErr.status == HttpStatus.FORBIDDEN
-
         when: "a user fetches the soft-deleted project's shift"
         client.exchange(
                 asOrgManager(HttpRequest.GET("/shifts/${deletedShift.id()}").accept(MediaType.APPLICATION_JSON_TYPE), TestPersonas.LAURA_LOCAL_MANAGER),
@@ -190,8 +221,8 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "404 NOT_FOUND is returned"
-        def deletedErr = thrown(HttpClientResponseException)
-        deletedErr.status == HttpStatus.NOT_FOUND
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     def "listing organizations and projects caps page size at 100"() {
@@ -259,27 +290,13 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         }
     }
 
-    def "org manager can submit draft project to pending and director cannot reject draft or rejected projects"() {
-        given: "a virtual draft project and a rejected project"
+    def "org manager can submit draft project to pending"() {
+        given: "a virtual draft project"
         def draft = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
                 .withTitle("Submit Draft ${UUID.randomUUID()}")
                 .withDescription("Virtual draft project ready to be submitted for review.")
                 .withStatus(ProjectStatus.DRAFT)
-                .persist()
-
-        def stillDraft = dataBuilder.project()
-                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
-                .withTitle("Unrejected Draft ${UUID.randomUUID()}")
-                .withDescription("Draft project that cannot be rejected before submission.")
-                .withStatus(ProjectStatus.DRAFT)
-                .persist()
-
-        def alreadyRejected = dataBuilder.project()
-                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
-                .withTitle("Already Rejected ${UUID.randomUUID()}")
-                .withDescription("Rejected project that cannot be rejected a second time.")
-                .withStatus(ProjectStatus.REJECTED)
                 .persist()
 
         when: "the org manager submits the draft project to PENDING"
@@ -301,58 +318,39 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
 
         then: "its status transitions to PENDING"
         submitted.status() == ProjectStatus.PENDING
-
-        when: "a region director tries to reject the DRAFT project"
-        projectService.rejectProject(stillDraft.id(), TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
-
-        then: "400 BAD_REQUEST is thrown"
-        def draftErr = thrown(HttpStatusException)
-        draftErr.status == HttpStatus.BAD_REQUEST
-
-        when: "a region director tries to reject the already REJECTED project"
-        projectService.rejectProject(alreadyRejected.id(), TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
-
-        then: "400 BAD_REQUEST is thrown"
-        def rejectedErr = thrown(HttpStatusException)
-        rejectedErr.status == HttpStatus.BAD_REQUEST
     }
 
-    def "org manager cannot create shifts on draft projects, deleted projects, or outside locations"() {
-        given: "a draft project, a soft-deleted project, and an active project with one assigned location"
-        def projectLocation = dataBuilder.location()
-                .withName("Assigned Denver Loc")
-                .withAddress("100 Main St", "Denver", "CO", "80202", "US")
-                .atPoint(-104.9903, 39.7392)
-                .persist()
-        def otherLocation = dataBuilder.location()
-                .withName("Unassigned Denver Loc")
-                .withAddress("200 Main St", "Denver", "CO", "80202", "US")
-                .atPoint(-104.9850, 39.7400)
+    @Unroll
+    def "region director cannot reject #statusLabel project"(String statusLabel, ProjectStatus initialStatus) {
+        given: "a project not in PENDING status"
+        def project = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Unrejectable ${statusLabel} ${UUID.randomUUID()}")
+                .withDescription("Project in ${statusLabel} status that cannot be rejected.")
+                .withStatus(initialStatus)
                 .persist()
 
+        when: "a region director tries to reject the project"
+        projectService.rejectProject(project.id(), TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
+
+        then: "400 BAD_REQUEST is thrown"
+        def e = thrown(HttpStatusException)
+        e.status == HttpStatus.BAD_REQUEST
+
+        where:
+        statusLabel | initialStatus
+        "draft"     | ProjectStatus.DRAFT
+        "rejected"  | ProjectStatus.REJECTED
+    }
+
+    def "org manager cannot create shift on draft project"() {
+        given: "a draft project"
         def draft = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
                 .withTitle("Draft Shift Guard ${UUID.randomUUID()}")
                 .withDescription("Draft project that should not accept new shifts.")
                 .withStatus(ProjectStatus.DRAFT)
                 .persist()
-
-        def deleted = dataBuilder.project()
-                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
-                .withTitle("Deleted Shift Guard ${UUID.randomUUID()}")
-                .withDescription("Soft-deleted project that should return 404 when adding shifts.")
-                .withStatus(ProjectStatus.ACTIVE)
-                .deleted()
-                .persist()
-
-        def activeWithLoc = dataBuilder.project()
-                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
-                .withTitle("Active Loc Guard ${UUID.randomUUID()}")
-                .withDescription("Active project bound to a specific location.")
-                .withStatus(ProjectStatus.ACTIVE)
-                .atLocation(projectLocation)
-                .persist()
-
         def start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
         def end = start.plusHours(2)
 
@@ -363,8 +361,21 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "400 BAD_REQUEST is returned"
-        def draftErr = thrown(HttpClientResponseException)
-        draftErr.status == HttpStatus.BAD_REQUEST
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "org manager gets 404 when creating shift on soft-deleted project"() {
+        given: "a soft-deleted project"
+        def deleted = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Deleted Shift Guard ${UUID.randomUUID()}")
+                .withDescription("Soft-deleted project that should return 404 when adding shifts.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .deleted()
+                .persist()
+        def start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        def end = start.plusHours(2)
 
         when: "the org manager creates a shift on the soft-deleted project"
         client.exchange(
@@ -373,8 +384,31 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "404 NOT_FOUND is returned"
-        def deletedErr = thrown(HttpClientResponseException)
-        deletedErr.status == HttpStatus.NOT_FOUND
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+    }
+
+    def "org manager cannot create shift at a location not assigned to the project"() {
+        given: "an active project with one assigned location and another unassigned location"
+        def projectLocation = dataBuilder.location()
+                .withName("Assigned Denver Loc")
+                .withAddress("100 Main St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def otherLocation = dataBuilder.location()
+                .withName("Unassigned Denver Loc")
+                .withAddress("200 Main St", "Denver", "CO", "80202", "US")
+                .atPoint(-104.9850, 39.7400)
+                .persist()
+        def activeWithLoc = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Active Loc Guard ${UUID.randomUUID()}")
+                .withDescription("Active project bound to a specific location.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .atLocation(projectLocation)
+                .persist()
+        def start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        def end = start.plusHours(2)
 
         when: "the org manager creates a shift using a location not in project.locations()"
         client.exchange(
@@ -383,8 +417,8 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "400 BAD_REQUEST is returned"
-        def locErr = thrown(HttpClientResponseException)
-        locErr.status == HttpStatus.BAD_REQUEST
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
     def "areAllLocationsInRegion returns false when project has empty locations"() {
@@ -400,10 +434,10 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         !authorizationService.areAllLocationsInRegion(emptyLocProject, TestPersonas.DENVER_COUNTY_REGION_ID)
     }
 
-    def "organization service blocks self-parenting, missing parent orgs, and restoring revoked verification"() {
-        given: "a revoked organization"
+    def "organization service blocks self-parenting"() {
+        given: "an organization"
         def org = dataBuilder.organization()
-                .withName("Revoked Org ${UUID.randomUUID()}")
+                .withName("Self Parent Org ${UUID.randomUUID()}")
                 .asPublic()
                 .withVerificationStatus(VerificationStatus.REVOKED)
                 .persist()
@@ -415,8 +449,17 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         organizationService.updateOrganization(org.id(), selfParentCandidate, TestPersonas.SARAH_ADMIN.id)
 
         then: "400 BAD_REQUEST is thrown"
-        def selfParentErr = thrown(HttpStatusException)
-        selfParentErr.status == HttpStatus.BAD_REQUEST
+        def e = thrown(HttpStatusException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "organization service blocks missing parent organization"() {
+        given: "an organization"
+        def org = dataBuilder.organization()
+                .withName("Missing Parent Org ${UUID.randomUUID()}")
+                .asPublic()
+                .withVerificationStatus(VerificationStatus.REVOKED)
+                .persist()
 
         when: "updating the organization with a nonexistent parentId"
         def missingParentCandidate = new Organization(
@@ -425,25 +468,57 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         organizationService.updateOrganization(org.id(), missingParentCandidate, TestPersonas.SARAH_ADMIN.id)
 
         then: "400 BAD_REQUEST is thrown"
-        def missingParentErr = thrown(HttpStatusException)
-        missingParentErr.status == HttpStatus.BAD_REQUEST
+        def e = thrown(HttpStatusException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "organization service blocks restoring revoked verification"() {
+        given: "a revoked organization"
+        def org = dataBuilder.organization()
+                .withName("Revoked Org ${UUID.randomUUID()}")
+                .asPublic()
+                .withVerificationStatus(VerificationStatus.REVOKED)
+                .persist()
 
         when: "attempting to change verification status from REVOKED to VERIFIED"
         organizationService.updateVerificationStatus(org.id(), VerificationStatus.VERIFIED, "Attempt restore", TestPersonas.SARAH_ADMIN.id)
 
         then: "400 BAD_REQUEST is thrown"
-        def statusErr = thrown(HttpStatusException)
-        statusErr.status == HttpStatus.BAD_REQUEST
+        def e = thrown(HttpStatusException)
+        e.status == HttpStatus.BAD_REQUEST
     }
 
-    def "denver region director cannot move an in-denver location or boundary out to boulder"() {
-        given: "a location and boundary inside Denver County"
+    def "denver region director cannot move an in-denver location out to boulder"() {
+        given: "a location inside Denver County"
         def denverLocation = dataBuilder.location()
                 .withName("Denver Civic Center")
                 .withAddress("1437 Bannock St", "Denver", "CO", "80202", "US")
                 .atPoint(-104.9903, 39.7392)
                 .persist()
+        def moveLocationRequest = new UpdateLocationRequest(
+                "Moved to Boulder",
+                "1777 Broadway",
+                "Boulder",
+                "CO",
+                "80302",
+                "US",
+                -105.2705,
+                40.0150
+        )
 
+        when: "Denver County director tries to move the Denver location to Boulder"
+        client.exchange(
+                asRegionDirector(HttpRequest.PUT("/locations/${denverLocation.id()}", moveLocationRequest), TestPersonas.DANIEL_COUNTY_DIRECTOR),
+                Map
+        )
+
+        then: "access is denied with 403 FORBIDDEN"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "denver region director cannot move an in-denver boundary out to boulder"() {
+        given: "a boundary inside Denver County"
         def denverPolygon = dataBuilder.geometryFactory.createPolygon([
                 new Coordinate(-105.00, 39.73),
                 new Coordinate(-104.98, 39.73),
@@ -455,17 +530,6 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 .withName("Denver Patch")
                 .withGeometry(denverPolygon)
                 .persist()
-
-        def moveLocationRequest = new UpdateLocationRequest(
-                "Moved to Boulder",
-                "1777 Broadway",
-                "Boulder",
-                "CO",
-                "80302",
-                "US",
-                -105.2705,
-                40.0150
-        )
         def moveBoundaryRequest = new UpdateBoundaryRequest(
                 "Moved to Boulder",
                 [
@@ -477,16 +541,6 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 ]
         )
 
-        when: "Denver County director tries to move the Denver location to Boulder"
-        client.exchange(
-                asRegionDirector(HttpRequest.PUT("/locations/${denverLocation.id()}", moveLocationRequest), TestPersonas.DANIEL_COUNTY_DIRECTOR),
-                Map
-        )
-
-        then: "access is denied with 403 FORBIDDEN"
-        def locErr = thrown(HttpClientResponseException)
-        locErr.status == HttpStatus.FORBIDDEN
-
         when: "Denver County director tries to move the Denver boundary to Boulder"
         client.exchange(
                 asRegionDirector(HttpRequest.PUT("/boundaries/${denverBoundary.id()}", moveBoundaryRequest), TestPersonas.DANIEL_COUNTY_DIRECTOR),
@@ -494,7 +548,7 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
         )
 
         then: "access is denied with 403 FORBIDDEN"
-        def boundaryErr = thrown(HttpClientResponseException)
-        boundaryErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 }

@@ -1,17 +1,17 @@
-package lol.pbu.kaiju.controller
+package lol.pbu.kaiju.security
 
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
-import lol.pbu.kaiju.TestFixtures
+import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
 import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.model.ProjectStatus
+import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.model.VerificationStatus
-import lol.pbu.kaiju.security.AuthorizationService
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.Point
 import org.locationtech.jts.io.WKTReader
@@ -84,9 +84,22 @@ class ProjectSecurityMatrixSpec extends BaseControllerSpec {
         and: "the target geographic point"
         String targetPointWkt = location == "INSIDE_BOUNDARY" ? POINT_INSIDE : POINT_OUTSIDE
         Geometry geom = new WKTReader().read(targetPointWkt)
-        Location dummyLocation = TestFixtures.createDummyLocation((Point) geom)
-        Organization dummyOrg = TestFixtures.createDummyOrganization(orgId, orgStatus)
-        Project dummyProject = TestFixtures.createDummyProject(dummyOrg, dummyLocation)
+        Location dummyLocation = dataBuilder.location()
+                .withId(UUID.randomUUID())
+                .withGeometry((Point) geom)
+                .build()
+        Organization dummyOrg = dataBuilder.organization()
+                .withId(orgId)
+                .withName("Test Org")
+                .withVerificationStatus(mappedOrgStatus)
+                .build()
+        Project dummyProject = dataBuilder.project()
+                .withId(UUID.randomUUID())
+                .forOrg(dummyOrg)
+                .withType(ProjectType.STANDARD)
+                .withStatus(PENDING)
+                .atLocation(dummyLocation)
+                .build()
 
         when: "the system evaluates the project creation request"
         def actualResult

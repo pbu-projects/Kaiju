@@ -14,7 +14,6 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
-import io.micronaut.security.authentication.Authentication;
 import jakarta.validation.Valid;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest;
@@ -26,8 +25,8 @@ import lol.pbu.kaiju.service.AdministrativeRegionService;
 import lol.pbu.kaiju.service.BoundaryIngestionService;
 import lol.pbu.kaiju.service.UsBoundarySyncService;
 import lol.pbu.kaiju.util.PageRequests;
-import org.jspecify.annotations.NonNull;
 
+import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -89,17 +88,17 @@ public class AdministrativeRegionController {
      * Creates and persists a new administrative region polygon.
      * Restricted to platform administrators.
      *
-     * @param request        the administrative region creation request
-     * @param authentication the authenticated user making the request
+     * @param request   the administrative region creation request
+     * @param principal the authenticated user making the request
      * @return the persisted administrative region
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Post
     public AdministrativeRegion addAdministrativeRegion(
             @Valid @Body CreateAdministrativeRegionRequest request,
-            @NonNull Authentication authentication
+            Principal principal
     ) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+        UUID actorUserId = UUID.fromString(principal.getName());
         return administrativeRegionService.createAdministrativeRegion(request, actorUserId);
     }
 
@@ -107,9 +106,9 @@ public class AdministrativeRegionController {
      * Updates an existing administrative region by ID.
      * Restricted to platform administrators.
      *
-     * @param id             the unique UUID of the administrative region to update
-     * @param request        the updated region request data
-     * @param authentication the authenticated user making the request
+     * @param id        the unique UUID of the administrative region to update
+     * @param request   the updated region request data
+     * @param principal the authenticated user making the request
      * @return the updated administrative region
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -117,9 +116,9 @@ public class AdministrativeRegionController {
     public AdministrativeRegion updateAdministrativeRegion(
             @PathVariable UUID id,
             @Valid @Body UpdateAdministrativeRegionRequest request,
-            @NonNull Authentication authentication
+            Principal principal
     ) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+        UUID actorUserId = UUID.fromString(principal.getName());
         return administrativeRegionService.updateAdministrativeRegion(id, request, actorUserId);
     }
 
@@ -127,16 +126,16 @@ public class AdministrativeRegionController {
      * Deletes an administrative region by its unique identifier.
      * Restricted to platform administrators.
      *
-     * @param id             the unique UUID of the administrative region to delete
-     * @param authentication the authenticated user making the request
+     * @param id        the unique UUID of the administrative region to delete
+     * @param principal the authenticated user making the request
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Delete("/{id}")
     public void deleteAdministrativeRegion(
             @PathVariable UUID id,
-            @NonNull Authentication authentication
+            Principal principal
     ) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+        UUID actorUserId = UUID.fromString(principal.getName());
         administrativeRegionService.deleteAdministrativeRegion(id, actorUserId);
     }
 
@@ -145,9 +144,9 @@ public class AdministrativeRegionController {
      * from an authoritative external source such as US Census Bureau TIGERweb.
      * Restricted strictly to platform administrators.
      *
-     * @param id             the unique UUID of the administrative region to update
-     * @param request        the boundary ingestion request
-     * @param authentication the authenticated user making the request
+     * @param id        the unique UUID of the administrative region to update
+     * @param request   the boundary ingestion request
+     * @param principal the authenticated user making the request
      * @return the ingestion summary response
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -155,9 +154,9 @@ public class AdministrativeRegionController {
     public IngestBoundaryResponse ingestBoundary(
             @PathVariable UUID id,
             @Valid @Body IngestBoundaryRequest request,
-            @NonNull Authentication authentication
+            Principal principal
     ) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+        UUID actorUserId = UUID.fromString(principal.getName());
         return boundaryIngestionService.ingestBoundary(id, request, actorUserId);
     }
 
@@ -165,13 +164,13 @@ public class AdministrativeRegionController {
      * Syncs all US state and territory boundaries from US Census Bureau TIGERweb.
      * Restricted strictly to platform administrators.
      *
-     * @param authentication the authenticated user making the request
+     * @param principal the authenticated user making the request
      * @return the sync summary response
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Post("/sync/us/states")
-    public UsSyncResult syncUsStates(@NonNull Authentication authentication) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+    public UsSyncResult syncUsStates(Principal principal) {
+        UUID actorUserId = UUID.fromString(principal.getName());
         return usBoundarySyncService.syncStates(actorUserId);
     }
 
@@ -179,17 +178,17 @@ public class AdministrativeRegionController {
      * Syncs county boundaries for a US state or territory from US Census Bureau TIGERweb.
      * Restricted strictly to platform administrators.
      *
-     * @param stateCode      the two-letter USPS state or territory code
-     * @param authentication the authenticated user making the request
+     * @param stateCode the two-letter USPS state or territory code
+     * @param principal the authenticated user making the request
      * @return the sync summary response
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
     @Post("/sync/us/states/{stateCode}/counties")
     public UsSyncResult syncUsCounties(
             @PathVariable String stateCode,
-            @NonNull Authentication authentication
+            Principal principal
     ) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+        UUID actorUserId = UUID.fromString(principal.getName());
         return usBoundarySyncService.syncStateCounties(stateCode, actorUserId);
     }
 
@@ -197,9 +196,9 @@ public class AdministrativeRegionController {
      * Syncs place boundaries for a US state or territory from US Census Bureau TIGERweb.
      * Restricted strictly to platform administrators.
      *
-     * @param stateCode      the two-letter USPS state or territory code
-     * @param includeCdps    whether to include Census Designated Places in addition to incorporated places
-     * @param authentication the authenticated user making the request
+     * @param stateCode   the two-letter USPS state or territory code
+     * @param includeCdps whether to include Census Designated Places in addition to incorporated places
+     * @param principal   the authenticated user making the request
      * @return the sync summary response
      */
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -207,9 +206,9 @@ public class AdministrativeRegionController {
     public UsSyncResult syncUsPlaces(
             @PathVariable String stateCode,
             @Nullable @QueryValue Boolean includeCdps,
-            @NonNull Authentication authentication
+            Principal principal
     ) {
-        UUID actorUserId = UUID.fromString(authentication.getName());
+        UUID actorUserId = UUID.fromString(principal.getName());
         return usBoundarySyncService.syncStatePlaces(stateCode, Boolean.TRUE.equals(includeCdps), actorUserId);
     }
 }

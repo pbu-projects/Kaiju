@@ -21,28 +21,43 @@ class ShiftSpec extends Specification {
         return new Location(UUID.randomUUID(), "Dummy Location", "123 St", "City", null, null, "US", null)
     }
 
-    def "positive testing | isValidLocationLogic should return true for valid configurations"() {
+    def "positive testing | constructs a virtual shift without a location"() {
         given:
-        def project = createDummyProject()
-        def location = createDummyLocation()
+        def expectedProject = createDummyProject()
+        def expectedStart = OffsetDateTime.now()
+        def expectedEnd = expectedStart.plusHours(2)
 
         when: "creating a valid virtual shift"
-        def virtualShift = new Shift(UUID.randomUUID(),
-                project,
-                true,
-                null,
-                OffsetDateTime.now(),
-                OffsetDateTime.now().plusHours(2),
-                [])
+        def virtualShift = new Shift(UUID.randomUUID(), expectedProject, true, null, expectedStart, expectedEnd, [])
 
-        then: "isValidLocationLogic returns true"
-        virtualShift.isValidLocationLogic()
+        then: "the virtual shift is constructed without a location"
+        verifyAll(virtualShift) {
+            isVirtual()
+            location() == null
+            project() == expectedProject
+            startTime() == expectedStart
+            endTime() == expectedEnd
+        }
+    }
+
+    def "positive testing | constructs a physical shift with a location"() {
+        given:
+        def expectedProject = createDummyProject()
+        def expectedLocation = createDummyLocation()
+        def expectedStart = OffsetDateTime.now()
+        def expectedEnd = expectedStart.plusHours(2)
 
         when: "creating a valid physical shift"
-        def physicalShift = new Shift(UUID.randomUUID(), project, false, location, OffsetDateTime.now(), OffsetDateTime.now().plusHours(2), [])
+        def physicalShift = new Shift(UUID.randomUUID(), expectedProject, false, expectedLocation, expectedStart, expectedEnd, [])
 
-        then: "isValidLocationLogic returns true"
-        physicalShift.isValidLocationLogic()
+        then: "the physical shift is constructed with the location"
+        verifyAll(physicalShift) {
+            !isVirtual()
+            location() == expectedLocation
+            project() == expectedProject
+            startTime() == expectedStart
+            endTime() == expectedEnd
+        }
     }
 
     @Unroll

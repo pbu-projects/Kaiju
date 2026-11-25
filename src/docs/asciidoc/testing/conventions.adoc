@@ -95,7 +95,7 @@ Choosing between a table and `.combinations()` comes down to balancing authoring
 **Guideline for Test Authors:**
 
 * **Use Visual Tables** when testing a small set of distinct, non-combinatorial business rules (such as 3 to 5 clear boundary cases). Learn more in the https://spockframework.org/spock/docs/2.5/data_driven_testing.html[Spock Data-Driven Testing Guide].
-* **Use `.combinations()`** when verifying cross-cutting variations across multiple independent inputs. Examples in Kaiju include `AuthentikAuthenticationMapperSpec` (32 token parsing permutations) and `ProjectSecurityMatrixSpec` (12 organization and location permission permutations).
+* **Use `.combinations()`** when verifying cross-cutting variations across multiple independent inputs. Examples in Kaiju include `AuthentikAuthenticationMapperSpec` (32 token parsing permutations) and `ProjectSecurityMatrixSpec` (16 organization and location permission permutations).
 
 == Test Variation Strategies: Combinatorial vs Pairwise (PICT)
 
@@ -113,7 +113,7 @@ If each test takes 2 seconds to start a web request and check a database, runnin
 
 === When We Use Full Combinatorial Testing (`.combinations()`)
 
-In specifications like `AuthentikAuthenticationMapperSpec` and `ProjectSecurityMatrixSpec`, total permutations are kept modest (between 12 and 32 cases). Even with database checks in PostGIS, running a dozen scenarios takes only a couple of seconds once the container starts, giving us thorough coverage with fast test execution.
+In specifications like `AuthentikAuthenticationMapperSpec` and `ProjectSecurityMatrixSpec`, total permutations are kept modest (between 16 and 32 cases). Even with database checks in PostGIS, running a dozen scenarios takes only a couple of seconds once the container starts, giving us thorough coverage with fast test execution.
 
 === When to Consider Pairwise Testing (PICT)
 

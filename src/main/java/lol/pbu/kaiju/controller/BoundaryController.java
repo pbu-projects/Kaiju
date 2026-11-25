@@ -20,8 +20,8 @@ import lol.pbu.kaiju.dto.CreateBoundaryRequest;
 import lol.pbu.kaiju.dto.UpdateBoundaryRequest;
 import lol.pbu.kaiju.repository.BoundaryRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.service.SpatialMappingService;
 import lol.pbu.kaiju.util.PageRequests;
-import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Geometry;
 
 import java.security.Principal;

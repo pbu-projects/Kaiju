@@ -13,7 +13,6 @@ import lol.pbu.kaiju.dto.CreateProjectRequest
 import lol.pbu.kaiju.dto.CreateShiftRequest
 import lol.pbu.kaiju.dto.UpdateProjectRequest
 import lol.pbu.kaiju.dto.UpdateShiftRequest
-import lol.pbu.kaiju.dto.ValidShiftLocationValidator
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.OrganizationUserRole
 import lol.pbu.kaiju.model.ProjectStatus
@@ -21,6 +20,7 @@ import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.RegionUserRole
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.model.VerificationStatus
+import lol.pbu.kaiju.validation.ValidShiftLocationValidator
 import net.datafaker.Faker
 import spock.lang.Specification
 

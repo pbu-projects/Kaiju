@@ -205,40 +205,27 @@ class RegionUserControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "READ | should reject outsider, agent, and cross-region director viewing another user's region membership with 403 FORBIDDEN"() {
+    @Unroll
+    def "READ | should reject #callerLabel viewing another user's region membership with 403 FORBIDDEN"(String callerLabel, TestPersonas.Persona caller) {
         given: "a region user membership in Denver County"
         UUID targetUserId = TestPersonas.DANIEL_COUNTY_DIRECTOR.id
         UUID regionId = TestPersonas.DENVER_COUNTY_REGION_ID
 
-        when: "a standard user attempts to read the membership"
+        when: "an unauthorized caller attempts to read the membership"
         client.exchange(
-                asStandardUser(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.VICTOR_VOLUNTEER),
+                asPersona(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), caller),
                 RegionUser
         )
 
         then: "403 Forbidden is thrown"
-        def volErr = thrown(HttpClientResponseException)
-        volErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
 
-        when: "a region agent in the same region attempts to read the director's membership"
-        client.exchange(
-                asRegionAgent(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.CONNIE_COUNTY_AGENT),
-                RegionUser
-        )
-
-        then: "403 Forbidden is thrown"
-        def agentErr = thrown(HttpClientResponseException)
-        agentErr.status == HttpStatus.FORBIDDEN
-
-        when: "a director from El Paso County attempts to read the Denver County membership"
-        client.exchange(
-                asRegionDirector(HttpRequest.GET("${BASE_PATH}/${targetUserId}/${regionId}"), TestPersonas.ETHAN_SIBLING_DIRECTOR),
-                RegionUser
-        )
-
-        then: "403 Forbidden is thrown"
-        def crossRegionErr = thrown(HttpClientResponseException)
-        crossRegionErr.status == HttpStatus.FORBIDDEN
+        where:
+        callerLabel             | caller
+        "outsider standard user"| TestPersonas.VICTOR_VOLUNTEER
+        "same-region agent"     | TestPersonas.CONNIE_COUNTY_AGENT
+        "cross-region director" | TestPersonas.ETHAN_SIBLING_DIRECTOR
     }
 
     def "READ | should reject demoted standard user with stale REGION_DIRECTOR row viewing another user's region membership with 403 FORBIDDEN"() {

@@ -11,7 +11,7 @@ import lol.pbu.kaiju.dto.UpdateLocationRequest
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.repository.LocationRepository
 import lol.pbu.kaiju.security.AuthorizationService
-import lol.pbu.kaiju.util.SpatialMappingService
+import lol.pbu.kaiju.service.SpatialMappingService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
@@ -358,65 +358,44 @@ class LocationControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "UPDATE | should update resolved timezone when coordinates change"() {
+    @Unroll
+    def "UPDATE | should update resolved timezone when coordinates change to #city"() {
         given: "an existing location in Denver"
         def request = new CreateLocationRequest("Test TZ Move ${faker.company().name()}", "123 Main St", "Denver", "CO", "80202", "US", -104.9903, 39.7392)
         Location created = track(client.exchange(asGlobalAdmin(HttpRequest.POST(BASE_PATH, request)), Location).body())
         assert created.timezone() == "America/Denver"
 
-        when: "updating the location coordinates to Chicago"
-        def updateToChicago = new UpdateLocationRequest(
+        when: "updating the location coordinates"
+        def updateRequest = new UpdateLocationRequest(
                 created.name(),
                 created.addressLine(),
-                "Chicago",
-                "IL",
-                "60601",
-                "US",
-                -87.6298,
-                41.8781
+                city,
+                state,
+                postalCode,
+                countryCode,
+                longitude,
+                latitude
         )
-        def responseChicago = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateToChicago)), Location)
-        Location updatedChicago = responseChicago.body()
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateRequest)), Location)
+        Location updated = response.body()
 
-        then: "the timezone changes to America/Chicago"
+        then: "the response reflects the expected timezone"
         verifyAll {
-            responseChicago.status == HttpStatus.OK
-            updatedChicago.timezone() == "America/Chicago"
+            response.status == HttpStatus.OK
+            updated.timezone() == expectedTimezone
         }
 
         and: "the database reflects the updated timezone"
-        def resultChicago = locationRepository.findById(created.id()).orElse(null)
-        verifyAll(resultChicago) {
-            resultChicago != null
-            timezone() == "America/Chicago"
+        def dbResult = locationRepository.findById(created.id()).orElse(null)
+        verifyAll(dbResult) {
+            dbResult != null
+            timezone() == expectedTimezone
         }
 
-        when: "updating coordinates to an unknown boundary area"
-        def updateToLondon = new UpdateLocationRequest(
-                created.name(),
-                created.addressLine(),
-                "London",
-                null,
-                "SW1A 2AA",
-                "GB",
-                -0.1276,
-                51.5072
-        )
-        def responseLondon = client.exchange(asGlobalAdmin(HttpRequest.PUT("${BASE_PATH}/${created.id()}", updateToLondon)), Location)
-        Location updatedLondon = responseLondon.body()
-
-        then: "the timezone becomes null"
-        verifyAll {
-            responseLondon.status == HttpStatus.OK
-            updatedLondon.timezone() == null
-        }
-
-        and: "the database reflects null timezone"
-        def resultLondon = locationRepository.findById(created.id()).orElse(null)
-        verifyAll(resultLondon) {
-            resultLondon != null
-            timezone() == null
-        }
+        where:
+        city      | state | postalCode | countryCode | longitude | latitude | expectedTimezone
+        "Chicago" | "IL"  | "60601"    | "US"        | -87.6298d | 41.8781d | "America/Chicago"
+        "London"  | null  | "SW1A 2AA" | "GB"        | -0.1276d  | 51.5072d | null
     }
 
     def "UPDATE | should preserve existing timezone when updating non-coordinate fields"() {
@@ -624,6 +603,7 @@ class LocationControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    @Unroll
     def "UPDATE | should fail to update location with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing location"
         def location = dataBuilder.location().withName("Test Update Invalid").withAddress("123 St", "City", "UT", "84000", "US").withGeometry(createPoint()).persist()
