@@ -23,6 +23,7 @@ import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.util.SpatialMappingService
 import org.locationtech.jts.geom.Polygon
+import spock.lang.Unroll
 
 import java.util.UUID
 
@@ -121,7 +122,7 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "QUERY | should get administrative regions page and find by id"() {
+    def "QUERY | lists administrative regions in pages"() {
         given: "an existing administrative region"
         def createRequest = new CreateAdministrativeRegionRequest("Query Region", null, validCoordinates())
         AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
@@ -136,6 +137,13 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             !content.isEmpty()
             content.size() <= 10
         }
+    }
+
+    def "QUERY | finds an administrative region by ID"() {
+        given: "an existing administrative region"
+        def createRequest = new CreateAdministrativeRegionRequest("Query Region", null, validCoordinates())
+        AdministrativeRegion region = regionService.createAdministrativeRegion(createRequest, testAdminUser.id())
+        track(region)
 
         when: "querying region by id"
         Optional<AdministrativeRegion> found = regionService.getAdministrativeRegionById(region.id())
@@ -413,30 +421,24 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "RESOLVE | should resolve coordinates to administrative regions and timezone"() {
-        when: "resolving coordinates for Denver city boundary"
-        Optional<RegionCoordinateResolution> result = regionService.resolveCoordinates(39.7392d, -104.9903d)
+    @Unroll
+    def "RESOLVE | resolves #scenario to #expectedCity and timezone"() {
+        when: "resolving coordinates"
+        Optional<RegionCoordinateResolution> result = regionService.resolveCoordinates(lat, lon)
 
-        then: "civic boundaries and timezone are resolved with full city name"
+        then: "civic boundaries and timezone are resolved"
         verifyAll {
             result.isPresent()
             result.get().state() == "CO"
             result.get().county() == "Denver County"
-            result.get().city() == "Denver City"
+            result.get().city() == expectedCity
             result.get().timeZone() == "America/Denver"
         }
 
-        when: "resolving coordinates inside downtown core"
-        Optional<RegionCoordinateResolution> downtown = regionService.resolveCoordinates(39.7450d, -104.9920d)
-
-        then: "downtown core suffix is stripped to canonical municipality name"
-        verifyAll {
-            downtown.isPresent()
-            downtown.get().state() == "CO"
-            downtown.get().county() == "Denver County"
-            downtown.get().city() == "Denver"
-            downtown.get().timeZone() == "America/Denver"
-        }
+        where:
+        scenario              | lat      | lon       || expectedCity
+        "Denver city limits"  | 39.7392d | -104.9903d || "Denver City"
+        "downtown core point" | 39.7450d | -104.9920d || "Denver"
     }
 
     def "RESOLVE | should return empty optional when coordinates are outside coverage"() {
@@ -449,7 +451,7 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "HIERARCHY | should query states, counties, and cities"() {
+    def "HIERARCHY | lists all states including Colorado"() {
         when: "querying all states"
         List<AdministrativeRegion> states = regionService.getStates()
 
@@ -458,7 +460,9 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             !states.isEmpty()
             states.any { it.stateCode() == "CO" || it.name().contains("Colorado") }
         }
+    }
 
+    def "HIERARCHY | lists counties in Colorado including Denver County"() {
         when: "querying counties for Colorado"
         List<AdministrativeRegion> counties = regionService.getCounties("CO")
 
@@ -467,7 +471,9 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             !counties.isEmpty()
             counties.any { it.name().contains("Denver County") }
         }
+    }
 
+    def "HIERARCHY | lists cities in Denver County"() {
         when: "querying cities for Denver County"
         List<AdministrativeRegion> cities = regionService.getCities("CO", "Denver County")
 
@@ -518,192 +524,117 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "RESOLVE | should return empty optional for invalid or out of bounds coordinates"() {
-        when: "resolving with latitude above 90"
-        Optional<RegionCoordinateResolution> outOfBoundsLat = regionService.resolveCoordinates(95.0d, -104.9903d)
+    @Unroll
+    def "RESOLVE | returns empty for invalid coordinates (#scenario)"() {
+        when: "resolving out-of-bounds or NaN coordinates"
+        Optional<RegionCoordinateResolution> result = regionService.resolveCoordinates(lat, lon)
 
         then: "empty optional is returned without exception"
-        verifyAll {
-            outOfBoundsLat.isEmpty()
-        }
+        result.isEmpty()
 
-        when: "resolving with latitude below -90"
-        Optional<RegionCoordinateResolution> lowLat = regionService.resolveCoordinates(-95.0d, 0.0d)
-
-        then: "empty optional is returned"
-        verifyAll {
-            lowLat.isEmpty()
-        }
-
-        when: "resolving with longitude above 180"
-        Optional<RegionCoordinateResolution> highLon = regionService.resolveCoordinates(0.0d, 185.0d)
-
-        then: "empty optional is returned"
-        verifyAll {
-            highLon.isEmpty()
-        }
-
-        when: "resolving with longitude below -180"
-        Optional<RegionCoordinateResolution> outOfBoundsLon = regionService.resolveCoordinates(39.7392d, -200.0d)
-
-        then: "empty optional is returned without exception"
-        verifyAll {
-            outOfBoundsLon.isEmpty()
-        }
-
-        when: "resolving with longitude below -180 boundary"
-        Optional<RegionCoordinateResolution> lowLon = regionService.resolveCoordinates(0.0d, -185.0d)
-
-        then: "empty optional is returned"
-        verifyAll {
-            lowLon.isEmpty()
-        }
-
-        when: "resolving with NaN latitude"
-        Optional<RegionCoordinateResolution> nanLat = regionService.resolveCoordinates(Double.NaN, -104.9903d)
-
-        then: "empty optional is returned without exception"
-        verifyAll {
-            nanLat.isEmpty()
-        }
-
-        when: "resolving with NaN longitude"
-        Optional<RegionCoordinateResolution> nanLon = regionService.resolveCoordinates(39.7392d, Double.NaN)
-
-        then: "empty optional is returned without exception"
-        verifyAll {
-            nanLon.isEmpty()
-        }
+        where:
+        scenario                   | lat        | lon
+        "latitude above 90"        | 95.0d      | -104.9903d
+        "latitude below -90"       | -95.0d     | 0.0d
+        "longitude above 180"      | 0.0d       | 185.0d
+        "longitude far below -180" | 39.7392d   | -200.0d
+        "longitude below -180"     | 0.0d       | -185.0d
+        "NaN latitude"             | Double.NaN | -104.9903d
+        "NaN longitude"            | 39.7392d   | Double.NaN
     }
 
-    def "RESOLVE | should normalize state from region name when stateCode is null"() {
-        given: "regions covering coordinates with null stateCode"
-        createRegionWithMetadata("Texas", 1, null, "America/Chicago", -98.0, 30.0, -97.0, 31.0)
-        createRegionWithMetadata("CO State Region", 1, null, "America/Denver", -96.0, 30.0, -95.0, 31.0)
-        createRegionWithMetadata("Custom Territory State", 1, null, "America/Denver", -94.0, 30.0, -93.0, 31.0)
-        createRegionWithMetadata("   ", 1, null, null, -92.0, 30.0, -91.0, 31.0)
+    @Unroll
+    def "RESOLVE | reads state #expectedState from region name #regionName when state code is missing"() {
+        given: "a region covering the test point with null stateCode"
+        createRegionWithMetadata(regionName, 1, null, timeZone, minLon, 30.0d, maxLon, 31.0d)
 
-        when: "resolving coordinates covering state name lookup"
-        Optional<RegionCoordinateResolution> txRes = regionService.resolveCoordinates(30.5d, -97.5d)
+        when: "resolving coordinates inside that region"
+        Optional<RegionCoordinateResolution> res = regionService.resolveCoordinates(30.5d, testLon)
 
-        then: "state code TX is resolved from Texas name"
+        then: "the expected state name or code is resolved"
         verifyAll {
-            txRes.isPresent()
-            txRes.get().state() == "TX"
+            res.isPresent()
+            res.get().state() == expectedState
         }
 
-        when: "resolving coordinates covering two-letter prefix state name"
-        Optional<RegionCoordinateResolution> coRes = regionService.resolveCoordinates(30.5d, -95.5d)
+        where:
+        regionName               | timeZone          | minLon | maxLon | testLon || expectedState
+        "Texas"                  | "America/Chicago" | -98.0d | -97.0d | -97.5d  || "TX"
+        "CO State Region"        | "America/Denver"  | -96.0d | -95.0d | -95.5d  || "CO"
+        "Custom Territory State" | "America/Denver"  | -94.0d | -93.0d | -93.5d  || "Custom Territory"
+    }
 
-        then: "state code CO is resolved"
-        verifyAll {
-            coRes.isPresent()
-            coRes.get().state() == "CO"
-        }
+    def "RESOLVE | returns empty when a covering region has a blank name and no metadata"() {
+        given: "a region with blank name and null metadata"
+        createRegionWithMetadata("   ", 1, null, null, -92.0d, 30.0d, -91.0d, 31.0d)
 
-        when: "resolving coordinates covering unknown state name"
-        Optional<RegionCoordinateResolution> customRes = regionService.resolveCoordinates(30.5d, -93.5d)
-
-        then: "stripped name is resolved as state"
-        verifyAll {
-            customRes.isPresent()
-            customRes.get().state() == "Custom Territory"
-        }
-
-        when: "resolving coordinates covering region with blank name and null metadata"
+        when: "resolving coordinates inside that region"
         Optional<RegionCoordinateResolution> emptyRes = regionService.resolveCoordinates(30.5d, -91.5d)
 
         then: "empty optional is returned when all civic components are null"
-        verifyAll {
-            emptyRes.isEmpty()
-        }
+        emptyRes.isEmpty()
     }
 
-    def "HIERARCHY | should find states with codes, names, or prefixes"() {
-        when: "searching by two-letter state code"
-        Optional<AdministrativeRegion> byCode = regionService.findState("CO")
+    @Unroll
+    def "HIERARCHY | finds Colorado when searching by #scenario"() {
+        when: "searching for the state"
+        Optional<AdministrativeRegion> found = regionService.findState(query)
 
-        then: "state is found"
+        then: "Colorado is returned"
         verifyAll {
-            byCode.isPresent()
-            byCode.get().stateCode() == "CO"
+            found.isPresent()
+            found.get().stateCode() == "CO"
         }
 
-        when: "searching by lowercase two-letter state code"
-        Optional<AdministrativeRegion> byLowerCode = regionService.findState("co")
+        where:
+        scenario                   | query
+        "uppercase state code"     | "CO"
+        "lowercase state code"     | "co"
+        "full state name"          | "Colorado"
+        "partial state name prefix"| "Colo"
+    }
 
-        then: "state is found"
-        verifyAll {
-            byLowerCode.isPresent()
-            byLowerCode.get().stateCode() == "CO"
-        }
-
-        when: "searching by state name"
-        Optional<AdministrativeRegion> byName = regionService.findState("Colorado")
-
-        then: "state is found"
-        verifyAll {
-            byName.isPresent()
-            byName.get().stateCode() == "CO"
-        }
-
-        when: "searching by state name prefix"
-        Optional<AdministrativeRegion> byPrefix = regionService.findState("Colo")
-
-        then: "state is found"
-        verifyAll {
-            byPrefix.isPresent()
-            byPrefix.get().stateCode() == "CO"
-        }
-
-        when: "searching by non-existent state"
-        Optional<AdministrativeRegion> notFound = regionService.findState("ZZ")
+    @Unroll
+    def "HIERARCHY | returns no state when searching with #scenario"() {
+        when: "searching for an invalid or missing state"
+        Optional<AdministrativeRegion> found = regionService.findState(query)
 
         then: "empty optional is returned"
-        verifyAll {
-            notFound.isEmpty()
-        }
+        found.isEmpty()
 
-        when: "searching with blank or null state"
-        Optional<AdministrativeRegion> blank = regionService.findState("   ")
-        Optional<AdministrativeRegion> nullState = regionService.findState(null)
-
-        then: "empty optionals are returned"
-        verifyAll {
-            blank.isEmpty()
-            nullState.isEmpty()
-        }
+        where:
+        scenario            | query
+        "non-existent code" | "ZZ"
+        "blank string"      | "   "
+        "null value"        | null
     }
 
-    def "HIERARCHY | should get counties with null or blank state"() {
-        when: "querying counties with null state"
-        List<AdministrativeRegion> nullStateCounties = regionService.getCounties(null)
+    @Unroll
+    def "HIERARCHY | lists all counties when state filter is #scenario"() {
+        when: "querying counties with no state filter"
+        List<AdministrativeRegion> counties = regionService.getCounties(stateFilter)
 
         then: "all level 2 counties are returned"
         verifyAll {
-            !nullStateCounties.isEmpty()
-            nullStateCounties.every { it.level() == 2 }
+            !counties.isEmpty()
+            counties.every { it.level() == 2 }
         }
 
-        when: "querying counties with blank state"
-        List<AdministrativeRegion> blankStateCounties = regionService.getCounties("   ")
+        where:
+        scenario       | stateFilter
+        "null"         | null
+        "blank spaces" | "   "
+    }
 
-        then: "all level 2 counties are returned"
-        verifyAll {
-            !blankStateCounties.isEmpty()
-            blankStateCounties.every { it.level() == 2 }
-        }
-
-        when: "querying counties with non-existent state"
+    def "HIERARCHY | returns no counties for an unknown state"() {
+        when: "querying counties with a non-existent state"
         List<AdministrativeRegion> noCounties = regionService.getCounties("ZZ")
 
         then: "empty list is returned"
-        verifyAll {
-            noCounties.isEmpty()
-        }
+        noCounties.isEmpty()
     }
 
-    def "HIERARCHY | should get cities for a state in a single query and handle edge cases"() {
+    def "HIERARCHY | lists all cities in a state when no county is given"() {
         when: "querying cities for state CO directly"
         List<AdministrativeRegion> cities = regionService.getCities("CO", null)
 
@@ -712,32 +643,23 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             !cities.isEmpty()
             cities.every { it.level() == 3 && it.stateCode() == "CO" }
         }
-
-        when: "querying cities for a non-existent state"
-        List<AdministrativeRegion> noCities = regionService.getCities("ZZ", null)
-
-        then: "empty list is returned"
-        verifyAll {
-            noCities.isEmpty()
-        }
-
-        when: "querying cities for a non-existent county"
-        List<AdministrativeRegion> noCountyCities = regionService.getCities("CO", "Nonexistent County")
-
-        then: "empty list is returned"
-        verifyAll {
-            noCountyCities.isEmpty()
-        }
     }
 
-    def "HIERARCHY | should get cities with null arguments and matching rules"() {
-        given: "an existing state"
-        AdministrativeRegion co = regionService.findState("CO").orElseThrow()
+    @Unroll
+    def "HIERARCHY | returns no cities when #scenario"() {
+        when: "querying cities with an unknown state or county"
+        List<AdministrativeRegion> cities = regionService.getCities(stateCode, countyName)
 
-        and: "a county with Region suffix to test normalized candidate name matching"
-        AdministrativeRegion adamsCounty = dataBuilder.region().withName("Adams Region").withParent(co.id()).persist()
-        track(adamsCounty)
+        then: "empty list is returned"
+        cities.isEmpty()
 
+        where:
+        scenario             | stateCode | countyName
+        "state is unknown"   | "ZZ"      | null
+        "county is unknown"  | "CO"      | "Nonexistent County"
+    }
+
+    def "HIERARCHY | lists all cities when neither state nor county is given"() {
         when: "querying cities with null state and null county"
         List<AdministrativeRegion> allCities = regionService.getCities(null, null)
 
@@ -746,40 +668,44 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             !allCities.isEmpty()
             allCities.every { it.level() == 3 }
         }
+    }
 
-        when: "querying cities with null state and county name fallback"
-        List<AdministrativeRegion> denverFallbackCities = regionService.getCities(null, "Denver County")
+    @Unroll
+    def "HIERARCHY | finds Denver cities when querying by #scenario"() {
+        when: "querying cities"
+        List<AdministrativeRegion> cities = regionService.getCities(stateCode, countyName)
 
-        then: "cities for Denver County are returned via fallback"
+        then: "Denver cities are returned"
         verifyAll {
-            !denverFallbackCities.isEmpty()
-            denverFallbackCities.any { it.name().contains("Denver") }
+            !cities.isEmpty()
+            cities.any { it.name().contains("Denver") }
         }
 
-        when: "querying cities with prefix match on county"
-        List<AdministrativeRegion> prefixMatchCities = regionService.getCities("CO", "Denver")
+        where:
+        scenario                  | stateCode | countyName
+        "county name without state" | null    | "Denver County"
+        "county name prefix"        | "CO"    | "Denver"
+    }
 
-        then: "cities matching prefix are returned"
-        verifyAll {
-            !prefixMatchCities.isEmpty()
-            prefixMatchCities.any { it.name().contains("Denver") }
-        }
+    def "HIERARCHY | handles county names ending with Region without error"() {
+        given: "an existing state and a county ending with Region"
+        AdministrativeRegion co = regionService.findState("CO").orElseThrow()
+        AdministrativeRegion adamsCounty = dataBuilder.region().withName("Adams Region").withParent(co.id()).persist()
+        track(adamsCounty)
 
-        when: "querying cities with normalized county name matching suffix stripped"
+        when: "querying cities with the stripped county name"
         List<AdministrativeRegion> normalizedMatchCities = regionService.getCities("CO", "Adams")
 
         then: "cities query returns successfully"
-        verifyAll {
-            normalizedMatchCities != null
-        }
+        normalizedMatchCities != null
+    }
 
-        when: "querying cities with non-existent county"
+    def "HIERARCHY | returns no cities when county name does not match"() {
+        when: "querying cities with a non-existent county"
         List<AdministrativeRegion> noCities = regionService.getCities("CO", "NonExistent")
 
         then: "empty list is returned"
-        verifyAll {
-            noCities.isEmpty()
-        }
+        noCities.isEmpty()
     }
 
     def "GEOID | should find backfilled Colorado seed regions by geoid and leave downtown cores null"() {
@@ -898,47 +824,90 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         }
     }
 
-    def "HIERARCHY | should resolve District of Columbia and US territories by code and name"() {
-        given: "DC and US territory level 1 regions"
-        createRegionWithMetadata("District of Columbia", 1, "DC", "America/New_York", -77.1, 38.8, -76.9, 39.0)
-        createRegionWithMetadata("Puerto Rico", 1, "PR", "America/Puerto_Rico", -67.3, 17.9, -65.2, 18.5)
-        createRegionWithMetadata("United States Virgin Islands", 1, "VI", "America/St_Thomas", -65.1, 17.6, -64.5, 18.4)
-        createRegionWithMetadata("Guam", 1, "GU", "Pacific/Guam", 144.6, 13.2, 145.0, 13.7)
-        createRegionWithMetadata("American Samoa", 1, "AS", "Pacific/Pago_Pago", -170.9, -14.4, -170.5, -14.2)
-        createRegionWithMetadata("Commonwealth of the Northern Mariana Islands", 1, "MP", "Pacific/Saipan", 145.1, 14.1, 145.8, 15.3)
+    @Unroll
+    def "HIERARCHY | finds #regionName by lookup term #query"() {
+        given: "a DC or US territory level 1 region"
+        createRegionWithMetadata(regionName, 1, expectedCode, timeZone, minLon, minLat, maxLon, maxLat)
 
-        expect: "findState resolves each by both code and name"
-        verifyAll {
-            regionService.findState("DC").map { it.stateCode() }.orElse(null) == "DC"
-            regionService.findState("District of Columbia").map { it.stateCode() }.orElse(null) == "DC"
-            regionService.findState("PR").map { it.stateCode() }.orElse(null) == "PR"
-            regionService.findState("Puerto Rico").map { it.stateCode() }.orElse(null) == "PR"
-            regionService.findState("VI").map { it.stateCode() }.orElse(null) == "VI"
-            regionService.findState("Virgin Islands").map { it.stateCode() }.orElse(null) == "VI"
-            regionService.findState("United States Virgin Islands").map { it.stateCode() }.orElse(null) == "VI"
-            regionService.findState("GU").map { it.stateCode() }.orElse(null) == "GU"
-            regionService.findState("Guam").map { it.stateCode() }.orElse(null) == "GU"
-            regionService.findState("AS").map { it.stateCode() }.orElse(null) == "AS"
-            regionService.findState("American Samoa").map { it.stateCode() }.orElse(null) == "AS"
-            regionService.findState("MP").map { it.stateCode() }.orElse(null) == "MP"
-            regionService.findState("Northern Mariana Islands").map { it.stateCode() }.orElse(null) == "MP"
-        }
+        expect: "findState resolves it to the expected state code"
+        regionService.findState(query).map { it.stateCode() }.orElse(null) == expectedCode
 
-        and: "resolveCoordinates resolves territory state codes when stateCode is null"
+        where:
+        regionName                                   | expectedCode | timeZone              | minLon | minLat | maxLon | maxLat | query
+        "District of Columbia"                       | "DC"         | "America/New_York"    | -77.1  | 38.8   | -76.9  | 39.0   | "DC"
+        "District of Columbia"                       | "DC"         | "America/New_York"    | -77.1  | 38.8   | -76.9  | 39.0   | "District of Columbia"
+        "Puerto Rico"                                | "PR"         | "America/Puerto_Rico" | -67.3  | 17.9   | -65.2  | 18.5   | "PR"
+        "Puerto Rico"                                | "PR"         | "America/Puerto_Rico" | -67.3  | 17.9   | -65.2  | 18.5   | "Puerto Rico"
+        "United States Virgin Islands"               | "VI"         | "America/St_Thomas"   | -65.1  | 17.6   | -64.5  | 18.4   | "VI"
+        "United States Virgin Islands"               | "VI"         | "America/St_Thomas"   | -65.1  | 17.6   | -64.5  | 18.4   | "Virgin Islands"
+        "United States Virgin Islands"               | "VI"         | "America/St_Thomas"   | -65.1  | 17.6   | -64.5  | 18.4   | "United States Virgin Islands"
+        "Guam"                                       | "GU"         | "Pacific/Guam"        | 144.6  | 13.2   | 145.0  | 13.7   | "GU"
+        "Guam"                                       | "GU"         | "Pacific/Guam"        | 144.6  | 13.2   | 145.0  | 13.7   | "Guam"
+        "American Samoa"                             | "AS"         | "Pacific/Pago_Pago"   | -170.9 | -14.4  | -170.5 | -14.2  | "AS"
+        "American Samoa"                             | "AS"         | "Pacific/Pago_Pago"   | -170.9 | -14.4  | -170.5 | -14.2  | "American Samoa"
+        "Commonwealth of the Northern Mariana Islands" | "MP"       | "Pacific/Saipan"      | 145.1  | 14.1   | 145.8  | 15.3   | "MP"
+        "Commonwealth of the Northern Mariana Islands" | "MP"       | "Pacific/Saipan"      | 145.1  | 14.1   | 145.8  | 15.3   | "Northern Mariana Islands"
+    }
+
+    def "RESOLVE | resolves territory state code from name when state code is missing"() {
+        given: "a territory region without a state code"
         createRegionWithMetadata("Puerto Rico", 1, null, "America/Puerto_Rico", -60.0, 10.0, -59.0, 11.0)
+
+        when: "resolving coordinates inside that region"
         Optional<RegionCoordinateResolution> prRes = regionService.resolveCoordinates(10.5d, -59.5d)
+
+        then: "Puerto Rico state code PR is resolved"
         verifyAll {
             prRes.isPresent()
             prRes.get().state() == "PR"
         }
     }
 
-    def "RESOLVE & HIERARCHY | should ignore blank city, county, and timezone names and match prefix counties"() {
-        given: "regions with blank city, blank county, blank timezone, and a leading-space county name"
-        AdministrativeRegion state = createRegionWithMetadata("Test Blank State", 1, "TB", "   ", -85.0, 34.0, -84.0, 35.0)
+    private DefaultAdministrativeRegionService buildUnitService(
+            AdministrativeRegionRepository regionRepo,
+            UserRepository userRepo,
+            ObjectMapper mapper
+    ) {
+        return new DefaultAdministrativeRegionService(
+                regionRepo,
+                userRepo,
+                spatialMappingService,
+                Mock(AuditService),
+                Mock(JdbcOperations),
+                mapper
+        )
+    }
+
+    def "RESOLVE | should ignore blank city, county, and timezone names when resolving coordinates"() {
+        given: "regions with blank city, county, and timezone names under a valid state"
+        createRegionWithMetadata("Test Blank State", 1, "TB", "   ", -85.0, 34.0, -84.0, 35.0)
         createRegionWithMetadata("   ", 2, "TB", "   ", -84.9, 34.6, -84.1, 34.9)
         createRegionWithMetadata("   ", 3, "TB", "   ", -84.8, 34.65, -84.2, 34.85)
 
+        when: "resolving coordinates inside the blank-metadata regions"
+        Optional<RegionCoordinateResolution> res = regionService.resolveCoordinates(34.75d, -84.5d)
+
+        then: "only the state code is populated and blank fields resolve to null"
+        verifyAll {
+            res.isPresent()
+            res.get().state() == "TB"
+            res.get().county() == null
+            res.get().city() == null
+            res.get().timeZone() == null
+        }
+    }
+
+    def "HIERARCHY | should find a state by single-letter prefix"() {
+        when: "finding a state using a single-letter query"
+        Optional<AdministrativeRegion> bySingleChar = regionService.findState("C")
+
+        then: "a matching state is returned"
+        bySingleChar.isPresent()
+    }
+
+    def "HIERARCHY | should match normalized county prefix when state filter is blank"() {
+        given: "a state, a county with leading spaces, and a city inside that county"
+        AdministrativeRegion state = createRegionWithMetadata("Test Blank State", 1, "TB", "   ", -85.0, 34.0, -84.0, 35.0)
         Polygon countyPoly = spatialMappingService.toPolygon([
                 new Coordinates(-84.5, 34.1),
                 new Coordinates(-84.3, 34.1),
@@ -955,87 +924,80 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         ))
         track(cityInSpaced)
 
-        when: "resolving coordinates where city, county, and timezone are blank"
-        Optional<RegionCoordinateResolution> res = regionService.resolveCoordinates(34.75d, -84.5d)
-
-        then: "only non-blank state is populated while blank city, county, and timezone resolve to null"
-        verifyAll {
-            res.isPresent()
-            res.get().state() == "TB"
-            res.get().county() == null
-            res.get().city() == null
-            res.get().timeZone() == null
-        }
-
-        when: "finding a state by single-letter prefix when code lookup does not apply"
-        Optional<AdministrativeRegion> bySingleChar = regionService.findState("C")
-
-        and: "querying cities with blank state and normalized prefix county"
+        when: "querying cities with a blank state and a normalized county prefix"
         List<AdministrativeRegion> cities = regionService.getCities("   ", "Spaced")
 
-        then: "single-letter prefix finds a state and normalized county prefix finds the city"
-        verifyAll {
-            bySingleChar.isPresent()
-            cities.any { it.id() == cityInSpaced.id() }
-        }
+        then: "the city inside the matching county is returned"
+        cities.any { it.id() == cityInSpaced.id() }
     }
 
-    def "UNIT | should handle null repository responses, concurrent delete race, null candidate names, and metadata IO errors"() {
-        given: "a DefaultAdministrativeRegionService with mocked dependencies"
+    def "UNIT | should return 404 when deleteAdministrativeRegion removes zero rows"() {
+        given: "a region that disappears before delete executes"
         AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
         UserRepository mockUserRepo = Mock(UserRepository)
-        AuditService mockAudit = Mock(AuditService)
-        JdbcOperations mockJdbc = Mock(JdbcOperations)
         ObjectMapper mockMapper = Mock(ObjectMapper)
-
-        DefaultAdministrativeRegionService unitService = new DefaultAdministrativeRegionService(
-                mockRegionRepo,
-                mockUserRepo,
-                spatialMappingService,
-                mockAudit,
-                mockJdbc,
-                mockMapper
-        )
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, mockUserRepo, mockMapper)
 
         UUID actorId = UUID.randomUUID()
         UUID regionId = UUID.randomUUID()
         User admin = dataBuilder.user().asAdmin().build().withId(actorId)
         AdministrativeRegion region = new AdministrativeRegion(regionId, "Unit Region", null, null, 1, "US", "CO", null, null)
 
-        when: "deleteAdministrativeRegion finds the region but removeById returns 0"
         mockUserRepo.findById(actorId) >> Optional.of(admin)
         mockRegionRepo.findById(regionId) >> Optional.of(region)
         mockMapper.writeValueAsString(_) >> '{"deletedName":"Unit Region"}'
         mockRegionRepo.removeById(regionId) >> 0L
+
+        when: "deleting the region"
         unitService.deleteAdministrativeRegion(regionId, actorId)
 
         then: "404 Not Found is thrown"
         HttpStatusException delEx = thrown()
         delEx.status == HttpStatus.NOT_FOUND
+    }
 
-        when: "buildMetadata fails with IOException during deleteAdministrativeRegion"
+    def "UNIT | should return 500 when deleteAdministrativeRegion metadata serialization fails"() {
+        given: "an object mapper that throws IOException when writing metadata"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        UserRepository mockUserRepo = Mock(UserRepository)
         ObjectMapper failingMapper = Mock(ObjectMapper) {
             writeValueAsString(_) >> { throw new IOException("JSON write failed") }
         }
-        DefaultAdministrativeRegionService failingMapperService = new DefaultAdministrativeRegionService(
-                mockRegionRepo,
-                mockUserRepo,
-                spatialMappingService,
-                mockAudit,
-                mockJdbc,
-                failingMapper
-        )
-        failingMapperService.deleteAdministrativeRegion(regionId, actorId)
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, mockUserRepo, failingMapper)
+
+        UUID actorId = UUID.randomUUID()
+        UUID regionId = UUID.randomUUID()
+        User admin = dataBuilder.user().asAdmin().build().withId(actorId)
+        AdministrativeRegion region = new AdministrativeRegion(regionId, "Unit Region", null, null, 1, "US", "CO", null, null)
+
+        mockUserRepo.findById(actorId) >> Optional.of(admin)
+        mockRegionRepo.findById(regionId) >> Optional.of(region)
+
+        when: "deleting the region"
+        unitService.deleteAdministrativeRegion(regionId, actorId)
 
         then: "500 Internal Server Error is thrown"
         HttpStatusException jsonEx = thrown()
         jsonEx.status == HttpStatus.INTERNAL_SERVER_ERROR
+    }
 
-        when: "resolveCoordinates receives null list or regions with null fields"
-        mockRegionRepo.findCoveringRegions(39.0d, -105.0d) >> null
-        Optional<RegionCoordinateResolution> nullListRes = unitService.resolveCoordinates(39.0d, -105.0d)
+    @Unroll
+    def "UNIT | should return empty optional from resolveCoordinates for #scenario"() {
+        given: "a repository returning empty or blank covering regions"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, Mock(UserRepository), Mock(ObjectMapper))
+        mockRegionRepo.findCoveringRegions(lat, -105.0d) >> coveringRegions
 
-        mockRegionRepo.findCoveringRegions(40.0d, -105.0d) >> [
+        when: "resolving coordinates"
+        Optional<RegionCoordinateResolution> res = unitService.resolveCoordinates(lat, -105.0d)
+
+        then: "empty optional is returned"
+        res.isEmpty()
+
+        where:
+        scenario                   | lat   | coveringRegions
+        "null covering list"       | 39.0d | null
+        "regions with blank names" | 40.0d | [
                 new CoveringRegion(UUID.randomUUID(), null, null, "US", null, null),
                 new CoveringRegion(UUID.randomUUID(), null, 3, "US", null, null),
                 new CoveringRegion(UUID.randomUUID(), "   ", 3, "US", null, null),
@@ -1044,43 +1006,74 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
                 new CoveringRegion(UUID.randomUUID(), null, 1, "US", "  ", null),
                 new CoveringRegion(UUID.randomUUID(), "  ", 1, "US", "  ", "  ")
         ]
-        Optional<RegionCoordinateResolution> nullFieldsRes = unitService.resolveCoordinates(40.0d, -105.0d)
+    }
 
-        then: "both return empty optional"
-        verifyAll {
-            nullListRes.isEmpty()
-            nullFieldsRes.isEmpty()
-        }
-
-        when: "getCities encounters a county with a null name, blank filters, and findState falls back to stateCode or name match"
-        mockRegionRepo.findByLevelOrderByNameAsc(2) >> [
-                new AdministrativeRegion(UUID.randomUUID(), null, null, null, 2, "US", "CO", null, null)
-        ]
-        List<AdministrativeRegion> nullCountyCities = unitService.getCities(null, "Denver")
-        mockRegionRepo.findByLevelOrderByNameAsc(3) >> []
-        List<AdministrativeRegion> blankFilterCities = unitService.getCities("   ", "   ")
-
+    def "UNIT | should resolve timezone when covering region only has a timezone"() {
+        given: "a covering region with only a timezone populated"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, Mock(UserRepository), Mock(ObjectMapper))
         mockRegionRepo.findCoveringRegions(41.0d, -105.0d) >> [
                 new CoveringRegion(UUID.randomUUID(), null, 1, "US", null, "America/Denver")
         ]
+
+        when: "resolving coordinates"
         Optional<RegionCoordinateResolution> tzOnlyRes = unitService.resolveCoordinates(41.0d, -105.0d)
 
-        mockRegionRepo.findFirstByLevelAndStateCodeIgnoreCase(1, "ZZ") >> Optional.empty()
+        then: "the timezone is returned"
+        verifyAll {
+            tzOnlyRes.isPresent()
+            tzOnlyRes.get().timeZone() == "America/Denver"
+        }
+    }
+
+    def "UNIT | should skip counties with null names in getCities"() {
+        given: "a level-2 region with a null name"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, Mock(UserRepository), Mock(ObjectMapper))
+        mockRegionRepo.findByLevelOrderByNameAsc(2) >> [
+                new AdministrativeRegion(UUID.randomUUID(), null, null, null, 2, "US", "CO", null, null)
+        ]
+
+        when: "querying cities by county name"
+        List<AdministrativeRegion> cities = unitService.getCities(null, "Denver")
+
+        then: "null county names are skipped and an empty list is returned"
+        cities.isEmpty()
+    }
+
+    def "UNIT | should return empty list when getCities receives blank filters"() {
+        given: "no level-3 cities in the repository"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, Mock(UserRepository), Mock(ObjectMapper))
+        mockRegionRepo.findByLevelOrderByNameAsc(3) >> []
+
+        when: "querying cities with blank state and county filters"
+        List<AdministrativeRegion> cities = unitService.getCities("   ", "   ")
+
+        then: "an empty list is returned"
+        cities.isEmpty()
+    }
+
+    @Unroll
+    def "UNIT | should find state using fallback scan by #lookupType"() {
+        given: "a direct code lookup miss and a level-1 state list containing null and matching names"
+        AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
+        DefaultAdministrativeRegionService unitService = buildUnitService(mockRegionRepo, Mock(UserRepository), Mock(ObjectMapper))
+        mockRegionRepo.findFirstByLevelAndStateCodeIgnoreCase(1, query) >> Optional.empty()
         mockRegionRepo.findByLevelOrderByNameAsc(1) >> [
                 new AdministrativeRegion(UUID.randomUUID(), null, null, null, 1, "US", null, null, null),
                 new AdministrativeRegion(UUID.randomUUID(), "Fallback State", null, null, 1, "US", "ZZ", null, null)
         ]
-        Optional<AdministrativeRegion> fallbackByCode = unitService.findState("ZZ")
-        Optional<AdministrativeRegion> fallbackByName = unitService.findState("Fallback State")
 
-        then: "null names are safely skipped and fallback state matching works"
-        verifyAll {
-            nullCountyCities.isEmpty()
-            blankFilterCities.isEmpty()
-            tzOnlyRes.isPresent()
-            tzOnlyRes.get().timeZone() == "America/Denver"
-            fallbackByCode.isPresent()
-            fallbackByName.isPresent()
-        }
+        when: "finding the state"
+        Optional<AdministrativeRegion> result = unitService.findState(query)
+
+        then: "the matching state is found"
+        result.isPresent()
+
+        where:
+        lookupType   | query
+        "state code" | "ZZ"
+        "state name" | "Fallback State"
     }
 }

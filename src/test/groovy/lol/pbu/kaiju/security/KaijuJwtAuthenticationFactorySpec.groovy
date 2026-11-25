@@ -12,6 +12,7 @@ import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.UserService
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.text.ParseException
 
@@ -53,11 +54,13 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
 
-        then: "authentication is present"
-        authOpt.isPresent()
-        def auth = authOpt.get()
+        then: "authentication and user are present"
         Optional<User> userOpt = userRepository.findByEmail(email)
-        userOpt.isPresent()
+        verifyAll {
+            authOpt.isPresent()
+            userOpt.isPresent()
+        }
+        def auth = authOpt.get()
         def user = userOpt.get()
 
         and: "the principal name, permissions, and attributes match"
@@ -84,11 +87,13 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         when: "the factory creates authentication"
         def authOpt = factory.createAuthentication(token)
 
-        then: "authentication is present"
-        authOpt.isPresent()
-        def auth = authOpt.get()
+        then: "authentication and user are present"
         Optional<User> userOpt = userRepository.findByEmail(email)
-        userOpt.isPresent()
+        verifyAll {
+            authOpt.isPresent()
+            userOpt.isPresent()
+        }
+        def auth = authOpt.get()
         def user = userOpt.get()
 
         and: "the newly provisioned user in database has GLOBAL_ADMIN role"
@@ -114,8 +119,10 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
 
         then: "authentication is created under the normalized lowercase email"
         Optional<User> userOpt = userRepository.findByEmail(expectedEmail)
-        authOpt.isPresent()
-        userOpt.isPresent()
+        verifyAll {
+            authOpt.isPresent()
+            userOpt.isPresent()
+        }
         verifyAll(authOpt.get()) {
             name == userOpt.get().id().toString()
         }
@@ -151,7 +158,8 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         authOpt.isEmpty()
     }
 
-    def "createAuthentication | should return empty when email_verified claim is missing, false, or invalid"() {
+    @Unroll
+    def "createAuthentication | returns empty when email_verified claim is '#verifiedClaim'"() {
         given: "a JWT with unverified or missing email_verified claim"
         def builder = new JWTClaimsSet.Builder()
                 .subject("unverified-user")
@@ -171,7 +179,8 @@ class KaijuJwtAuthenticationFactorySpec extends Specification {
         verifiedClaim << ["MISSING", null, false, "false", "FALSE", "unverified", "no", 0]
     }
 
-    def "createAuthentication | accepts string email_verified values like true with whitespace"() {
+    @Unroll
+    def "createAuthentication | accepts string email_verified value '#claimValue' like true with whitespace"() {
         given: "a JWT where email_verified is a string true value"
         String email = "jwt.string.verified@kaiju.local"
         JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()

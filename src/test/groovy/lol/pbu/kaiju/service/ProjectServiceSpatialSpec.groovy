@@ -25,6 +25,7 @@ import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.security.AuthorizationService
 import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
+import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -162,31 +163,37 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
         }
     }
 
-    def "ProjectService | approves and rejects project with audit records"() {
-        given: "an admin, organization, and projects in PENDING state"
+    def "ProjectService | sets a pending project to active when approved"() {
+        given: "an admin, organization, and project in PENDING state"
         def admin = dataBuilder.user().asAdmin().persist()
         def org = dataBuilder.organization().withName("Approve Org").persist()
-        def pendingProject1 = dataBuilder.project()
+        def pendingProject = dataBuilder.project()
                 .forOrg(org)
                 .withTitle("Pending Project 1")
                 .withDescription("Desc")
                 .withStatus(ProjectStatus.PENDING)
                 .persist()
-        def pendingProject2 = dataBuilder.project()
+
+        when: "approving the project"
+        def approved = projectService.approveProject(pendingProject.id(), admin.id())
+
+        then: "status is updated to ACTIVE"
+        approved.status() == ProjectStatus.ACTIVE
+    }
+
+    def "ProjectService | sets a pending project to rejected when rejected"() {
+        given: "an admin, organization, and project in PENDING state"
+        def admin = dataBuilder.user().asAdmin().persist()
+        def org = dataBuilder.organization().withName("Approve Org").persist()
+        def pendingProject = dataBuilder.project()
                 .forOrg(org)
                 .withTitle("Pending Project 2")
                 .withDescription("Desc")
                 .withStatus(ProjectStatus.PENDING)
                 .persist()
 
-        when: "approving the project"
-        def approved = projectService.approveProject(pendingProject1.id(), admin.id())
-
-        then: "status is updated to ACTIVE"
-        approved.status() == ProjectStatus.ACTIVE
-
         when: "rejecting the project"
-        def rejected = projectService.rejectProject(pendingProject2.id(), admin.id())
+        def rejected = projectService.rejectProject(pendingProject.id(), admin.id())
 
         then: "status is updated to REJECTED"
         rejected.status() == ProjectStatus.REJECTED
@@ -204,8 +211,7 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
         updated.verificationStatus() == VerificationStatus.REVOKED
     }
 
-    def "ProjectService | handles missing org, unsaved region, null defaults, draft transitions, and rejection edges"() {
-        given: "a global admin, two regions, and an organization"
+    private Map createEdgeProjectContext() {
         def admin = dataBuilder.user().asAdmin().persist()
         def org = dataBuilder.organization().withName("Edge Project Org").asPublic().verified().persist()
         Coordinate[] regionCoords = [
@@ -224,149 +230,10 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
                 .withAddress("123 Main", "Denver", "CO", "80202", "US")
                 .atPoint(-104.9903, 39.7392)
                 .persist()
-
-        when: "global admin creates a project with null organization"
-        projectService.createProject(
-                Project.forCreation(null, null, "No Org", "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, [], []),
-                admin.id()
-        )
-
-        then:
-        HttpStatusException noOrgEx = thrown()
-        noOrgEx.status == HttpStatus.BAD_REQUEST
-
-        when: "global admin creates a project with an unsaved organization (null ID)"
-        projectService.createProject(
-                Project.forCreation(new Organization(null, "Unsaved", null, null, true, VerificationStatus.UNVERIFIED, null, []), null, "Unsaved Org", "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, [], []),
-                admin.id()
-        )
-
-        then:
-        HttpStatusException unsavedOrgEx = thrown()
-        unsavedOrgEx.status == HttpStatus.BAD_REQUEST
-
-        when: "global admin creates a project with an unsaved managing region (null ID)"
-        projectService.createProject(
-                Project.forCreation(org, new AdministrativeRegion(null, "Unsaved Region", null, null), "Unsaved Reg", "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, [], []),
-                admin.id()
-        )
-
-        then:
-        HttpStatusException unsavedRegEx = thrown()
-        unsavedRegEx.status == HttpStatus.BAD_REQUEST
-
-        when: "global admin creates a project with null status, null locations, null boundaries, and a managing region"
-        Project createdWithNullLocsAndRegion = track(projectService.createProject(
-                new Project(null, org, region, "Region Null Locs", "Description long enough", ProjectType.STANDARD, null, null, null, null, null, null),
-                admin.id()
-        ))
-
-        and: "global admin creates a project with null status, null locations, and null boundaries"
-        Project createdDefaults = track(projectService.createProject(
-                new Project(null, org, null, "Defaults Proj", "Description long enough", ProjectType.STANDARD, null, null, null, null, null, null),
-                admin.id()
-        ))
-
-        then: "status defaults to DRAFT"
-        verifyAll {
-            createdDefaults.id() != null
-            createdDefaults.status() == ProjectStatus.DRAFT
-            createdWithNullLocsAndRegion.id() != null
-            createdWithNullLocsAndRegion.managingRegion()?.id() == region.id()
-        }
-
-        when: "global admin updates a project with a non-null organization whose ID is null"
-        projectService.updateProject(
-                createdDefaults.id(),
-                Project.forCreation(new Organization(null, "Missing Id", null, null, true, VerificationStatus.UNVERIFIED, null, []), null, "Title", "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, [], []),
-                admin.id()
-        )
-
-        then:
-        HttpStatusException nullTargetOrgEx = thrown()
-        nullTargetOrgEx.status == HttpStatus.NOT_FOUND
-
-        when: "global admin assigns a non-existent managing region during update"
-        projectService.updateProject(
-                createdDefaults.id(),
-                Project.forUpdate(createdDefaults.id(), org, AdministrativeRegion.forId(UUID.randomUUID()), "Title", "Desc", ProjectType.STANDARD, [], []),
-                admin.id()
-        )
-
-        then:
-        HttpStatusException missingRegionUpdateEx = thrown()
-        missingRegionUpdateEx.status == HttpStatus.BAD_REQUEST
-
-        when: "global admin assigns a valid managing region during update with null locations and boundaries"
-        Project withRegion = projectService.updateProject(
-                createdDefaults.id(),
-                new Project(createdDefaults.id(), org, region, "Updated With Region", "Description long enough", ProjectType.STANDARD, ProjectStatus.DRAFT, null, null, null, null, null),
-                admin.id()
-        )
-
-        then: "managing region is assigned and status remains DRAFT"
-        verifyAll(withRegion) {
-            managingRegion()?.id() == region.id()
-            status() == ProjectStatus.DRAFT
-        }
-
-        when: "global admin tries to update a DRAFT project directly to REJECTED status"
-        projectService.updateProject(
-                createdDefaults.id(),
-                Project.forCreation(org, region, "Invalid Draft Jump", "Description long enough", ProjectType.STANDARD, ProjectStatus.REJECTED, [], []),
-                admin.id()
-        )
-
-        then:
-        HttpStatusException invalidDraftEx = thrown()
-        invalidDraftEx.status == HttpStatus.BAD_REQUEST
-
-        when: "global admin submits a DRAFT project to PENDING via updateProject"
-        Project submitted = projectService.updateProject(
-                createdDefaults.id(),
-                Project.forCreation(org, region, "Submitted Draft", "Description long enough", ProjectType.STANDARD, ProjectStatus.PENDING, [loc], []),
-                admin.id()
-        )
-
-        and: "global admin submits a second DRAFT project requesting ACTIVE status via updateProject"
-        Project activeAttempt = projectService.updateProject(
-                createdWithNullLocsAndRegion.id(),
-                Project.forCreation(org, region, "Submitted Active Draft", "Description long enough", ProjectType.STANDARD, ProjectStatus.ACTIVE, [loc], []),
-                admin.id()
-        )
-
-        then:
-        verifyAll {
-            submitted.status() == ProjectStatus.PENDING
-            activeAttempt.status() == ProjectStatus.PENDING
-        }
-
-        when: "global admin rejects a DRAFT project"
-        Project draftProj = dataBuilder.project().forOrg(org).withTitle("Draft To Reject").withDescription("Desc").withStatus(ProjectStatus.DRAFT).persist()
-        projectService.rejectProject(draftProj.id(), admin.id())
-
-        then:
-        HttpStatusException rejectDraftEx = thrown()
-        rejectDraftEx.status == HttpStatus.BAD_REQUEST
-
-        when: "global admin rejects a non-existent project"
-        projectService.rejectProject(UUID.randomUUID(), admin.id())
-
-        then:
-        HttpStatusException rejectMissingEx = thrown()
-        rejectMissingEx.status == HttpStatus.NOT_FOUND
-
-        when: "global admin rejects an already REJECTED project"
-        Project rejectedProj = dataBuilder.project().forOrg(org).withTitle("Already Rejected").withDescription("Desc").withStatus(ProjectStatus.REJECTED).persist()
-        projectService.rejectProject(rejectedProj.id(), admin.id())
-
-        then:
-        HttpStatusException rejectTwiceEx = thrown()
-        rejectTwiceEx.status == HttpStatus.BAD_REQUEST
+        [admin: admin, org: org, region: region, loc: loc]
     }
 
-    def "ProjectService | handles null existing org, populated existing lists, and ACTIVE demotion on null target org"() {
-        given: "a mocked DefaultProjectService to reach defensive null-org and populated-list branches"
+    private Map createMockProjectHarness() {
         ProjectRepository mockProjectRepo = Mock(ProjectRepository)
         AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
         OrganizationRepository mockOrgRepo = Mock(OrganizationRepository)
@@ -414,49 +281,233 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
         mockProjectRepo.findById(projectId) >> Optional.of(activeNoOrg)
         mockProjectRepo.update(_ as Project) >> { Project p -> p }
 
-        when: "updating the project to assign a new managing region when existing organization is null"
-        UUID newRegionId = UUID.randomUUID()
-        unitService.updateProject(
-                projectId,
-                new Project(projectId, null, AdministrativeRegion.forId(newRegionId), "Title", "Desc", ProjectType.STANDARD, null, null, null, null, null, null),
-                actorId
+        [
+                unitService    : unitService,
+                mockProjectRepo: mockProjectRepo,
+                actorId        : actorId,
+                projectId      : projectId,
+                region         : region,
+                existingBnd    : existingBnd
+        ]
+    }
+
+    @Unroll
+    def "ProjectService | createProject throws BAD_REQUEST when #scenario"() {
+        given: "a global admin and organization"
+        def ctx = createEdgeProjectContext()
+        Organization targetOrg = switch (orgCase) {
+            case "null" -> null
+            case "unsaved" -> new Organization(null, "Unsaved", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+            default -> ctx.org
+        }
+        AdministrativeRegion targetRegion = regionCase == "unsaved"
+                ? new AdministrativeRegion(null, "Unsaved Region", null, null)
+                : null
+
+        when: "creating the project"
+        projectService.createProject(
+                Project.forCreation(targetOrg, targetRegion, title, "Desc", ProjectType.STANDARD, ProjectStatus.DRAFT, [], []),
+                ctx.admin.id()
         )
 
-        then: "assignManagingRegion rejects null effectiveOrgId with FORBIDDEN"
-        HttpStatusException assignEx = thrown()
-        assignEx.status == HttpStatus.FORBIDDEN
+        then: "BAD_REQUEST is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.BAD_REQUEST
 
-        when: "updating the project to unassign managing region when existing organization is null"
-        unitService.updateProject(
-                projectId,
-                new Project(projectId, null, null, "Title", "Desc", ProjectType.STANDARD, null, null, null, null, null, null),
-                actorId
+        where:
+        scenario                              | orgCase   | regionCase | title
+        "organization is null"                | "null"    | "none"     | "No Org"
+        "organization is unsaved (null ID)"   | "unsaved" | "none"     | "Unsaved Org"
+        "managing region is unsaved (null ID)"| "valid"   | "unsaved"  | "Unsaved Reg"
+    }
+
+    @Unroll
+    def "ProjectService | createProject defaults status to DRAFT when #scenario"() {
+        given: "a global admin, organization, and managing region"
+        def ctx = createEdgeProjectContext()
+        AdministrativeRegion targetRegion = withRegion ? ctx.region : null
+
+        when: "creating a project with null status, locations, and boundaries"
+        Project created = track(projectService.createProject(
+                new Project(null, ctx.org, targetRegion, "Defaults Proj", "Description long enough", ProjectType.STANDARD, null, null, null, null, null, null),
+                ctx.admin.id()
+        ))
+
+        then: "project is saved as DRAFT with expected managing region"
+        verifyAll(created) {
+            id() != null
+            status() == ProjectStatus.DRAFT
+            managingRegion()?.id() == (withRegion ? ctx.region.id() : null)
+        }
+
+        where:
+        scenario                     | withRegion
+        "managing region is present" | true
+        "managing region is null"    | false
+    }
+
+    @Unroll
+    def "ProjectService | updateProject fails with #expectedStatus when #scenario"() {
+        given: "a global admin and a saved DRAFT project"
+        def ctx = createEdgeProjectContext()
+        Project draft = track(projectService.createProject(
+                new Project(null, ctx.org, null, "Draft Proj", "Description long enough", ProjectType.STANDARD, null, null, null, null, null, null),
+                ctx.admin.id()
+        ))
+
+        Organization targetOrg = unsavedOrg
+                ? new Organization(null, "Missing Id", null, null, true, VerificationStatus.UNVERIFIED, null, [])
+                : ctx.org
+        AdministrativeRegion targetRegion = missingRegion
+                ? AdministrativeRegion.forId(UUID.randomUUID())
+                : (useValidRegion ? ctx.region : null)
+
+        when: "updating the project"
+        projectService.updateProject(
+                draft.id(),
+                Project.forCreation(targetOrg, targetRegion, "Title", "Description long enough", ProjectType.STANDARD, targetStatus, [], []),
+                ctx.admin.id()
         )
 
-        then: "unassignManagingRegion rejects null effectiveOrgId with FORBIDDEN"
-        HttpStatusException unassignEx = thrown()
-        unassignEx.status == HttpStatus.FORBIDDEN
+        then: "the expected HTTP error is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == expectedStatus
 
-        when: "updating an ACTIVE project with modified locations when targetOrg is null and managingRegion is unchanged"
-        Project updatedDemoted = unitService.updateProject(
-                projectId,
-                new Project(projectId, null, region, "Updated Title", "Desc", ProjectType.STANDARD, null, null, null, null, [], null),
-                actorId
+        where:
+        scenario                               | unsavedOrg | missingRegion | useValidRegion | targetStatus           || expectedStatus
+        "organization has null ID"             | true       | false         | false          | ProjectStatus.DRAFT    || HttpStatus.NOT_FOUND
+        "managing region does not exist"       | false      | true          | false          | ProjectStatus.DRAFT    || HttpStatus.BAD_REQUEST
+        "transitioning DRAFT straight to REJECTED" | false  | false         | true           | ProjectStatus.REJECTED || HttpStatus.BAD_REQUEST
+    }
+
+    def "ProjectService | updateProject assigns a valid managing region with null lists and stays DRAFT"() {
+        given: "a global admin and a saved DRAFT project"
+        def ctx = createEdgeProjectContext()
+        Project draft = track(projectService.createProject(
+                new Project(null, ctx.org, null, "Draft Proj", "Description long enough", ProjectType.STANDARD, null, null, null, null, null, null),
+                ctx.admin.id()
+        ))
+
+        when: "assigning a valid managing region with null locations and boundaries"
+        Project updated = projectService.updateProject(
+                draft.id(),
+                new Project(draft.id(), ctx.org, ctx.region, "Updated With Region", "Description long enough", ProjectType.STANDARD, ProjectStatus.DRAFT, null, null, null, null, null),
+                ctx.admin.id()
+        )
+
+        then: "managing region is assigned and status remains DRAFT"
+        verifyAll(updated) {
+            managingRegion()?.id() == ctx.region.id()
+            status() == ProjectStatus.DRAFT
+        }
+    }
+
+    @Unroll
+    def "ProjectService | updateProject moves a DRAFT project to PENDING when requesting #requestedStatus"() {
+        given: "a global admin, region, location, and a saved DRAFT project"
+        def ctx = createEdgeProjectContext()
+        Project draft = track(projectService.createProject(
+                new Project(null, ctx.org, ctx.region, "Draft Submit", "Description long enough", ProjectType.STANDARD, null, null, null, null, null, null),
+                ctx.admin.id()
+        ))
+
+        when: "submitting the DRAFT project via updateProject"
+        Project submitted = projectService.updateProject(
+                draft.id(),
+                Project.forCreation(ctx.org, ctx.region, "Submitted Draft", "Description long enough", ProjectType.STANDARD, requestedStatus, [ctx.loc], []),
+                ctx.admin.id()
+        )
+
+        then: "status becomes PENDING"
+        submitted.status() == ProjectStatus.PENDING
+
+        where:
+        requestedStatus << [ProjectStatus.PENDING, ProjectStatus.ACTIVE]
+    }
+
+    @Unroll
+    def "ProjectService | rejectProject fails with #expectedStatus when #scenario"() {
+        given: "a global admin and organization"
+        def ctx = createEdgeProjectContext()
+        UUID projectId = switch (projectState) {
+            case "draft" -> dataBuilder.project().forOrg(ctx.org).withTitle("Draft To Reject").withDescription("Desc").withStatus(ProjectStatus.DRAFT).persist().id()
+            case "rejected" -> dataBuilder.project().forOrg(ctx.org).withTitle("Already Rejected").withDescription("Desc").withStatus(ProjectStatus.REJECTED).persist().id()
+            default -> UUID.randomUUID()
+        }
+
+        when: "rejecting the project"
+        projectService.rejectProject(projectId, ctx.admin.id())
+
+        then: "the expected HTTP error is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == expectedStatus
+
+        where:
+        scenario                     | projectState || expectedStatus
+        "project is in DRAFT status" | "draft"      || HttpStatus.BAD_REQUEST
+        "project does not exist"     | "missing"    || HttpStatus.NOT_FOUND
+        "project is already REJECTED"| "rejected"   || HttpStatus.BAD_REQUEST
+    }
+
+    def "ProjectService | assignManagingRegion throws FORBIDDEN when existing organization is null"() {
+        given: "a mocked project with a null organization"
+        def h = createMockProjectHarness()
+
+        when: "updating the project to assign a new managing region"
+        h.unitService.updateProject(
+                h.projectId,
+                new Project(h.projectId, null, AdministrativeRegion.forId(UUID.randomUUID()), "Title", "Desc", ProjectType.STANDARD, null, null, null, null, null, null),
+                h.actorId
+        )
+
+        then: "FORBIDDEN is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.FORBIDDEN
+    }
+
+    def "ProjectService | unassignManagingRegion throws FORBIDDEN when existing organization is null"() {
+        given: "a mocked project with a null organization"
+        def h = createMockProjectHarness()
+
+        when: "updating the project to unassign the managing region"
+        h.unitService.updateProject(
+                h.projectId,
+                new Project(h.projectId, null, null, "Title", "Desc", ProjectType.STANDARD, null, null, null, null, null, null),
+                h.actorId
+        )
+
+        then: "FORBIDDEN is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.FORBIDDEN
+    }
+
+    def "ProjectService | modifying locations on ACTIVE project with null target org demotes status to PENDING"() {
+        given: "a mocked ACTIVE project with null organization and existing boundaries"
+        def h = createMockProjectHarness()
+
+        when: "updating locations with null targetOrg and unchanged managingRegion"
+        Project updatedDemoted = h.unitService.updateProject(
+                h.projectId,
+                new Project(h.projectId, null, h.region, "Updated Title", "Desc", ProjectType.STANDARD, null, null, null, null, [], null),
+                h.actorId
         )
 
         then: "status is demoted to PENDING and existing boundaries are kept"
         verifyAll(updatedDemoted) {
             status() == ProjectStatus.PENDING
-            boundaries() == [existingBnd]
+            boundaries() == [h.existingBnd]
             locations().isEmpty()
         }
+    }
 
-        when: "updating an ACTIVE project whose existing locations and boundaries are null"
+    def "ProjectService | updating ACTIVE project with null lists defaults lists to empty and keeps ACTIVE"() {
+        given: "a mocked ACTIVE project whose existing locations and boundaries are null"
+        def h = createMockProjectHarness()
         UUID nullListsProjectId = UUID.randomUUID()
         Project activeNullLists = new Project(
                 nullListsProjectId,
                 null,
-                region,
+                h.region,
                 "Active Null Lists",
                 "Description long enough",
                 ProjectType.STANDARD,
@@ -467,14 +518,16 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
                 null,
                 null
         )
-        mockProjectRepo.findById(nullListsProjectId) >> Optional.of(activeNullLists)
-        Project updatedFromNullLists = unitService.updateProject(
+        h.mockProjectRepo.findById(nullListsProjectId) >> Optional.of(activeNullLists)
+
+        when: "updating the project with null locations and boundaries"
+        Project updatedFromNullLists = h.unitService.updateProject(
                 nullListsProjectId,
-                new Project(nullListsProjectId, null, region, "Updated Null Lists", "Desc", ProjectType.STANDARD, null, null, null, null, null, null),
-                actorId
+                new Project(nullListsProjectId, null, h.region, "Updated Null Lists", "Desc", ProjectType.STANDARD, null, null, null, null, null, null),
+                h.actorId
         )
 
-        then: "null lists default to empty lists and status remains ACTIVE"
+        then: "null lists default to empty lists and status stays ACTIVE"
         verifyAll(updatedFromNullLists) {
             status() == ProjectStatus.ACTIVE
             locations().isEmpty()

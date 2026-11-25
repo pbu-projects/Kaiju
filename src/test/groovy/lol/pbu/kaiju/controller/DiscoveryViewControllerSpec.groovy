@@ -230,22 +230,27 @@ class DiscoveryViewControllerSpec extends BaseControllerSpec {
         ProjectType.REGIONAL  | "Regional"
     }
 
-    def "landing page handles missing organization or missing organization name"() {
-        when: "rendering a project without an organization"
-        FeaturedProjectView noOrgView = renderFeaturedProject(projectWith(null, null, ProjectType.STANDARD, []))
+    @Unroll
+    def "landing page defaults organizationName and verified when #caseName"(
+            String caseName,
+            Organization organization
+    ) {
+        given: "a project with #caseName"
+        Project project = projectWith(organization, null, ProjectType.STANDARD, [])
 
-        and: "rendering a project whose organization has no name and is unverified"
-        FeaturedProjectView nullOrgNameView = renderFeaturedProject(
-                projectWith(orgWith(null, VerificationStatus.UNVERIFIED), null, ProjectType.STANDARD, [])
-        )
+        when: "rendering the landing page model"
+        FeaturedProjectView view = renderFeaturedProject(project)
 
         then: "organizationName defaults to empty string and verified is false"
-        verifyAll {
-            noOrgView.organizationName() == ""
-            !noOrgView.verified()
-            nullOrgNameView.organizationName() == ""
-            !nullOrgNameView.verified()
+        verifyAll(view) {
+            organizationName() == ""
+            !verified()
         }
+
+        where:
+        caseName                       | organization
+        "organization is null"         | null
+        "organization name is missing" | orgWith(null, VerificationStatus.UNVERIFIED)
     }
 
     @Unroll

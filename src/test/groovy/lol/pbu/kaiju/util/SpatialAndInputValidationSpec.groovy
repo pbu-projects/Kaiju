@@ -42,6 +42,7 @@ import org.locationtech.jts.geom.PrecisionModel
 import org.postgresql.util.PGobject
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -134,7 +135,8 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- JtsGeometrySerde tests ---
 
-    def "geometry serde rejects NaN and Infinity numbers in coordinates"() {
+    @Unroll
+    def "geometry serde rejects NaN and Infinity numbers in coordinates (#lon, #lat)"() {
         given:
         JsonNode pointNode = JsonNode.createObjectNode([
                 type       : JsonNode.createStringNode("Point"),
@@ -159,7 +161,8 @@ class SpatialAndInputValidationSpec extends Specification {
         -105.0d                  | Double.NEGATIVE_INFINITY
     }
 
-    def "geometry serde rejects coordinates outside WGS84 bounds"() {
+    @Unroll
+    def "geometry serde rejects coordinates outside WGS84 bounds (#lon, #lat)"() {
         given:
         JsonNode pointNode = JsonNode.createObjectNode([
                 type       : JsonNode.createStringNode("Point"),
@@ -188,7 +191,8 @@ class SpatialAndInputValidationSpec extends Specification {
         -105.0d | 91.0d
     }
 
-    def "geometry serde rejects null elements inside coordinates and polygon rings"() {
+    @Unroll
+    def "geometry serde rejects null elements inside #jsonPayload"() {
         given:
         JsonNode node = objectMapper.readValue(jsonPayload, JsonNode)
 
@@ -231,7 +235,8 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- SpatialMappingService tests ---
 
-    def "toPoint rejects NaN, Infinity, and out-of-range WGS84 coordinates"() {
+    @Unroll
+    def "toPoint rejects invalid WGS84 coordinates (#lon, #lat)"() {
         when:
         spatialMappingService.toPoint(lon, lat)
 
@@ -250,7 +255,8 @@ class SpatialAndInputValidationSpec extends Specification {
         -105.0d                  | -91.0d
     }
 
-    def "toPolygon rejects NaN, Infinity, and out-of-range WGS84 coordinates"() {
+    @Unroll
+    def "toPolygon rejects invalid WGS84 coordinates (#badLon, #badLat)"() {
         given:
         List<Coordinates> coords = [
                 new Coordinates(0.0d, 0.0d),
@@ -276,7 +282,8 @@ class SpatialAndInputValidationSpec extends Specification {
         1.0d                     | -91.0d
     }
 
-    def "toPolygon rejects null coordinate entries and null longitude or latitude values"() {
+    @Unroll
+    def "toPolygon rejects null coordinate entries and values (#coords)"() {
         when:
         spatialMappingService.toPolygon(coords)
 
@@ -327,10 +334,9 @@ class SpatialAndInputValidationSpec extends Specification {
         ex.message.contains("Expected Point geometry")
     }
 
-    def "JtsPolygonConverter rejects Point values on both write and read"() {
+    def "JtsPolygonConverter rejects Point values on write"() {
         given:
         Point point = geometryFactory.createPoint(new Coordinate(-105.0d, 39.0d))
-        PGobject pointWkb = pointConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
 
         when:
         polygonConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
@@ -338,6 +344,12 @@ class SpatialAndInputValidationSpec extends Specification {
         then:
         def writeEx = thrown(IllegalArgumentException)
         writeEx.message.contains("Expected Polygon or MultiPolygon")
+    }
+
+    def "JtsPolygonConverter rejects Point WKB values on read"() {
+        given:
+        Point point = geometryFactory.createPoint(new Coordinate(-105.0d, 39.0d))
+        PGobject pointWkb = pointConverter.convertToPersistedValue(point, ConversionContext.DEFAULT)
 
         when:
         polygonConverter.convertToEntityValue(pointWkb, ConversionContext.DEFAULT)
@@ -349,65 +361,46 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- DTO Bean Validation tests ---
 
-    def "organization requests reject javascript URLs for websiteUrl"() {
+    @Unroll
+    def "#requestType rejects javascript URLs for websiteUrl"() {
         given:
-        CreateOrganizationRequest createRequest = new CreateOrganizationRequest(
-                "Mutual Aid Group",
-                "javascript:alert(1)",
-                null,
-                true
-        )
-        UpdateOrganizationRequest updateRequest = new UpdateOrganizationRequest(
-                "Mutual Aid Group",
-                "javascript:alert(1)",
-                null,
-                true
-        )
+        def request = requestType == "CreateOrganizationRequest"
+                ? new CreateOrganizationRequest("Mutual Aid Group", "javascript:alert(1)", null, true)
+                : new UpdateOrganizationRequest("Mutual Aid Group", "javascript:alert(1)", null, true)
 
         when:
-        def createViolations = validator.validate(createRequest)
-        def updateViolations = validator.validate(updateRequest)
+        def violations = validator.validate(request)
 
         then:
         verifyAll {
-            createViolations.size() == 1
-            createViolations[0].propertyPath.toString() == "websiteUrl"
-            updateViolations.size() == 1
-            updateViolations[0].propertyPath.toString() == "websiteUrl"
+            violations.size() == 1
+            violations[0].propertyPath.toString() == "websiteUrl"
         }
+
+        where:
+        requestType << ["CreateOrganizationRequest", "UpdateOrganizationRequest"]
     }
 
-    def "shift requests reject endTime before startTime"() {
+    @Unroll
+    def "#requestType rejects endTime before startTime"() {
         given:
         OffsetDateTime start = OffsetDateTime.of(2026, 6, 15, 14, 0, 0, 0, ZoneOffset.UTC)
         OffsetDateTime end = start.minusHours(2)
-        CreateShiftRequest createRequest = new CreateShiftRequest(
-                UUID.randomUUID(),
-                true,
-                null,
-                start,
-                end,
-                []
-        )
-        UpdateShiftRequest updateRequest = new UpdateShiftRequest(
-                true,
-                null,
-                start,
-                end,
-                []
-        )
+        def request = requestType == "CreateShiftRequest"
+                ? new CreateShiftRequest(UUID.randomUUID(), true, null, start, end, [])
+                : new UpdateShiftRequest(true, null, start, end, [])
 
         when:
-        def createViolations = validator.validate(createRequest)
-        def updateViolations = validator.validate(updateRequest)
+        def violations = validator.validate(request)
 
         then:
         verifyAll {
-            createViolations.size() == 1
-            createViolations[0].message == "Shift start time must be before end time."
-            updateViolations.size() == 1
-            updateViolations[0].message == "Shift start time must be before end time."
+            violations.size() == 1
+            violations[0].message == "Shift start time must be before end time."
         }
+
+        where:
+        requestType << ["CreateShiftRequest", "UpdateShiftRequest"]
     }
 
     // --- BoundaryIngestionService audit guard test ---
@@ -460,19 +453,19 @@ class SpatialAndInputValidationSpec extends Specification {
 
     // --- Validator null-input and AuditLogRequest DTO tests ---
 
-    def "ValidTimeRangeValidator accepts null range and ranges with missing start or end time"() {
+    @Unroll
+    def "ValidTimeRangeValidator accepts #caseLabel"() {
         given:
         ValidTimeRangeValidator rangeValidator = new ValidTimeRangeValidator()
-        OffsetDateTime sampleTime = OffsetDateTime.of(2026, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC)
-        ShiftTimeRange missingStart = [startTime: { null }, endTime: { sampleTime }] as ShiftTimeRange
-        ShiftTimeRange missingEnd = [startTime: { sampleTime }, endTime: { null }] as ShiftTimeRange
 
         expect:
-        verifyAll {
-            rangeValidator.isValid(null, null)
-            rangeValidator.isValid(missingStart, null)
-            rangeValidator.isValid(missingEnd, null)
-        }
+        rangeValidator.isValid(range, null)
+
+        where:
+        caseLabel                       | range
+        "null range"                    | null
+        "range with missing start time" | ([startTime: { null }, endTime: { OffsetDateTime.of(2026, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC) }] as ShiftTimeRange)
+        "range with missing end time"   | ([startTime: { OffsetDateTime.of(2026, 6, 15, 10, 0, 0, 0, ZoneOffset.UTC) }, endTime: { null }] as ShiftTimeRange)
     }
 
     def "ValidShiftLocationValidator accepts null ShiftLocation"() {
@@ -483,47 +476,72 @@ class SpatialAndInputValidationSpec extends Specification {
         locationValidator.isValid(null, null)
     }
 
-    def "AuditLogRequest records construct cleanly and enforce validation rules"() {
+    def "CreateOrganizationAuditLogRequest stores fields and passes validation"() {
         given:
         UUID orgId = UUID.randomUUID()
+        UUID actorId = UUID.randomUUID()
+        def request = new CreateOrganizationAuditLogRequest(orgId, actorId, "UNVERIFIED", "VERIFIED", "Reviewed docs")
+
+        expect:
+        verifyAll {
+            validator.validate(request).isEmpty()
+            request.organizationId() == orgId
+            request.actorId() == actorId
+            request.previousStatus() == "UNVERIFIED"
+            request.newStatus() == "VERIFIED"
+            request.reason() == "Reviewed docs"
+        }
+    }
+
+    def "CreateProjectAuditLogRequest stores fields and passes validation"() {
+        given:
         UUID projectId = UUID.randomUUID()
         UUID actorId = UUID.randomUUID()
+        def request = new CreateProjectAuditLogRequest(projectId, actorId, AuditAction.APPROVED)
 
-        def createOrgReq = new CreateOrganizationAuditLogRequest(orgId, actorId, "UNVERIFIED", "VERIFIED", "Reviewed docs")
-        def createProjectReq = new CreateProjectAuditLogRequest(projectId, actorId, AuditAction.APPROVED)
-        def updateOrgReq = new UpdateOrganizationAuditLogRequest("VERIFIED", "SUSPENDED", "Expired")
-        def updateProjectReq = new UpdateProjectAuditLogRequest(AuditAction.EDITED)
-
-        def invalidCreateOrg = new CreateOrganizationAuditLogRequest(null, null, "", " ", null)
-        def invalidCreateProject = new CreateProjectAuditLogRequest(null, null, null)
-        def invalidUpdateOrg = new UpdateOrganizationAuditLogRequest("", " ", null)
-        def invalidUpdateProject = new UpdateProjectAuditLogRequest(null)
-
-        when:
-        def validResults = [
-                validator.validate(createOrgReq),
-                validator.validate(createProjectReq),
-                validator.validate(updateOrgReq),
-                validator.validate(updateProjectReq)
-        ]
-
-        then:
+        expect:
         verifyAll {
-            validResults.every { it.isEmpty() }
-            createOrgReq.organizationId() == orgId
-            createOrgReq.actorId() == actorId
-            createOrgReq.previousStatus() == "UNVERIFIED"
-            createOrgReq.newStatus() == "VERIFIED"
-            createOrgReq.reason() == "Reviewed docs"
-            createProjectReq.projectId() == projectId
-            createProjectReq.action() == AuditAction.APPROVED
-            updateOrgReq.previousStatus() == "VERIFIED"
-            updateOrgReq.newStatus() == "SUSPENDED"
-            updateProjectReq.action() == AuditAction.EDITED
-            validator.validate(invalidCreateOrg).size() == 4
-            validator.validate(invalidCreateProject).size() == 3
-            validator.validate(invalidUpdateOrg).size() == 2
-            validator.validate(invalidUpdateProject).size() == 1
+            validator.validate(request).isEmpty()
+            request.projectId() == projectId
+            request.actorId() == actorId
+            request.action() == AuditAction.APPROVED
         }
+    }
+
+    def "UpdateOrganizationAuditLogRequest stores fields and passes validation"() {
+        given:
+        def request = new UpdateOrganizationAuditLogRequest("VERIFIED", "SUSPENDED", "Expired")
+
+        expect:
+        verifyAll(request) {
+            validator.validate(it).isEmpty()
+            previousStatus() == "VERIFIED"
+            newStatus() == "SUSPENDED"
+            reason() == "Expired"
+        }
+    }
+
+    def "UpdateProjectAuditLogRequest stores fields and passes validation"() {
+        given:
+        def request = new UpdateProjectAuditLogRequest(AuditAction.EDITED)
+
+        expect:
+        verifyAll(request) {
+            validator.validate(it).isEmpty()
+            action() == AuditAction.EDITED
+        }
+    }
+
+    @Unroll
+    def "#requestName reports #expectedViolations violations when required fields are invalid"() {
+        expect:
+        validator.validate(request).size() == expectedViolations
+
+        where:
+        requestName                         | request                                                             | expectedViolations
+        "CreateOrganizationAuditLogRequest" | new CreateOrganizationAuditLogRequest(null, null, "", " ", null)    | 4
+        "CreateProjectAuditLogRequest"      | new CreateProjectAuditLogRequest(null, null, null)                  | 3
+        "UpdateOrganizationAuditLogRequest" | new UpdateOrganizationAuditLogRequest("", " ", null)                | 2
+        "UpdateProjectAuditLogRequest"      | new UpdateProjectAuditLogRequest(null)                              | 1
     }
 }

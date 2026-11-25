@@ -46,6 +46,7 @@ Name classes, methods, and files so anyone can tell what they do without opening
 
 ## 4. Testing Conventions
 
+* **One Behavior Per Test:** Each test method must test only one behavior so any failure points directly to what broke. Use Spock `@Unroll` and `where:` data-driven tables when checking multiple inputs for the same behavior, and never bundle unrelated checks into one test method.
 * **Assertions:** Use Spock `verifyAll` blocks when checking multiple fields or conditions on an object or response. Never write loose consecutive assertions on the same target.
 * **Real Containers Over Mocks:** Prefer full HTTP pipeline integration tests against live PostgreSQL + PostGIS Testcontainers over mocking repositories or services.
 * **Never Fix Failing Tests by Weakening Them:** Fix the underlying code bug rather than deleting or relaxing a failing test, unless requirements explicitly changed.

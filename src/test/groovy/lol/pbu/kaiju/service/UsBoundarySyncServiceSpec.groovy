@@ -239,8 +239,7 @@ class UsBoundarySyncServiceSpec extends Specification {
         executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
     }
 
-    def "should assign multi-county city to largest overlap county and fall back to state for independent city"() {
-        given: "a state and two counties in Wyoming"
+    private UsBoundarySyncService setupWyomingWithCounties(String placesPayload) {
         String statePayload = '''{
             "type": "FeatureCollection",
             "features": [{
@@ -273,27 +272,6 @@ class UsBoundarySyncServiceSpec extends Specification {
                 }
             ]
         }'''
-        String placesPayload = '''{
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "properties": { "GEOID": "5690001", "NAME": "Split City", "STATE": "56" },
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[[-105.1, 41.2], [-104.2, 41.2], [-104.2, 41.8], [-105.1, 41.8], [-105.1, 41.2]]]
-                    }
-                },
-                {
-                    "type": "Feature",
-                    "properties": { "GEOID": "5690002", "NAME": "Independent City", "STATE": "56" },
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[[-109.5, 43.2], [-109.2, 43.2], [-109.2, 43.5], [-109.5, 43.5], [-109.5, 43.2]]]
-                    }
-                }
-            ]
-        }'''
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             String uri = req.uri().toString()
             String body
@@ -309,29 +287,80 @@ class UsBoundarySyncServiceSpec extends Specification {
         UsBoundarySyncService syncService = buildSyncService(stubClient)
         syncService.syncStates(null)
         syncService.syncStateCounties("WY", null)
+        return syncService
+    }
+
+    def "assigns a city spanning two counties to the county with the larger overlap"() {
+        given: "a state, two counties, and a city overlapping mostly East County"
+        String placesPayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "5690001", "NAME": "Split City", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-105.1, 41.2], [-104.2, 41.2], [-104.2, 41.8], [-105.1, 41.8], [-105.1, 41.2]]]
+                }
+            }]
+        }'''
+        UsBoundarySyncService syncService = setupWyomingWithCounties(placesPayload)
 
         when: "syncStatePlaces runs for WY"
         UsSyncResult result = syncService.syncStatePlaces("WY", false, null)
 
-        then: "Split City picks East County (larger overlap) and Independent City falls back to Wyoming"
+        then: "Split City picks East County and records area sizes"
         verifyAll(result) {
             stateCode() == "WY"
             level() == 3
-            created() == 2
+            created() == 1
             failed() == 0
         }
-        UUID wyId = queryUuid("SELECT id FROM administrative_regions WHERE geoid = '56'")
         UUID eastCountyId = queryUuid("SELECT id FROM administrative_regions WHERE geoid = '56012'")
         verifyAll {
             queryUuid("SELECT parent_region_id FROM administrative_regions WHERE geoid = '5690001'") == eastCountyId
-            queryUuid("SELECT parent_region_id FROM administrative_regions WHERE geoid = '5690002'") == wyId
             queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '56012'") > 1_000_000.0d
             queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '5690001'") > 1_000_000.0d
+        }
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '5690001'")
+        executeSql("DELETE FROM administrative_regions WHERE geoid IN ('56011', '56012')")
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
+    }
+
+    def "assigns an independent city with no county overlap directly to the state"() {
+        given: "a state, two counties, and a city outside both counties"
+        String placesPayload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "5690002", "NAME": "Independent City", "STATE": "56" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-109.5, 43.2], [-109.2, 43.2], [-109.2, 43.5], [-109.5, 43.5], [-109.5, 43.2]]]
+                }
+            }]
+        }'''
+        UsBoundarySyncService syncService = setupWyomingWithCounties(placesPayload)
+
+        when: "syncStatePlaces runs for WY"
+        UsSyncResult result = syncService.syncStatePlaces("WY", false, null)
+
+        then: "Independent City falls back to Wyoming as parent"
+        verifyAll(result) {
+            stateCode() == "WY"
+            level() == 3
+            created() == 1
+            failed() == 0
+        }
+        UUID wyId = queryUuid("SELECT id FROM administrative_regions WHERE geoid = '56'")
+        verifyAll {
+            queryUuid("SELECT parent_region_id FROM administrative_regions WHERE geoid = '5690002'") == wyId
             queryDouble("SELECT area_sq_m FROM administrative_regions WHERE geoid = '5690002'") > 1_000_000.0d
         }
 
         cleanup:
-        executeSql("DELETE FROM administrative_regions WHERE geoid IN ('5690001', '5690002')")
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '5690002'")
         executeSql("DELETE FROM administrative_regions WHERE geoid IN ('56011', '56012')")
         executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
     }
@@ -574,33 +603,21 @@ class UsBoundarySyncServiceSpec extends Specification {
         executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
     }
 
-    def "should handle state sync fallback, skipped unknown FIPS, nested transfer limit, and invalid geometry"() {
-        given: "a state payload with STATE fallback, unknown FIPS, invalid geometry, and nested transfer limit"
+    def "updates a state using its state code when GEOID is missing and more-pages flag is false"() {
+        given: "a state payload with STATE code fallback and nested transfer limit set to false"
         String payload = '''{
             "type": "FeatureCollection",
             "properties": { "exceededTransferLimit": false },
-            "features": [
-                {
-                    "type": "Feature",
-                    "properties": { "STATE": "08", "NAME": "Colorado" },
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[
-                            [-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]
-                        ]]
-                    }
-                },
-                {
-                    "type": "Feature",
-                    "properties": { "GEOID": "99", "NAME": "Unknown Territory" },
-                    "geometry": null
-                },
-                {
-                    "type": "Feature",
-                    "properties": { "GEOID": "15", "NAME": "Hawaii" },
-                    "geometry": null
+            "features": [{
+                "type": "Feature",
+                "properties": { "STATE": "08", "NAME": "Colorado" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[
+                        [-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]
+                    ]]
                 }
-            ]
+            }]
         }'''
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
@@ -610,31 +627,105 @@ class UsBoundarySyncServiceSpec extends Specification {
         when: "syncStates runs"
         UsSyncResult result = syncService.syncStates(null)
 
-        then: "Colorado updates via STATE fallback, unknown FIPS is skipped, and Hawaii failure is recorded"
+        then: "Colorado updates via STATE fallback"
         verifyAll(result) {
             stateCode() == "US"
             level() == 1
             updated() == 1
+            skipped() == 0
+            failed() == 0
+        }
+    }
+
+    def "skips an unknown state code during national state sync"() {
+        given: "a state payload with an unknown state code"
+        String payload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "99", "NAME": "Unknown Territory" },
+                "geometry": null
+            }]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "the unknown code is skipped"
+        verifyAll(result) {
+            stateCode() == "US"
+            level() == 1
+            updated() == 0
             skipped() == 1
+            failed() == 0
+        }
+    }
+
+    def "records a failure when a known state has no boundary shape during national state sync"() {
+        given: "a state payload for Hawaii with null geometry"
+        String payload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "15", "NAME": "Hawaii" },
+                "geometry": null
+            }]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "the Hawaii failure is recorded"
+        verifyAll(result) {
+            stateCode() == "US"
+            level() == 1
+            updated() == 0
+            skipped() == 0
             failed() == 1
             errors().size() == 1
             errors()[0].startsWith("HI:")
         }
     }
 
-    def "should skip incomplete features, record geometry errors, and support includeCdps for any state"() {
-        given: "Wyoming state and county/place payloads with malformed features plus a layer 30 CDP"
-        String statePayload = '''{
-            "type": "FeatureCollection",
-            "features": [{
-                "type": "Feature",
-                "properties": { "GEOID": "56", "NAME": "Wyoming", "STATE": "56" },
-                "geometry": {
-                    "type": "Polygon",
-                    "coordinates": [[[-111.0, 41.0], [-104.0, 41.0], [-104.0, 45.0], [-111.0, 45.0], [-111.0, 41.0]]]
-                }
-            }]
-        }'''
+    private static final String WYOMING_STATE_PAYLOAD = '''{
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "properties": { "GEOID": "56", "NAME": "Wyoming", "STATE": "56" },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [[[-111.0, 41.0], [-104.0, 41.0], [-104.0, 45.0], [-111.0, 45.0], [-111.0, 41.0]]]
+            }
+        }]
+    }'''
+
+    private UsBoundarySyncService buildTrailingSlashSyncService(StubHttpClient stubClient) {
+        BoundaryIngestionService ingestionService = new BoundaryIngestionService(
+                jdbcOperations,
+                objectMapper,
+                stubClient,
+                "tigerweb.geo.census.gov",
+                "/arcgis/rest/services/TIGERweb/"
+        )
+        return new UsBoundarySyncService(
+                ingestionService,
+                jdbcOperations,
+                objectMapper,
+                "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/",
+                80, 82, 28, 30
+        )
+    }
+
+    def "should skip malformed county features and record geometry errors in syncStateCounties"() {
+        given: "Wyoming state and county payloads with missing fields and null geometry"
         String countiesPayload = '''{
             "type": "FeatureCollection",
             "features": [
@@ -655,6 +746,32 @@ class UsBoundarySyncServiceSpec extends Specification {
                 }
             ]
         }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            String uri = req.uri().toString()
+            String body = uri.contains("/80/query") ? WYOMING_STATE_PAYLOAD : countiesPayload
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+        syncService.syncStates(null)
+
+        when: "syncStateCounties runs for WY"
+        UsSyncResult countyResult = syncService.syncStateCounties("WY", null)
+
+        then: "incomplete county features are skipped and geometry errors are recorded"
+        verifyAll(countyResult) {
+            created() == 0
+            skipped() == 2
+            failed() == 1
+            errors().size() == 1
+            errors()[0].startsWith("56098:")
+        }
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
+    }
+
+    def "should skip malformed place features and record geometry errors in syncStatePlaces"() {
+        given: "Wyoming state and place payloads with malformed properties and null geometry"
         String placesPayload = '''{
             "type": "FeatureCollection",
             "features": [
@@ -679,6 +796,33 @@ class UsBoundarySyncServiceSpec extends Specification {
                 }
             ]
         }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            String uri = req.uri().toString()
+            String body = uri.contains("/80/query") ? WYOMING_STATE_PAYLOAD : placesPayload
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+        syncService.syncStates(null)
+
+        when: "syncStatePlaces runs with includeCdps set to false"
+        UsSyncResult placeResult = syncService.syncStatePlaces("WY", false, null)
+
+        then: "malformed places are skipped and geometry errors are recorded"
+        verifyAll(placeResult) {
+            created() == 0
+            skipped() == 3
+            failed() == 1
+            errors().size() == 1
+            errors()[0].startsWith("5699999:")
+        }
+
+        cleanup:
+        executeSql("DELETE FROM administrative_regions WHERE geoid = '56'")
+    }
+
+    def "should sync layer 30 CDPs when includeCdps is true"() {
+        given: "Wyoming state, empty place, and layer 30 CDP payloads"
+        String emptyPlacesPayload = '{"type": "FeatureCollection", "features": []}'
         String cdpPayload = '''{
             "type": "FeatureCollection",
             "features": [{
@@ -694,37 +838,26 @@ class UsBoundarySyncServiceSpec extends Specification {
             String uri = req.uri().toString()
             String body
             if (uri.contains("/80/query")) {
-                body = statePayload
-            } else if (uri.contains("/82/query")) {
-                body = countiesPayload
+                body = WYOMING_STATE_PAYLOAD
             } else if (uri.contains("/30/query")) {
                 body = cdpPayload
             } else {
-                body = placesPayload
+                body = emptyPlacesPayload
             }
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
         })
         UsBoundarySyncService syncService = buildSyncService(stubClient)
         syncService.syncStates(null)
 
-        when: "syncStateCounties and syncStatePlaces with includeCdps=true run for WY"
-        UsSyncResult countyResult = syncService.syncStateCounties("WY", null)
+        when: "syncStatePlaces runs with includeCdps set to true"
         UsSyncResult placeResult = syncService.syncStatePlaces("WY", true, null)
 
-        then: "incomplete features are skipped, geometry errors are counted, and the CDP is created"
-        verifyAll(countyResult) {
-            created() == 0
-            skipped() == 2
-            failed() == 1
-            errors().size() == 1
-            errors()[0].startsWith("56098:")
-        }
+        then: "the layer 30 CDP is created without errors"
         verifyAll(placeResult) {
             created() == 1
-            skipped() == 3
-            failed() == 1
-            errors().size() == 1
-            errors()[0].startsWith("5699999:")
+            skipped() == 0
+            failed() == 0
+            errors().isEmpty()
         }
 
         cleanup:
@@ -743,89 +876,219 @@ class UsBoundarySyncServiceSpec extends Specification {
         ex.status == HttpStatus.NOT_FOUND
     }
 
-    def "should handle trailing slash baseUrl, empty pages, blank properties, nested transfer limit, and audit log success"() {
-        given: "a sync service initialized with trailing slash baseUrl and an actor user in DB"
+    def "removes duplicate slashes when the boundary server URL ends with a slash"() {
+        given: "a sync service configured with a trailing slash baseUrl"
+        String page1 = '''{
+            "type": "FeatureCollection",
+            "exceededTransferLimit": false,
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "08", "STATE": "08", "NAME": "Colorado" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]]]
+                }
+            }]
+        }'''
+        List<String> requestedUris = []
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            requestedUris << req.uri().toString()
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(page1.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildTrailingSlashSyncService(stubClient)
+
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "URL paths have no double slash and Colorado is updated"
+        verifyAll {
+            result.stateCode() == "US"
+            result.level() == 1
+            result.updated() == 1
+            result.skipped() == 0
+            result.failed() == 0
+            requestedUris.every { !it.contains("MapServer//80") }
+        }
+    }
+
+    def "stops paging when a boundary response has no features even if more pages are flagged"() {
+        given: "two pages where the second page has no features despite exceededTransferLimit being true"
+        String page1 = '''{
+            "type": "FeatureCollection",
+            "exceededTransferLimit": true,
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "08", "STATE": "08", "NAME": "Colorado" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]]]
+                }
+            }]
+        }'''
+        String page2 = '''{
+            "type": "FeatureCollection",
+            "exceededTransferLimit": true,
+            "features": []
+        }'''
+        List<String> requestedUris = []
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            String uri = req.uri().toString()
+            requestedUris << uri
+            String body = uri.contains("resultOffset=0") ? page1 : page2
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+
+        when: "syncStates runs across both pages"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "pagination stops after the empty second page"
+        verifyAll {
+            result.stateCode() == "US"
+            result.level() == 1
+            result.updated() == 1
+            result.skipped() == 0
+            result.failed() == 0
+            requestedUris.size() == 2
+        }
+    }
+
+    def "paginates using nested exceededTransferLimit when top-level flag is not boolean"() {
+        given: "two pages with a non-boolean top-level exceededTransferLimit and a nested properties flag"
         String page1 = '''{
             "type": "FeatureCollection",
             "exceededTransferLimit": "not-a-boolean",
             "properties": { "exceededTransferLimit": true },
-            "features": [
-                {
-                    "type": "Feature",
-                    "properties": "not-an-object",
-                    "geometry": null
-                },
-                {
-                    "type": "Feature",
-                    "properties": { "GEOID": "   ", "STATE": "08", "NAME": "   " },
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [[[-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]]]
-                    }
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "08", "STATE": "08", "NAME": "Colorado" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]]]
                 }
-            ]
+            }]
         }'''
         String page2 = '''{
             "type": "FeatureCollection",
             "properties": { "exceededTransferLimit": "not-a-boolean" },
             "features": []
         }'''
+        List<String> requestedUris = []
         StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
             String uri = req.uri().toString()
+            requestedUris << uri
             String body = uri.contains("resultOffset=0") ? page1 : page2
             new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)))
         })
-        BoundaryIngestionService ingestionService = new BoundaryIngestionService(
-                jdbcOperations,
-                objectMapper,
-                stubClient,
-                "tigerweb.geo.census.gov",
-                "/arcgis/rest/services/TIGERweb/"
-        )
-        UsBoundarySyncService syncService = new UsBoundarySyncService(
-                ingestionService,
-                jdbcOperations,
-                objectMapper,
-                "https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/",
-                80, 82, 28, 30
-        )
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
 
-        UUID actorId = UUID.randomUUID()
-        executeSql("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", actorId, "sync-actor-${actorId}@example.com".toString())
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
 
-        when: "syncStates runs across two pages with an actor user ID"
-        UsSyncResult result = syncService.syncStates(actorId)
+        then: "sync fetches the second page and stops when the nested flag is not boolean"
+        verifyAll {
+            result.stateCode() == "US"
+            result.level() == 1
+            result.updated() == 1
+            result.skipped() == 0
+            result.failed() == 0
+            requestedUris.size() == 2
+        }
+    }
 
-        then: "Colorado updates via STATE fallback, invalid feature is skipped, empty page stops pagination, and audit log succeeds"
+    def "skips features when properties is not an object"() {
+        given: "a payload containing a feature with non-object properties"
+        String payload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": "not-an-object",
+                "geometry": null
+            }]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "the invalid feature is skipped"
+        verifyAll(result) {
+            stateCode() == "US"
+            level() == 1
+            updated() == 0
+            skipped() == 1
+            failed() == 0
+        }
+    }
+
+    def "falls back to state code when GEOID and NAME are blank"() {
+        given: "a feature with blank GEOID and NAME but a valid STATE code"
+        String payload = '''{
+            "type": "FeatureCollection",
+            "features": [{
+                "type": "Feature",
+                "properties": { "GEOID": "   ", "STATE": "08", "NAME": "   " },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [[[-109.05, 37.0], [-102.04, 37.0], [-102.04, 41.0], [-109.05, 41.0], [-109.05, 37.0]]]
+                }
+            }]
+        }'''
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(payload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+
+        when: "syncStates runs"
+        UsSyncResult result = syncService.syncStates(null)
+
+        then: "Colorado updates using the STATE fallback"
         verifyAll(result) {
             stateCode() == "US"
             level() == 1
             updated() == 1
-            skipped() == 1
+            skipped() == 0
             failed() == 0
         }
+    }
+
+    def "should insert an audit log entry when syncStates runs with an actor user"() {
+        given: "an empty FeatureCollection response and an actor user in the database"
+        String emptyFeaturesPayload = '{"type": "FeatureCollection", "features": []}'
+        StubHttpClient stubClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService syncService = buildSyncService(stubClient)
+        UUID actorId = UUID.randomUUID()
+        executeSql("INSERT INTO users (id, email, role) VALUES (?, ?, 'GLOBAL_ADMIN')", actorId, "sync-actor-${actorId}@example.com".toString())
+
+        when: "syncStates runs with the actor user ID"
+        UsSyncResult result = syncService.syncStates(actorId)
+
+        then: "the sync completes and records an audit log with US metadata"
         String auditMeta = queryString(
                 "SELECT metadata::text FROM administrative_region_audit_logs WHERE actor_id = ? ORDER BY created_at DESC LIMIT 1",
                 actorId
         )
-        auditMeta != null && auditMeta.contains("US")
+        verifyAll {
+            result.stateCode() == "US"
+            auditMeta != null
+            auditMeta.contains("US")
+        }
 
         cleanup:
         executeSql("DELETE FROM administrative_region_audit_logs WHERE actor_id = ?", actorId)
         executeSql("DELETE FROM users WHERE id = ?", actorId)
     }
 
-    def "should handle state lookup SQLException, metadata IOException fallback, and concurrency guard contention"() {
-        given: "a state payload and mocked JDBC and ObjectMapper"
-        String emptyFeaturesPayload = '{"type": "FeatureCollection", "features": []}'
+    def "should return 500 when syncStateCounties encounters a SQLException during state lookup"() {
+        given: "a JDBC connection that throws SQLException on prepareStatement"
         StubHttpClient fastClient = new StubHttpClient(sendHandler: { req, handler ->
-            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8)))
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream('{"type": "FeatureCollection", "features": []}'.getBytes(StandardCharsets.UTF_8)))
         })
-        PreparedStatement auditStmt = Mock(PreparedStatement) {
-            executeUpdate() >> 1
-        }
-
-        when: "requireStateRegionId encounters a SQLException"
         Connection errConn = Mock(Connection) {
             prepareStatement(_) >> { throw new SQLException("State lookup failed") }
         }
@@ -837,6 +1100,8 @@ class UsBoundarySyncServiceSpec extends Specification {
                 errJdbc,
                 objectMapper
         )
+
+        when: "syncStateCounties runs"
         errSyncService.syncStateCounties("CO", null)
 
         then: "500 Internal Server Error is thrown"
@@ -845,8 +1110,17 @@ class UsBoundarySyncServiceSpec extends Specification {
             status == HttpStatus.INTERNAL_SERVER_ERROR
             message.contains("Failed looking up state region")
         }
+    }
 
-        when: "objectMapper fails to serialize audit metadata during recordAuditLog"
+    def "should fall back to empty JSON metadata when ObjectMapper throws IOException during audit logging"() {
+        given: "an ObjectMapper that fails to serialize audit metadata"
+        String emptyFeaturesPayload = '{"type": "FeatureCollection", "features": []}'
+        StubHttpClient fastClient = new StubHttpClient(sendHandler: { req, handler ->
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8)))
+        })
+        PreparedStatement auditStmt = Mock(PreparedStatement) {
+            executeUpdate() >> 1
+        }
         ObjectMapper failingMapper = Mock(ObjectMapper) {
             readValue(_ as byte[], _ as Class) >> objectMapper.readValue(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8), JsonNode)
             writeValueAsString(_) >> { throw new IOException("Audit JSON failed") }
@@ -862,13 +1136,18 @@ class UsBoundarySyncServiceSpec extends Specification {
                 okJdbc,
                 failingMapper
         )
+
+        when: "syncStates runs with an actor user ID"
         UsSyncResult fallbackResult = fallbackSyncService.syncStates(UUID.randomUUID())
 
-        then: "audit log falls back to empty JSON object and succeeds"
+        then: "audit log falls back to {} and sync succeeds"
         1 * auditStmt.setString(3, "{}")
         fallbackResult.stateCode() == "US"
+    }
 
-        when: "a sync is already running and another thread times out or gets interrupted"
+    def "returns service unavailable when a waiting sync call is interrupted"() {
+        given: "an active syncStates call holding the sync lock"
+        String emptyFeaturesPayload = '{"type": "FeatureCollection", "features": []}'
         CountDownLatch startedLatch = new CountDownLatch(1)
         CountDownLatch releaseLatch = new CountDownLatch(1)
         StubHttpClient blockingClient = new StubHttpClient(sendHandler: { req, handler ->
@@ -880,7 +1159,8 @@ class UsBoundarySyncServiceSpec extends Specification {
         def executor = Executors.newVirtualThreadPerTaskExecutor()
         Future<UsSyncResult> holderFuture = null
         HttpStatusException interruptedEx = null
-        HttpStatusException busyEx = null
+
+        when: "a second caller is interrupted while waiting for the lock"
         try {
             holderFuture = executor.submit({ -> contendedService.syncStates(null) })
             assert startedLatch.await(5, TimeUnit.SECONDS)
@@ -895,6 +1175,41 @@ class UsBoundarySyncServiceSpec extends Specification {
                 }
             })
             interruptedEx = interruptedFuture.get(5, TimeUnit.SECONDS)
+        } finally {
+            releaseLatch.countDown()
+            try {
+                holderFuture?.get(5, TimeUnit.SECONDS)
+            } finally {
+                executor.close()
+            }
+        }
+
+        then: "interrupted caller receives 503 Service Unavailable"
+        verifyAll {
+            interruptedEx != null
+            interruptedEx.status == HttpStatus.SERVICE_UNAVAILABLE
+        }
+    }
+
+    def "returns too many requests when a sync call times out waiting for an active sync"() {
+        given: "an active syncStates call holding the sync lock"
+        String emptyFeaturesPayload = '{"type": "FeatureCollection", "features": []}'
+        CountDownLatch startedLatch = new CountDownLatch(1)
+        CountDownLatch releaseLatch = new CountDownLatch(1)
+        StubHttpClient blockingClient = new StubHttpClient(sendHandler: { req, handler ->
+            startedLatch.countDown()
+            releaseLatch.await(30, TimeUnit.SECONDS)
+            new StubHttpResponse<InputStream>(200, new ByteArrayInputStream(emptyFeaturesPayload.getBytes(StandardCharsets.UTF_8)))
+        })
+        UsBoundarySyncService contendedService = buildSyncService(blockingClient)
+        def executor = Executors.newVirtualThreadPerTaskExecutor()
+        Future<UsSyncResult> holderFuture = null
+        HttpStatusException busyEx = null
+
+        when: "another caller times out waiting for the lock"
+        try {
+            holderFuture = executor.submit({ -> contendedService.syncStates(null) })
+            assert startedLatch.await(5, TimeUnit.SECONDS)
 
             try {
                 contendedService.syncStates(null)
@@ -910,10 +1225,8 @@ class UsBoundarySyncServiceSpec extends Specification {
             }
         }
 
-        then: "interrupted caller receives 503 and timed-out caller receives 429"
+        then: "timed-out caller receives 429 Too Many Requests"
         verifyAll {
-            interruptedEx != null
-            interruptedEx.status == HttpStatus.SERVICE_UNAVAILABLE
             busyEx != null
             busyEx.status == HttpStatus.TOO_MANY_REQUESTS
         }

@@ -35,28 +35,51 @@ class BoundarySpec extends Specification {
         }
     }
 
-    def "forCreation, forUpdate, and withId populate expected boundary fields"() {
-        given: "a polygon and boundary identifiers"
+    def "forCreation builds an unsaved boundary with name and geometry"() {
+        given: "a polygon"
         Polygon polygon = createPolygon()
-        UUID id1 = UUID.randomUUID()
-        UUID id2 = UUID.randomUUID()
 
-        when: "using the factory and copy helpers"
+        when: "calling Boundary.forCreation"
         Boundary created = Boundary.forCreation("Denver County", polygon)
-        Boundary updated = Boundary.forUpdate(id1, "Boulder County", polygon)
-        Boundary reassigned = created.withId(id2)
 
-        then: "each boundary carries the expected values"
-        verifyAll {
-            created.id() == null
-            created.name() == "Denver County"
-            created.geom() == polygon
-            updated.id() == id1
-            updated.name() == "Boulder County"
-            updated.geom() == polygon
-            reassigned.id() == id2
-            reassigned.name() == "Denver County"
-            reassigned.geom() == polygon
+        then: "id is null and name and geometry are set"
+        verifyAll(created) {
+            id() == null
+            name() == "Denver County"
+            geom() == polygon
+        }
+    }
+
+    def "forUpdate builds a boundary with id, name, and geometry"() {
+        given: "a polygon and boundary id"
+        Polygon polygon = createPolygon()
+        UUID boundaryId = UUID.randomUUID()
+
+        when: "calling Boundary.forUpdate"
+        Boundary updated = Boundary.forUpdate(boundaryId, "Boulder County", polygon)
+
+        then: "id, name, and geometry are set"
+        verifyAll(updated) {
+            id() == boundaryId
+            name() == "Boulder County"
+            geom() == polygon
+        }
+    }
+
+    def "withId returns a copy with the new id and keeps name and geometry"() {
+        given: "an existing boundary and a new id"
+        Polygon polygon = createPolygon()
+        Boundary created = Boundary.forCreation("Denver County", polygon)
+        UUID newId = UUID.randomUUID()
+
+        when: "calling withId"
+        Boundary reassigned = created.withId(newId)
+
+        then: "the new id is set while name and geometry remain"
+        verifyAll(reassigned) {
+            id() == newId
+            name() == "Denver County"
+            geom() == polygon
         }
     }
 }

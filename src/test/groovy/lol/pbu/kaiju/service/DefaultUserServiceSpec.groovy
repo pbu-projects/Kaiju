@@ -15,6 +15,7 @@ import lol.pbu.kaiju.repository.PermissionQueryRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.security.AuthorizationService
 import org.locationtech.jts.geom.GeometryFactory
+import spock.lang.Unroll
 
 import java.sql.SQLException
 import java.time.OffsetDateTime
@@ -27,56 +28,7 @@ class DefaultUserServiceSpec extends BaseControllerSpec {
     @Inject
     UserService userService
 
-    def "handles queries, role updates, missing users, and blank email lookups"() {
-        given: "a global admin and a standard user"
-        def admin = dataBuilder.user().asAdmin().persist()
-        def target = dataBuilder.user().asStandardUser().persist()
-
-        expect: "blank and null email lookups return empty and getUsers returns a page"
-        verifyAll {
-            userService.getUserByEmail(null).isEmpty()
-            userService.getUserByEmail("   ").isEmpty()
-            userService.getUserByEmail("  ${target.email().toUpperCase(Locale.ROOT)}  ").isPresent()
-            !userService.getUsers(CursoredPageable.from(10, Sort.UNSORTED)).content.isEmpty()
-        }
-
-        when: "getCurrentUser is called for a missing user"
-        userService.getCurrentUser(UUID.randomUUID())
-
-        then:
-        HttpStatusException currentEx = thrown()
-        currentEx.status == HttpStatus.NOT_FOUND
-
-        when: "updateRole is called for an existing user and then a missing user"
-        User promoted = userService.updateRole(target.id(), UserRole.REGION_AGENT, admin.id())
-
-        then:
-        promoted.role() == UserRole.REGION_AGENT
-
-        when:
-        userService.updateRole(UUID.randomUUID(), UserRole.REGION_AGENT, admin.id())
-
-        then:
-        HttpStatusException roleMissingEx = thrown()
-        roleMissingEx.status == HttpStatus.NOT_FOUND
-
-        when: "deleteUser is called for a missing user as admin"
-        userService.deleteUser(UUID.randomUUID(), admin.id())
-
-        then:
-        HttpStatusException deleteMissingEx = thrown()
-        deleteMissingEx.status == HttpStatus.NOT_FOUND
-
-        when: "deleteUser is called for an existing user as admin"
-        def disposable = dataBuilder.user().asStandardUser().persist()
-        userService.deleteUser(disposable.id(), admin.id())
-
-        then:
-        userService.getUserById(disposable.id(), admin.id()).isEmpty()
-    }
-
-    def "handles null emails on create and update"() {
-        given: "a unit-tested DefaultUserService with mocked repository"
+    private Map createMockUserHarness() {
         UserRepository mockUserRepo = Mock(UserRepository)
         AuthorizationService unitAuth = new AuthorizationService(
                 Mock(PermissionQueryRepository),
@@ -97,71 +49,161 @@ class DefaultUserServiceSpec extends BaseControllerSpec {
         mockUserRepo.findById(targetId) >> Optional.of(existing)
         mockUserRepo.update(_ as User) >> { User u -> u }
 
-        when: "createUser and updateUser receive a User record with null email and with mixed-case email"
-        User createdNullEmail = unitService.createUser(new User(null, null, null, null), actorId)
-        User createdValidEmail = unitService.createUser(new User(null, "  Created@Example.COM ", null, null), actorId)
-        User updatedNullEmail = unitService.updateUser(targetId, new User(targetId, null, null, null), actorId)
-        User updatedValidEmail = unitService.updateUser(targetId, new User(targetId, "  Updated@Example.COM ", null, null), actorId)
-
-        then: "null emails pass through and non-null emails are canonicalized"
-        verifyAll {
-            createdNullEmail.email() == null
-            createdValidEmail.email() == "created@example.com"
-            updatedNullEmail.email() == null
-            updatedValidEmail.email() == "updated@example.com"
-        }
+        [
+                unitService : unitService,
+                mockUserRepo: mockUserRepo,
+                actorId     : actorId,
+                targetId    : targetId
+        ]
     }
 
-    def "handles non-unique and missing database errors during user provisioning"() {
-        when: "provisionOrGetUser hits a RuntimeException wrapping a non-unique SQLException"
-        UserRepository repo1 = Mock(UserRepository)
-        DefaultUserService svc1 = new DefaultUserService(
-                repo1,
-                new AuthorizationService(Mock(PermissionQueryRepository), repo1, Mock(LocationRepository), Mock(BoundaryRepository), new GeometryFactory())
+    @Unroll
+    def "getUserByEmail returns #expectedPresent when looking up #scenario"() {
+        given: "a persisted standard user"
+        def target = dataBuilder.user().asStandardUser().persist()
+        String query = useTargetUpperPadded ? "  ${target.email().toUpperCase(Locale.ROOT)}  " : rawInput
+
+        when: "looking up the user by email"
+        Optional<User> result = userService.getUserByEmail(query)
+
+        then: "presence matches expectation"
+        result.isPresent() == expectedPresent
+
+        where:
+        scenario                   | rawInput | useTargetUpperPadded || expectedPresent
+        "null email"               | null     | false                || false
+        "blank email"              | "   "    | false                || false
+        "padded uppercase email"   | null     | true                 || true
+    }
+
+    def "getUsers returns a non-empty page of users"() {
+        given: "a persisted user"
+        dataBuilder.user().asStandardUser().persist()
+
+        when: "listing users"
+        def page = userService.getUsers(CursoredPageable.from(10, Sort.UNSORTED))
+
+        then: "the page contains users"
+        !page.content.isEmpty()
+    }
+
+    def "getCurrentUser throws NOT_FOUND when the user does not exist"() {
+        when: "fetching the current user for an unknown ID"
+        userService.getCurrentUser(UUID.randomUUID())
+
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
+    }
+
+    def "updateRole updates the role of an existing user"() {
+        given: "a global admin and a standard user"
+        def admin = dataBuilder.user().asAdmin().persist()
+        def target = dataBuilder.user().asStandardUser().persist()
+
+        when: "promoting the user to REGION_AGENT"
+        User promoted = userService.updateRole(target.id(), UserRole.REGION_AGENT, admin.id())
+
+        then: "the returned user has the updated role"
+        promoted.role() == UserRole.REGION_AGENT
+    }
+
+    def "updateRole throws NOT_FOUND when the target user is missing"() {
+        given: "a global admin"
+        def admin = dataBuilder.user().asAdmin().persist()
+
+        when: "updating the role of a missing user"
+        userService.updateRole(UUID.randomUUID(), UserRole.REGION_AGENT, admin.id())
+
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
+    }
+
+    def "deleteUser throws NOT_FOUND when the target user is missing"() {
+        given: "a global admin"
+        def admin = dataBuilder.user().asAdmin().persist()
+
+        when: "deleting a missing user"
+        userService.deleteUser(UUID.randomUUID(), admin.id())
+
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
+    }
+
+    def "deleteUser removes an existing user"() {
+        given: "a global admin and a disposable user"
+        def admin = dataBuilder.user().asAdmin().persist()
+        def disposable = dataBuilder.user().asStandardUser().persist()
+
+        when: "deleting the user"
+        userService.deleteUser(disposable.id(), admin.id())
+
+        then: "the user can no longer be found"
+        userService.getUserById(disposable.id(), admin.id()).isEmpty()
+    }
+
+    @Unroll
+    def "createUser handles #scenario email"() {
+        given: "a mocked DefaultUserService"
+        def h = createMockUserHarness()
+
+        when: "creating a user"
+        User created = h.unitService.createUser(new User(null, inputEmail, null, null), h.actorId)
+
+        then: "the email matches the expected value"
+        created.email() == expectedEmail
+
+        where:
+        scenario                   | inputEmail                 || expectedEmail
+        "null"                     | null                       || null
+        "padded mixed-case"        | "  Created@Example.COM "   || "created@example.com"
+    }
+
+    @Unroll
+    def "updateUser handles #scenario email"() {
+        given: "a mocked DefaultUserService"
+        def h = createMockUserHarness()
+
+        when: "updating a user"
+        User updated = h.unitService.updateUser(h.targetId, new User(h.targetId, inputEmail, null, null), h.actorId)
+
+        then: "the email matches the expected value"
+        updated.email() == expectedEmail
+
+        where:
+        scenario                   | inputEmail                 || expectedEmail
+        "null"                     | null                       || null
+        "padded mixed-case"        | "  Updated@Example.COM "   || "updated@example.com"
+    }
+
+    @Unroll
+    def "provisionOrGetUser rethrows #expectedType.simpleName when #scenario"() {
+        given: "a mocked UserRepository that fails on save"
+        UserRepository repo = Mock(UserRepository)
+        DefaultUserService svc = new DefaultUserService(
+                repo,
+                new AuthorizationService(Mock(PermissionQueryRepository), repo, Mock(LocationRepository), Mock(BoundaryRepository), new GeometryFactory())
         )
-        String failEmail1 = "db-fail-${UUID.randomUUID()}@example.com"
-        repo1.findByEmail(failEmail1) >> Optional.empty()
-        repo1.save(_ as User) >> {
-            throw new IllegalStateException("Connection error", new SQLException("Lost link", "08001"))
+        String email = "prov-${UUID.randomUUID()}@example.com"
+        repo.findByEmail(email) >>> lookupResponses
+        repo.save(_ as User) >> { throw thrownError }
+
+        when: "provisioning the user"
+        svc.provisionOrGetUser(email)
+
+        then: "the expected exception and message are thrown"
+        Throwable ex = thrown(Throwable)
+        verifyAll {
+            expectedType.isInstance(ex)
+            exactMessage ? ex.message == expectedMessage : ex.message.contains(expectedMessage)
         }
-        svc1.provisionOrGetUser(failEmail1)
 
-        then: "the original RuntimeException is rethrown"
-        IllegalStateException nonUniqueEx = thrown()
-        nonUniqueEx.message == "Connection error"
-
-        when: "provisionOrGetUser hits a RuntimeException with no SQLException cause"
-        UserRepository repo2 = Mock(UserRepository)
-        DefaultUserService svc2 = new DefaultUserService(
-                repo2,
-                new AuthorizationService(Mock(PermissionQueryRepository), repo2, Mock(LocationRepository), Mock(BoundaryRepository), new GeometryFactory())
-        )
-        String failEmail2 = "plain-fail-${UUID.randomUUID()}@example.com"
-        repo2.findByEmail(failEmail2) >> Optional.empty()
-        repo2.save(_ as User) >> {
-            throw new IllegalArgumentException("Unexpected failure")
-        }
-        svc2.provisionOrGetUser(failEmail2)
-
-        then:
-        IllegalArgumentException plainEx = thrown()
-        plainEx.message == "Unexpected failure"
-
-        when: "provisionOrGetUser hits unique violation 23505 but the concurrent user still cannot be found"
-        UserRepository repo3 = Mock(UserRepository)
-        DefaultUserService svc3 = new DefaultUserService(
-                repo3,
-                new AuthorizationService(Mock(PermissionQueryRepository), repo3, Mock(LocationRepository), Mock(BoundaryRepository), new GeometryFactory())
-        )
-        String ghostEmail = "ghost-${UUID.randomUUID()}@example.com"
-        repo3.findByEmail(ghostEmail) >>> [Optional.empty(), Optional.empty()]
-        repo3.save(_ as User) >> {
-            throw new RuntimeException("Duplicate key", new SQLException("Unique violation", "23505"))
-        }
-        svc3.provisionOrGetUser(ghostEmail)
-
-        then:
-        IllegalStateException ghostEx = thrown()
-        ghostEx.message.contains("User record could not be found after unique violation")
+        where:
+        scenario                                                | thrownError                                                                               | lookupResponses                       || expectedType             | expectedMessage                                         | exactMessage
+        "save hits a non-unique SQLException"                   | new IllegalStateException("Connection error", new SQLException("Lost link", "08001"))     | [Optional.empty()]                    || IllegalStateException    | "Connection error"                                      | true
+        "save hits a RuntimeException without SQLException"     | new IllegalArgumentException("Unexpected failure")                                        | [Optional.empty()]                    || IllegalArgumentException | "Unexpected failure"                                    | true
+        "unique violation occurs and user still cannot be found"| new RuntimeException("Duplicate key", new SQLException("Unique violation", "23505"))      | [Optional.empty(), Optional.empty()]  || IllegalStateException    | "User record could not be found after unique violation" | false
     }
 }

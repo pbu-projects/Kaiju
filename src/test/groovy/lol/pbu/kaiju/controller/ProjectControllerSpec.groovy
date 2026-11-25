@@ -163,7 +163,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "CREATE | should ensure child locations and boundaries have server-generated IDs (Issue #26 mass-assignment immunity)"() {
+    def "CREATE | keeps child location and boundary IDs null when creating a project"() {
         given: "a project create request with child locations and boundaries"
         def org = getRandomOrganization()
         def locRequest = new ProjectLocationRequest(
@@ -1305,9 +1305,9 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "APPROVE | should return 403 Forbidden (not 404) when out-of-region director approves or rejects non-existent or deleted project"() {
-        given: "a non-existent project ID and a soft-deleted project outside Denver County"
-        def missingId = UUID.randomUUID()
+    @Unroll
+    def "APPROVE | returns 403 Forbidden when out-of-region director approves #targetCase project"() {
+        given: "a non-existent or soft-deleted project outside Denver County"
         def org = getRandomOrganization()
         def csLoc = dataBuilder.location()
                 .withName("CS Deleted Loc")
@@ -1325,44 +1325,62 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .atLocation(csLoc)
                 .deleted()
                 .persist()
+        def targetId = targetCase == "missing" ? UUID.randomUUID() : deletedOutOfRegion.id()
 
-        when: "Denver County director tries to approve the non-existent project via HTTP"
-        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${missingId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
-
-        then: "403 Forbidden is returned"
-        def approveMissingErr = thrown(HttpClientResponseException)
-        approveMissingErr.status == HttpStatus.FORBIDDEN
-
-        when: "Denver County director tries to approve the soft-deleted out-of-region project via HTTP"
-        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${deletedOutOfRegion.id()}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
+        when: "Denver County director tries to approve the project via HTTP"
+        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${targetId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
 
         then: "403 Forbidden is returned"
-        def approveDeletedErr = thrown(HttpClientResponseException)
-        approveDeletedErr.status == HttpStatus.FORBIDDEN
+        def err = thrown(HttpClientResponseException)
+        err.status == HttpStatus.FORBIDDEN
 
-        when: "Denver County director tries to reject the non-existent project"
-        projectService.rejectProject(missingId, TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
-
-        then: "403 Forbidden is thrown"
-        def rejectMissingErr = thrown(HttpStatusException)
-        rejectMissingErr.status == HttpStatus.FORBIDDEN
-
-        when: "Denver County director tries to reject the soft-deleted out-of-region project"
-        projectService.rejectProject(deletedOutOfRegion.id(), TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
-
-        then: "403 Forbidden is thrown"
-        def rejectDeletedErr = thrown(HttpStatusException)
-        rejectDeletedErr.status == HttpStatus.FORBIDDEN
+        where:
+        targetCase << ["missing", "deleted out-of-region"]
     }
 
-    def "APPROVE | should throw 401 Unauthorized when approving or rejecting missing actor targets non-existent project"() {
+    @Unroll
+    def "REJECT | returns 403 Forbidden when out-of-region director rejects #targetCase project"() {
+        given: "a non-existent or soft-deleted project outside Denver County"
+        def org = getRandomOrganization()
+        def csLoc = dataBuilder.location()
+                .withName("CS Deleted Loc")
+                .withAddressLine("123 Main")
+                .withCity("Colo Springs")
+                .withCountryCode("US")
+                .atPoint(-104.82, 38.83)
+                .persist()
+        def deletedOutOfRegion = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("CS Deleted Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .atLocation(csLoc)
+                .deleted()
+                .persist()
+        def targetId = targetCase == "missing" ? UUID.randomUUID() : deletedOutOfRegion.id()
+
+        when: "Denver County director tries to reject the project"
+        projectService.rejectProject(targetId, TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
+
+        then: "403 Forbidden is thrown"
+        def err = thrown(HttpStatusException)
+        err.status == HttpStatus.FORBIDDEN
+
+        where:
+        targetCase << ["missing", "deleted out-of-region"]
+    }
+
+    def "APPROVE | throws 401 Unauthorized when approving with a missing actor"() {
         when: "calling approveProject with a missing actor UUID"
         projectService.approveProject(UUID.randomUUID(), UUID.randomUUID())
 
         then: "401 Unauthorized is thrown"
         def approveErr = thrown(HttpStatusException)
         approveErr.status == HttpStatus.UNAUTHORIZED
+    }
 
+    def "REJECT | throws 401 Unauthorized when rejecting with a missing actor"() {
         when: "calling rejectProject with a missing actor UUID"
         projectService.rejectProject(UUID.randomUUID(), UUID.randomUUID())
 
@@ -1763,7 +1781,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
     }
 
-    def "UPDATE & DELETE | should return 403 Forbidden (not 404) when non-admin targets missing or soft-deleted project"() {
+    @Unroll
+    def "UPDATE & DELETE | returns #expectedStatus when #actorRole sends #method for #targetCase project"() {
         given: "a soft-deleted project and a random missing project ID"
         def org = dataBuilder.organization().withName("Oracle Guard Org").asPublic().verified().persist()
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
@@ -1775,50 +1794,34 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withStatus(DRAFT)
                 .deleted()
                 .persist()
-        def missingId = UUID.randomUUID()
+        def targetId = targetCase == "missing" ? UUID.randomUUID() : deletedProject.id()
         def updateRequest = updateProjectRequest(org.id(), "Tampered Title", "Description with at least twenty characters here.")
+        def rawReq = method == "PUT"
+                ? HttpRequest.PUT("/projects/${targetId}", updateRequest)
+                : HttpRequest.DELETE("/projects/${targetId}")
+        def signedReq = actorRole == "unaffiliated user"
+                ? asVolunteer(rawReq)
+                : asOrgManager(rawReq, TestPersonas.LAURA_LOCAL_MANAGER)
 
-        when: "an unaffiliated user attempts to update the missing and soft-deleted projects"
-        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${missingId}", updateRequest)), Project)
+        when: "sending the #method request"
+        if (method == "PUT") {
+            client.exchange(signedReq, Project)
+        } else {
+            client.exchange(signedReq)
+        }
 
-        then:
-        def updateMissingEx = thrown(HttpClientResponseException)
-        updateMissingEx.status == HttpStatus.FORBIDDEN
+        then: "the expected status is returned"
+        def ex = thrown(HttpClientResponseException)
+        ex.status == expectedStatus
 
-        when:
-        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${deletedProject.id()}", updateRequest)), Project)
-
-        then:
-        def updateDeletedEx = thrown(HttpClientResponseException)
-        updateDeletedEx.status == HttpStatus.FORBIDDEN
-
-        when: "an unaffiliated user attempts to delete the missing and soft-deleted projects"
-        client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${missingId}")))
-
-        then:
-        def deleteMissingEx = thrown(HttpClientResponseException)
-        deleteMissingEx.status == HttpStatus.FORBIDDEN
-
-        when:
-        client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${deletedProject.id()}")))
-
-        then:
-        def deleteDeletedEx = thrown(HttpClientResponseException)
-        deleteDeletedEx.status == HttpStatus.FORBIDDEN
-
-        when: "the owning org manager attempts to update or delete their soft-deleted project"
-        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${deletedProject.id()}", updateRequest), TestPersonas.LAURA_LOCAL_MANAGER), Project)
-
-        then:
-        def managerUpdateDeletedEx = thrown(HttpClientResponseException)
-        managerUpdateDeletedEx.status == HttpStatus.NOT_FOUND
-
-        when:
-        client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${deletedProject.id()}"), TestPersonas.LAURA_LOCAL_MANAGER))
-
-        then:
-        def managerDeleteDeletedEx = thrown(HttpClientResponseException)
-        managerDeleteDeletedEx.status == HttpStatus.NOT_FOUND
+        where:
+        actorRole           | method   | targetCase     | expectedStatus
+        "unaffiliated user" | "PUT"    | "missing"      | HttpStatus.FORBIDDEN
+        "unaffiliated user" | "PUT"    | "soft-deleted" | HttpStatus.FORBIDDEN
+        "unaffiliated user" | "DELETE" | "missing"      | HttpStatus.FORBIDDEN
+        "unaffiliated user" | "DELETE" | "soft-deleted" | HttpStatus.FORBIDDEN
+        "owning manager"    | "PUT"    | "soft-deleted" | HttpStatus.NOT_FOUND
+        "owning manager"    | "DELETE" | "soft-deleted" | HttpStatus.NOT_FOUND
     }
 
     /********** LIST / Draining Tests **********/
@@ -1909,10 +1912,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
 
     /********** Security Anonymous Discovery Tests **********/
 
-    def "Security | should allow anonymous visitors to discover and view projects"() {
-        given: "a persisted project"
+    def "Security | allows anonymous visitors to list public projects"() {
+        given: "a persisted active project"
         def org = getRandomOrganization()
-        def project = dataBuilder.project()
+        dataBuilder.project()
                 .forOrg(org)
                 .withTitle("Public Discovery Project")
                 .withDescription("Public project description with at least twenty characters.")
@@ -1923,24 +1926,41 @@ class ProjectControllerSpec extends BaseControllerSpec {
         when: "an anonymous visitor requests projects list"
         def listResponse = client.exchange(HttpRequest.GET("/projects"), Map)
 
-        and: "an anonymous visitor requests project details by ID"
+        then: "200 OK is returned"
+        listResponse.status == HttpStatus.OK
+    }
+
+    def "Security | allows anonymous visitors to view public project details"() {
+        given: "a persisted active project"
+        def org = getRandomOrganization()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Public Discovery Project")
+                .withDescription("Public project description with at least twenty characters.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .persist()
+
+        when: "an anonymous visitor requests project details by ID"
         def detailResponse = client.exchange(HttpRequest.GET("/projects/${project.id()}"), Project)
 
-        and: "an anonymous visitor searches projects by location"
-        def searchResponse = client.exchange(HttpRequest.GET("/projects/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=50000"), Map)
-
-        then: "all endpoints return 200 OK and project details match"
+        then: "200 OK and matching project details are returned"
         verifyAll {
-            listResponse.status == HttpStatus.OK
             detailResponse.status == HttpStatus.OK
             detailResponse.body() != null
             detailResponse.body()?.id() == project.id()
-            searchResponse.status == HttpStatus.OK
         }
     }
 
-    def "READ | should handle blank title filter, public title filter, and non-active project visibility"() {
-        given: "an active project and a draft project"
+    def "Security | allows anonymous visitors to search public projects by location"() {
+        when: "an anonymous visitor searches projects by location"
+        def searchResponse = client.exchange(HttpRequest.GET("/projects/search-by-location?longitude=-104.99&latitude=39.73&radiusMeters=50000"), Map)
+
+        then: "200 OK is returned"
+        searchResponse.status == HttpStatus.OK
+    }
+
+    private Map persistVisibilityProjects() {
         def org = dataBuilder.organization().withName("Visibility Filter Org").asPublic().verified().persist()
         dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
         def uniqueActiveTitle = "Active Filter ${faker.number().digits(6)}"
@@ -1958,46 +1978,86 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 .withType(STANDARD)
                 .withStatus(DRAFT)
                 .persist()
+        return [activeProject: activeProject, draftProject: draftProject, uniqueActiveTitle: uniqueActiveTitle]
+    }
+
+    def "READ | blank title filter falls back to public active list for anonymous visitor"() {
+        given: "an active project and a draft project"
+        def fixtures = persistVisibilityProjects()
+        def blankUri = UriBuilder.of("/projects").queryParam("title", "   ").queryParam("size", 200).build().toString()
 
         when: "anonymous user queries /projects with a blank title"
-        def blankAnonUri = UriBuilder.of("/projects").queryParam("title", "   ").queryParam("size", 200).build().toString()
-        def blankAnonRes = client.exchange(HttpRequest.GET(blankAnonUri), Map)
+        def response = client.exchange(HttpRequest.GET(blankUri), Map)
 
-        and: "global admin queries /projects with a blank title"
-        def blankAdminRes = client.exchange(asGlobalAdmin(HttpRequest.GET(blankAnonUri)), Map)
-
-        and: "anonymous user queries /projects with an exact active title"
-        def titleAnonUri = UriBuilder.of("/projects").queryParam("title", uniqueActiveTitle).build().toString()
-        def titleAnonRes = client.exchange(HttpRequest.GET(titleAnonUri), Map)
-
-        and: "owning org manager views the non-active draft project"
-        def managerDraftRes = client.exchange(asOrgManager(HttpRequest.GET("/projects/${draftProject.id()}")), Project)
-
-        then: "blank titles fall back to unfiltered lists, title filter finds active project, and manager views draft"
+        then: "active project is included in the unfiltered public list"
         verifyAll {
-            blankAnonRes.status == HttpStatus.OK
-            (blankAnonRes.body().content as List).any { it.id == activeProject.id().toString() }
-            blankAdminRes.status == HttpStatus.OK
-            (blankAdminRes.body().content as List).any { it.id == draftProject.id().toString() }
-            titleAnonRes.status == HttpStatus.OK
-            (titleAnonRes.body().content as List).collect { it.id } == [activeProject.id().toString()]
-            managerDraftRes.status == HttpStatus.OK
-            managerDraftRes.body().id() == draftProject.id()
+            response.status == HttpStatus.OK
+            (response.body().content as List).any { it.id == fixtures.activeProject.id().toString() }
         }
+    }
 
-        when: "anonymous user requests the non-active draft project by ID"
-        client.exchange(HttpRequest.GET("/projects/${draftProject.id()}"), Project)
+    def "READ | blank title filter includes draft projects for global admin"() {
+        given: "an active project and a draft project"
+        def fixtures = persistVisibilityProjects()
+        def blankUri = UriBuilder.of("/projects").queryParam("title", "   ").queryParam("size", 200).build().toString()
 
-        then: "404 Not Found is returned without revealing existence"
-        def anonDraftEx = thrown(HttpClientResponseException)
-        anonDraftEx.status == HttpStatus.NOT_FOUND
+        when: "global admin queries /projects with a blank title"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.GET(blankUri)), Map)
 
-        when: "unaffiliated user requests the non-active draft project by ID"
-        client.exchange(asVolunteer(HttpRequest.GET("/projects/${draftProject.id()}")), Project)
+        then: "draft project is included for global admin"
+        verifyAll {
+            response.status == HttpStatus.OK
+            (response.body().content as List).any { it.id == fixtures.draftProject.id().toString() }
+        }
+    }
 
-        then: "403 Forbidden is returned"
-        def outsiderDraftEx = thrown(HttpClientResponseException)
-        outsiderDraftEx.status == HttpStatus.FORBIDDEN
+    def "READ | exact active title filter returns matching active project for anonymous visitor"() {
+        given: "an active project and a draft project"
+        def fixtures = persistVisibilityProjects()
+        def titleUri = UriBuilder.of("/projects").queryParam("title", fixtures.uniqueActiveTitle).build().toString()
+
+        when: "anonymous user queries /projects with the exact active title"
+        def response = client.exchange(HttpRequest.GET(titleUri), Map)
+
+        then: "only the matching active project is returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            (response.body().content as List).collect { it.id } == [fixtures.activeProject.id().toString()]
+        }
+    }
+
+    def "READ | owning org manager can view non-active draft project by id"() {
+        given: "a draft project owned by the manager's organization"
+        def fixtures = persistVisibilityProjects()
+
+        when: "owning org manager views the draft project"
+        def response = client.exchange(asOrgManager(HttpRequest.GET("/projects/${fixtures.draftProject.id()}")), Project)
+
+        then: "200 OK and the draft project are returned"
+        verifyAll {
+            response.status == HttpStatus.OK
+            response.body().id() == fixtures.draftProject.id()
+        }
+    }
+
+    @Unroll
+    def "READ | #callerLabel receives #expectedStatus when requesting draft project by id"() {
+        given: "a draft project"
+        def fixtures = persistVisibilityProjects()
+        def request = HttpRequest.GET("/projects/${fixtures.draftProject.id()}")
+        def signedRequest = asVolunteerCaller ? asVolunteer(request) : request
+
+        when: "#callerLabel requests the draft project by ID"
+        client.exchange(signedRequest, Project)
+
+        then: "#expectedStatus is returned"
+        def ex = thrown(HttpClientResponseException)
+        ex.status == expectedStatus
+
+        where:
+        callerLabel              | asVolunteerCaller | expectedStatus
+        "anonymous visitor"      | false             | HttpStatus.NOT_FOUND
+        "unaffiliated volunteer" | true              | HttpStatus.FORBIDDEN
     }
 
     def "UPDATE | should accept null organizationId and null locations when updating a project"() {

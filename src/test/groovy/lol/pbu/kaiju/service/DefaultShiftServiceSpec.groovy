@@ -26,6 +26,7 @@ import lol.pbu.kaiju.repository.TagRepository
 import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.security.AuthorizationService
 import org.locationtech.jts.geom.GeometryFactory
+import spock.lang.Unroll
 
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -52,8 +53,7 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
     @Inject
     AuthorizationService authorizationService
 
-    def "handles shift validation, project checks, location checks, tags, and queries"() {
-        given: "an admin, standard user, org, locations, active and draft projects, and a tag"
+    private Map createShiftTestContext() {
         def admin = dataBuilder.user().asAdmin().persist()
         def standardUser = dataBuilder.user().asStandardUser().persist()
         def org = dataBuilder.organization().withName("Shift Edge Org").asPublic().verified().persist()
@@ -99,130 +99,20 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
                 .deleted(admin)
                 .persist()
 
-        def tag = dataBuilder.tag().withName("edge-tag-${UUID.randomUUID().toString().take(8)}").persist()
-
-        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
-        OffsetDateTime end = start.plusHours(2)
-
-        when: "creating a shift with null project"
-        shiftService.createShift(new Shift(null, null, true, null, start, end, []), admin.id())
-
-        then:
-        HttpStatusException nullProjEx = thrown()
-        nullProjEx.status == HttpStatus.BAD_REQUEST
-
-        when: "creating a shift with unsaved project having null ID"
-        Project unsavedProj = Project.forCreation(org, null, "Unsaved", "Desc", ProjectType.STANDARD, ProjectStatus.ACTIVE, [], [])
-        shiftService.createShift(new Shift(null, unsavedProj, true, null, start, end, []), admin.id())
-
-        then:
-        HttpStatusException unsavedProjEx = thrown()
-        unsavedProjEx.status == HttpStatus.BAD_REQUEST
-
-        when: "creating a shift on a missing project as admin"
-        shiftService.createShift(new Shift(null, Project.forId(UUID.randomUUID()), true, null, start, end, []), admin.id())
-
-        then:
-        HttpStatusException missingProjAdminEx = thrown()
-        missingProjAdminEx.status == HttpStatus.NOT_FOUND
-
-        when: "creating a shift on a missing project as standard user"
-        shiftService.createShift(new Shift(null, Project.forId(UUID.randomUUID()), true, null, start, end, []), standardUser.id())
-
-        then:
-        HttpStatusException missingProjUserEx = thrown()
-        missingProjUserEx.status == HttpStatus.FORBIDDEN
-
-        when: "creating a shift on a soft-deleted project"
-        shiftService.createShift(new Shift(null, deletedProject, true, null, start, end, []), admin.id())
-
-        then:
-        HttpStatusException deletedProjEx = thrown()
-        deletedProjEx.status == HttpStatus.NOT_FOUND
-
-        when: "creating a shift on a DRAFT project"
-        shiftService.createShift(new Shift(null, draftProject, true, null, start, end, []), admin.id())
-
-        then:
-        HttpStatusException draftProjEx = thrown()
-        draftProjEx.status == HttpStatus.BAD_REQUEST
-
-        when: "creating a shift with start time after end time"
-        shiftService.createShift(new Shift(null, activeProject, true, null, end, start, []), admin.id())
-
-        then:
-        HttpStatusException badTimeEx = thrown()
-        badTimeEx.status == HttpStatus.BAD_REQUEST
-
-        when: "creating a shift with an unsaved location whose ID is null"
-        Location unsavedLoc = Location.forCreation("Unsaved", "123 St", "Denver", "CO", "80202", "US", null)
-        shiftService.createShift(new Shift(null, activeProject, false, unsavedLoc, start, end, []), admin.id())
-
-        then:
-        HttpStatusException nullLocIdEx = thrown()
-        nullLocIdEx.status == HttpStatus.BAD_REQUEST
-
-        when: "creating a shift with a location that does not belong to the project"
-        shiftService.createShift(new Shift(null, activeProject, false, otherLoc, start, end, []), admin.id())
-
-        then:
-        HttpStatusException wrongLocEx = thrown()
-        wrongLocEx.status == HttpStatus.BAD_REQUEST
-
-        when: "creating a shift on a virtual project with a missing location ID"
-        shiftService.createShift(new Shift(null, virtualProject, false, Location.forId(UUID.randomUUID()), start, end, []), admin.id())
-
-        then:
-        HttpStatusException missingLocEx = thrown()
-        missingLocEx.status == HttpStatus.NOT_FOUND
-
-        when: "creating a shift with unsaved tags (null IDs only)"
-        Shift shiftWithNullTag = track(shiftService.createShift(
-                new Shift(null, activeProject, false, allowedLoc, start, end, [new Tag(null, "Unsaved Tag")]),
-                admin.id()
-        ))
-
-        and: "creating a virtual shift with null tags and a physical shift with persisted tags"
-        Shift virtualShift = track(shiftService.createShift(
-                new Shift(null, virtualProject, true, null, start, end, null),
-                admin.id()
-        ))
-        Shift taggedShift = track(shiftService.createShift(
-                new Shift(null, activeProject, false, allowedLoc, start, end, [tag]),
-                admin.id()
-        ))
-
-        then: "all shifts persist cleanly and query endpoints return them"
-        def allPage = shiftService.getShifts(CursoredPageable.from(20, Sort.UNSORTED))
-        def activePage = shiftService.getActiveShifts(CursoredPageable.from(20, Sort.UNSORTED))
-        def foundShift = shiftService.getShiftById(taggedShift.id())
-        verifyAll {
-            shiftWithNullTag.id() != null
-            virtualShift.id() != null
-            taggedShift.id() != null
-            !allPage.content.isEmpty()
-            !activePage.content.isEmpty()
-            foundShift.isPresent()
-            foundShift.get().id() == taggedShift.id()
-        }
-
-        when: "updating and deleting a missing shift as admin"
-        shiftService.updateShift(UUID.randomUUID(), virtualShift, admin.id())
-
-        then:
-        HttpStatusException updateMissingEx = thrown()
-        updateMissingEx.status == HttpStatus.NOT_FOUND
-
-        when:
-        shiftService.deleteShift(UUID.randomUUID(), admin.id())
-
-        then:
-        HttpStatusException deleteMissingEx = thrown()
-        deleteMissingEx.status == HttpStatus.NOT_FOUND
+        [
+                admin         : admin,
+                standardUser  : standardUser,
+                org           : org,
+                allowedLoc    : allowedLoc,
+                otherLoc      : otherLoc,
+                activeProject : activeProject,
+                virtualProject: virtualProject,
+                draftProject  : draftProject,
+                deletedProject: deletedProject
+        ]
     }
 
-    def "handles project locations list checks, null shift times, and concurrent delete race in unit tests"() {
-        given: "a DefaultShiftService with mocked repositories"
+    private Map createMockShiftHarness() {
         ShiftRepository mockShiftRepo = Mock(ShiftRepository)
         ProjectRepository mockProjectRepo = Mock(ProjectRepository)
         LocationRepository mockLocationRepo = Mock(LocationRepository)
@@ -235,7 +125,6 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
                 Mock(BoundaryRepository),
                 new GeometryFactory()
         )
-
         DefaultShiftService unitService = new DefaultShiftService(
                 mockShiftRepo,
                 mockProjectRepo,
@@ -264,35 +153,221 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
         mockLocationRepo.findById(allowedLocId) >> Optional.of(allowedLoc)
         mockShiftRepo.save(_ as Shift) >> { Shift s -> s.withId(shiftId) }
 
-        when: "creating a shift with a location present in project.locations() and null start/end times"
-        Shift created = unitService.createShift(new Shift(null, projectWithLocations, false, allowedLoc, null, null, []), actorId)
+        [
+                unitService         : unitService,
+                mockShiftRepo       : mockShiftRepo,
+                mockProjectRepo     : mockProjectRepo,
+                actorId             : actorId,
+                shiftId             : shiftId,
+                allowedLoc          : allowedLoc,
+                foreignLoc          : foreignLoc,
+                projectWithLocations: projectWithLocations
+        ]
+    }
 
-        then: "location is accepted from project.locations() without extra location existence queries"
-        created.id() == shiftId
-        0 * mockProjectRepo.hasAnyProjectLocation(_)
+    @Unroll
+    def "createShift fails with #expectedStatus when #scenario"() {
+        given: "test users, projects, and locations"
+        def ctx = createShiftTestContext()
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        OffsetDateTime end = start.plusHours(2)
 
-        when: "creating a shift with startTime non-null and endTime null"
+        UUID actorId = asStandardUser ? ctx.standardUser.id() : ctx.admin.id()
+        Project project = switch (projectCase) {
+            case "null" -> null
+            case "unsaved" -> Project.forCreation(ctx.org, null, "Unsaved", "Desc", ProjectType.STANDARD, ProjectStatus.ACTIVE, [], [])
+            case "missing" -> Project.forId(UUID.randomUUID())
+            case "deleted" -> ctx.deletedProject
+            case "draft" -> ctx.draftProject
+            case "virtual" -> ctx.virtualProject
+            default -> ctx.activeProject
+        }
+        Location location = switch (locationCase) {
+            case "unsaved" -> Location.forCreation("Unsaved", "123 St", "Denver", "CO", "80202", "US", null)
+            case "other" -> ctx.otherLoc
+            case "missing" -> Location.forId(UUID.randomUUID())
+            default -> null
+        }
+        OffsetDateTime shiftStart = swapTimes ? end : start
+        OffsetDateTime shiftEnd = swapTimes ? start : end
+
+        when: "creating the invalid shift"
+        shiftService.createShift(new Shift(null, project, virtualFlag, location, shiftStart, shiftEnd, []), actorId)
+
+        then: "the expected HTTP error is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == expectedStatus
+
+        where:
+        scenario                                    | projectCase | asStandardUser | virtualFlag | locationCase | swapTimes || expectedStatus
+        "project is null"                           | "null"      | false          | true        | "none"       | false     || HttpStatus.BAD_REQUEST
+        "project is unsaved with null ID"           | "unsaved"   | false          | true        | "none"       | false     || HttpStatus.BAD_REQUEST
+        "project is missing as admin"               | "missing"   | false          | true        | "none"       | false     || HttpStatus.NOT_FOUND
+        "project is missing as standard user"       | "missing"   | true           | true        | "none"       | false     || HttpStatus.FORBIDDEN
+        "project is soft-deleted"                   | "deleted"   | false          | true        | "none"       | false     || HttpStatus.NOT_FOUND
+        "project is in DRAFT status"                | "draft"     | false          | true        | "none"       | false     || HttpStatus.BAD_REQUEST
+        "start time is after end time"              | "active"    | false          | true        | "none"       | true      || HttpStatus.BAD_REQUEST
+        "location is unsaved with null ID"          | "active"    | false          | false       | "unsaved"    | false     || HttpStatus.BAD_REQUEST
+        "location does not belong to the project"   | "active"    | false          | false       | "other"      | false     || HttpStatus.BAD_REQUEST
+        "location ID is missing on virtual project" | "virtual"   | false          | false       | "missing"    | false     || HttpStatus.NOT_FOUND
+    }
+
+    @Unroll
+    def "createShift persists #scenario"() {
+        given: "an admin user, active projects, location, and tag"
+        def ctx = createShiftTestContext()
+        def tag = dataBuilder.tag().withName("edge-tag-${UUID.randomUUID().toString().take(8)}").persist()
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        OffsetDateTime end = start.plusHours(2)
+
+        Project project = virtualFlag ? ctx.virtualProject : ctx.activeProject
+        Location location = virtualFlag ? null : ctx.allowedLoc
+        List<Tag> tags = switch (tagCase) {
+            case "unsaved" -> [new Tag(null, "Unsaved Tag")]
+            case "persisted" -> [tag]
+            default -> null
+        }
+
+        when: "creating the shift"
+        Shift created = track(shiftService.createShift(
+                new Shift(null, project, virtualFlag, location, start, end, tags),
+                ctx.admin.id()
+        ))
+
+        then: "the shift is saved with an ID"
+        created.id() != null
+
+        where:
+        scenario                               | virtualFlag | tagCase
+        "a physical shift with unsaved tags"   | false       | "unsaved"
+        "a virtual shift with null tags"       | true        | "null"
+        "a physical shift with persisted tags" | false       | "persisted"
+    }
+
+    private Shift createSavedShiftForQuery() {
+        def ctx = createShiftTestContext()
+        def tag = dataBuilder.tag().withName("query-tag-${UUID.randomUUID().toString().take(8)}").persist()
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        OffsetDateTime end = start.plusHours(2)
+        return track(shiftService.createShift(
+                new Shift(null, ctx.activeProject, false, ctx.allowedLoc, start, end, [tag]),
+                ctx.admin.id()
+        ))
+    }
+
+    def "lists all shifts including a newly saved shift"() {
+        given: "a saved shift"
+        createSavedShiftForQuery()
+
+        when: "querying all shifts"
+        def allPage = shiftService.getShifts(CursoredPageable.from(20, Sort.UNSORTED))
+
+        then: "the page contains shifts"
+        !allPage.content.isEmpty()
+    }
+
+    def "lists active shifts including a newly saved shift"() {
+        given: "a saved shift"
+        createSavedShiftForQuery()
+
+        when: "querying active shifts"
+        def activePage = shiftService.getActiveShifts(CursoredPageable.from(20, Sort.UNSORTED))
+
+        then: "the page contains active shifts"
+        !activePage.content.isEmpty()
+    }
+
+    def "finds a saved shift by its ID"() {
+        given: "a saved shift"
+        Shift saved = createSavedShiftForQuery()
+
+        when: "querying the shift by ID"
+        def foundShift = shiftService.getShiftById(saved.id())
+
+        then: "the saved shift is returned"
+        verifyAll {
+            foundShift.isPresent()
+            foundShift.get().id() == saved.id()
+        }
+    }
+
+    def "updateShift throws NOT_FOUND when the shift does not exist"() {
+        given: "an admin user and a shift payload"
+        def ctx = createShiftTestContext()
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        Shift payload = new Shift(null, ctx.virtualProject, true, null, start, start.plusHours(2), [])
+
+        when: "updating a non-existent shift"
+        shiftService.updateShift(UUID.randomUUID(), payload, ctx.admin.id())
+
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
+    }
+
+    def "deleteShift throws NOT_FOUND when the shift does not exist"() {
+        given: "an admin user"
+        def admin = dataBuilder.user().asAdmin().persist()
+
+        when: "deleting a non-existent shift"
+        shiftService.deleteShift(UUID.randomUUID(), admin.id())
+
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
+    }
+
+    @Unroll
+    def "createShift accepts project.locations() without extra location checks when #scenario"() {
+        given: "a mocked DefaultShiftService with a project containing allowedLoc"
+        def h = createMockShiftHarness()
+        OffsetDateTime startTime = includeStart ? OffsetDateTime.now(ZoneOffset.UTC).plusDays(1) : null
+
+        when: "creating a shift with a location in project.locations()"
+        Shift created = h.unitService.createShift(
+                new Shift(null, h.projectWithLocations, false, h.allowedLoc, startTime, null, []),
+                h.actorId
+        )
+
+        then: "shift is saved without calling hasAnyProjectLocation"
+        created.id() == h.shiftId
+        0 * h.mockProjectRepo.hasAnyProjectLocation(_)
+
+        where:
+        scenario                              | includeStart
+        "startTime and endTime are both null" | false
+        "startTime is set and endTime is null"| true
+    }
+
+    def "createShift rejects a location not in project.locations()"() {
+        given: "a mocked DefaultShiftService with a project containing allowedLoc"
+        def h = createMockShiftHarness()
         OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
-        Shift startOnly = unitService.createShift(new Shift(null, projectWithLocations, false, allowedLoc, start, null, []), actorId)
 
-        then:
-        startOnly.id() == shiftId
+        when: "creating a shift with a foreign location"
+        h.unitService.createShift(
+                new Shift(null, h.projectWithLocations, false, h.foreignLoc, start, start.plusHours(1), []),
+                h.actorId
+        )
 
-        when: "creating a shift with a location not in project.locations()"
-        unitService.createShift(new Shift(null, projectWithLocations, false, foreignLoc, start, start.plusHours(1), []), actorId)
+        then: "BAD_REQUEST is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.BAD_REQUEST
+    }
 
-        then:
-        HttpStatusException wrongLocEx = thrown()
-        wrongLocEx.status == HttpStatus.BAD_REQUEST
+    def "deleteShift throws NOT_FOUND when removeById deletes zero rows"() {
+        given: "a mocked DefaultShiftService where shift exists but removeById returns 0"
+        def h = createMockShiftHarness()
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
+        Shift existing = new Shift(h.shiftId, h.projectWithLocations, true, null, start, start.plusHours(1), [])
+        h.mockShiftRepo.findById(h.shiftId) >> Optional.of(existing)
+        h.mockShiftRepo.removeById(h.shiftId) >> 0L
 
-        when: "deleteShift finds an existing shift whose removeById returns 0"
-        Shift existing = new Shift(shiftId, projectWithLocations, true, null, start, start.plusHours(1), [])
-        mockShiftRepo.findById(shiftId) >> Optional.of(existing)
-        mockShiftRepo.removeById(shiftId) >> 0L
-        unitService.deleteShift(shiftId, actorId)
+        when: "deleting the shift"
+        h.unitService.deleteShift(h.shiftId, h.actorId)
 
-        then:
-        HttpStatusException raceDeleteEx = thrown()
-        raceDeleteEx.status == HttpStatus.NOT_FOUND
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
     }
 }
