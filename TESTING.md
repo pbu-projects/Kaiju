@@ -128,8 +128,8 @@ Run the whole test suite:
 Or you can run specific tests:
 
 ```bash
-./gradlew test --tests "*createAuth*"
+./gradlew test --tests "ProjectSecurityMatrixSpec"
 ```
 
-![Spock and Testcontainers running createAuthSpec](./testing-call.gif)
+![Spock and Testcontainers running ProjectSecurityMatrixSpec](./testing-call.gif)
 

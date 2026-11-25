@@ -55,7 +55,7 @@ To run the token and claim mapping test suite:
 ./gradlew test --tests "lol.pbu.kaiju.security.AuthentikAuthenticationMapperSpec"
 ----
 
-Expected result: Tests spin up PostGIS via Testcontainers, apply Flyway migrations, and execute 55 test specifications green.
+Expected result: Tests spin up PostGIS via Testcontainers, apply Flyway migrations, and execute 55 test cases green.
 
 === Running the Live Integration Tests
 

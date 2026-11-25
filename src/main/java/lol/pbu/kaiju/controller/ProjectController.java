@@ -37,8 +37,8 @@ import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.ProjectService;
+import lol.pbu.kaiju.service.SpatialMappingService;
 import lol.pbu.kaiju.util.PageRequests;
-import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
@@ -116,7 +116,7 @@ public class ProjectController {
     }
 
     @Post
-    public Project submitProject(@Valid @Body CreateProjectRequest request, Principal principal) {
+    public Project addProject(@Valid @Body CreateProjectRequest request, Principal principal) {
         Organization org = request.organizationId() != null
                 ? Organization.forId(request.organizationId())
                 : null;

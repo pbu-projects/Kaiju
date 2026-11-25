@@ -215,21 +215,21 @@ class ShiftControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "CREATE | should batch resolve tags and hide location existence oracle from unauthorized callers"() {
-        given: "an active project, two persisted tags, and an unauthorized volunteer"
+    def "CREATE | should batch resolve tags when creating a shift"() {
+        given: "an active project and two persisted tags"
         def project = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
-                .withTitle("Shift Tag And Oracle Proj ${UUID.randomUUID()}")
-                .withDescription("Active project used to test tag batching and location oracle.")
+                .withTitle("Shift Tag Proj ${UUID.randomUUID()}")
+                .withDescription("Active project used to test tag batching.")
                 .withStatus(ProjectStatus.ACTIVE)
                 .persist()
         def tag1 = dataBuilder.tag().withName("shift-tag-a-${UUID.randomUUID().toString().take(8)}").persist()
         def tag2 = dataBuilder.tag().withName("shift-tag-b-${UUID.randomUUID().toString().take(8)}").persist()
         def start = OffsetDateTime.now().plusDays(1)
         def end = start.plusHours(2)
+        def createRequest = new CreateShiftRequest(project.id(), true, null, start, end, [tag1.id(), tag2.id()])
 
         when: "an authorized manager creates a virtual shift with two tags"
-        def createRequest = new CreateShiftRequest(project.id(), true, null, start, end, [tag1.id(), tag2.id()])
         def response = client.exchange(
                 asOrgManager(HttpRequest.POST("/shifts", createRequest), TestPersonas.LAURA_LOCAL_MANAGER),
                 Shift
@@ -242,9 +242,21 @@ class ShiftControllerSpec extends BaseControllerSpec {
             tags() != null
             tags()*.id().toSet() == [tag1.id(), tag2.id()].toSet()
         }
+    }
+
+    def "CREATE | should hide location existence oracle from unauthorized callers"() {
+        given: "an active project and a request referencing a non-existent location"
+        def project = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Shift Oracle Proj ${UUID.randomUUID()}")
+                .withDescription("Active project used to test location oracle.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .persist()
+        def start = OffsetDateTime.now().plusDays(1)
+        def end = start.plusHours(2)
+        def oracleRequest = new CreateShiftRequest(project.id(), false, UUID.randomUUID(), start, end, null)
 
         when: "an outsider tries to create a shift referencing a non-existent location"
-        def oracleRequest = new CreateShiftRequest(project.id(), false, UUID.randomUUID(), start, end, null)
         client.exchange(asVolunteer(HttpRequest.POST("/shifts", oracleRequest), TestPersonas.VICTOR_VOLUNTEER), Shift)
 
         then: "403 FORBIDDEN is returned instead of leaking 404 for the location"
@@ -297,8 +309,25 @@ class ShiftControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "CREATE | should return 403 Forbidden when outsider targets non-existent or soft-deleted project"() {
-        given: "a soft-deleted project and a non-existent project ID"
+    def "CREATE | should return 403 Forbidden when outsider targets non-existent project"() {
+        given: "a shift request targeting a non-existent project ID"
+        def start = OffsetDateTime.now().plusDays(1)
+        def end = start.plusHours(2)
+        def request = new CreateShiftRequest(UUID.randomUUID(), true, null, start, end, null)
+
+        when: "an unrelated volunteer tries to add a shift to a non-existent project"
+        client.exchange(
+                asVolunteer(HttpRequest.POST("/shifts", request), TestPersonas.VICTOR_VOLUNTEER),
+                Shift
+        )
+
+        then: "403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "CREATE | should return 403 Forbidden when outsider targets soft-deleted project"() {
+        given: "a soft-deleted project"
         def deletedProject = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
                 .withTitle("Deleted Shift Oracle Proj ${UUID.randomUUID()}")
@@ -308,26 +337,17 @@ class ShiftControllerSpec extends BaseControllerSpec {
                 .persist()
         def start = OffsetDateTime.now().plusDays(1)
         def end = start.plusHours(2)
-
-        when: "an unrelated volunteer tries to add a shift to a non-existent project"
-        client.exchange(
-                asVolunteer(HttpRequest.POST("/shifts", new CreateShiftRequest(UUID.randomUUID(), true, null, start, end, null)), TestPersonas.VICTOR_VOLUNTEER),
-                Shift
-        )
-
-        then: "403 Forbidden is returned"
-        def missingErr = thrown(HttpClientResponseException)
-        missingErr.status == HttpStatus.FORBIDDEN
+        def request = new CreateShiftRequest(deletedProject.id(), true, null, start, end, null)
 
         when: "an unrelated volunteer tries to add a shift to the soft-deleted project"
         client.exchange(
-                asVolunteer(HttpRequest.POST("/shifts", new CreateShiftRequest(deletedProject.id(), true, null, start, end, null)), TestPersonas.VICTOR_VOLUNTEER),
+                asVolunteer(HttpRequest.POST("/shifts", request), TestPersonas.VICTOR_VOLUNTEER),
                 Shift
         )
 
         then: "403 Forbidden is returned"
-        def deletedErr = thrown(HttpClientResponseException)
-        deletedErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** READ Tests **********/
@@ -492,7 +512,24 @@ class ShiftControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "UPDATE | should return 403 Forbidden when outsider targets non-existent shift or shift on deleted project"() {
+    def "UPDATE | should return 403 Forbidden when outsider targets non-existent shift"() {
+        given: "a valid update request for a non-existent shift ID"
+        def start = OffsetDateTime.now().plusDays(1)
+        def end = start.plusHours(2)
+        def updateRequest = new UpdateShiftRequest(true, null, start, end, null)
+
+        when: "an unrelated volunteer tries to update a non-existent shift"
+        client.exchange(
+                asVolunteer(HttpRequest.PUT("/shifts/${UUID.randomUUID()}", updateRequest), TestPersonas.VICTOR_VOLUNTEER),
+                Shift
+        )
+
+        then: "403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should return 403 Forbidden when outsider targets shift on soft-deleted project"() {
         given: "a shift on a soft-deleted project"
         def deletedProject = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
@@ -506,16 +543,6 @@ class ShiftControllerSpec extends BaseControllerSpec {
         def end = start.plusHours(2)
         def updateRequest = new UpdateShiftRequest(true, null, start, end, null)
 
-        when: "an unrelated volunteer tries to update a non-existent shift"
-        client.exchange(
-                asVolunteer(HttpRequest.PUT("/shifts/${UUID.randomUUID()}", updateRequest), TestPersonas.VICTOR_VOLUNTEER),
-                Shift
-        )
-
-        then: "403 Forbidden is returned"
-        def missingErr = thrown(HttpClientResponseException)
-        missingErr.status == HttpStatus.FORBIDDEN
-
         when: "an unrelated volunteer tries to update the shift on the soft-deleted project"
         client.exchange(
                 asVolunteer(HttpRequest.PUT("/shifts/${deletedShift.id()}", updateRequest), TestPersonas.VICTOR_VOLUNTEER),
@@ -523,8 +550,23 @@ class ShiftControllerSpec extends BaseControllerSpec {
         )
 
         then: "403 Forbidden is returned"
-        def deletedErr = thrown(HttpClientResponseException)
-        deletedErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should return 404 Not Found when owning org manager targets shift on soft-deleted project"() {
+        given: "a shift on a soft-deleted project"
+        def deletedProject = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Deleted Update Shift Proj ${UUID.randomUUID()}")
+                .withDescription("Soft-deleted project with a shift for update oracle protection.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .deleted()
+                .persist()
+        def deletedShift = dataBuilder.shift().forProject(deletedProject).asVirtual().persist()
+        def start = OffsetDateTime.now().plusDays(1)
+        def end = start.plusHours(2)
+        def updateRequest = new UpdateShiftRequest(true, null, start, end, null)
 
         when: "the owning org manager tries to update the shift on the soft-deleted project"
         client.exchange(
@@ -532,9 +574,9 @@ class ShiftControllerSpec extends BaseControllerSpec {
                 Shift
         )
 
-        then: "404 Not Found is returned with Shift not found"
-        def managerErr = thrown(HttpClientResponseException)
-        managerErr.status == HttpStatus.NOT_FOUND
+        then: "404 Not Found is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     @Unroll
@@ -613,7 +655,16 @@ class ShiftControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "DELETE | should return 403 Forbidden when outsider targets non-existent shift or shift on deleted project"() {
+    def "DELETE | should return 403 Forbidden when outsider targets non-existent shift"() {
+        when: "an unrelated volunteer tries to delete a non-existent shift"
+        client.exchange(asVolunteer(HttpRequest.DELETE("/shifts/${UUID.randomUUID()}"), TestPersonas.VICTOR_VOLUNTEER))
+
+        then: "403 Forbidden is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should return 403 Forbidden when outsider targets shift on soft-deleted project"() {
         given: "a shift on a soft-deleted project"
         def deletedProject = dataBuilder.project()
                 .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
@@ -624,26 +675,31 @@ class ShiftControllerSpec extends BaseControllerSpec {
                 .persist()
         def deletedShift = dataBuilder.shift().forProject(deletedProject).asVirtual().persist()
 
-        when: "an unrelated volunteer tries to delete a non-existent shift"
-        client.exchange(asVolunteer(HttpRequest.DELETE("/shifts/${UUID.randomUUID()}"), TestPersonas.VICTOR_VOLUNTEER))
-
-        then: "403 Forbidden is returned"
-        def missingErr = thrown(HttpClientResponseException)
-        missingErr.status == HttpStatus.FORBIDDEN
-
         when: "an unrelated volunteer tries to delete the shift on the soft-deleted project"
         client.exchange(asVolunteer(HttpRequest.DELETE("/shifts/${deletedShift.id()}"), TestPersonas.VICTOR_VOLUNTEER))
 
         then: "403 Forbidden is returned"
-        def deletedErr = thrown(HttpClientResponseException)
-        deletedErr.status == HttpStatus.FORBIDDEN
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should return 404 Not Found when owning org manager targets shift on soft-deleted project"() {
+        given: "a shift on a soft-deleted project"
+        def deletedProject = dataBuilder.project()
+                .forOrg(TestPersonas.DENVER_METRO_BRANCH_ID)
+                .withTitle("Deleted Delete Shift Proj ${UUID.randomUUID()}")
+                .withDescription("Soft-deleted project with a shift for delete oracle protection.")
+                .withStatus(ProjectStatus.ACTIVE)
+                .deleted()
+                .persist()
+        def deletedShift = dataBuilder.shift().forProject(deletedProject).asVirtual().persist()
 
         when: "the owning org manager tries to delete the shift on the soft-deleted project"
         client.exchange(asOrgManager(HttpRequest.DELETE("/shifts/${deletedShift.id()}"), TestPersonas.LAURA_LOCAL_MANAGER))
 
         then: "404 Not Found is returned"
-        def managerErr = thrown(HttpClientResponseException)
-        managerErr.status == HttpStatus.NOT_FOUND
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
     }
 
     /********** LIST Tests **********/

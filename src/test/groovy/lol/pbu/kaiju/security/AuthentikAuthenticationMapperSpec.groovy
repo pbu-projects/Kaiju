@@ -223,9 +223,9 @@ class AuthentikAuthenticationMapperSpec extends Specification {
     }
 
     @Unroll
-    def "should provision new user with role '#expectedRole' derived from upstream IdP group '#groupClaim'"() {
+    def "should provision new user with role '#expectedRole' derived from upstream identity provider group '#groupClaim'"() {
         given: "an unseeded email"
-        String email = "idp-role-${UUID.randomUUID()}@example.com"
+        String email = "provider-role-${UUID.randomUUID()}@example.com"
         assert !userRepository.findByEmail(email).isPresent()
 
         and: "an incoming token for that email with groups claim"
@@ -270,12 +270,12 @@ class AuthentikAuthenticationMapperSpec extends Specification {
         (["Kaiju Region Directors"] as String[])                                | UserRole.REGION_DIRECTOR
     }
 
-    def "should maintain database role as authoritative when existing user logs in with different IdP group"() {
+    def "should maintain database role as authoritative when existing user logs in with different identity provider group"() {
         given: "an existing user with REGION_DIRECTOR role in database"
         String email = "existing-director-${UUID.randomUUID()}@example.com"
         userRepository.save(new User(null, email, UserRole.REGION_DIRECTOR, OffsetDateTime.now()))
 
-        and: "an incoming token with different IdP group"
+        and: "an incoming token with different identity provider group"
         OpenIdClaims claims = [
                 getEmail: { -> email },
                 get: { String k ->

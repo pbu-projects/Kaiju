@@ -12,16 +12,15 @@ import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CoveringRegion
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest
 import lol.pbu.kaiju.dto.IngestBoundaryResponse
-import lol.pbu.kaiju.dto.RegionCoordinateResolution
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest
+import lol.pbu.kaiju.model.CoveringRegion
 import lol.pbu.kaiju.model.RegionAuditAction
+import lol.pbu.kaiju.model.RegionCoordinateResolution
 import lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
 import lol.pbu.kaiju.repository.UserRepository
-import lol.pbu.kaiju.util.SpatialMappingService
 import org.locationtech.jts.geom.Polygon
 import spock.lang.Unroll
 

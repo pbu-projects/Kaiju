@@ -319,7 +319,7 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
 
     @Unroll
     def "createShift accepts project.locations() without extra location checks when #scenario"() {
-        given: "a mocked DefaultShiftService with a project containing allowedLoc"
+        given: "a DefaultShiftService with mocked repositories and a project containing allowedLoc"
         def h = createMockShiftHarness()
         OffsetDateTime startTime = includeStart ? OffsetDateTime.now(ZoneOffset.UTC).plusDays(1) : null
 
@@ -340,7 +340,7 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
     }
 
     def "createShift rejects a location not in project.locations()"() {
-        given: "a mocked DefaultShiftService with a project containing allowedLoc"
+        given: "a DefaultShiftService with mocked repositories and a project containing allowedLoc"
         def h = createMockShiftHarness()
         OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
 
@@ -356,7 +356,7 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
     }
 
     def "deleteShift throws NOT_FOUND when removeById deletes zero rows"() {
-        given: "a mocked DefaultShiftService where shift exists but removeById returns 0"
+        given: "a DefaultShiftService with mocked repositories where shift exists but removeById returns 0"
         def h = createMockShiftHarness()
         OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
         Shift existing = new Shift(h.shiftId, h.projectWithLocations, true, null, start, start.plusHours(1), [])

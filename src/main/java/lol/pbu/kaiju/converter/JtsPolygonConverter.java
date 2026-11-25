@@ -1,4 +1,4 @@
-package lol.pbu.kaiju.model;
+package lol.pbu.kaiju.converter;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.data.model.runtime.convert.AttributeConverter;

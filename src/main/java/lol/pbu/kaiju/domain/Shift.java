@@ -8,7 +8,6 @@ import io.micronaut.data.annotation.Relation;
 import io.micronaut.data.annotation.sql.JoinTable;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.ValidationException;
-import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.OffsetDateTime;
@@ -48,11 +47,6 @@ public record Shift(
         if ((isVirtual && location != null) || (!isVirtual && location == null)) {
             throw new ValidationException("A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
         }
-    }
-
-    @AssertTrue(message = "A shift must have a location if it is not virtual, and must not have a location if it is virtual.")
-    public boolean isValidLocationLogic() {
-        return (isVirtual && location == null) || (!isVirtual && location != null);
     }
 
     public static Shift forSubmission(

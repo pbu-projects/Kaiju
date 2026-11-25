@@ -27,8 +27,8 @@ import lol.pbu.kaiju.dto.UpdateOrganizationRequest;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.OrganizationService;
+import lol.pbu.kaiju.service.SpatialMappingService;
 import lol.pbu.kaiju.util.PageRequests;
-import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;

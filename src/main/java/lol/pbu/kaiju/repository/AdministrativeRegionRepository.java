@@ -6,7 +6,7 @@ import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
 import io.micronaut.data.repository.PageableRepository;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
-import lol.pbu.kaiju.dto.CoveringRegion;
+import lol.pbu.kaiju.model.CoveringRegion;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
@@ -32,8 +32,6 @@ public interface AdministrativeRegionRepository extends PageableRepository<Admin
     List<CoveringRegion> findCoveringRegions(double lat, double lon);
 
     List<AdministrativeRegion> findByLevelOrderByNameAsc(int level);
-
-    List<AdministrativeRegion> findByParentRegionIdOrderByNameAsc(UUID parentRegionId);
 
     List<AdministrativeRegion> findByLevelAndParentRegionIdOrderByNameAsc(Integer level, UUID parentRegionId);
 

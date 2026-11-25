@@ -1014,7 +1014,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         ]
     }
 
-    def "DefaultShiftService allows an in-region agent to create a shift"() {
+    def "ShiftService allows an in-region agent to create a shift"() {
         given: "an active project and an in-region agent"
         def fixtures = persistShiftServiceFixtures()
 
@@ -1025,7 +1025,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         created.id() != null
     }
 
-    def "DefaultShiftService allows a project sponsor to update a shift"() {
+    def "ShiftService allows a project sponsor to update a shift"() {
         given: "an existing shift and a project sponsor"
         def fixtures = persistShiftServiceFixtures()
         def created = track(shiftService.createShift(fixtures.candidateShift as Shift, (fixtures.inRegionAgent as User).id()))
@@ -1043,7 +1043,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         updated.startTime() == start.plusHours(1)
     }
 
-    def "DefaultShiftService denies shift creation by an out-of-region agent"() {
+    def "ShiftService denies shift creation by an out-of-region agent"() {
         given: "an active project and an out-of-region agent"
         def fixtures = persistShiftServiceFixtures()
 
@@ -1055,7 +1055,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         ex.status == HttpStatus.FORBIDDEN
     }
 
-    def "DefaultShiftService denies shift deletion by an outsider"() {
+    def "ShiftService denies shift deletion by an outsider"() {
         given: "an existing shift and an outsider"
         def fixtures = persistShiftServiceFixtures()
         def created = track(shiftService.createShift(fixtures.candidateShift as Shift, (fixtures.inRegionAgent as User).id()))
@@ -1068,7 +1068,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         ex.status == HttpStatus.FORBIDDEN
     }
 
-    def "DefaultShiftService allows a project sponsor to delete a shift"() {
+    def "ShiftService allows a project sponsor to delete a shift"() {
         given: "an existing shift and a project sponsor"
         def fixtures = persistShiftServiceFixtures()
         def created = track(shiftService.createShift(fixtures.candidateShift as Shift, (fixtures.inRegionAgent as User).id()))
@@ -1081,7 +1081,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "DefaultShiftService throws UNAUTHORIZED on #operation for a missing actor"() {
+    def "ShiftService throws UNAUTHORIZED on #operation for a missing actor"() {
         given: "a candidate shift"
         def fixtures = persistShiftServiceFixtures()
         UUID missingActorId = UUID.randomUUID()
@@ -1107,7 +1107,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         operation << ["createShift", "updateShift", "deleteShift"]
     }
 
-    def "DefaultUserService getCurrentUser returns current user for self"() {
+    def "UserService getCurrentUser returns current user for self"() {
         given: "a standard user"
         def alice = saveUser(UserRole.STANDARD_USER)
 
@@ -1116,7 +1116,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "DefaultUserService getUserById allows #actorRole to read target user"() {
+    def "UserService getUserById allows #actorRole to read target user"() {
         given: "a target user and an actor"
         def alice = saveUser(UserRole.STANDARD_USER)
         def actorId = actorRole == "self" ? alice.id() : saveUser(UserRole.GLOBAL_ADMIN).id()
@@ -1128,7 +1128,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         actorRole << ["self", "GLOBAL_ADMIN"]
     }
 
-    def "DefaultUserService getUserById throws FORBIDDEN when another standard user reads user"() {
+    def "UserService getUserById throws FORBIDDEN when another standard user reads user"() {
         given: "two standard users"
         def alice = saveUser(UserRole.STANDARD_USER)
         def bob = saveUser(UserRole.STANDARD_USER)
@@ -1141,7 +1141,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         readEx.status == HttpStatus.FORBIDDEN
     }
 
-    def "DefaultUserService createUser throws FORBIDDEN for standard user"() {
+    def "UserService createUser throws FORBIDDEN for standard user"() {
         given: "a standard user"
         def bob = saveUser(UserRole.STANDARD_USER)
 
@@ -1153,7 +1153,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         createEx.status == HttpStatus.FORBIDDEN
     }
 
-    def "DefaultUserService updateUser throws FORBIDDEN for standard user"() {
+    def "UserService updateUser throws FORBIDDEN for standard user"() {
         given: "two standard users"
         def alice = saveUser(UserRole.STANDARD_USER)
         def bob = saveUser(UserRole.STANDARD_USER)
@@ -1166,7 +1166,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         updateEx.status == HttpStatus.FORBIDDEN
     }
 
-    def "DefaultUserService deleteUser throws FORBIDDEN for standard user"() {
+    def "UserService deleteUser throws FORBIDDEN for standard user"() {
         given: "two standard users"
         def alice = saveUser(UserRole.STANDARD_USER)
         def bob = saveUser(UserRole.STANDARD_USER)

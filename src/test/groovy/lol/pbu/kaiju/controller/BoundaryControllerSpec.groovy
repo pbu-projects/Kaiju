@@ -275,6 +275,7 @@ class BoundaryControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
+    @Unroll
     def "UPDATE | should fail to update boundary with invalid data: #testCase"(String testCase, Map payload) {
         given: "an existing boundary"
         def boundary = dataBuilder.boundary().withName("Test Update Invalid").withGeometry(createPolygon()).persist()

@@ -450,7 +450,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
                         .header("Authorization", "Bearer ${tokens.idToken}")
         )
 
-        then: "access is granted with 200 OK verifying system:user-manage permission"
+        then: "access is granted with 200 OK verifying system:user:manage permission"
         usersResponse.status == HttpStatus.OK
 
         when: "Sarah calls POST /administrative-regions to create an administrative boundary"
@@ -462,7 +462,7 @@ class AuthentikOidcIntegrationSpec extends Specification {
         )
         createdRegionId = regionResponse.body().id()
 
-        then: "region creation is granted with 200 OK verifying region:manage permission"
+        then: "region creation is granted with 200 OK verifying system:admin permission"
         verifyAll {
             regionResponse.status == HttpStatus.OK
             createdRegionId != null

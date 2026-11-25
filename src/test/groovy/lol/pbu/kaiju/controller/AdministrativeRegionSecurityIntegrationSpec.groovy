@@ -12,6 +12,7 @@ import org.locationtech.jts.geom.Coordinate
 import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.PrecisionModel
 import spock.lang.Shared
+import spock.lang.Unroll
 
 import java.util.UUID
 
@@ -426,33 +427,28 @@ class AdministrativeRegionSecurityIntegrationSpec extends BaseControllerSpec {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "Security | should reject unauthenticated and non-admin callers on US sync endpoints"() {
+    def "Security | should reject unauthenticated POST /administrative-regions/sync/us/states with 401 UNAUTHORIZED"() {
         when: "an unauthenticated caller attempts to sync US states"
         client.exchange(HttpRequest.POST("/administrative-regions/sync/us/states", [:]).accept(MediaType.APPLICATION_JSON_TYPE))
 
-        then:
-        def e1 = thrown(HttpClientResponseException)
-        e1.status == HttpStatus.UNAUTHORIZED
+        then: "an UNAUTHORIZED response is returned"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
+    }
 
-        when: "a standard volunteer attempts to sync US states"
-        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/sync/us/states", [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
+    @Unroll
+    def "Security | should reject standard volunteer on US #syncTarget sync endpoint with 403 FORBIDDEN"(String syncTarget, String endpoint) {
+        when: "a standard volunteer attempts to sync US regions"
+        client.exchange(asVolunteer(HttpRequest.POST(endpoint, [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
 
-        then:
-        def e2 = thrown(HttpClientResponseException)
-        e2.status == HttpStatus.FORBIDDEN
+        then: "a 403 FORBIDDEN status is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
 
-        when: "a standard volunteer attempts to sync US counties"
-        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/sync/us/states/CO/counties", [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
-
-        then:
-        def e3 = thrown(HttpClientResponseException)
-        e3.status == HttpStatus.FORBIDDEN
-
-        when: "a standard volunteer attempts to sync US places"
-        client.exchange(asVolunteer(HttpRequest.POST("/administrative-regions/sync/us/states/CO/places", [:]).accept(MediaType.APPLICATION_JSON_TYPE)))
-
-        then:
-        def e4 = thrown(HttpClientResponseException)
-        e4.status == HttpStatus.FORBIDDEN
+        where:
+        syncTarget | endpoint
+        "states"   | "/administrative-regions/sync/us/states"
+        "counties" | "/administrative-regions/sync/us/states/CO/counties"
+        "places"   | "/administrative-regions/sync/us/states/CO/places"
     }
 }

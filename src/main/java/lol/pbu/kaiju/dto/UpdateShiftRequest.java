@@ -4,6 +4,10 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lol.pbu.kaiju.validation.ShiftLocation;
+import lol.pbu.kaiju.validation.ShiftTimeRange;
+import lol.pbu.kaiju.validation.ValidShiftLocation;
+import lol.pbu.kaiju.validation.ValidTimeRange;
 
 import java.time.OffsetDateTime;
 import java.util.List;

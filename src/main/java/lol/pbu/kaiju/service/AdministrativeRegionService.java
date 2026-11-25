@@ -5,8 +5,8 @@ import io.micronaut.data.model.CursoredPageable;
 import lol.pbu.kaiju.domain.AdministrativeRegion;
 import lol.pbu.kaiju.dto.CreateAdministrativeRegionRequest;
 import lol.pbu.kaiju.dto.IngestBoundaryResponse;
-import lol.pbu.kaiju.dto.RegionCoordinateResolution;
 import lol.pbu.kaiju.dto.UpdateAdministrativeRegionRequest;
+import lol.pbu.kaiju.model.RegionCoordinateResolution;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 

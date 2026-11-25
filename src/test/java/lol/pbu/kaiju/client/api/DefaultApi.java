@@ -146,6 +146,18 @@ public interface DefaultApi {
     );
 
     /**
+     * addProject
+     *
+     * @param createProjectRequest (required)
+     *
+     * @return addProject 200 response (status code 200)
+     */
+    @Post("/projects")
+    Project addProject(
+        @Body @NotNull @Valid CreateProjectRequest createProjectRequest
+    );
+
+    /**
      * {@summary Associates a user with an administrative region under a designated role.}
      * Associates a user with an administrative region under a designated role. Restricted to platform administrators and directors of the target region.
      *
@@ -237,7 +249,7 @@ public interface DefaultApi {
      * @param id the ID of the location to delete (required)
      */
     @Delete("/locations/{id}")
-    void deleteById(
+    void deleteLocation(
         @PathVariable("id") @NotNull UUID id
     );
 
@@ -740,18 +752,6 @@ public interface DefaultApi {
     PageOrganization searchByRegion(
         @QueryValue("regionId") @NotNull UUID regionId,
         @QueryValue("pageable") @NotNull @Valid Pageable pageable
-    );
-
-    /**
-     * submitProject
-     *
-     * @param createProjectRequest (required)
-     *
-     * @return submitProject 200 response (status code 200)
-     */
-    @Post("/projects")
-    Project submitProject(
-        @Body @NotNull @Valid CreateProjectRequest createProjectRequest
     );
 
     /**

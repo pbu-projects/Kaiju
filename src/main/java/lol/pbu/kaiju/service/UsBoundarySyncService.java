@@ -11,7 +11,8 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import lol.pbu.kaiju.dto.UsSyncResult;
 import lol.pbu.kaiju.service.BoundaryIngestionService.RegionUpsert;
-import lol.pbu.kaiju.service.UsStateCatalog.UsStateEntry;
+import lol.pbu.kaiju.util.UsStateCatalog;
+import lol.pbu.kaiju.util.UsStateCatalog.UsStateEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

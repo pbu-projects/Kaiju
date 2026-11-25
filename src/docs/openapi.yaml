@@ -476,7 +476,7 @@ paths:
         access.
       description: Deletes a location by its ID after checking caller permission and
         region access.
-      operationId: deleteById
+      operationId: deleteLocation
       parameters:
       - name: id
         in: path
@@ -487,7 +487,7 @@ paths:
           format: uuid
       responses:
         "200":
-          description: deleteById 200 response
+          description: deleteLocation 200 response
   /organization-audit-logs:
     get:
       operationId: getOrganizationAuditLogs
@@ -904,7 +904,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/CursoredPage_Project_"
     post:
-      operationId: submitProject
+      operationId: addProject
       requestBody:
         content:
           application/json:
@@ -913,7 +913,7 @@ paths:
         required: true
       responses:
         "200":
-          description: submitProject 200 response
+          description: addProject 200 response
           content:
             application/json:
               schema:

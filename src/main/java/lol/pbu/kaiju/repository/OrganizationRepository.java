@@ -9,8 +9,8 @@ import io.micronaut.data.model.DataType;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.data.repository.PageableRepository;
+import lol.pbu.kaiju.converter.JtsPointConverter;
 import lol.pbu.kaiju.domain.Organization;
-import lol.pbu.kaiju.model.JtsPointConverter;
 import org.jspecify.annotations.NonNull;
 import org.locationtech.jts.geom.Point;
 

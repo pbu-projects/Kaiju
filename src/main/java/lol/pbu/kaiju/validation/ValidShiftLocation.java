@@ -1,4 +1,4 @@
-package lol.pbu.kaiju.dto;
+package lol.pbu.kaiju.validation;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;

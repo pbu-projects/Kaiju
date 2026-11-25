@@ -15,6 +15,10 @@ Name classes, methods, and files so anyone can tell what they do without opening
   * Name read models and value records after what they represent (`Coordinates`, `CoveringRegion`).
   * Name HTTP request payloads `<Action><Entity>Request` and place them in `lol.pbu.kaiju.dto` (for example, `CreateUserRequest`, `UpdateUserRoleRequest`). Do not put request payloads in `model/` or name them `*Command`.
   * Name utility classes after what they provide (`PageRequests` instead of `PageableUtils`).
+* **Package Boundaries (`dto`, `model`, `validation`):**
+  * `lol.pbu.kaiju.dto`: HTTP request and response wire payloads (`*Request`, `*Response`, `*Result`, `Coordinates`).
+  * `lol.pbu.kaiju.model`: Domain enums, internal query projections, and read/view models (such as `CoveringRegion`, `RegionCoordinateResolution`, `ProjectSearchCard`, `FeaturedProjectView`).
+  * `lol.pbu.kaiju.validation`: Bean Validation contracts, constraint annotations, and validators (such as `ShiftLocation`, `ShiftTimeRange`, `ValidShiftLocation`, `ValidShiftLocationValidator`, `ValidTimeRange`, `ValidTimeRangeValidator`).
 * **Spell out non-obvious abbreviations:**
   * Prefer `IdentityProviderRoleMapper` over `IdpRoleMapper`.
   * Standard, well-known abbreviations are fine when they are clearer (for example, `UsSyncResult`).

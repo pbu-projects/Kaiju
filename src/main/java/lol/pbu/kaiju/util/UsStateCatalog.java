@@ -1,4 +1,4 @@
-package lol.pbu.kaiju.service;
+package lol.pbu.kaiju.util;
 
 import java.util.List;
 import java.util.Locale;

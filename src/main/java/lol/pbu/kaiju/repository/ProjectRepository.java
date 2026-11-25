@@ -11,8 +11,8 @@ import io.micronaut.data.model.DataType;
 import io.micronaut.data.model.Page;
 import io.micronaut.data.model.Pageable;
 import io.micronaut.data.repository.PageableRepository;
+import lol.pbu.kaiju.converter.JtsPointConverter;
 import lol.pbu.kaiju.domain.Project;
-import lol.pbu.kaiju.model.JtsPointConverter;
 import lol.pbu.kaiju.model.ProjectSearchCard;
 import lol.pbu.kaiju.model.ProjectStatus;
 import org.jspecify.annotations.NonNull;
@@ -51,9 +51,6 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
     @NonNull
     @Join("organization")
     CursoredPage<Project> findByStatusAndDeletedAtIsNull(@NonNull ProjectStatus status, @NonNull CursoredPageable pageable);
-
-    @Join("organization")
-    CursoredPage<Project> findByTitle(@Nullable String title, CursoredPageable pageable);
 
     @Join("organization")
     CursoredPage<Project> findByTitleAndDeletedAtIsNull(@Nullable String title, @NonNull CursoredPageable pageable);
