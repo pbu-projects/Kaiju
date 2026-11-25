@@ -26,7 +26,7 @@ import lol.pbu.kaiju.repository.OrganizationRepository
 import lol.pbu.kaiju.repository.ProjectAuditLogRepository
 import lol.pbu.kaiju.repository.ProjectRepository
 import lol.pbu.kaiju.repository.UserRepository
-import lol.pbu.kaiju.security.ProjectSecurityService
+import lol.pbu.kaiju.service.ProjectService
 import net.datafaker.Faker
 import org.locationtech.jts.geom.Coordinate
 import spock.lang.Shared
@@ -52,7 +52,7 @@ class ProjectControllerSpec extends BaseControllerSpec {
     ProjectController projectController
 
     @Inject
-    ProjectSecurityService realProjectSecurityService
+    ProjectService projectService
 
     @Inject
     OrganizationRepository organizationRepository
@@ -296,6 +296,18 @@ class ProjectControllerSpec extends BaseControllerSpec {
         then: "a 400 Bad Request is returned"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.BAD_REQUEST
+    }
+
+    def "CREATE | should return 403 Forbidden for standard user with non-existent organizationId (no existence oracle)"() {
+        given: "a create command with non-existent organization ID"
+        def command = createProjectCommand(UUID.randomUUID(), "Outsider Orphan Project")
+
+        when: "an unprivileged standard user submits via HTTP POST"
+        client.exchange(asVolunteer(HttpRequest.POST("/projects", command), TestPersonas.VICTOR_VOLUNTEER), Project)
+
+        then: "a 403 Forbidden is returned instead of 400"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
     }
 
     /********** READ Tests **********/
@@ -1248,22 +1260,115 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "APPROVE | should throw 404 Not Found when approving principal does not exist in users table"() {
+    def "APPROVE | should throw 401 Unauthorized when approving principal does not exist in users table"() {
         given: "a PENDING project"
         def org = getRandomOrganization()
-        def command = createProjectCommand(org.id(), "Actor 404 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
+        def command = createProjectCommand(org.id(), "Actor 401 Project", "Description with at least twenty characters here.", STANDARD, PENDING)
         Project saved = track(client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", command)), Project).body())
 
         when: "calling approveProject directly with a principal UUID that is not in the users table"
         def nonExistentUserId = UUID.randomUUID()
         projectController.approveProject(saved.id(), createPrincipal(nonExistentUserId))
 
-        then: "a 404 Not Found is thrown"
+        then: "a 401 Unauthorized is thrown"
         def e = thrown(HttpStatusException)
         verifyAll(e) {
-            status == HttpStatus.NOT_FOUND
-            message == "User not found"
+            status == HttpStatus.UNAUTHORIZED
+            message == "Actor user not found"
         }
+    }
+
+    def "APPROVE | should throw 403 Forbidden before 400 status check when out-of-region director targets DRAFT project"() {
+        given: "a DRAFT project in Colorado Springs outside Denver County"
+        def org = getRandomOrganization()
+        def csLoc = dataBuilder.location()
+                .withName("CS Draft Loc")
+                .withAddressLine("123 Main")
+                .withCity("Colo Springs")
+                .withCountryCode("US")
+                .atPoint(-104.82, 38.83)
+                .persist()
+        def project = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("CS Draft Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .atLocation(csLoc)
+                .persist()
+
+        when: "Denver County director tries to approve the out-of-region DRAFT project"
+        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${project.id()}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
+
+        then: "403 Forbidden is thrown without leaking project status"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "APPROVE | should return 403 Forbidden (not 404) when out-of-region director approves or rejects non-existent or deleted project"() {
+        given: "a non-existent project ID and a soft-deleted project outside Denver County"
+        def missingId = UUID.randomUUID()
+        def org = getRandomOrganization()
+        def csLoc = dataBuilder.location()
+                .withName("CS Deleted Loc")
+                .withAddressLine("123 Main")
+                .withCity("Colo Springs")
+                .withCountryCode("US")
+                .atPoint(-104.82, 38.83)
+                .persist()
+        def deletedOutOfRegion = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("CS Deleted Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(PENDING)
+                .atLocation(csLoc)
+                .deleted()
+                .persist()
+
+        when: "Denver County director tries to approve the non-existent project via HTTP"
+        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${missingId}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
+
+        then: "403 Forbidden is returned"
+        def approveMissingErr = thrown(HttpClientResponseException)
+        approveMissingErr.status == HttpStatus.FORBIDDEN
+
+        when: "Denver County director tries to approve the soft-deleted out-of-region project via HTTP"
+        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${deletedOutOfRegion.id()}/status", ""), TestPersonas.DANIEL_COUNTY_DIRECTOR), Project)
+
+        then: "403 Forbidden is returned"
+        def approveDeletedErr = thrown(HttpClientResponseException)
+        approveDeletedErr.status == HttpStatus.FORBIDDEN
+
+        when: "Denver County director tries to reject the non-existent project"
+        projectService.rejectProject(missingId, TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
+
+        then: "403 Forbidden is thrown"
+        def rejectMissingErr = thrown(HttpStatusException)
+        rejectMissingErr.status == HttpStatus.FORBIDDEN
+
+        when: "Denver County director tries to reject the soft-deleted out-of-region project"
+        projectService.rejectProject(deletedOutOfRegion.id(), TestPersonas.DANIEL_COUNTY_DIRECTOR.id)
+
+        then: "403 Forbidden is thrown"
+        def rejectDeletedErr = thrown(HttpStatusException)
+        rejectDeletedErr.status == HttpStatus.FORBIDDEN
+    }
+
+    def "APPROVE | should throw 401 Unauthorized when approving or rejecting missing actor targets non-existent project"() {
+        when: "calling approveProject with a missing actor UUID"
+        projectService.approveProject(UUID.randomUUID(), UUID.randomUUID())
+
+        then: "401 Unauthorized is thrown"
+        def approveErr = thrown(HttpStatusException)
+        approveErr.status == HttpStatus.UNAUTHORIZED
+
+        when: "calling rejectProject with a missing actor UUID"
+        projectService.rejectProject(UUID.randomUUID(), UUID.randomUUID())
+
+        then: "401 Unauthorized is thrown"
+        def rejectErr = thrown(HttpStatusException)
+        rejectErr.status == HttpStatus.UNAUTHORIZED
     }
 
     /********** MANAGING REGION Tests **********/
@@ -1656,6 +1761,64 @@ class ProjectControllerSpec extends BaseControllerSpec {
             deleted.deletedAt() != null
             projectRepository.findByIdAndDeletedAtIsNull(saved.id()).isEmpty()
         }
+    }
+
+    def "UPDATE & DELETE | should return 403 Forbidden (not 404) when non-admin targets missing or soft-deleted project"() {
+        given: "a soft-deleted project and a random missing project ID"
+        def org = dataBuilder.organization().withName("Oracle Guard Org").asPublic().verified().persist()
+        dataBuilder.organizationUser().asOrgManager(TestPersonas.LAURA_LOCAL_MANAGER, org).persist()
+        def deletedProject = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Soft Deleted Oracle Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(DRAFT)
+                .deleted()
+                .persist()
+        def missingId = UUID.randomUUID()
+        def updateCmd = updateProjectCommand(org.id(), "Tampered Title", "Description with at least twenty characters here.")
+
+        when: "an unaffiliated user attempts to update the missing and soft-deleted projects"
+        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${missingId}", updateCmd)), Project)
+
+        then:
+        def updateMissingEx = thrown(HttpClientResponseException)
+        updateMissingEx.status == HttpStatus.FORBIDDEN
+
+        when:
+        client.exchange(asVolunteer(HttpRequest.PUT("/projects/${deletedProject.id()}", updateCmd)), Project)
+
+        then:
+        def updateDeletedEx = thrown(HttpClientResponseException)
+        updateDeletedEx.status == HttpStatus.FORBIDDEN
+
+        when: "an unaffiliated user attempts to delete the missing and soft-deleted projects"
+        client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${missingId}")))
+
+        then:
+        def deleteMissingEx = thrown(HttpClientResponseException)
+        deleteMissingEx.status == HttpStatus.FORBIDDEN
+
+        when:
+        client.exchange(asVolunteer(HttpRequest.DELETE("/projects/${deletedProject.id()}")))
+
+        then:
+        def deleteDeletedEx = thrown(HttpClientResponseException)
+        deleteDeletedEx.status == HttpStatus.FORBIDDEN
+
+        when: "the owning org manager attempts to update or delete their soft-deleted project"
+        client.exchange(asOrgManager(HttpRequest.PUT("/projects/${deletedProject.id()}", updateCmd), TestPersonas.LAURA_LOCAL_MANAGER), Project)
+
+        then:
+        def managerUpdateDeletedEx = thrown(HttpClientResponseException)
+        managerUpdateDeletedEx.status == HttpStatus.NOT_FOUND
+
+        when:
+        client.exchange(asOrgManager(HttpRequest.DELETE("/projects/${deletedProject.id()}"), TestPersonas.LAURA_LOCAL_MANAGER))
+
+        then:
+        def managerDeleteDeletedEx = thrown(HttpClientResponseException)
+        managerDeleteDeletedEx.status == HttpStatus.NOT_FOUND
     }
 
     /********** LIST / Draining Tests **********/

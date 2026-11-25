@@ -19,8 +19,7 @@ import lol.pbu.kaiju.domain.Location;
 import lol.pbu.kaiju.dto.CreateLocationCommand;
 import lol.pbu.kaiju.dto.UpdateLocationCommand;
 import lol.pbu.kaiju.repository.LocationRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
@@ -29,7 +28,6 @@ import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
@@ -45,21 +43,19 @@ public class LocationController {
 
     public static final String DEFAULT_SORT_FIELD = "name";
     private static final String LOCATION_NOT_FOUND = "Location not found";
-    private static final String OUTSIDE_REGION_ERROR =
-            "Forbidden: Only system admins or region directors for this area may modify this location";
 
     private final LocationRepository locationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final UserRepository userRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public LocationController(
             LocationRepository locationRepository,
             SpatialMappingService spatialMappingService,
-            UserRepository userRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.locationRepository = locationRepository;
         this.spatialMappingService = spatialMappingService;
-        this.userRepository = userRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     @Get
@@ -84,9 +80,8 @@ public class LocationController {
     @Post
     public Location addLocation(@Valid @Body CreateLocationCommand command, Principal principal) {
         Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        verifyPointJurisdiction(principal, point);
-        Location location = new Location(
-                null,
+        projectSecurityService.authorizeLocationCreate(UUID.fromString(principal.getName()), point);
+        Location location = Location.forCreation(
                 command.name(),
                 command.addressLine(),
                 command.city(),
@@ -114,13 +109,12 @@ public class LocationController {
             @Valid @Body UpdateLocationCommand command,
             Principal principal
     ) {
+        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
+        projectSecurityService.authorizeLocationUpdate(UUID.fromString(principal.getName()), id, point);
         Location existing = locationRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND));
-        Point point = spatialMappingService.toPoint(command.longitude(), command.latitude());
-        verifyLocationAndPointJurisdiction(principal, id, point);
         String timezone = resolveUpdatedTimezone(existing, point, command.timezone());
-        Location location = new Location(
-                id,
+        Location location = existing.withUpdatedDetails(
                 command.name(),
                 command.addressLine(),
                 command.city(),
@@ -143,46 +137,11 @@ public class LocationController {
     @Delete("/{id}")
     public void deleteById(@PathVariable UUID id, Principal principal) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!isSystemAdmin(actorId)) {
-            if (!locationRepository.existsById(id)) {
-                throw new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND);
-            }
-            if (!locationRepository.isLocationInDirectorRegion(actorId, id)) {
-                throw new HttpStatusException(FORBIDDEN, OUTSIDE_REGION_ERROR);
-            }
-        }
+        projectSecurityService.authorizeLocationDelete(actorId, id);
         long deletedCount = locationRepository.removeById(id);
         if (deletedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, LOCATION_NOT_FOUND);
         }
-    }
-
-    private void verifyPointJurisdiction(Principal principal, Point point) {
-        UUID actorId = UUID.fromString(principal.getName());
-        if (isSystemAdmin(actorId)) {
-            return;
-        }
-        if (point == null || !locationRepository.isPointInDirectorRegion(actorId, point)) {
-            throw new HttpStatusException(FORBIDDEN, OUTSIDE_REGION_ERROR);
-        }
-    }
-
-    private void verifyLocationAndPointJurisdiction(Principal principal, UUID locationId, Point point) {
-        UUID actorId = UUID.fromString(principal.getName());
-        if (isSystemAdmin(actorId)) {
-            return;
-        }
-        if (!locationRepository.isLocationInDirectorRegion(actorId, locationId)
-                || point == null
-                || !locationRepository.isPointInDirectorRegion(actorId, point)) {
-            throw new HttpStatusException(FORBIDDEN, OUTSIDE_REGION_ERROR);
-        }
-    }
-
-    private boolean isSystemAdmin(UUID userId) {
-        return userRepository.findById(userId)
-                .map(user -> user.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
     }
 
     private String resolveUpdatedTimezone(Location existing, Point point, String requestedTimezone) {

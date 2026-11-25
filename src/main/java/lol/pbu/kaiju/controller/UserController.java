@@ -10,7 +10,6 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -19,8 +18,6 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.dto.CreateUserCommand;
 import lol.pbu.kaiju.dto.UpdateUserCommand;
 import lol.pbu.kaiju.model.UserRole;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.service.UserService;
 import lol.pbu.kaiju.util.PageableUtils;
 
@@ -30,8 +27,6 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
-import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_USER_MANAGE_CLAIM;
 
@@ -43,18 +38,15 @@ public class UserController {
     public static final String DEFAULT_SORT_FIELD = "email";
 
     private final UserService userService;
-    private final UserRepository userRepository;
 
-    public UserController(UserService userService, UserRepository userRepository) {
+    public UserController(UserService userService) {
         this.userService = userService;
-        this.userRepository = userRepository;
     }
 
     @Get("/me")
     public User getCurrentUser(Principal principal) {
         UUID userId = UUID.fromString(principal.getName());
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "User not found"));
+        return userService.getCurrentUser(userId);
     }
 
     @Get
@@ -65,22 +57,21 @@ public class UserController {
 
     @Get("/{id}")
     public Optional<User> getUser(@PathVariable UUID id, Principal principal) {
-        verifySelfOrAdmin(id, principal);
-        return userService.getUserById(id);
+        UUID actorUserId = UUID.fromString(principal.getName());
+        return userService.getUserById(id, actorUserId);
     }
 
     @Secured(SYSTEM_USER_MANAGE_CLAIM)
     @Post
     public User addUser(@Valid @Body CreateUserCommand command, Principal principal) {
-        verifyAdmin(principal);
+        UUID actorUserId = UUID.fromString(principal.getName());
         UserRole targetRole = command.role() != null ? command.role() : UserRole.STANDARD_USER;
-        User safeUser = new User(
-                null,
+        User safeUser = User.forCreation(
                 command.email(),
                 targetRole,
                 OffsetDateTime.now(ZoneOffset.UTC)
         );
-        return userService.createUser(safeUser);
+        return userService.createUser(safeUser, actorUserId);
     }
 
     /**
@@ -97,14 +88,9 @@ public class UserController {
      */
     @Put("/{id}")
     public User updateUser(@PathVariable UUID id, @Valid @Body UpdateUserCommand command, Principal principal) {
-        verifySelfOrAdmin(id, principal);
-        User candidate = new User(
-                id,
-                command.email(),
-                null,
-                null
-        );
-        return userService.updateUser(id, candidate);
+        UUID actorUserId = UUID.fromString(principal.getName());
+        User candidate = User.forEmailUpdate(id, command.email());
+        return userService.updateUser(id, candidate, actorUserId);
     }
 
     /**
@@ -118,31 +104,7 @@ public class UserController {
      */
     @Delete("/{id}")
     public void deleteUser(@PathVariable UUID id, Principal principal) {
-        verifySelfOrAdmin(id, principal);
-        userService.deleteUser(id);
-    }
-
-    private void verifySelfOrAdmin(UUID targetUserId, Principal principal) {
-        UUID callerId = UUID.fromString(principal.getName());
-        boolean isSelf = callerId.equals(targetUserId);
-        if (isSelf) {
-            return;
-        }
-        boolean hasAdminManage = userRepository.findById(callerId)
-                .map(u -> u.role().hasPermission(Permission.SYSTEM_USER_MANAGE) || u.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-        if (!hasAdminManage) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: You cannot modify or delete another user's account");
-        }
-    }
-
-    private void verifyAdmin(Principal principal) {
-        UUID callerId = UUID.fromString(principal.getName());
-        boolean hasAdmin = userRepository.findById(callerId)
-                .map(u -> u.role().hasPermission(Permission.SYSTEM_USER_MANAGE) || u.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-        if (!hasAdmin) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: Only administrators can assign elevated user roles");
-        }
+        UUID actorUserId = UUID.fromString(principal.getName());
+        userService.deleteUser(id, actorUserId);
     }
 }

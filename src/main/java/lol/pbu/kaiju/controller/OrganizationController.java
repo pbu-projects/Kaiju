@@ -14,7 +14,6 @@ import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 import io.micronaut.security.annotation.Secured;
@@ -25,24 +24,17 @@ import jakarta.validation.constraints.Positive;
 import lol.pbu.kaiju.domain.Organization;
 import lol.pbu.kaiju.dto.CreateOrganizationCommand;
 import lol.pbu.kaiju.dto.UpdateOrganizationCommand;
-import lol.pbu.kaiju.model.VerificationStatus;
 import lol.pbu.kaiju.repository.OrganizationRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.service.OrganizationService;
 import lol.pbu.kaiju.util.PageableUtils;
 import lol.pbu.kaiju.util.SpatialMappingService;
 import org.locationtech.jts.geom.Point;
 
 import java.security.Principal;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.SYSTEM_ADMIN_CLAIM;
 
@@ -56,21 +48,18 @@ public class OrganizationController {
     private final OrganizationService organizationService;
     private final OrganizationRepository organizationRepository;
     private final SpatialMappingService spatialMappingService;
-    private final UserRepository userRepository;
-    private final SecurityQueryRepository queryRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public OrganizationController(
             OrganizationService organizationService,
             OrganizationRepository organizationRepository,
             SpatialMappingService spatialMappingService,
-            UserRepository userRepository,
-            SecurityQueryRepository queryRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.organizationService = organizationService;
         this.organizationRepository = organizationRepository;
         this.spatialMappingService = spatialMappingService;
-        this.userRepository = userRepository;
-        this.queryRepository = queryRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     @Secured(SYSTEM_ADMIN_CLAIM)
@@ -203,32 +192,22 @@ public class OrganizationController {
 
     @Get("/{id}")
     public Optional<Organization> getOrganization(@PathVariable UUID id, Principal principal) {
-        Optional<Organization> orgOpt = organizationService.getOrganizationById(id);
-        if (orgOpt.isEmpty()) {
-            return Optional.empty();
-        }
-        Organization org = orgOpt.get();
-        if (!isPubliclyVisible(org)) {
-            UUID callerId = UUID.fromString(principal.getName());
-            if (!isSystemAdmin(callerId) && !queryRepository.isAnyOrgMember(callerId, id)) {
-                throw new HttpStatusException(FORBIDDEN, "Forbidden: You do not have permission to view this organization");
-            }
-        }
-        return Optional.of(org);
+        UUID callerId = UUID.fromString(principal.getName());
+        return organizationService.getOrganizationById(id)
+                .map(org -> {
+                    projectSecurityService.authorizeOrganizationView(callerId, org);
+                    return org;
+                });
     }
 
     @Post
     public Organization addOrganization(@Valid @Body CreateOrganizationCommand command, Principal principal) {
         UUID creatorUserId = UUID.fromString(principal.getName());
-        Organization organization = new Organization(
-                null,
+        Organization organization = Organization.forCreation(
                 command.name(),
                 command.websiteUrl(),
                 command.parentId(),
-                command.isPublic(),
-                VerificationStatus.UNVERIFIED,
-                null,
-                List.of()
+                command.isPublic()
         );
         return organizationService.createOrganization(organization, creatorUserId);
     }
@@ -244,16 +223,12 @@ public class OrganizationController {
      */
     @Put("/{id}")
     public Organization updateOrganization(@PathVariable UUID id, @Valid @Body UpdateOrganizationCommand command, Principal principal) {
-        verifyOrgAdminAuthority(principal, id);
-        Organization candidate = new Organization(
+        Organization candidate = Organization.forUpdate(
                 id,
                 command.name(),
                 command.websiteUrl(),
                 command.parentId(),
-                command.isPublic(),
-                null,
-                null,
-                null
+                command.isPublic()
         );
         UUID actorUserId = UUID.fromString(principal.getName());
         return organizationService.updateOrganization(id, candidate, actorUserId);
@@ -268,31 +243,7 @@ public class OrganizationController {
      */
     @Delete("/{id}")
     public void deleteOrganization(@PathVariable UUID id, Principal principal) {
-        verifyOrgAdminAuthority(principal, id);
-        organizationService.deleteOrganization(id);
-    }
-
-    private void verifyOrgAdminAuthority(Principal principal, UUID organizationId) {
-        UUID callerId = UUID.fromString(principal.getName());
-        if (isSystemAdmin(callerId)) {
-            return;
-        }
-        if (!queryRepository.isOrgAdmin(callerId, organizationId)) {
-            throw new HttpStatusException(FORBIDDEN, "Forbidden: Only organization admins or system administrators may modify this organization");
-        }
-    }
-
-    private boolean isSystemAdmin(UUID callerId) {
-        return userRepository.findById(callerId)
-                .map(u -> u.role().hasPermission(Permission.SYSTEM_ADMIN))
-                .orElse(false);
-    }
-
-    private boolean isPubliclyVisible(Organization org) {
-        boolean notExpired = org.verificationExpiresAt() == null
-                || org.verificationExpiresAt().isAfter(OffsetDateTime.now(ZoneOffset.UTC));
-        return Boolean.TRUE.equals(org.isPublic())
-                && org.verificationStatus() == VerificationStatus.VERIFIED
-                && notExpired;
+        UUID actorUserId = UUID.fromString(principal.getName());
+        organizationService.deleteOrganization(id, actorUserId);
     }
 }

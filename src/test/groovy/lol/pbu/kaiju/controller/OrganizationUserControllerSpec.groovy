@@ -78,6 +78,25 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
+    def "CREATE | should reject cross-org admin attempting to add user to another organization with 403 FORBIDDEN"() {
+        given: "an org admin of Denver Metro Branch targeting Utah State Chapter"
+        def command = new CreateOrganizationUserCommand(
+                TestPersonas.VICTOR_VOLUNTEER.id,
+                TestPersonas.UTAH_STATE_CHAPTER_ID,
+                OrganizationUserRole.ORG_MEMBER
+        )
+
+        when: "the Denver org admin attempts to add a member to Utah State Chapter"
+        client.exchange(
+                asOrgAdmin(HttpRequest.POST("/organization-users", command), TestPersonas.LEO_LOCAL_ADMIN),
+                OrganizationUser
+        )
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     @Unroll
     def "CREATE | should fail to save organization user with invalid data: #testCase"(String testCase, Map payload) {
         when: "an attempt is made to add with invalid data via HTTP POST"
@@ -121,6 +140,53 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
             result.id().organizationId() == orgId
             result.role() == OrganizationUserRole.ORG_ADMIN
         }
+    }
+
+    def "READ | should allow user to view their own organization membership"() {
+        given: "a member of Denver Metro Branch"
+        UUID userId = TestPersonas.LUKE_LOCAL_MEMBER.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
+
+        when: "the member reads their own membership record"
+        def response = client.exchange(
+                asOrgMember(HttpRequest.GET("/organization-users/${userId}/${orgId}"), TestPersonas.LUKE_LOCAL_MEMBER),
+                OrganizationUser
+        )
+        OrganizationUser result = response.body()
+
+        then: "200 OK is returned with their membership details"
+        verifyAll {
+            response.status == HttpStatus.OK
+            result.id().userId() == userId
+            result.id().organizationId() == orgId
+            result.role() == OrganizationUserRole.ORG_MEMBER
+        }
+    }
+
+    def "READ | should reject outsider and cross-org admin viewing another user's organization membership with 403 FORBIDDEN"() {
+        given: "a membership in Denver Metro Branch"
+        UUID targetUserId = TestPersonas.LEO_LOCAL_ADMIN.id
+        UUID orgId = TestPersonas.DENVER_METRO_BRANCH_ID
+
+        when: "an unaffiliated volunteer requests the membership"
+        client.exchange(
+                asVolunteer(HttpRequest.GET("/organization-users/${targetUserId}/${orgId}"), TestPersonas.VICTOR_VOLUNTEER),
+                OrganizationUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def outsiderErr = thrown(HttpClientResponseException)
+        outsiderErr.status == HttpStatus.FORBIDDEN
+
+        when: "an org admin from Utah State Chapter requests the Denver membership"
+        client.exchange(
+                asOrgAdmin(HttpRequest.GET("/organization-users/${targetUserId}/${orgId}"), TestPersonas.URSULA_UTAH_ADMIN),
+                OrganizationUser
+        )
+
+        then: "403 Forbidden is thrown"
+        def crossOrgErr = thrown(HttpClientResponseException)
+        crossOrgErr.status == HttpStatus.FORBIDDEN
     }
 
     def "READ | should return 404 for a non-existent composite ID"() {
@@ -189,6 +255,23 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
+    def "UPDATE | should throw 403 Forbidden when cross-org admin attempts to update org user in another organization"() {
+        given: "a Denver org admin targeting a Utah State Chapter membership"
+        UUID userId = TestPersonas.URSULA_UTAH_ADMIN.id
+        UUID orgId = TestPersonas.UTAH_STATE_CHAPTER_ID
+        def command = new UpdateOrganizationUserCommand(OrganizationUserRole.ORG_MEMBER)
+
+        when: "the Denver org admin attempts to update the Utah membership"
+        client.exchange(
+                asOrgAdmin(HttpRequest.PUT("/organization-users/${userId}/${orgId}", command), TestPersonas.LEO_LOCAL_ADMIN),
+                OrganizationUser
+        )
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     def "UPDATE | should fail to update a non-existent organization user when called by admin"() {
         given: "a non-existent user and organization ID"
         def nonExistentUserId = UUID.randomUUID()
@@ -240,6 +323,21 @@ class OrganizationUserControllerSpec extends BaseControllerSpec {
         when: "the standard user attempts to delete org user via HTTP DELETE"
         client.exchange(
                 asVolunteer(HttpRequest.DELETE("/organization-users/${targetUserId}/${orgId}"), TestPersonas.VICTOR_VOLUNTEER)
+        )
+
+        then: "a 403 Forbidden is thrown"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
+    def "DELETE | should throw 403 Forbidden when cross-org admin attempts to delete org user in another organization"() {
+        given: "a Denver org admin targeting a Utah State Chapter membership"
+        UUID targetUserId = TestPersonas.URSULA_UTAH_ADMIN.id
+        UUID orgId = TestPersonas.UTAH_STATE_CHAPTER_ID
+
+        when: "the Denver org admin attempts to delete the Utah membership"
+        client.exchange(
+                asOrgAdmin(HttpRequest.DELETE("/organization-users/${targetUserId}/${orgId}"), TestPersonas.LEO_LOCAL_ADMIN)
         )
 
         then: "a 403 Forbidden is thrown"

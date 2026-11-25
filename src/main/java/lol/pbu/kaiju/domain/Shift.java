@@ -55,6 +55,18 @@ public record Shift(
         return (isVirtual && location == null) || (!isVirtual && location != null);
     }
 
+    public static Shift forSubmission(
+            @Nullable UUID id,
+            @Nullable Project project,
+            boolean isVirtual,
+            @Nullable Location location,
+            @NotNull OffsetDateTime startTime,
+            @NotNull OffsetDateTime endTime,
+            @Nullable List<Tag> tags
+    ) {
+        return new Shift(id, project, isVirtual, location, startTime, endTime, tags);
+    }
+
     /**
      * Instead of using setters, this method gives the opportunity to take an existing shift ID and assign that to
      * the shift properties in this shift record.
@@ -71,6 +83,38 @@ public record Shift(
                 this.startTime(),
                 this.endTime(),
                 this.tags()
+        );
+    }
+
+    public Shift withCreationDetails(
+            @NotNull Project newProject,
+            @Nullable Location newLocation,
+            @NotNull List<Tag> newTags
+    ) {
+        return new Shift(
+                null,
+                newProject,
+                this.isVirtual(),
+                newLocation,
+                this.startTime(),
+                this.endTime(),
+                newTags
+        );
+    }
+
+    public Shift withUpdatedDetails(
+            @NotNull Shift source,
+            @Nullable Location newLocation,
+            @NotNull List<Tag> newTags
+    ) {
+        return new Shift(
+                this.id(),
+                this.project(),
+                source.isVirtual(),
+                newLocation,
+                source.startTime(),
+                source.endTime(),
+                newTags
         );
     }
 }

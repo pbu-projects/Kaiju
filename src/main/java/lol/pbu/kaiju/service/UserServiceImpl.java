@@ -9,6 +9,7 @@ import jakarta.inject.Singleton;
 import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.UserRole;
 import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.postgresql.util.PSQLState;
@@ -30,9 +31,11 @@ public class UserServiceImpl implements UserService {
     private static final String USER_NOT_FOUND = "User not found";
 
     private final UserRepository userRepository;
+    private final ProjectSecurityService projectSecurityService;
 
-    public UserServiceImpl(UserRepository userRepository) {
+    public UserServiceImpl(UserRepository userRepository, ProjectSecurityService projectSecurityService) {
         this.userRepository = userRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     @Override
@@ -45,7 +48,16 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     @NonNull
-    public Optional<User> getUserById(@NonNull UUID id) {
+    public User getCurrentUser(@NonNull UUID actorUserId) {
+        return userRepository.findById(actorUserId)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    @NonNull
+    public Optional<User> getUserById(@NonNull UUID id, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
         return userRepository.findById(id);
     }
 
@@ -62,13 +74,13 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @NonNull
-    public User createUser(@NonNull User user) {
+    public User createUser(@NonNull User user, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeUserManager(actorUserId);
         String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
-        User toSave = new User(
-                null,
+        User toSave = user.withCreationDetails(
                 canonicalEmail,
-                user.role() != null ? user.role() : UserRole.STANDARD_USER,
-                user.createdAt() != null ? user.createdAt() : OffsetDateTime.now(ZoneOffset.UTC)
+                UserRole.STANDARD_USER,
+                OffsetDateTime.now(ZoneOffset.UTC)
         );
         return userRepository.save(toSave);
     }
@@ -76,31 +88,31 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     @NonNull
-    public User updateUser(@NonNull UUID id, @NonNull User user) {
+    public User updateUser(@NonNull UUID id, @NonNull User user, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
         User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
 
         String canonicalEmail = user.email() != null ? canonicalizeEmail(user.email()) : null;
-        User safeUpdate = new User(
-                id,
-                canonicalEmail,
-                existing.role(),
-                existing.createdAt()
-        );
+        User safeUpdate = existing.withEmail(canonicalEmail);
         return userRepository.update(safeUpdate);
     }
 
     @Override
     @Transactional
-    public void updateRole(@NonNull UUID id, @NonNull UserRole role) {
-        userRepository.findById(id)
+    @NonNull
+    public User updateRole(@NonNull UUID id, @NonNull UserRole role, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeSystemAdmin(actorUserId);
+        User existing = userRepository.findById(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND));
         userRepository.updateRole(id, role);
+        return existing.withRole(role);
     }
 
     @Override
     @Transactional
-    public void deleteUser(@NonNull UUID id) {
+    public void deleteUser(@NonNull UUID id, @NonNull UUID actorUserId) {
+        projectSecurityService.authorizeSelfOrUserManager(actorUserId, id);
         long count = userRepository.removeById(id);
         if (count == 0) {
             throw new HttpStatusException(HttpStatus.NOT_FOUND, USER_NOT_FOUND);
@@ -119,8 +131,7 @@ public class UserServiceImpl implements UserService {
         String canonicalEmail = canonicalizeEmail(email);
         return userRepository.findByEmail(canonicalEmail).orElseGet(() -> {
             try {
-                UserRole roleToAssign = initialRole != null ? initialRole : UserRole.STANDARD_USER;
-                User newUser = new User(null, canonicalEmail, roleToAssign, OffsetDateTime.now(ZoneOffset.UTC));
+                User newUser = User.forCreation(canonicalEmail, initialRole, OffsetDateTime.now(ZoneOffset.UTC));
                 return userRepository.save(newUser);
             } catch (Exception ex) {
                 if (isUniqueConstraintViolation(ex)) {

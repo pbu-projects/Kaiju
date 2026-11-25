@@ -17,7 +17,7 @@ import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
-import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.security.Permission;
 import lol.pbu.kaiju.security.ProjectSecurityService;
 import org.jspecify.annotations.NonNull;
 
@@ -37,10 +37,8 @@ public class ProjectServiceImpl implements ProjectService {
     private static final String UNAUTHORIZED_ASSIGN_REGION = "You do not have authority to assign this managing region";
     private static final String UNAUTHORIZED_UNASSIGN_REGION = "You do not have authority to unassign this managing region";
     private static final String ORGANIZATION_REQUIRED = "Organization is required";
-    private static final String ACTOR_USER_NOT_FOUND = "Actor user not found";
 
     private final ProjectRepository projectRepository;
-    private final UserRepository userRepository;
     private final AdministrativeRegionRepository administrativeRegionRepository;
     private final OrganizationRepository organizationRepository;
     private final ProjectSecurityService securityService;
@@ -48,14 +46,12 @@ public class ProjectServiceImpl implements ProjectService {
 
     public ProjectServiceImpl(
             ProjectRepository projectRepository,
-            UserRepository userRepository,
             AdministrativeRegionRepository administrativeRegionRepository,
             OrganizationRepository organizationRepository,
             ProjectSecurityService securityService,
             AuditService auditService
     ) {
         this.projectRepository = projectRepository;
-        this.userRepository = userRepository;
         this.administrativeRegionRepository = administrativeRegionRepository;
         this.organizationRepository = organizationRepository;
         this.securityService = securityService;
@@ -80,152 +76,112 @@ public class ProjectServiceImpl implements ProjectService {
     @Transactional
     @NonNull
     public Project createProject(@NonNull Project project, @NonNull UUID actorUserId) {
+        User actor = securityService.requireActor(actorUserId);
+        securityService.authorizeProjectCreation(actor, project);
+
         if (project.organization() == null || project.organization().id() == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED);
         }
 
-        Organization org = organizationRepository.findById(project.organization().id())
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED));
+        List<Location> domainLocations = project.locations() != null ? project.locations() : List.of();
+        List<Boundary> domainBoundaries = project.boundaries() != null ? project.boundaries() : List.of();
+        ProjectStatus requestedStatus = project.status() != null ? project.status() : ProjectStatus.DRAFT;
 
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_USER_NOT_FOUND));
+        Organization org = organizationRepository.findById(project.organization().id()).orElse(null);
+        if (org == null) {
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED);
+        }
 
-        AdministrativeRegion managingRegion = validateAndResolveManagingRegion(project, org.id(), actorUserId);
+        AdministrativeRegion managingRegion = validateAndResolveManagingRegion(project, org.id(), actor);
 
-        Project transientProject = new Project(
-                null,
+        Project candidate = project.withCreationDetails(
                 org,
                 managingRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
-                project.status() != null ? project.status() : ProjectStatus.DRAFT,
+                requestedStatus,
                 OffsetDateTime.now(ZoneOffset.UTC),
-                null,
-                null,
-                project.locations() != null ? project.locations() : List.of(),
-                project.boundaries() != null ? project.boundaries() : List.of()
+                domainLocations,
+                domainBoundaries
         );
 
-        ProjectStatus initialStatus = securityService.evaluateProjectCreationByUser(actorUserId, transientProject);
-
-        Project toSave = new Project(
-                null,
-                org,
-                managingRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
-                initialStatus,
-                OffsetDateTime.now(ZoneOffset.UTC),
-                null,
-                null,
-                project.locations() != null ? project.locations() : List.of(),
-                project.boundaries() != null ? project.boundaries() : List.of()
-        );
-
-        Project saved = projectRepository.save(toSave);
+        ProjectStatus initialStatus = securityService.evaluateProjectCreationByUser(actor, candidate);
+        Project saved = projectRepository.save(candidate.withStatus(initialStatus));
         auditService.recordProjectAudit(saved, actor, AuditAction.CREATED);
         return saved;
     }
 
     private AdministrativeRegion validateAndResolveManagingRegion(
-            Project project, UUID orgId, UUID actorUserId) {
+            Project project, UUID orgId, User actor) {
         if (project.managingRegion() == null) {
             return null;
         }
         UUID regionId = project.managingRegion().id();
-        if (regionId == null || !administrativeRegionRepository.existsById(regionId)) {
+        if (regionId == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
         }
+        if (!securityService.canAssignManagingRegion(actor, orgId, regionId)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
+        }
+        AdministrativeRegion region = administrativeRegionRepository.findById(regionId)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST));
         if (project.locations() != null && !project.locations().isEmpty()
                 && !securityService.areAllLocationsInRegion(project, regionId)) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
         }
-        if (!securityService.canAssignManagingRegion(actorUserId, orgId, regionId)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
-        }
-        return administrativeRegionRepository.findById(regionId).orElse(project.managingRegion());
+        return region;
     }
 
     @Override
     @Transactional
     @NonNull
     public Project updateProject(@NonNull UUID id, @NonNull Project project, @NonNull UUID actorUserId) {
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_USER_NOT_FOUND));
+        User actor = securityService.requireActor(actorUserId);
+        Project existing = requireModifiableProject(id, actor, "You do not have permission to modify this project");
 
-        Project existing = projectRepository.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
-
-        if (!securityService.canModifyProject(actorUserId, existing)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to modify this project");
-        }
-
-        Organization targetOrg = resolveTargetOrganization(actorUserId, existing, project);
+        Organization targetOrg = resolveTargetOrganization(actor, existing, project);
         UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
         UUID effectiveOrgId = targetOrg != null ? targetOrg.id() : existingOrgId;
-        AdministrativeRegion targetRegion = resolveTargetRegion(actorUserId, existing, effectiveOrgId, project);
+        AdministrativeRegion targetRegion = resolveTargetRegion(actor, existing, effectiveOrgId, project);
 
         List<Location> existingLocations = existing.locations() != null ? existing.locations() : List.of();
         List<Boundary> existingBoundaries = existing.boundaries() != null ? existing.boundaries() : List.of();
         List<Location> domainLocations = project.locations() != null ? project.locations() : existingLocations;
         List<Boundary> domainBoundaries = project.boundaries() != null ? project.boundaries() : existingBoundaries;
 
-        Project transientProject = new Project(
-                id,
+        Project candidate = existing.withUpdatedDetails(
                 targetOrg,
                 targetRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
+                project,
                 project.status() != null ? project.status() : existing.status(),
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
                 domainLocations,
                 domainBoundaries
         );
 
         if (targetRegion != null && !domainLocations.isEmpty()
-                && !securityService.areAllLocationsInRegion(transientProject, targetRegion.id())) {
+                && !securityService.areAllLocationsInRegion(candidate, targetRegion.id())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
         }
 
         ProjectStatus newStatus = determineUpdatedStatus(
-                actorUserId,
+                actor,
                 existing,
-                transientProject,
+                candidate,
                 project.status()
         );
 
-        Project updated = projectRepository.update(new Project(
-                id,
-                targetOrg,
-                targetRegion,
-                project.title(),
-                project.description(),
-                project.projectType(),
-                newStatus,
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
-                domainLocations,
-                domainBoundaries
-        ));
+        Project updated = projectRepository.update(candidate.withStatus(newStatus));
 
         auditService.recordProjectAudit(updated, actor, AuditAction.EDITED);
         return updated;
     }
 
-    private Organization resolveTargetOrganization(UUID actorUserId, Project existing, Project project) {
+    private Organization resolveTargetOrganization(User actor, Project existing, Project project) {
         Organization targetOrg = existing.organization();
         UUID existingOrgId = existing.organization() != null ? existing.organization().id() : null;
 
         if (project.organization() != null) {
             UUID requestedOrgId = project.organization().id();
             if (!Objects.equals(requestedOrgId, existingOrgId)) {
-                if (!securityService.canReassignProject(actorUserId, existing)) {
+                if (!securityService.canReassignProject(actor, existing)) {
                     throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to reassign this project to another organization");
                 }
                 if (requestedOrgId == null) {
@@ -239,7 +195,7 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     private AdministrativeRegion resolveTargetRegion(
-            UUID actorUserId, Project existing, UUID effectiveOrgId, Project project) {
+            User actor, Project existing, UUID effectiveOrgId, Project project) {
         UUID existingRegionId = existing.managingRegion() != null ? existing.managingRegion().id() : null;
         UUID requestedRegionId = project.managingRegion() != null ? project.managingRegion().id() : null;
 
@@ -247,31 +203,29 @@ public class ProjectServiceImpl implements ProjectService {
             return existing.managingRegion();
         }
         if (requestedRegionId != null) {
-            return assignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId, project.managingRegion());
+            return assignManagingRegion(actor, effectiveOrgId, requestedRegionId);
         }
-        unassignManagingRegion(actorUserId, effectiveOrgId, existingRegionId);
+        unassignManagingRegion(actor, effectiveOrgId, existingRegionId);
         return null;
     }
 
     private AdministrativeRegion assignManagingRegion(
-            UUID actorUserId, UUID effectiveOrgId, UUID requestedRegionId, AdministrativeRegion fallbackRegion) {
-        if (!administrativeRegionRepository.existsById(requestedRegionId)) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST);
-        }
-        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, requestedRegionId)) {
+            User actor, UUID effectiveOrgId, UUID requestedRegionId) {
+        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actor, effectiveOrgId, requestedRegionId)) {
             throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_ASSIGN_REGION);
         }
-        return administrativeRegionRepository.findById(requestedRegionId).orElse(fallbackRegion);
+        return administrativeRegionRepository.findById(requestedRegionId)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.BAD_REQUEST, MANAGING_REGION_NOT_EXIST));
     }
 
-    private void unassignManagingRegion(UUID actorUserId, UUID effectiveOrgId, UUID existingRegionId) {
-        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actorUserId, effectiveOrgId, existingRegionId)) {
+    private void unassignManagingRegion(User actor, UUID effectiveOrgId, UUID existingRegionId) {
+        if (effectiveOrgId == null || !securityService.canAssignManagingRegion(actor, effectiveOrgId, existingRegionId)) {
             throw new HttpStatusException(HttpStatus.FORBIDDEN, UNAUTHORIZED_UNASSIGN_REGION);
         }
     }
 
     private ProjectStatus determineUpdatedStatus(
-            UUID actorUserId,
+            User actor,
             Project existing,
             Project transientProject,
             ProjectStatus requestedStatus) {
@@ -281,7 +235,7 @@ public class ProjectServiceImpl implements ProjectService {
             if (requestedStatus != ProjectStatus.PENDING && requestedStatus != ProjectStatus.ACTIVE) {
                 throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Draft projects can only be submitted for approval");
             }
-            return securityService.evaluateProjectCreationByUser(actorUserId, transientProject);
+            return securityService.evaluateProjectCreationByUser(actor, transientProject);
         }
 
         List<Location> existingLocations = existing.locations() != null ? existing.locations() : List.of();
@@ -300,68 +254,47 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     @Transactional
     public void deleteProject(@NonNull UUID id, @NonNull UUID actorUserId) {
-        Project existing = projectRepository.findByIdAndDeletedAtIsNull(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
+        User actor = securityService.requireActor(actorUserId);
+        Project existing = requireModifiableProject(id, actor, "You do not have permission to delete this project");
 
-        if (!securityService.canModifyProject(actorUserId, existing)) {
-            throw new HttpStatusException(HttpStatus.FORBIDDEN, "You do not have permission to delete this project");
-        }
-
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_USER_NOT_FOUND));
-
-        Project deleted = projectRepository.update(new Project(
-                existing.id(),
-                existing.organization(),
-                existing.managingRegion(),
-                existing.title(),
-                existing.description(),
-                existing.projectType(),
-                existing.status(),
-                existing.createdAt(),
-                OffsetDateTime.now(ZoneOffset.UTC),
-                actor,
-                existing.locations(),
-                existing.boundaries()
-        ));
+        Project deleted = projectRepository.update(
+                existing.withDeleted(OffsetDateTime.now(ZoneOffset.UTC), actor)
+        );
 
         auditService.recordProjectAudit(deleted, actor, AuditAction.EDITED);
+    }
+
+    private Project requireModifiableProject(UUID id, User actor, String forbiddenMessage) {
+        Project existing = projectRepository.findById(id).orElse(null);
+        if (existing == null) {
+            if (actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+                throw new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND);
+            }
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, forbiddenMessage);
+        }
+        if (!securityService.canModifyProject(actor, existing)) {
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, forbiddenMessage);
+        }
+        if (existing.deletedAt() != null) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND);
+        }
+        return existing;
     }
 
     @Override
     @Transactional
     @NonNull
     public Project approveProject(@NonNull UUID id, @NonNull UUID actorUserId) {
-        Project existing = projectRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
+        User actor = securityService.authorizeRegionalAdminApproval(actorUserId, id);
 
-        if (existing.deletedAt() != null) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND);
-        }
+        Project existing = projectRepository.findByIdAndDeletedAtIsNull(id)
+                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
 
         if (existing.status() != ProjectStatus.PENDING && existing.status() != ProjectStatus.PENDING_UPDATE) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Only PENDING or PENDING_UPDATE projects can be approved");
         }
 
-        securityService.authorizeRegionalAdminApproval(actorUserId, id);
-
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
-
-        Project approved = projectRepository.update(new Project(
-                existing.id(),
-                existing.organization(),
-                existing.managingRegion(),
-                existing.title(),
-                existing.description(),
-                existing.projectType(),
-                ProjectStatus.ACTIVE,
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
-                existing.locations(),
-                existing.boundaries()
-        ));
+        Project approved = projectRepository.update(existing.withStatus(ProjectStatus.ACTIVE));
 
         auditService.recordProjectAudit(approved, actor, AuditAction.APPROVED);
         return approved;
@@ -371,6 +304,8 @@ public class ProjectServiceImpl implements ProjectService {
     @Transactional
     @NonNull
     public Project rejectProject(@NonNull UUID id, @NonNull UUID actorUserId) {
+        User actor = securityService.authorizeRegionalAdminApproval(actorUserId, id);
+
         Project existing = projectRepository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, PROJECT_NOT_FOUND));
 
@@ -378,25 +313,7 @@ public class ProjectServiceImpl implements ProjectService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Cannot reject a project in " + existing.status() + " status");
         }
 
-        securityService.authorizeRegionalAdminApproval(actorUserId, id);
-
-        User actor = userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "User not found"));
-
-        Project rejected = projectRepository.update(new Project(
-                existing.id(),
-                existing.organization(),
-                existing.managingRegion(),
-                existing.title(),
-                existing.description(),
-                existing.projectType(),
-                ProjectStatus.REJECTED,
-                existing.createdAt(),
-                existing.deletedAt(),
-                existing.deletedBy(),
-                existing.locations(),
-                existing.boundaries()
-        ));
+        Project rejected = projectRepository.update(existing.withStatus(ProjectStatus.REJECTED));
 
         auditService.recordProjectAudit(rejected, actor, AuditAction.REJECTED);
         return rejected;

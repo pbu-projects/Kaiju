@@ -179,9 +179,9 @@ class UserJourneyProtectionSpec extends BaseControllerSpec {
                 Shift
         )
 
-        then: "access is blocked"
+        then: "access is blocked with 403 FORBIDDEN"
         def outsiderErr = thrown(HttpClientResponseException)
-        outsiderErr.status in [HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND]
+        outsiderErr.status == HttpStatus.FORBIDDEN
 
         when: "a user fetches the soft-deleted project's shift"
         client.exchange(

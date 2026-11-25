@@ -13,6 +13,7 @@ import lol.pbu.kaiju.dto.CreateProjectCommand
 import lol.pbu.kaiju.dto.CreateShiftCommand
 import lol.pbu.kaiju.dto.UpdateProjectCommand
 import lol.pbu.kaiju.dto.UpdateShiftCommand
+import lol.pbu.kaiju.dto.ValidShiftLocationValidator
 import lol.pbu.kaiju.fixtures.TestPersonas
 import lol.pbu.kaiju.model.OrganizationUserRole
 import lol.pbu.kaiju.model.ProjectStatus
@@ -377,6 +378,7 @@ class DataBuilderSpec extends Specification {
                 .asCommand()
 
         then: "create command has valid attributes and location logic"
+        def locationValidator = new ValidShiftLocationValidator()
         verifyAll(createCmd) {
             projectId() == projId
             !isVirtual()
@@ -384,7 +386,7 @@ class DataBuilderSpec extends Specification {
             startTime() == start
             endTime() == end
             tagIds() == [tag.id()]
-            isValidLocationLogic()
+            locationValidator.isValid(createCmd, null)
         }
 
         when: "generating update shift command for virtual shift"
@@ -399,7 +401,7 @@ class DataBuilderSpec extends Specification {
             locationId() == null
             startTime() == start
             endTime() == end
-            isValidLocationLogic()
+            locationValidator.isValid(updateCmd, null)
         }
     }
 

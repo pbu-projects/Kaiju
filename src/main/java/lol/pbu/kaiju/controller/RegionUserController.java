@@ -20,16 +20,13 @@ import lol.pbu.kaiju.domain.RegionUserId;
 import lol.pbu.kaiju.dto.CreateRegionUserCommand;
 import lol.pbu.kaiju.dto.UpdateRegionUserCommand;
 import lol.pbu.kaiju.repository.RegionUserRepository;
-import lol.pbu.kaiju.repository.SecurityQueryRepository;
-import lol.pbu.kaiju.repository.UserRepository;
-import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.security.ProjectSecurityService;
 import lol.pbu.kaiju.util.PageableUtils;
 
 import java.security.Principal;
 import java.util.Optional;
 import java.util.UUID;
 
-import static io.micronaut.http.HttpStatus.FORBIDDEN;
 import static io.micronaut.http.HttpStatus.NOT_FOUND;
 import static io.micronaut.security.rules.SecurityRule.IS_AUTHENTICATED;
 import static lol.pbu.kaiju.security.Permission.REGION_MANAGE_CLAIM;
@@ -46,17 +43,14 @@ public class RegionUserController {
     public static final String DEFAULT_SORT_FIELD = "id.userId";
 
     private final RegionUserRepository regionUserRepository;
-    private final UserRepository userRepository;
-    private final SecurityQueryRepository securityQueryRepository;
+    private final ProjectSecurityService projectSecurityService;
 
     public RegionUserController(
             RegionUserRepository regionUserRepository,
-            UserRepository userRepository,
-            SecurityQueryRepository securityQueryRepository
+            ProjectSecurityService projectSecurityService
     ) {
         this.regionUserRepository = regionUserRepository;
-        this.userRepository = userRepository;
-        this.securityQueryRepository = securityQueryRepository;
+        this.projectSecurityService = projectSecurityService;
     }
 
     /**
@@ -86,9 +80,7 @@ public class RegionUserController {
             Principal principal
     ) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (!actorId.equals(userId)) {
-            verifyRegionDirectorAuthority(principal, regionId);
-        }
+        projectSecurityService.authorizeRegionUserView(actorId, userId, regionId);
         return regionUserRepository.findById(new RegionUserId(userId, regionId));
     }
 
@@ -158,20 +150,6 @@ public class RegionUserController {
 
     private void verifyRegionDirectorAuthority(Principal principal, UUID regionId) {
         UUID actorId = UUID.fromString(principal.getName());
-        if (hasPermission(actorId, Permission.SYSTEM_ADMIN)) {
-            return;
-        }
-        if (!securityQueryRepository.isRegionDirector(actorId, regionId)) {
-            throw new HttpStatusException(
-                    FORBIDDEN,
-                    "Forbidden: Only system admins or region directors of this region may manage region members"
-            );
-        }
-    }
-
-    private boolean hasPermission(UUID userId, Permission permission) {
-        return userRepository.findById(userId)
-                .map(user -> user.role().hasPermission(permission))
-                .orElse(false);
+        projectSecurityService.authorizeRegionDirector(actorId, regionId);
     }
 }
