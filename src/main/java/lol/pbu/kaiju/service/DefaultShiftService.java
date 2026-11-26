@@ -147,12 +147,6 @@ public class DefaultShiftService implements ShiftService {
     }
 
     private void validateShiftInvariants(Shift shift) {
-        if (shift.isVirtual() && shift.location() != null) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
-        }
-        if (!shift.isVirtual() && shift.location() == null) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, "A shift must have a location if it is not virtual, and must not have a location if it is virtual.");
-        }
         if (shift.startTime() != null && shift.endTime() != null && !shift.startTime().isBefore(shift.endTime())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, "Shift start time must be before end time");
         }
@@ -204,6 +198,10 @@ public class DefaultShiftService implements ShiftService {
         if (tagIds.isEmpty()) {
             return List.of();
         }
-        return tagRepository.findByIdIn(tagIds);
+        List<Tag> resolvedTags = tagRepository.findByIdIn(tagIds);
+        if (resolvedTags.size() != tagIds.size()) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Tag not found");
+        }
+        return resolvedTags;
     }
 }

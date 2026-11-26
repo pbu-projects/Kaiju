@@ -20,7 +20,12 @@ import lol.pbu.kaiju.model.RegionAuditAction
 import lol.pbu.kaiju.model.RegionCoordinateResolution
 import lol.pbu.kaiju.repository.AdministrativeRegionAuditLogRepository
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository
+import lol.pbu.kaiju.repository.BoundaryRepository
+import lol.pbu.kaiju.repository.LocationRepository
+import lol.pbu.kaiju.repository.PermissionQueryRepository
 import lol.pbu.kaiju.repository.UserRepository
+import lol.pbu.kaiju.security.AuthorizationService
+import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.Polygon
 import spock.lang.Unroll
 
@@ -867,9 +872,16 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
             UserRepository userRepo,
             ObjectMapper mapper
     ) {
+        AuthorizationService unitAuth = new AuthorizationService(
+                Mock(PermissionQueryRepository),
+                userRepo,
+                Mock(LocationRepository),
+                Mock(BoundaryRepository),
+                new GeometryFactory()
+        )
         return new DefaultAdministrativeRegionService(
                 regionRepo,
-                userRepo,
+                unitAuth,
                 spatialMappingService,
                 Mock(AuditService),
                 Mock(JdbcOperations),

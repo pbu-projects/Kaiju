@@ -86,7 +86,7 @@ public class UpdateProjectRequest {
     @Nullable
     @Size(max = 50, message = "Project cannot have more than 50 locations.")
     @JsonProperty(JSON_PROPERTY_LOCATIONS)
-    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     private List<@Valid ProjectLocationRequest> locations;
 
     public UpdateProjectRequest() {

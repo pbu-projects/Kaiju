@@ -17,7 +17,7 @@ import lol.pbu.kaiju.model.CoveringRegion;
 import lol.pbu.kaiju.model.RegionAuditAction;
 import lol.pbu.kaiju.model.RegionCoordinateResolution;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
-import lol.pbu.kaiju.repository.UserRepository;
+import lol.pbu.kaiju.security.AuthorizationService;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.locationtech.jts.geom.Polygon;
@@ -38,7 +38,6 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultAdministrativeRegionService.class);
 
-    private static final String ACTOR_NOT_FOUND = "Actor user not found";
     private static final String REGION_NOT_FOUND = "Administrative region not found";
     private static final String PARENT_NOT_FOUND = "Parent administrative region does not exist";
     private static final String INVALID_GEOMETRY = "Region geometry is topologically invalid";
@@ -113,7 +112,7 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
     );
 
     private final AdministrativeRegionRepository regionRepository;
-    private final UserRepository userRepository;
+    private final AuthorizationService authorizationService;
     private final SpatialMappingService spatialMappingService;
     private final AuditService auditService;
     private final JdbcOperations jdbcOperations;
@@ -121,14 +120,14 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
 
     public DefaultAdministrativeRegionService(
             AdministrativeRegionRepository regionRepository,
-            UserRepository userRepository,
+            AuthorizationService authorizationService,
             SpatialMappingService spatialMappingService,
             AuditService auditService,
             JdbcOperations jdbcOperations,
             ObjectMapper objectMapper
     ) {
         this.regionRepository = regionRepository;
-        this.userRepository = userRepository;
+        this.authorizationService = authorizationService;
         this.spatialMappingService = spatialMappingService;
         this.auditService = auditService;
         this.jdbcOperations = jdbcOperations;
@@ -444,8 +443,7 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
     }
 
     private User resolveActor(UUID actorUserId) {
-        return userRepository.findById(actorUserId)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.UNAUTHORIZED, ACTOR_NOT_FOUND));
+        return authorizationService.requireActor(actorUserId);
     }
 
     private String buildMetadata(Map<String, ?> data) {

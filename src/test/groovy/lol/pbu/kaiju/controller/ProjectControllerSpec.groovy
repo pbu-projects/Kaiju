@@ -310,6 +310,36 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
+    def "CREATE | should return 403 Forbidden for regional admin in-region with non-existent organizationId (no existence oracle)"() {
+        given: "a create request with an in-region Denver location and non-existent organization ID"
+        def denverLoc = new ProjectLocationRequest(
+                "Denver Loc",
+                "123 Main St",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9903,
+                39.7392
+        )
+        def request = createProjectRequest(
+                UUID.randomUUID(),
+                "Regional Orphan Project",
+                "Description with at least twenty characters here.",
+                STANDARD,
+                PENDING,
+                null,
+                [denverLoc]
+        )
+
+        when: "the Denver regional agent submits via HTTP POST"
+        client.exchange(asRegionAgent(HttpRequest.POST("/projects", request), TestPersonas.CONNIE_COUNTY_AGENT), Project)
+
+        then: "a 403 Forbidden is returned instead of leaking org non-existence via 400"
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.FORBIDDEN
+    }
+
     /********** READ Tests **********/
 
     def "READ | should retrieve an existing project by ID"() {
@@ -2087,6 +2117,522 @@ class ProjectControllerSpec extends BaseControllerSpec {
             updated.id() == saved.id()
             updated.organization().id() == org.id()
             updated.title() == "Updated Without Org Or Locations"
+        }
+    }
+
+    def "UPDATE | should preserve existing locations and ACTIVE status when updating an ACTIVE physical project with null locations"() {
+        given: "a region, verified org in that region, persisted location inside the region, and an ACTIVE physical project"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("Null Locations Preserve Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        def org = dataBuilder.organization().withName("Preserve Loc Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        def loc = dataBuilder.location()
+                .withName("Preserved Denver Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Physical Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(loc)
+                .persist()
+
+        and: "an update request with null locations"
+        def updateRequest = new UpdateProjectRequest(
+                org.id(),
+                null,
+                "Updated Active Physical Title",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                null,
+                defaultBoundaries()
+        )
+
+        when: "updating via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
+        Project updated = response.body()
+
+        then: "existing locations are preserved and status remains ACTIVE"
+        response.status == HttpStatus.OK
+        verifyAll(updated) {
+            status() == ACTIVE
+            locations() != null
+            locations().size() == 1
+            locations()[0].id() == loc.id()
+        }
+
+        and: "GET /projects/{id} and database reflect the preserved location"
+        def fetched = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects/${saved.id()}")), Project).body()
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll(fetched) {
+            status() == ACTIVE
+            locations() != null
+            locations().size() == 1
+            locations()[0].id() == loc.id()
+        }
+        verifyAll(dbProject) {
+            it != null
+            status() == ACTIVE
+            locations() != null
+            locations().size() == 1
+            locations()[0].id() == loc.id()
+        }
+    }
+
+    def "UPDATE | should clear locations and demote ACTIVE physical project to PENDING when locations is empty list"() {
+        given: "a region, verified org in that region, persisted location inside the region, and an ACTIVE physical project"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("Empty Locations Demote Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        def org = dataBuilder.organization().withName("Demote Empty Loc Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        def loc = dataBuilder.location()
+                .withName("Cleared Denver Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Physical To Clear")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(loc)
+                .persist()
+
+        and: "an update request with an explicit empty locations list"
+        def updateRequest = new UpdateProjectRequest(
+                org.id(),
+                null,
+                "Updated Active Physical Cleared",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                [],
+                defaultBoundaries()
+        )
+
+        when: "updating via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
+        Project updated = response.body()
+
+        then: "locations are cleared and status transitions to PENDING"
+        response.status == HttpStatus.OK
+        verifyAll(updated) {
+            status() == PENDING
+            locations() != null
+            locations().isEmpty()
+        }
+
+        and: "GET /projects/{id} and database reflect the cleared locations"
+        def fetched = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects/${saved.id()}")), Project).body()
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll(fetched) {
+            status() == PENDING
+            locations() != null
+            locations().isEmpty()
+        }
+        verifyAll(dbProject) {
+            it != null
+            status() == PENDING
+            locations() != null
+            locations().isEmpty()
+        }
+    }
+
+    def "UPDATE | should persist and replace locations in PostgreSQL when updating a project with new locations"() {
+        given: "a region, verified org in that region, persisted initial location, and an ACTIVE physical project"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("Replace Locations Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        def org = dataBuilder.organization().withName("Replace Loc Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        def oldLoc = dataBuilder.location()
+                .withName("Old Denver Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Physical To Replace")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(oldLoc)
+                .persist()
+
+        and: "an update request with a new in-region location"
+        def newLocReq = new ProjectLocationRequest(
+                "New Denver Loc",
+                "1700 Lincoln St",
+                "Denver",
+                "CO",
+                "80203",
+                "US",
+                -104.9850,
+                39.7435
+        )
+        def updateRequest = new UpdateProjectRequest(
+                org.id(),
+                null,
+                "Updated With New Location",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                [newLocReq],
+                defaultBoundaries()
+        )
+
+        when: "updating via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
+        Project updated = response.body()
+
+        then: "the new location is persisted with a generated ID and replaces the old location"
+        response.status == HttpStatus.OK
+        verifyAll(updated) {
+            locations() != null
+            locations().size() == 1
+            locations()[0].id() != null
+            locations()[0].id() != oldLoc.id()
+            locations()[0].name() == "New Denver Loc"
+        }
+
+        and: "GET /projects/{id} and database reflect only the new location"
+        def fetched = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects/${saved.id()}")), Project).body()
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll(fetched) {
+            locations() != null
+            locations().size() == 1
+            locations()[0].id() == updated.locations()[0].id()
+            locations()[0].name() == "New Denver Loc"
+        }
+        verifyAll(dbProject) {
+            it != null
+            locations() != null
+            locations().size() == 1
+            locations()[0].id() == updated.locations()[0].id()
+            locations()[0].name() == "New Denver Loc"
+        }
+    }
+
+    def "UPDATE | should prevent REGION_AGENT from approving project after clearing locations to empty list"() {
+        given: "a region with a REGION_AGENT, verified org, in-region location, and an ACTIVE physical project"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def region = dataBuilder.region()
+                .withName("Agent Bypass Guard Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        dataBuilder.regionUser().asRegionAgent(TestPersonas.CONNIE_COUNTY_AGENT, region).persist()
+        def org = dataBuilder.organization().withName("Agent Bypass Guard Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, region)
+        def loc = dataBuilder.location()
+                .withName("Cleared Guard Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Physical Guard")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(loc)
+                .persist()
+
+        and: "locations are cleared to [] via PUT, demoting the project to PENDING"
+        def clearRequest = new UpdateProjectRequest(
+                org.id(),
+                null,
+                "Cleared Guard Project",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                [],
+                defaultBoundaries()
+        )
+        client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", clearRequest)), Project)
+
+        when: "the REGION_AGENT attempts to approve the now-virtual PENDING project"
+        client.exchange(asRegionAgent(HttpRequest.PUT("/projects/${saved.id()}/status", ""), TestPersonas.CONNIE_COUNTY_AGENT), Project)
+
+        then: "403 Forbidden is thrown because project_locations was cleared in PostgreSQL"
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.FORBIDDEN
+    }
+
+    def "UPDATE | should reject REGION_AGENT moving an ACTIVE project outside their assigned region"() {
+        given: "Denver and Boulder regions, a statewide verified org in both, and a Denver REGION_AGENT"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def denverRegion = dataBuilder.region()
+                .withName("Denver Agent Move Guard Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        Coordinate[] boulderCoords = [
+                new Coordinate(-105.35, 39.95),
+                new Coordinate(-105.15, 39.95),
+                new Coordinate(-105.15, 40.10),
+                new Coordinate(-105.35, 40.10),
+                new Coordinate(-105.35, 39.95)
+        ]
+        def boulderRegion = dataBuilder.region()
+                .withName("Boulder Agent Move Guard Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(boulderCoords))
+                .persist()
+        dataBuilder.regionUser().asRegionAgent(TestPersonas.CONNIE_COUNTY_AGENT, denverRegion).persist()
+
+        def statewideOrg = dataBuilder.organization().withName("Statewide Multi-Region Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(statewideOrg, denverRegion)
+        dataBuilder.linkOrganizationToRegion(statewideOrg, boulderRegion)
+
+        def denverLoc = dataBuilder.location()
+                .withName("Denver In-Region Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(statewideOrg)
+                .withTitle("Active Denver Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(denverLoc)
+                .persist()
+
+        and: "an update request replacing the location with Boulder coordinates outside Denver"
+        def boulderLocReq = new ProjectLocationRequest(
+                "Boulder Out-of-Region Loc",
+                "123 Pearl St",
+                "Boulder",
+                "CO",
+                "80302",
+                "US",
+                -105.2705,
+                40.0150
+        )
+        def moveRequest = updateProjectRequest(
+                statewideOrg.id(),
+                "Moved Out of Region",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                null,
+                [boulderLocReq]
+        )
+
+        when: "CONNIE_COUNTY_AGENT attempts to move the project out of Denver via HTTP PUT"
+        client.exchange(asRegionAgent(HttpRequest.PUT("/projects/${saved.id()}", moveRequest), TestPersonas.CONNIE_COUNTY_AGENT), Project)
+
+        then: "403 Forbidden is thrown and persisted status and location are unchanged"
+        def ex = thrown(HttpClientResponseException)
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll {
+            ex.status == HttpStatus.FORBIDDEN
+            dbProject != null
+            dbProject.status() == ACTIVE
+            dbProject.title() == "Active Denver Project"
+            dbProject.locations().size() == 1
+            dbProject.locations()[0].id() == denverLoc.id()
+        }
+    }
+
+    def "UPDATE | should reject REGION_AGENT clearing locations to empty list on an ACTIVE project"() {
+        given: "a Denver region with CONNIE_COUNTY_AGENT, verified org, in-region location, and ACTIVE project"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def denverRegion = dataBuilder.region()
+                .withName("Denver Agent Clear Guard Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        dataBuilder.regionUser().asRegionAgent(TestPersonas.CONNIE_COUNTY_AGENT, denverRegion).persist()
+
+        def org = dataBuilder.organization().withName("Denver Clear Guard Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(org, denverRegion)
+        def denverLoc = dataBuilder.location()
+                .withName("Denver Keep Loc")
+                .withAddressLine("1700 Lincoln St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80203")
+                .withCountryCode("US")
+                .atPoint(-104.9850, 39.7435)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Active Physical To Protect")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(denverLoc)
+                .persist()
+
+        and: "an update request clearing locations to []"
+        def clearRequest = updateProjectRequest(
+                org.id(),
+                "Cleared Physical Project",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                null,
+                []
+        )
+
+        when: "CONNIE_COUNTY_AGENT attempts to clear locations to [] via HTTP PUT"
+        client.exchange(asRegionAgent(HttpRequest.PUT("/projects/${saved.id()}", clearRequest), TestPersonas.CONNIE_COUNTY_AGENT), Project)
+
+        then: "403 Forbidden is thrown and persisted status and location are unchanged"
+        def ex = thrown(HttpClientResponseException)
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll {
+            ex.status == HttpStatus.FORBIDDEN
+            dbProject != null
+            dbProject.status() == ACTIVE
+            dbProject.title() == "Active Physical To Protect"
+            dbProject.locations().size() == 1
+            dbProject.locations()[0].id() == denverLoc.id()
+        }
+    }
+
+    def "UPDATE | should reject REGION_DIRECTOR moving an ACTIVE project outside their assigned region"() {
+        given: "Denver and Boulder regions, a statewide verified org in both, and a Denver REGION_DIRECTOR"
+        Coordinate[] denverCoords = [
+                new Coordinate(-105.1099, 39.7891),
+                new Coordinate(-104.7432, 39.7912),
+                new Coordinate(-104.7528, 39.6158),
+                new Coordinate(-105.0536, 39.6137),
+                new Coordinate(-105.1099, 39.7891)
+        ]
+        def denverRegion = dataBuilder.region()
+                .withName("Denver Director Move Guard Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(denverCoords))
+                .persist()
+        Coordinate[] boulderCoords = [
+                new Coordinate(-105.35, 39.95),
+                new Coordinate(-105.15, 39.95),
+                new Coordinate(-105.15, 40.10),
+                new Coordinate(-105.35, 40.10),
+                new Coordinate(-105.35, 39.95)
+        ]
+        def boulderRegion = dataBuilder.region()
+                .withName("Boulder Director Move Guard Region")
+                .withGeometry(dataBuilder.geometryFactory.createPolygon(boulderCoords))
+                .persist()
+        dataBuilder.regionUser().asRegionDirector(TestPersonas.DIANA_COUNTY_DIRECTOR, denverRegion).persist()
+
+        def statewideOrg = dataBuilder.organization().withName("Director Statewide Multi-Region Org").asPublic().verified().persist()
+        dataBuilder.linkOrganizationToRegion(statewideOrg, denverRegion)
+        dataBuilder.linkOrganizationToRegion(statewideOrg, boulderRegion)
+
+        def denverLoc = dataBuilder.location()
+                .withName("Denver Director Keep Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(statewideOrg)
+                .withTitle("Active Director Protected Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(denverLoc)
+                .persist()
+
+        and: "an update request replacing the location with Boulder coordinates outside Denver"
+        def boulderLocReq = new ProjectLocationRequest(
+                "Boulder Out-of-Region Loc",
+                "123 Pearl St",
+                "Boulder",
+                "CO",
+                "80302",
+                "US",
+                -105.2705,
+                40.0150
+        )
+        def moveRequest = updateProjectRequest(
+                statewideOrg.id(),
+                "Director Moved Out of Region",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                null,
+                [boulderLocReq]
+        )
+
+        when: "DIANA_COUNTY_DIRECTOR attempts to move the project out of Denver via HTTP PUT"
+        client.exchange(asRegionDirector(HttpRequest.PUT("/projects/${saved.id()}", moveRequest), TestPersonas.DIANA_COUNTY_DIRECTOR), Project)
+
+        then: "403 Forbidden is thrown and persisted status and location are unchanged"
+        def ex = thrown(HttpClientResponseException)
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll {
+            ex.status == HttpStatus.FORBIDDEN
+            dbProject != null
+            dbProject.status() == ACTIVE
+            dbProject.title() == "Active Director Protected Project"
+            dbProject.locations().size() == 1
+            dbProject.locations()[0].id() == denverLoc.id()
         }
     }
 }

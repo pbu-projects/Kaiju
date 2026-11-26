@@ -15,9 +15,11 @@ import lol.pbu.kaiju.domain.User;
 import lol.pbu.kaiju.model.AuditAction;
 import lol.pbu.kaiju.model.ProjectStatus;
 import lol.pbu.kaiju.repository.AdministrativeRegionRepository;
+import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.repository.OrganizationRepository;
 import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
+import lol.pbu.kaiju.security.AuthorizationService.CreationAuthority;
 import lol.pbu.kaiju.security.Permission;
 import org.jspecify.annotations.NonNull;
 
@@ -41,6 +43,7 @@ public class DefaultProjectService implements ProjectService {
     private final ProjectRepository projectRepository;
     private final AdministrativeRegionRepository administrativeRegionRepository;
     private final OrganizationRepository organizationRepository;
+    private final LocationRepository locationRepository;
     private final AuthorizationService authorizationService;
     private final AuditService auditService;
 
@@ -48,12 +51,14 @@ public class DefaultProjectService implements ProjectService {
             ProjectRepository projectRepository,
             AdministrativeRegionRepository administrativeRegionRepository,
             OrganizationRepository organizationRepository,
+            LocationRepository locationRepository,
             AuthorizationService authorizationService,
             AuditService auditService
     ) {
         this.projectRepository = projectRepository;
         this.administrativeRegionRepository = administrativeRegionRepository;
         this.organizationRepository = organizationRepository;
+        this.locationRepository = locationRepository;
         this.authorizationService = authorizationService;
         this.auditService = auditService;
     }
@@ -77,7 +82,7 @@ public class DefaultProjectService implements ProjectService {
     @NonNull
     public Project createProject(@NonNull Project project, @NonNull UUID actorUserId) {
         User actor = authorizationService.requireActor(actorUserId);
-        authorizationService.authorizeProjectCreation(actor, project);
+        CreationAuthority creationAuthority = authorizationService.authorizeProjectCreation(actor, project);
 
         if (project.organization() == null || project.organization().id() == null) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED);
@@ -89,7 +94,10 @@ public class DefaultProjectService implements ProjectService {
 
         Organization org = organizationRepository.findById(project.organization().id()).orElse(null);
         if (org == null) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED);
+            if (actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+                throw new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED);
+            }
+            throw new HttpStatusException(HttpStatus.FORBIDDEN, "User is not authorized to create a project for this organization");
         }
 
         AdministrativeRegion managingRegion = validateAndResolveManagingRegion(project, org.id(), actor);
@@ -103,7 +111,7 @@ public class DefaultProjectService implements ProjectService {
                 domainBoundaries
         );
 
-        ProjectStatus initialStatus = authorizationService.evaluateProjectCreationByUser(actor, candidate);
+        ProjectStatus initialStatus = authorizationService.evaluateProjectCreationByUser(actor, candidate, creationAuthority);
         Project saved = projectRepository.save(candidate.withStatus(initialStatus));
         auditService.recordProjectAudit(saved, actor, AuditAction.CREATED);
         return saved;
@@ -156,6 +164,10 @@ public class DefaultProjectService implements ProjectService {
                 domainBoundaries
         );
 
+        if (project.locations() != null) {
+            authorizationService.authorizeProjectLocationUpdate(actor, candidate);
+        }
+
         if (targetRegion != null && !domainLocations.isEmpty()
                 && !authorizationService.areAllLocationsInRegion(candidate, targetRegion.id())) {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, LOCATIONS_NOT_IN_REGION);
@@ -168,10 +180,32 @@ public class DefaultProjectService implements ProjectService {
                 project.status()
         );
 
-        Project updated = projectRepository.update(candidate.withStatus(newStatus));
+        List<Location> syncedLocations = syncProjectLocations(id, project.locations(), domainLocations);
+        Project updated = projectRepository.update(
+                candidate.withLocations(syncedLocations).withStatus(newStatus)
+        );
 
         auditService.recordProjectAudit(updated, actor, AuditAction.EDITED);
         return updated;
+    }
+
+    private List<Location> syncProjectLocations(
+            UUID projectId,
+            List<Location> requestedLocations,
+            List<Location> fallbackLocations
+    ) {
+        if (requestedLocations == null) {
+            return fallbackLocations;
+        }
+        List<Location> persistedLocations = requestedLocations.stream()
+                .map(loc -> loc.id() == null ? locationRepository.save(loc) : loc)
+                .toList();
+        projectRepository.deleteProjectLocations(projectId);
+        persistedLocations.stream()
+                .map(Location::id)
+                .filter(Objects::nonNull)
+                .forEach(locationId -> projectRepository.addProjectLocation(projectId, locationId));
+        return persistedLocations;
     }
 
     private Organization resolveTargetOrganization(User actor, Project existing, Project project) {

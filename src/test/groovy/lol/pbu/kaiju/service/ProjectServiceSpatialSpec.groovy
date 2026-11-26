@@ -250,6 +250,7 @@ class ProjectServiceSpatialSpec extends BaseControllerSpec {
                 mockProjectRepo,
                 mockRegionRepo,
                 mockOrgRepo,
+                Mock(LocationRepository),
                 unitAuth,
                 mockAudit
         )

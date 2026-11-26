@@ -15,16 +15,11 @@ import jakarta.validation.Validator
 import lol.pbu.kaiju.converter.JtsPointConverter
 import lol.pbu.kaiju.converter.JtsPolygonConverter
 import lol.pbu.kaiju.dto.Coordinates
-import lol.pbu.kaiju.dto.CreateOrganizationAuditLogRequest
 import lol.pbu.kaiju.dto.CreateOrganizationRequest
-import lol.pbu.kaiju.dto.CreateProjectAuditLogRequest
 import lol.pbu.kaiju.dto.CreateShiftRequest
 import lol.pbu.kaiju.dto.IngestBoundaryRequest
-import lol.pbu.kaiju.dto.UpdateOrganizationAuditLogRequest
 import lol.pbu.kaiju.dto.UpdateOrganizationRequest
-import lol.pbu.kaiju.dto.UpdateProjectAuditLogRequest
 import lol.pbu.kaiju.dto.UpdateShiftRequest
-import lol.pbu.kaiju.model.AuditAction
 import lol.pbu.kaiju.serde.JtsGeometrySerde
 import lol.pbu.kaiju.service.AdministrativeRegionService
 import lol.pbu.kaiju.service.BoundaryIngestionService
@@ -452,7 +447,7 @@ class SpatialAndInputValidationSpec extends Specification {
         0 * regionService.applyIngestedBoundary(*_)
     }
 
-    // --- Validator null-input and AuditLogRequest tests ---
+    // --- Validator null-input tests ---
 
     @Unroll
     def "ValidTimeRangeValidator accepts #caseLabel"() {
@@ -475,74 +470,5 @@ class SpatialAndInputValidationSpec extends Specification {
 
         expect:
         locationValidator.isValid(null, null)
-    }
-
-    def "CreateOrganizationAuditLogRequest stores fields and passes validation"() {
-        given:
-        UUID orgId = UUID.randomUUID()
-        UUID actorId = UUID.randomUUID()
-        def request = new CreateOrganizationAuditLogRequest(orgId, actorId, "UNVERIFIED", "VERIFIED", "Reviewed docs")
-
-        expect:
-        verifyAll {
-            validator.validate(request).isEmpty()
-            request.organizationId() == orgId
-            request.actorId() == actorId
-            request.previousStatus() == "UNVERIFIED"
-            request.newStatus() == "VERIFIED"
-            request.reason() == "Reviewed docs"
-        }
-    }
-
-    def "CreateProjectAuditLogRequest stores fields and passes validation"() {
-        given:
-        UUID projectId = UUID.randomUUID()
-        UUID actorId = UUID.randomUUID()
-        def request = new CreateProjectAuditLogRequest(projectId, actorId, AuditAction.APPROVED)
-
-        expect:
-        verifyAll {
-            validator.validate(request).isEmpty()
-            request.projectId() == projectId
-            request.actorId() == actorId
-            request.action() == AuditAction.APPROVED
-        }
-    }
-
-    def "UpdateOrganizationAuditLogRequest stores fields and passes validation"() {
-        given:
-        def request = new UpdateOrganizationAuditLogRequest("VERIFIED", "SUSPENDED", "Expired")
-
-        expect:
-        verifyAll(request) {
-            validator.validate(it).isEmpty()
-            previousStatus() == "VERIFIED"
-            newStatus() == "SUSPENDED"
-            reason() == "Expired"
-        }
-    }
-
-    def "UpdateProjectAuditLogRequest stores fields and passes validation"() {
-        given:
-        def request = new UpdateProjectAuditLogRequest(AuditAction.EDITED)
-
-        expect:
-        verifyAll(request) {
-            validator.validate(it).isEmpty()
-            action() == AuditAction.EDITED
-        }
-    }
-
-    @Unroll
-    def "#requestName reports #expectedViolations violations when required fields are invalid"() {
-        expect:
-        validator.validate(request).size() == expectedViolations
-
-        where:
-        requestName                         | request                                                             | expectedViolations
-        "CreateOrganizationAuditLogRequest" | new CreateOrganizationAuditLogRequest(null, null, "", " ", null)    | 4
-        "CreateProjectAuditLogRequest"      | new CreateProjectAuditLogRequest(null, null, null)                  | 3
-        "UpdateOrganizationAuditLogRequest" | new UpdateOrganizationAuditLogRequest("", " ", null)                | 2
-        "UpdateProjectAuditLogRequest"      | new UpdateProjectAuditLogRequest(null)                              | 1
     }
 }
