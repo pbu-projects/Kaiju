@@ -866,7 +866,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "canViewProject returns #expected when #viewerLabel views a #projectLabel project"() {
+    def "canViewProject returns #expected for viewer=#viewerKey and project=#projectKey"() {
         given: "projects and users"
         def fixtures = persistProjectAndShiftViewFixtures()
         def viewerId = viewerKey ? (fixtures[viewerKey] as User).id() : null
@@ -876,14 +876,11 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         service.canViewProject(viewerId, project) == expected
 
         where:
-        viewerLabel      | viewerKey       | projectLabel | projectKey       | expected
-        "anonymous user" | null            | "active"     | "activeProject"  | true
-        "anonymous user" | null            | "pending"    | "pendingProject" | false
-        "outsider"       | "outsider"      | "pending"    | "pendingProject" | false
-        "global admin"   | "admin"         | "pending"    | "pendingProject" | true
-        "org member"     | "orgMember"     | "pending"    | "pendingProject" | true
-        "sponsor"        | "sponsor"       | "pending"    | "pendingProject" | true
-        "regional agent" | "regionalAgent" | "pending"    | "pendingProject" | true
+        [viewerKey, projectKey] << [
+                [null, "outsider", "admin", "orgMember", "sponsor", "regionalAgent"],
+                ["activeProject", "pendingProject"]
+        ].combinations()
+        expected = projectKey == "activeProject" || viewerKey in ["admin", "orgMember", "sponsor", "regionalAgent"]
     }
 
     def "canViewProject returns true without actor lookup for an active project"() {
@@ -1217,7 +1214,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "canViewOrganization returns #expected when #callerLabel views a #orgLabel"() {
+    def "canViewOrganization returns #expected for caller=#callerKey and org=#orgKey"() {
         given: "organizations and users"
         def fixtures = persistOrgRegionAuthFixtures()
         def callerId = callerKey ? (fixtures[callerKey] as User).id() : null
@@ -1227,12 +1224,11 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         service.canViewOrganization(callerId, org) == expected
 
         where:
-        callerLabel      | callerKey    | orgLabel               | orgKey       | expected
-        "anonymous user" | null         | "public organization"  | "publicOrg"  | true
-        "anonymous user" | null         | "private organization" | "privateOrg" | false
-        "outsider"       | "outsider"   | "private organization" | "privateOrg" | false
-        "org manager"    | "orgManager" | "private organization" | "privateOrg" | true
-        "global admin"   | "admin"      | "private organization" | "privateOrg" | true
+        [callerKey, orgKey] << [
+                [null, "outsider", "orgManager", "admin"],
+                ["publicOrg", "privateOrg"]
+        ].combinations()
+        expected = orgKey == "publicOrg" || callerKey in ["orgManager", "admin"]
     }
 
     def "canViewOrganization returns true without actor lookup for a public organization"() {

@@ -310,8 +310,8 @@ class ProjectControllerSpec extends BaseControllerSpec {
         e.status == HttpStatus.FORBIDDEN
     }
 
-    def "CREATE | should return 403 Forbidden for regional admin in-region with non-existent organizationId (no existence oracle)"() {
-        given: "a create request with an in-region Denver location and non-existent organization ID"
+    def "CREATE | should block a county helper who tries to start a project for a missing group"() {
+        given: "a project request in Denver for a group that does not exist"
         def denverLoc = new ProjectLocationRequest(
                 "Denver Loc",
                 "123 Main St",
@@ -332,10 +332,10 @@ class ProjectControllerSpec extends BaseControllerSpec {
                 [denverLoc]
         )
 
-        when: "the Denver regional agent submits via HTTP POST"
+        when: "the Denver county helper submits via HTTP POST"
         client.exchange(asRegionAgent(HttpRequest.POST("/projects", request), TestPersonas.CONNIE_COUNTY_AGENT), Project)
 
-        then: "a 403 Forbidden is returned instead of leaking org non-existence via 400"
+        then: "the request is blocked with 403 Forbidden"
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.FORBIDDEN
     }
