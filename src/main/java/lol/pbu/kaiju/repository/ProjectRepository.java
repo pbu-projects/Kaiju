@@ -30,11 +30,13 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
     @Override
     @Join("organization")
     @Join(value = "managingRegion", type = LEFT_FETCH)
+    @Join(value = "locations", type = LEFT_FETCH)
     @NonNull
     Optional<Project> findById(@NonNull UUID id);
 
     @Join("organization")
     @Join(value = "managingRegion", type = LEFT_FETCH)
+    @Join(value = "locations", type = LEFT_FETCH)
     @NonNull
     Optional<Project> findByIdAndDeletedAtIsNull(@NonNull UUID id);
 
@@ -117,6 +119,12 @@ public interface ProjectRepository extends PageableRepository<Project, UUID>{
 
     @Query("SELECT EXISTS (SELECT 1 FROM project_locations WHERE project_id = :projectId AND location_id = :locationId)")
     boolean hasProjectLocation(@NonNull UUID projectId, @NonNull UUID locationId);
+
+    @Query("DELETE FROM project_locations WHERE project_id = :projectId")
+    void deleteProjectLocations(@NonNull UUID projectId);
+
+    @Query("INSERT INTO project_locations (project_id, location_id) VALUES (:projectId, :locationId) ON CONFLICT DO NOTHING")
+    void addProjectLocation(@NonNull UUID projectId, @NonNull UUID locationId);
 
     long removeById(@NonNull UUID id);
 }

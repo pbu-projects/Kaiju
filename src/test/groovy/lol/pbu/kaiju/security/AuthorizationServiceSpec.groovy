@@ -9,6 +9,7 @@ import lol.pbu.kaiju.controller.BaseControllerSpec
 import lol.pbu.kaiju.domain.AdministrativeRegion
 import lol.pbu.kaiju.domain.Location
 import lol.pbu.kaiju.domain.Organization
+import lol.pbu.kaiju.domain.Project
 import lol.pbu.kaiju.domain.Shift
 import lol.pbu.kaiju.domain.User
 import lol.pbu.kaiju.fixtures.TestPersonas
@@ -16,10 +17,14 @@ import lol.pbu.kaiju.model.ProjectStatus
 import lol.pbu.kaiju.model.ProjectType
 import lol.pbu.kaiju.model.UserRole
 import lol.pbu.kaiju.model.VerificationStatus
+import lol.pbu.kaiju.repository.BoundaryRepository
+import lol.pbu.kaiju.repository.LocationRepository
 import lol.pbu.kaiju.repository.PermissionQueryRepository
+import lol.pbu.kaiju.repository.UserRepository
 import lol.pbu.kaiju.service.ShiftService
 import lol.pbu.kaiju.service.UserService
 import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.GeometryFactory
 import org.locationtech.jts.geom.Polygon
 import spock.lang.Unroll
 
@@ -861,7 +866,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "canViewProject returns #expected when #viewerLabel views a #projectLabel project"() {
+    def "canViewProject returns #expected for viewer=#viewerKey and project=#projectKey"() {
         given: "projects and users"
         def fixtures = persistProjectAndShiftViewFixtures()
         def viewerId = viewerKey ? (fixtures[viewerKey] as User).id() : null
@@ -871,32 +876,31 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         service.canViewProject(viewerId, project) == expected
 
         where:
-        viewerLabel      | viewerKey       | projectLabel | projectKey       | expected
-        "anonymous user" | null            | "active"     | "activeProject"  | true
-        "anonymous user" | null            | "pending"    | "pendingProject" | false
-        "outsider"       | "outsider"      | "pending"    | "pendingProject" | false
-        "global admin"   | "admin"         | "pending"    | "pendingProject" | true
-        "org member"     | "orgMember"     | "pending"    | "pendingProject" | true
-        "sponsor"        | "sponsor"       | "pending"    | "pendingProject" | true
-        "regional agent" | "regionalAgent" | "pending"    | "pendingProject" | true
+        [viewerKey, projectKey] << [
+                [null, "outsider", "admin", "orgMember", "sponsor", "regionalAgent"],
+                ["activeProject", "pendingProject"]
+        ].combinations()
+        expected = projectKey == "activeProject" || viewerKey in ["admin", "orgMember", "sponsor", "regionalAgent"]
     }
 
-    @Unroll
-    def "canViewProject throws UNAUTHORIZED for a missing actor on a #projectLabel project"() {
+    def "canViewProject returns true without actor lookup for an active project"() {
         given: "projects"
         def fixtures = persistProjectAndShiftViewFixtures()
 
-        when:
-        service.canViewProject(UUID.randomUUID(), fixtures[projectKey])
+        expect: "active project short-circuits without requiring actor lookup"
+        service.canViewProject(UUID.randomUUID(), fixtures.activeProject) == true
+    }
+
+    def "canViewProject throws UNAUTHORIZED for a missing actor on a pending project"() {
+        given: "projects"
+        def fixtures = persistProjectAndShiftViewFixtures()
+
+        when: "a missing actor requests a pending project"
+        service.canViewProject(UUID.randomUUID(), fixtures.pendingProject)
 
         then:
         HttpStatusException ex = thrown()
         ex.status == HttpStatus.UNAUTHORIZED
-
-        where:
-        projectLabel | projectKey
-        "active"     | "activeProject"
-        "pending"    | "pendingProject"
     }
 
     @Unroll
@@ -917,16 +921,12 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         "global admin"   | "admin"    | "orphan"   | "orphanShift"  | false
     }
 
-    def "canViewShift throws UNAUTHORIZED for a missing actor on an active shift"() {
+    def "canViewShift returns true without actor lookup on an active shift"() {
         given: "an active shift"
         def fixtures = persistProjectAndShiftViewFixtures()
 
-        when:
-        service.canViewShift(UUID.randomUUID(), fixtures.activeShift as Shift)
-
-        then:
-        HttpStatusException ex = thrown()
-        ex.status == HttpStatus.UNAUTHORIZED
+        expect:
+        service.canViewShift(UUID.randomUUID(), fixtures.activeShift as Shift) == true
     }
 
     def "authorizeShiftView allows a project sponsor to view a pending shift"() {
@@ -958,7 +958,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         callerLabel      | callerMode  | shiftLabel | shiftKey       | expectedStatus
         "outsider"       | "outsider"  | "pending"  | "pendingShift" | HttpStatus.FORBIDDEN
         "anonymous user" | "anonymous" | "pending"  | "pendingShift" | HttpStatus.UNAUTHORIZED
-        "missing actor"  | "missing"   | "active"   | "activeShift"  | HttpStatus.UNAUTHORIZED
+        "missing actor"  | "missing"   | "pending"  | "pendingShift" | HttpStatus.UNAUTHORIZED
     }
 
     private Map persistShiftServiceFixtures() {
@@ -1214,7 +1214,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
     }
 
     @Unroll
-    def "canViewOrganization returns #expected when #callerLabel views a #orgLabel"() {
+    def "canViewOrganization returns #expected for caller=#callerKey and org=#orgKey"() {
         given: "organizations and users"
         def fixtures = persistOrgRegionAuthFixtures()
         def callerId = callerKey ? (fixtures[callerKey] as User).id() : null
@@ -1224,20 +1224,27 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         service.canViewOrganization(callerId, org) == expected
 
         where:
-        callerLabel      | callerKey    | orgLabel               | orgKey       | expected
-        "anonymous user" | null         | "public organization"  | "publicOrg"  | true
-        "anonymous user" | null         | "private organization" | "privateOrg" | false
-        "outsider"       | "outsider"   | "private organization" | "privateOrg" | false
-        "org manager"    | "orgManager" | "private organization" | "privateOrg" | true
-        "global admin"   | "admin"      | "private organization" | "privateOrg" | true
+        [callerKey, orgKey] << [
+                [null, "outsider", "orgManager", "admin"],
+                ["publicOrg", "privateOrg"]
+        ].combinations()
+        expected = orgKey == "publicOrg" || callerKey in ["orgManager", "admin"]
     }
 
-    def "canViewOrganization throws UNAUTHORIZED when a missing actor views a public organization"() {
-        given: "a public organization"
+    def "canViewOrganization returns true without actor lookup for a public organization"() {
+        given: "public and private organizations"
         def fixtures = persistOrgRegionAuthFixtures()
 
-        when:
-        service.canViewOrganization(UUID.randomUUID(), fixtures.publicOrg as Organization)
+        expect: "public organization short-circuits without requiring actor lookup"
+        service.canViewOrganization(UUID.randomUUID(), fixtures.publicOrg as Organization) == true
+    }
+
+    def "canViewOrganization throws UNAUTHORIZED for a missing actor on a private organization"() {
+        given: "public and private organizations"
+        def fixtures = persistOrgRegionAuthFixtures()
+
+        when: "a missing actor requests a private organization"
+        service.canViewOrganization(UUID.randomUUID(), fixtures.privateOrg as Organization)
 
         then:
         HttpStatusException ex = thrown()
@@ -1282,7 +1289,7 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
         callerLabel      | callerMode  | orgLabel               | orgKey       | expectedStatus
         "outsider"       | "outsider"  | "private organization" | "privateOrg" | HttpStatus.FORBIDDEN
         "anonymous user" | "anonymous" | "private organization" | "privateOrg" | HttpStatus.UNAUTHORIZED
-        "missing actor"  | "missing"   | "public organization"  | "publicOrg"  | HttpStatus.UNAUTHORIZED
+        "missing actor"  | "missing"   | "private organization" | "privateOrg" | HttpStatus.UNAUTHORIZED
     }
 
     @Unroll
@@ -2650,5 +2657,153 @@ class AuthorizationServiceSpec extends BaseControllerSpec {
                 "authorizeBoundaryCreate",
                 "authorizeUserManager"
         ]
+    }
+
+    def "requireCreationAuthority short-circuits org and spatial queries for global admin"() {
+        given: "a mocked AuthorizationService, a global admin, and a physical project"
+        PermissionQueryRepository mockQueryRepo = Mock(PermissionQueryRepository)
+        UserRepository mockUserRepo = Mock(UserRepository)
+        AuthorizationService unitAuth = new AuthorizationService(
+                mockQueryRepo,
+                mockUserRepo,
+                Mock(LocationRepository),
+                Mock(BoundaryRepository),
+                new GeometryFactory()
+        )
+        User admin = new User(UUID.randomUUID(), "admin@example.com", UserRole.GLOBAL_ADMIN, OffsetDateTime.now(ZoneOffset.UTC))
+        Organization org = new Organization(UUID.randomUUID(), "Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        Location loc = dataBuilder.location().withName("Loc").atPoint(-104.99, 39.74).build()
+        Project project = dataBuilder.project().forOrg(org).withStatus(ProjectStatus.DRAFT).atLocation(loc).build()
+
+        when: "authorizing and evaluating project creation"
+        def auth = unitAuth.authorizeProjectCreation(admin, project)
+        def status = unitAuth.evaluateProjectCreationByUser(admin, project, auth)
+
+        then: "no org membership or spatial region queries are run"
+        verifyAll {
+            auth.isGlobalAdmin()
+            !auth.isRegionalAdmin()
+            auth.hasLocations()
+            status == ProjectStatus.DRAFT
+        }
+        0 * mockQueryRepo.isAnyOrgMember(*_)
+        0 * mockQueryRepo.areAllPointsInAgentAssignedRegion(*_)
+        0 * mockQueryRepo.isUserInRegion(*_)
+    }
+
+    def "requireCreationAuthority skips regional spatial query for non-regional standard user"() {
+        given: "a mocked AuthorizationService, a standard org member, and a physical project"
+        PermissionQueryRepository mockQueryRepo = Mock(PermissionQueryRepository)
+        UserRepository mockUserRepo = Mock(UserRepository)
+        AuthorizationService unitAuth = new AuthorizationService(
+                mockQueryRepo,
+                mockUserRepo,
+                Mock(LocationRepository),
+                Mock(BoundaryRepository),
+                new GeometryFactory()
+        )
+        User member = new User(UUID.randomUUID(), "member@example.com", UserRole.STANDARD_USER, OffsetDateTime.now(ZoneOffset.UTC))
+        UUID memberOrgId = UUID.randomUUID()
+        Organization org = new Organization(memberOrgId, "Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        Location loc = dataBuilder.location().withName("Loc").atPoint(-104.99, 39.74).build()
+        Project project = dataBuilder.project().forOrg(org).withStatus(ProjectStatus.DRAFT).atLocation(loc).build()
+        mockQueryRepo.isAnyOrgMember(member.id(), memberOrgId) >> true
+
+        when: "authorizing project creation"
+        def auth = unitAuth.authorizeProjectCreation(member, project)
+
+        then: "regional spatial queries are skipped"
+        verifyAll {
+            !auth.isGlobalAdmin()
+            !auth.isRegionalAdmin()
+            !auth.inAssignedRegion()
+        }
+        0 * mockQueryRepo.areAllPointsInAgentAssignedRegion(*_)
+        0 * mockQueryRepo.isUserInRegion(*_)
+    }
+
+    def "canViewProject short-circuits before querying users for an active project"() {
+        given: "a mocked UserRepository and an active project"
+        UserRepository mockUserRepo = Mock(UserRepository)
+        AuthorizationService unitAuth = new AuthorizationService(
+                Mock(PermissionQueryRepository),
+                mockUserRepo,
+                Mock(LocationRepository),
+                Mock(BoundaryRepository),
+                new GeometryFactory()
+        )
+        Organization publicOrg = new Organization(UUID.randomUUID(), "Public Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+        Project activeProj = dataBuilder.project().forOrg(publicOrg).withStatus(ProjectStatus.ACTIVE).build()
+
+        when: "checking visibility with a non-null user ID"
+        boolean canViewProj = unitAuth.canViewProject(UUID.randomUUID(), activeProj)
+
+        then: "it returns true without querying users"
+        canViewProj
+        0 * mockUserRepo.findById(_)
+    }
+
+    def "canViewOrganization short-circuits before querying users for a public organization"() {
+        given: "a mocked UserRepository and a public verified organization"
+        UserRepository mockUserRepo = Mock(UserRepository)
+        AuthorizationService unitAuth = new AuthorizationService(
+                Mock(PermissionQueryRepository),
+                mockUserRepo,
+                Mock(LocationRepository),
+                Mock(BoundaryRepository),
+                new GeometryFactory()
+        )
+        Organization publicOrg = new Organization(UUID.randomUUID(), "Public Org", null, null, true, VerificationStatus.VERIFIED, null, [])
+
+        when: "checking visibility with a non-null user ID"
+        boolean canViewOrg = unitAuth.canViewOrganization(UUID.randomUUID(), publicOrg)
+
+        then: "it returns true without querying users"
+        canViewOrg
+        0 * mockUserRepo.findById(_)
+    }
+
+    def "authorizeProjectLocationUpdate allows director with virtual jurisdiction to clear locations and blocks outside director"() {
+        given: "Denver and Boulder regions, verified org in Denver only, and a Denver REGION_DIRECTOR"
+        def denverRegion = dataBuilder.region()
+                .withName("Loc Update Denver Reg")
+                .withGeometry(denverBoxPolygon())
+                .persist()
+        def boulderRegion = dataBuilder.region()
+                .withName("Loc Update Boulder Reg")
+                .withGeometry(denverBoxPolygon())
+                .persist()
+        def denverOrg = dataBuilder.organization()
+                .withName("Loc Update Denver Org")
+                .asPublic()
+                .verified()
+                .persist()
+        dataBuilder.linkOrganizationToRegion(denverOrg, denverRegion)
+
+        def denverDirector = saveUser(UserRole.REGION_DIRECTOR)
+        def boulderDirector = saveUser(UserRole.REGION_DIRECTOR)
+        dataBuilder.regionUser().asRegionDirector(denverDirector, denverRegion).persist()
+        dataBuilder.regionUser().asRegionDirector(boulderDirector, boulderRegion).persist()
+
+        def emptyLocationsCandidate = dataBuilder.project()
+                .forOrg(denverOrg)
+                .withTitle("Virtual Candidate")
+                .withDescription("Desc")
+                .withType(ProjectType.STANDARD)
+                .withStatus(ProjectStatus.ACTIVE)
+                .build()
+
+        when: "Denver director clears locations on a Denver org project"
+        service.authorizeProjectLocationUpdate(denverDirector, emptyLocationsCandidate)
+
+        then: "it succeeds"
+        noExceptionThrown()
+
+        when: "Boulder director tries to clear locations on the Denver org project"
+        service.authorizeProjectLocationUpdate(boulderDirector, emptyLocationsCandidate)
+
+        then: "403 Forbidden is thrown"
+        def ex = thrown(HttpStatusException)
+        ex.status == HttpStatus.FORBIDDEN
     }
 }

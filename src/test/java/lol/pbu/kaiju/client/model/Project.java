@@ -46,11 +46,11 @@ import jakarta.annotation.Generated;
     Project.JSON_PROPERTY_PROJECT_TYPE,
     Project.JSON_PROPERTY_STATUS,
     Project.JSON_PROPERTY_CREATED_AT,
-    Project.JSON_PROPERTY_LOCATIONS,
-    Project.JSON_PROPERTY_BOUNDARIES,
     Project.JSON_PROPERTY_MANAGING_REGION,
     Project.JSON_PROPERTY_DELETED_AT,
     Project.JSON_PROPERTY_DELETED_BY,
+    Project.JSON_PROPERTY_LOCATIONS,
+    Project.JSON_PROPERTY_BOUNDARIES,
 })
 @Serdeable
 @Generated("io.micronaut.openapi.generator.JavaMicronautClientCodegen")
@@ -63,11 +63,11 @@ public class Project {
     public static final String JSON_PROPERTY_PROJECT_TYPE = "projectType";
     public static final String JSON_PROPERTY_STATUS = "status";
     public static final String JSON_PROPERTY_CREATED_AT = "createdAt";
-    public static final String JSON_PROPERTY_LOCATIONS = "locations";
-    public static final String JSON_PROPERTY_BOUNDARIES = "boundaries";
     public static final String JSON_PROPERTY_MANAGING_REGION = "managingRegion";
     public static final String JSON_PROPERTY_DELETED_AT = "deletedAt";
     public static final String JSON_PROPERTY_DELETED_BY = "deletedBy";
+    public static final String JSON_PROPERTY_LOCATIONS = "locations";
+    public static final String JSON_PROPERTY_BOUNDARIES = "boundaries";
 
     @NotNull
     @JsonProperty(JSON_PROPERTY_ID)
@@ -100,14 +100,6 @@ public class Project {
     @JsonProperty(JSON_PROPERTY_CREATED_AT)
     private ZonedDateTime createdAt;
 
-    @NotNull
-    @JsonProperty(JSON_PROPERTY_LOCATIONS)
-    private List<@Valid Location> locations = new ArrayList<>();
-
-    @NotNull
-    @JsonProperty(JSON_PROPERTY_BOUNDARIES)
-    private List<@Valid Boundary> boundaries = new ArrayList<>();
-
     @Nullable
     @Valid
     @JsonProperty(JSON_PROPERTY_MANAGING_REGION)
@@ -125,10 +117,20 @@ public class Project {
     @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
     private User deletedBy;
 
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_LOCATIONS)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private List<@Valid Location> locations;
+
+    @Nullable
+    @JsonProperty(JSON_PROPERTY_BOUNDARIES)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private List<@Valid Boundary> boundaries;
+
     public Project() {
     }
 
-    public Project(UUID id, Organization organization, String title, String description, ProjectType projectType, ProjectStatus status, ZonedDateTime createdAt, List<@Valid Location> locations, List<@Valid Boundary> boundaries) {
+    public Project(UUID id, Organization organization, String title, String description, ProjectType projectType, ProjectStatus status, ZonedDateTime createdAt) {
         this.id = id;
         this.organization = organization;
         this.title = title;
@@ -136,8 +138,6 @@ public class Project {
         this.projectType = projectType;
         this.status = status;
         this.createdAt = createdAt;
-        this.locations = locations;
-        this.boundaries = boundaries;
     }
 
     /**
@@ -323,78 +323,6 @@ public class Project {
     }
 
     /**
-     * @return the locations property value
-     */
-    public List<@Valid Location> getLocations() {
-        return locations;
-    }
-
-    /**
-     * Set the locations property value
-     *
-     * @param locations property value to set
-     */
-    public void setLocations(List<@Valid Location> locations) {
-        this.locations = locations;
-    }
-
-    /**
-     * Set locations in a chainable fashion.
-     *
-     * @return The same instance of Project for chaining.
-     */
-    public Project locations(List<@Valid Location> locations) {
-        this.locations = locations;
-        return this;
-    }
-
-    /**
-     * Add an item to the locations property in a chainable fashion.
-     *
-     * @return The same instance of Project for chaining.
-     */
-    public Project addLocationsItem(Location locationsItem) {
-        locations.add(locationsItem);
-        return this;
-    }
-
-    /**
-     * @return the boundaries property value
-     */
-    public List<@Valid Boundary> getBoundaries() {
-        return boundaries;
-    }
-
-    /**
-     * Set the boundaries property value
-     *
-     * @param boundaries property value to set
-     */
-    public void setBoundaries(List<@Valid Boundary> boundaries) {
-        this.boundaries = boundaries;
-    }
-
-    /**
-     * Set boundaries in a chainable fashion.
-     *
-     * @return The same instance of Project for chaining.
-     */
-    public Project boundaries(List<@Valid Boundary> boundaries) {
-        this.boundaries = boundaries;
-        return this;
-    }
-
-    /**
-     * Add an item to the boundaries property in a chainable fashion.
-     *
-     * @return The same instance of Project for chaining.
-     */
-    public Project addBoundariesItem(Boundary boundariesItem) {
-        boundaries.add(boundariesItem);
-        return this;
-    }
-
-    /**
      * @return the managingRegion property value
      */
     public AdministrativeRegion getManagingRegion() {
@@ -472,6 +400,84 @@ public class Project {
         return this;
     }
 
+    /**
+     * @return the locations property value
+     */
+    public List<@Valid Location> getLocations() {
+        return locations;
+    }
+
+    /**
+     * Set the locations property value
+     *
+     * @param locations property value to set
+     */
+    public void setLocations(List<@Valid Location> locations) {
+        this.locations = locations;
+    }
+
+    /**
+     * Set locations in a chainable fashion.
+     *
+     * @return The same instance of Project for chaining.
+     */
+    public Project locations(List<@Valid Location> locations) {
+        this.locations = locations;
+        return this;
+    }
+
+    /**
+     * Add an item to the locations property in a chainable fashion.
+     *
+     * @return The same instance of Project for chaining.
+     */
+    public Project addLocationsItem(Location locationsItem) {
+        if (locations == null) {
+            locations = new ArrayList<>();
+        }
+        locations.add(locationsItem);
+        return this;
+    }
+
+    /**
+     * @return the boundaries property value
+     */
+    public List<@Valid Boundary> getBoundaries() {
+        return boundaries;
+    }
+
+    /**
+     * Set the boundaries property value
+     *
+     * @param boundaries property value to set
+     */
+    public void setBoundaries(List<@Valid Boundary> boundaries) {
+        this.boundaries = boundaries;
+    }
+
+    /**
+     * Set boundaries in a chainable fashion.
+     *
+     * @return The same instance of Project for chaining.
+     */
+    public Project boundaries(List<@Valid Boundary> boundaries) {
+        this.boundaries = boundaries;
+        return this;
+    }
+
+    /**
+     * Add an item to the boundaries property in a chainable fashion.
+     *
+     * @return The same instance of Project for chaining.
+     */
+    public Project addBoundariesItem(Boundary boundariesItem) {
+        if (boundaries == null) {
+            boundaries = new ArrayList<>();
+        }
+        boundaries.add(boundariesItem);
+        return this;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -488,16 +494,16 @@ public class Project {
             && Objects.equals(this.projectType, project.projectType)
             && Objects.equals(this.status, project.status)
             && Objects.equals(this.createdAt, project.createdAt)
-            && Objects.equals(this.locations, project.locations)
-            && Objects.equals(this.boundaries, project.boundaries)
             && Objects.equals(this.managingRegion, project.managingRegion)
             && Objects.equals(this.deletedAt, project.deletedAt)
-            && Objects.equals(this.deletedBy, project.deletedBy);
+            && Objects.equals(this.deletedBy, project.deletedBy)
+            && Objects.equals(this.locations, project.locations)
+            && Objects.equals(this.boundaries, project.boundaries);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, organization, title, description, projectType, status, createdAt, locations, boundaries, managingRegion, deletedAt, deletedBy);
+        return Objects.hash(id, organization, title, description, projectType, status, createdAt, managingRegion, deletedAt, deletedBy, locations, boundaries);
     }
 
     @Override
@@ -510,11 +516,11 @@ public class Project {
             + "projectType: " + getProjectType() + ", "
             + "status: " + getStatus() + ", "
             + "createdAt: " + getCreatedAt() + ", "
-            + "locations: " + getLocations() + ", "
-            + "boundaries: " + getBoundaries() + ", "
             + "managingRegion: " + getManagingRegion() + ", "
             + "deletedAt: " + getDeletedAt() + ", "
-            + "deletedBy: " + getDeletedBy()
+            + "deletedBy: " + getDeletedBy() + ", "
+            + "locations: " + getLocations() + ", "
+            + "boundaries: " + getBoundaries()
             + ")";
     }
 

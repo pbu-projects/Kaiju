@@ -64,32 +64,35 @@ public class AuthorizationService {
         this.geometryFactory = geometryFactory;
     }
 
-    private record CreationAuthority(
+    public record CreationAuthority(
             boolean isGlobalAdmin,
             boolean isRegionalAdmin,
             boolean hasLocations,
             boolean inAssignedRegion
     ) {}
 
-    public void authorizeProjectCreation(@NonNull User user, @NonNull Project project) {
-        requireCreationAuthority(user, project);
+    @NonNull
+    public CreationAuthority authorizeProjectCreation(@NonNull User user, @NonNull Project project) {
+        return requireCreationAuthority(user, project);
     }
 
     private CreationAuthority requireCreationAuthority(User user, Project project) {
         UUID userId = user.id();
+        boolean hasLocations = project.locations() != null && !project.locations().isEmpty();
+        if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return new CreationAuthority(true, false, hasLocations, false);
+        }
+
         UUID organizationId = project.organization() != null ? project.organization().id() : null;
-        boolean isGlobalAdmin = user.role().hasPermission(Permission.SYSTEM_ADMIN);
         boolean isOrgMember = organizationId != null && queryRepository.isAnyOrgMember(userId, organizationId);
         boolean isRegionalAdmin = isRegionalAdmin(user);
-
-        boolean hasLocations = project.locations() != null && !project.locations().isEmpty();
-        boolean inAssignedRegion = isInAssignedRegion(project, userId, hasLocations);
+        boolean inAssignedRegion = isRegionalAdmin && isInAssignedRegion(project, userId, hasLocations);
         boolean isAuthorizedRegionalAdmin = isRegionalAdmin && inAssignedRegion;
 
-        if (!isGlobalAdmin && !isOrgMember && !isAuthorizedRegionalAdmin) {
+        if (!isOrgMember && !isAuthorizedRegionalAdmin) {
             throw new HttpStatusException(FORBIDDEN, "User is not authorized to create a project for this organization");
         }
-        return new CreationAuthority(isGlobalAdmin, isRegionalAdmin, hasLocations, inAssignedRegion);
+        return new CreationAuthority(false, isRegionalAdmin, hasLocations, inAssignedRegion);
     }
 
     /**
@@ -103,7 +106,15 @@ public class AuthorizationService {
 
     @NonNull
     public ProjectStatus evaluateProjectCreationByUser(@NonNull User user, @NonNull Project project) {
-        CreationAuthority auth = requireCreationAuthority(user, project);
+        return evaluateProjectCreationByUser(user, project, requireCreationAuthority(user, project));
+    }
+
+    @NonNull
+    public ProjectStatus evaluateProjectCreationByUser(
+            @NonNull User user,
+            @NonNull Project project,
+            @NonNull CreationAuthority auth
+    ) {
         UUID userId = user.id();
         UUID organizationId = project.organization() != null ? project.organization().id() : null;
 
@@ -242,6 +253,43 @@ public class AuthorizationService {
     }
 
     /**
+     * Checks that a regional admin who updates project locations stays within their assigned region
+     * and does not clear locations unless they hold director-level virtual-project authority.
+     */
+    public void authorizeProjectLocationUpdate(@NonNull User actor, @NonNull Project candidate) {
+        if (actor.role().hasPermission(Permission.SYSTEM_ADMIN)) {
+            return;
+        }
+        UUID effectiveOrgId = candidate.organization() != null ? candidate.organization().id() : null;
+        if (effectiveOrgId != null && queryRepository.isOrgManager(actor.id(), effectiveOrgId)) {
+            return;
+        }
+        List<Location> updatedLocations = candidate.locations();
+        if (updatedLocations == null || updatedLocations.isEmpty()) {
+            if (!hasVirtualProjectJurisdiction(actor, candidate)) {
+                throw new HttpStatusException(FORBIDDEN, "You do not have permission to remove all locations from this project");
+            }
+            return;
+        }
+        if (!areAllLocationsInAssignedRegion(candidate, actor.id())) {
+            throw new HttpStatusException(FORBIDDEN, "You do not have geographic jurisdiction over the updated project locations");
+        }
+    }
+
+    private boolean hasVirtualProjectJurisdiction(User actor, Project candidate) {
+        if (!actor.role().hasPermission(Permission.REGION_MANAGE)) {
+            return false;
+        }
+        if (candidate.managingRegion() != null && candidate.managingRegion().id() != null) {
+            return queryRepository.isRegionDirector(actor.id(), candidate.managingRegion().id());
+        }
+        if (candidate.organization() != null && candidate.organization().id() != null) {
+            return queryRepository.isVerifiedOrgInDirectorRegion(actor.id(), candidate.organization().id());
+        }
+        return false;
+    }
+
+    /**
      * Checks if a user can reassign a project to another organization.
      * Only users with PROJECT_REASSIGN permission can reassign a project
      * (system admins anywhere, or regional admins with jurisdiction).
@@ -309,16 +357,16 @@ public class AuthorizationService {
      * system admins, organization members, project sponsors, and regional admins with jurisdiction.
      */
     public boolean canViewProject(@Nullable UUID userId, @NonNull Project project) {
-        User user = userId != null ? requireActor(userId) : null;
         if (project.deletedAt() != null) {
             return false;
         }
         if (project.status() == ACTIVE) {
             return true;
         }
-        if (user == null) {
+        if (userId == null) {
             return false;
         }
+        User user = requireActor(userId);
         if (user.role().hasPermission(Permission.SYSTEM_ADMIN)) {
             return true;
         }
@@ -397,13 +445,13 @@ public class AuthorizationService {
     }
 
     public boolean canViewOrganization(@Nullable UUID userId, @NonNull Organization organization) {
-        User user = userId != null ? requireActor(userId) : null;
         if (isPubliclyVisible(organization)) {
             return true;
         }
-        if (user == null) {
+        if (userId == null) {
             return false;
         }
+        User user = requireActor(userId);
         return user.role().hasPermission(Permission.SYSTEM_ADMIN)
                 || (organization.id() != null && queryRepository.isAnyOrgMember(user.id(), organization.id()));
     }

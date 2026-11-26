@@ -162,4 +162,18 @@ public interface PermissionQueryRepository extends GenericRepository<User, UUID>
         )
     """)
     boolean isVirtualProjectInDirectorJurisdiction(@NonNull UUID regionalAdminId, @NonNull UUID projectId);
+
+    @Query("""
+        SELECT EXISTS (
+            SELECT 1 FROM organization_regions or_reg
+            JOIN organizations o ON o.id = or_reg.organization_id
+            JOIN region_users ru ON ru.region_id = or_reg.region_id
+            WHERE or_reg.organization_id = :organizationId
+              AND ru.user_id = :regionalAdminId
+              AND ru.role = 'REGION_DIRECTOR'
+              AND o.verification_status = 'VERIFIED'
+              AND (o.verification_expires_at IS NULL OR o.verification_expires_at > NOW())
+        )
+    """)
+    boolean isVerifiedOrgInDirectorRegion(@NonNull UUID regionalAdminId, @NonNull UUID organizationId);
 }

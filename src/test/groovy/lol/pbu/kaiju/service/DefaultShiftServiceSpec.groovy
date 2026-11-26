@@ -370,4 +370,23 @@ class DefaultShiftServiceSpec extends BaseControllerSpec {
         HttpStatusException ex = thrown()
         ex.status == HttpStatus.NOT_FOUND
     }
+
+    def "createShift throws NOT_FOUND when any requested tag ID does not exist"() {
+        given: "an active virtual project and a non-existent tag ID"
+        def ctx = createShiftTestContext()
+        def validTag = dataBuilder.tag().withName("valid-tag-${UUID.randomUUID().toString().take(8)}").persist()
+        OffsetDateTime start = OffsetDateTime.now(ZoneOffset.UTC).plusDays(2)
+        OffsetDateTime end = start.plusHours(2)
+        List<Tag> requestedTags = [Tag.forId(validTag.id()), Tag.forId(UUID.randomUUID())]
+
+        when: "creating a shift with a missing tag ID"
+        shiftService.createShift(
+                new Shift(null, ctx.virtualProject, true, null, start, end, requestedTags),
+                ctx.admin.id()
+        )
+
+        then: "NOT_FOUND is thrown"
+        HttpStatusException ex = thrown()
+        ex.status == HttpStatus.NOT_FOUND
+    }
 }

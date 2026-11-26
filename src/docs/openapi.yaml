@@ -2795,11 +2795,9 @@ components:
       type: object
     Project:
       required:
-      - boundaries
       - createdAt
       - description
       - id
-      - locations
       - organization
       - projectType
       - status
@@ -2841,10 +2839,12 @@ components:
           - $ref: "#/components/schemas/User"
         locations:
           type: array
+          nullable: true
           items:
             $ref: "#/components/schemas/Location"
         boundaries:
           type: array
+          nullable: true
           items:
             $ref: "#/components/schemas/Boundary"
     ProjectAuditLog:

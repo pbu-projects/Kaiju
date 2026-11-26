@@ -172,6 +172,24 @@ tasks.register<Copy>("generateApiClient") {
     from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiApis/src/main/java"))
     from(layout.buildDirectory.dir("generated/openapi/generateClientOpenApiModels/src/main/java"))
     into("src/test/java")
+    doLast {
+        val updateProjectRequest = file("src/test/java/lol/pbu/kaiju/client/model/UpdateProjectRequest.java")
+        val target = """
+            |    @JsonProperty(JSON_PROPERTY_LOCATIONS)
+            |    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+        """.trimMargin()
+        val replacement = """
+            |    @JsonProperty(JSON_PROPERTY_LOCATIONS)
+            |    @JsonInclude(JsonInclude.Include.NON_NULL)
+        """.trimMargin()
+        val content = updateProjectRequest.readText()
+        if (!content.contains(target) && !content.contains(replacement)) {
+            throw GradleException("Expected @JsonInclude annotation on UpdateProjectRequest.locations in $updateProjectRequest")
+        }
+        if (content.contains(target)) {
+            updateProjectRequest.writeText(content.replace(target, replacement))
+        }
+    }
 }
 sonar {
     properties {

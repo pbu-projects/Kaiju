@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.serde.annotation.Serdeable;
 import jakarta.validation.Valid;
@@ -11,6 +12,8 @@ import lol.pbu.kaiju.model.ProjectType;
 
 import java.util.List;
 import java.util.UUID;
+
+import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 
 @Serdeable
 public record UpdateProjectRequest(
@@ -32,6 +35,7 @@ public record UpdateProjectRequest(
         ProjectType projectType,
 
         @Nullable
+        @JsonInclude(NON_NULL)
         @Size(max = 50, message = "Project cannot have more than 50 locations.")
         @Valid
         List<ProjectLocationRequest> locations,

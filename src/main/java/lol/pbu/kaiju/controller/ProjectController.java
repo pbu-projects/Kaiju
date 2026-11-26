@@ -215,9 +215,10 @@ public class ProjectController {
         return projectService.approveProject(id, regionalAdminId);
     }
 
-    private List<Location> mapLocations(List<ProjectLocationRequest> locations) {
+    @Nullable
+    private List<Location> mapLocations(@Nullable List<ProjectLocationRequest> locations) {
         if (locations == null) {
-            return List.of();
+            return null;
         }
         return locations.stream()
                 .map(loc -> Location.forCreation(
@@ -232,9 +233,10 @@ public class ProjectController {
                 .toList();
     }
 
-    private List<Boundary> mapBoundaries(List<ProjectBoundaryRequest> boundaries) {
+    @Nullable
+    private List<Boundary> mapBoundaries(@Nullable List<ProjectBoundaryRequest> boundaries) {
         if (boundaries == null) {
-            return List.of();
+            return null;
         }
         return boundaries.stream()
                 .map(bnd -> Boundary.forCreation(

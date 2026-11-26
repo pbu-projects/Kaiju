@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.domain;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.data.annotation.GeneratedValue;
 import io.micronaut.data.annotation.Id;
@@ -18,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import static com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL;
 import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_MANY;
 import static io.micronaut.data.annotation.Relation.Kind.MANY_TO_ONE;
 
@@ -58,10 +60,14 @@ public record Project(
 
         @Relation(MANY_TO_MANY)
         @JoinTable(name = "project_locations")
+        @Nullable
+        @JsonInclude(NON_NULL)
         List<Location> locations, //can be empty if the project is a virtual one
 
         @Relation(MANY_TO_MANY)
         @JoinTable(name = "project_boundaries")
+        @Nullable
+        @JsonInclude(NON_NULL)
         List<Boundary> boundaries
 ) {
     public static Project forId(@NotNull UUID id) {
@@ -75,8 +81,8 @@ public record Project(
             @NotNull String description,
             @NotNull ProjectType projectType,
             @Nullable ProjectStatus status,
-            @NotNull List<Location> locations,
-            @NotNull List<Boundary> boundaries
+            @Nullable List<Location> locations,
+            @Nullable List<Boundary> boundaries
     ) {
         return new Project(
                 null,
@@ -101,8 +107,8 @@ public record Project(
             @NotNull String title,
             @NotNull String description,
             @NotNull ProjectType projectType,
-            @NotNull List<Location> locations,
-            @NotNull List<Boundary> boundaries
+            @Nullable List<Location> locations,
+            @Nullable List<Boundary> boundaries
     ) {
         return new Project(
                 id,
@@ -160,6 +166,23 @@ public record Project(
         );
     }
 
+    public Project withLocations(@NotNull List<Location> newLocations) {
+        return new Project(
+                this.id(),
+                this.organization(),
+                this.managingRegion(),
+                this.title(),
+                this.description(),
+                this.projectType(),
+                this.status(),
+                this.createdAt(),
+                this.deletedAt(),
+                this.deletedBy(),
+                newLocations,
+                this.boundaries()
+        );
+    }
+
     public Project withCreationDetails(
             @NotNull Organization newOrganization,
             @Nullable AdministrativeRegion newManagingRegion,
@@ -185,7 +208,7 @@ public record Project(
     }
 
     public Project withUpdatedDetails(
-            @NotNull Organization newOrganization,
+            @Nullable Organization newOrganization,
             @Nullable AdministrativeRegion newManagingRegion,
             @NotNull Project source,
             @NotNull ProjectStatus newStatus,

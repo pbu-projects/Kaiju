@@ -4,6 +4,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import lol.pbu.kaiju.client.api.DefaultApi
 import lol.pbu.kaiju.client.model.AdministrativeRegion
+import lol.pbu.kaiju.client.model.Coordinates
 import lol.pbu.kaiju.client.model.CreateTagRequest
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegion
 import lol.pbu.kaiju.client.model.CursoredPageAdministrativeRegionAuditLog
@@ -20,7 +21,12 @@ import lol.pbu.kaiju.client.model.CursoredPageTag
 import lol.pbu.kaiju.client.model.CursoredPageUser
 import lol.pbu.kaiju.client.model.Organization
 import lol.pbu.kaiju.client.model.OrganizationUser
+import lol.pbu.kaiju.client.model.Project
+import lol.pbu.kaiju.client.model.ProjectBoundaryRequest
+import lol.pbu.kaiju.client.model.ProjectStatus
+import lol.pbu.kaiju.client.model.ProjectType
 import lol.pbu.kaiju.client.model.RegionUser
+import lol.pbu.kaiju.client.model.UpdateProjectRequest
 import lol.pbu.kaiju.client.model.UpdateUserRoleRequest
 import lol.pbu.kaiju.client.model.Tag
 import lol.pbu.kaiju.client.model.UpdateTagRequest
@@ -288,6 +294,63 @@ class ApiClientSpec extends BaseControllerSpec {
             it != null
             id.userId == TestPersonas.NATHAN_NATIONAL_ADMIN.id
             id.organizationId == TestPersonas.NATIONAL_RELIEF_NETWORK_ID
+        }
+    }
+
+    def "updateProject sends empty locations list over the wire and clears persisted locations"() {
+        given: "an active project with a persisted location and a logged-in global admin"
+        loginAs(TestPersonas.SARAH_ADMIN)
+        def org = dataBuilder.organization().withName("Client Clear Loc Org").asPublic().verified().persist()
+        def loc = dataBuilder.location()
+                .withName("Client Cleared Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Client Physical Project")
+                .withDescription("Description with at least twenty characters here.")
+                .withStatus(lol.pbu.kaiju.model.ProjectStatus.ACTIVE)
+                .atLocation(loc)
+                .persist()
+
+        and: "a generated UpdateProjectRequest with an explicit empty locations list"
+        def boundary = new ProjectBoundaryRequest(
+                "Client Boundary",
+                [
+                        new Coordinates(-105.0d, 39.0d),
+                        new Coordinates(-104.0d, 39.0d),
+                        new Coordinates(-104.0d, 40.0d),
+                        new Coordinates(-105.0d, 39.0d)
+                ]
+        )
+        UpdateProjectRequest request = new UpdateProjectRequest(
+                "Client Cleared Title",
+                "Updated description with at least twenty characters.",
+                ProjectType.STANDARD,
+                [boundary]
+        )
+                .organizationId(org.id())
+                .locations([])
+
+        when: "updating the project via the generated DefaultApi client"
+        Project updated = defaultApi.updateProject(saved.id(), request)
+        Project fetched = defaultApi.getProject(saved.id())
+
+        then: "locations are cleared on the server and status transitions to PENDING"
+        verifyAll(updated) {
+            status == ProjectStatus.PENDING
+            locations != null
+            locations.isEmpty()
+        }
+        verifyAll(fetched) {
+            status == ProjectStatus.PENDING
+            locations != null
+            locations.isEmpty()
         }
     }
 }
