@@ -3,7 +3,6 @@ package lol.pbu.kaiju.security
 import com.nimbusds.jose.JWSAlgorithm
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.jose.crypto.MACSigner
-import com.nimbusds.jose.crypto.RSASSASigner
 import com.nimbusds.jose.crypto.RSASSAVerifier
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
@@ -38,8 +37,6 @@ import java.net.http.HttpClient as JavaHttpClient
 import java.net.http.HttpRequest as JavaHttpRequest
 import java.net.http.HttpResponse as JavaHttpResponse
 import java.nio.charset.StandardCharsets
-import java.security.KeyPairGenerator
-import java.security.interfaces.RSAPrivateKey
 
 @Property(name = "micronaut.security.enabled", value = "true")
 @Property(name = "micronaut.security.token.jwt.enabled", value = "true")
@@ -193,36 +190,27 @@ class AuthentikOidcIntegrationSpec extends Specification {
         !valid
     }
 
-    def "expired token fails temporal validity assertion"() {
-        given: "a genuine ID token"
-        Map<String, String> tokens = authentikDriver.obtainLiveTokens("sarah.admin1@kaiju.local")
-        SignedJWT signedJWT = SignedJWT.parse(tokens.idToken)
-        Date expiration = signedJWT.getJWTClaimsSet().getExpirationTime()
-
-        expect: "current time is before token expiration"
-        new Date().before(expiration)
-
-        and: "a point in time after expiration is correctly identified as expired"
-        Date simulatedFutureTime = new Date(expiration.getTime() + 10000)
-        simulatedFutureTime.after(expiration)
-    }
-
-    def "HTTP requests with expired authorization token return 401 Unauthorized"() {
-        given: "a signed token with an expiration timestamp in the past"
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA")
-        gen.initialize(2048)
-        def keyPair = gen.generateKeyPair()
-        RSASSASigner signer = new RSASSASigner((RSAPrivateKey) keyPair.private)
-        JWTClaimsSet expiredClaims = new JWTClaimsSet.Builder()
+    private String signHmacJwt(Date issueTime, Date expirationTime) {
+        byte[] secretBytes = "pleaseChangeThisSecretForANewOne32Bits".getBytes(StandardCharsets.UTF_8)
+        MACSigner signer = new MACSigner(secretBytes)
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
                 .issuer(authentikDriver.issuer)
                 .audience(authentikDriver.clientId)
                 .subject("sarah.admin1@kaiju.local")
-                .expirationTime(new Date(System.currentTimeMillis() - 60000))
-                .issueTime(new Date(System.currentTimeMillis() - 120000))
+                .claim("email", "sarah.admin1@kaiju.local")
+                .claim("email_verified", true)
+                .issueTime(issueTime)
+                .expirationTime(expirationTime)
                 .build()
-        SignedJWT expiredJWT = new SignedJWT(new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("test-key").build(), expiredClaims)
-        expiredJWT.sign(signer)
-        String expiredToken = expiredJWT.serialize()
+        SignedJWT jwt = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claims)
+        jwt.sign(signer)
+        return jwt.serialize()
+    }
+
+    def "HTTP requests with expired authorization token return 401 Unauthorized"() {
+        given: "an expired token signed with the trusted test HMAC secret"
+        long nowMillis = System.currentTimeMillis()
+        String expiredToken = signHmacJwt(new Date(nowMillis - 120000), new Date(nowMillis - 60000))
 
         when: "calling a secured endpoint with the expired token"
         client.exchange(
@@ -233,6 +221,16 @@ class AuthentikOidcIntegrationSpec extends Specification {
         then: "access is rejected with 401 Unauthorized"
         HttpClientResponseException ex = thrown()
         ex.status == HttpStatus.UNAUTHORIZED
+
+        when: "calling the same secured endpoint with a non-expired token signed with the same HMAC secret"
+        String validToken = signHmacJwt(new Date(nowMillis), new Date(nowMillis + 60000))
+        def response = client.exchange(
+                HttpRequest.GET("/organizations")
+                        .header("Authorization", "Bearer ${validToken}")
+        )
+
+        then: "access is granted with 200 OK, proving rejection was due to expiration rather than key trust"
+        response.status == HttpStatus.OK
     }
 
     def "HTTP requests with untrusted or mismatched issuer token return 401 Unauthorized"() {

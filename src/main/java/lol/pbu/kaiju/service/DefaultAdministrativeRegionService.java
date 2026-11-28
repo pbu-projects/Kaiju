@@ -232,16 +232,11 @@ public class DefaultAdministrativeRegionService implements AdministrativeRegionS
     public void deleteAdministrativeRegion(@NonNull UUID id, @NonNull UUID actorUserId) {
         User actor = resolveActor(actorUserId);
 
-        AdministrativeRegion existing = regionRepository.findById(id)
+        String deletedName = regionRepository.deleteAndReturnName(id)
                 .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND));
 
-        String metadata = buildMetadata(Map.of("deletedName", existing.name()));
+        String metadata = buildMetadata(Map.of("deletedName", deletedName));
         auditService.recordAdministrativeRegionAudit(id, actor, RegionAuditAction.DELETE, metadata);
-
-        long deleted = regionRepository.removeById(id);
-        if (deleted == 0) {
-            throw new HttpStatusException(HttpStatus.NOT_FOUND, REGION_NOT_FOUND);
-        }
     }
 
     @Override

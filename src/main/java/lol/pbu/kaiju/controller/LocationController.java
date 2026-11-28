@@ -21,6 +21,7 @@ import lol.pbu.kaiju.dto.UpdateLocationRequest;
 import lol.pbu.kaiju.repository.LocationRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.service.SpatialMappingService;
+import lol.pbu.kaiju.util.LocationTimezones;
 import lol.pbu.kaiju.util.PageRequests;
 import org.locationtech.jts.geom.Point;
 
@@ -152,10 +153,6 @@ public class LocationController {
     }
 
     String resolveTimezone(Point point, String fallbackTimezone) {
-        if (point == null) {
-            return fallbackTimezone;
-        }
-        return locationRepository.findTimezoneByPoint(point)
-                .orElse(fallbackTimezone);
+        return LocationTimezones.resolveTimezone(locationRepository, point, fallbackTimezone);
     }
 }

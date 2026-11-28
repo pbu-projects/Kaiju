@@ -114,11 +114,11 @@ public class BoundaryController {
     ) {
         Geometry polygon = spatialMappingService.toPolygon(request.coordinates());
         authorizationService.authorizeBoundaryUpdate(UUID.fromString(principal.getName()), id, polygon);
-        if (!boundaryRepository.existsById(id)) {
+        long updatedCount = boundaryRepository.updateBoundary(id, request.name(), polygon);
+        if (updatedCount == 0) {
             throw new HttpStatusException(NOT_FOUND, BOUNDARY_NOT_FOUND);
         }
-        Boundary boundary = Boundary.forUpdate(id, request.name(), polygon);
-        return boundaryRepository.update(boundary);
+        return Boundary.forUpdate(id, request.name(), polygon);
     }
 
     /**

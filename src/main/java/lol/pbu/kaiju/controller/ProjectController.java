@@ -228,7 +228,8 @@ public class ProjectController {
                         loc.stateProvince(),
                         loc.postalCode(),
                         loc.countryCode(),
-                        spatialMappingService.toPoint(loc.longitude(), loc.latitude())
+                        spatialMappingService.toPoint(loc.longitude(), loc.latitude()),
+                        loc.timezone()
                 ))
                 .toList();
     }

@@ -1334,10 +1334,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/Tag"
     put:
-      summary: Updates an existing tag by its ID after validating that it exists.
-      description: Updates an existing tag by its ID after validating that it exists.
-        Restricted to platform administrators and regional managers. Throws 404 NOT_FOUND
-        if the tag does not exist.
+      summary: Updates an existing tag by its ID.
+      description: Updates an existing tag by its ID. Restricted to platform administrators
+        and regional managers. Throws 404 NOT_FOUND if the tag does not exist.
       operationId: updateTag
       parameters:
       - name: id
@@ -2947,6 +2946,12 @@ components:
           x-maximum-message: Latitude must be less than or equal to 90.
           x-minimum-message: Latitude must be greater than or equal to -90.
           x-not-null-message: Latitude is required.
+        timezone:
+          maxLength: 100
+          minLength: 1
+          type: string
+          nullable: true
+          x-size-message: Location timezone must be between 1 and 100 characters.
       description: Location details sent inside a project create or update request.
         Excludes `id` so callers cannot overwrite existing location records directly.
     ProjectSearchCard:

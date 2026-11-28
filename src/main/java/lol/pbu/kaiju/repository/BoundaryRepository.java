@@ -24,6 +24,17 @@ public interface BoundaryRepository extends PageableRepository<Boundary, UUID> {
     long removeById(@NonNull UUID id);
 
     @Query(value = """
+        UPDATE boundaries
+        SET name = :name, geom = CAST(:geom AS geography)
+        WHERE id = :id
+    """, nativeQuery = true)
+    long updateBoundary(
+            @NonNull UUID id,
+            @NonNull String name,
+            @NonNull @TypeDef(type = DataType.OBJECT, converter = JtsPolygonConverter.class) Geometry geom
+    );
+
+    @Query(value = """
         SELECT EXISTS (
             SELECT 1 FROM boundaries b
             JOIN region_users ru ON ru.user_id = :actorId AND ru.role = 'REGION_DIRECTOR'

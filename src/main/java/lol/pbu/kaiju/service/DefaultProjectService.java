@@ -21,6 +21,7 @@ import lol.pbu.kaiju.repository.ProjectRepository;
 import lol.pbu.kaiju.security.AuthorizationService;
 import lol.pbu.kaiju.security.AuthorizationService.CreationAuthority;
 import lol.pbu.kaiju.security.Permission;
+import lol.pbu.kaiju.util.LocationTimezones;
 import org.jspecify.annotations.NonNull;
 
 import java.time.OffsetDateTime;
@@ -88,7 +89,9 @@ public class DefaultProjectService implements ProjectService {
             throw new HttpStatusException(HttpStatus.BAD_REQUEST, ORGANIZATION_REQUIRED);
         }
 
-        List<Location> domainLocations = project.locations() != null ? project.locations() : List.of();
+        List<Location> domainLocations = project.locations() != null
+                ? LocationTimezones.resolveNewLocations(locationRepository, project.locations())
+                : List.of();
         List<Boundary> domainBoundaries = project.boundaries() != null ? project.boundaries() : List.of();
         ProjectStatus requestedStatus = project.status() != null ? project.status() : ProjectStatus.DRAFT;
 
@@ -198,7 +201,9 @@ public class DefaultProjectService implements ProjectService {
             return fallbackLocations;
         }
         List<Location> persistedLocations = requestedLocations.stream()
-                .map(loc -> loc.id() == null ? locationRepository.save(loc) : loc)
+                .map(loc -> loc.id() == null
+                        ? locationRepository.save(LocationTimezones.withResolvedTimezone(locationRepository, loc))
+                        : loc)
                 .toList();
         projectRepository.deleteProjectLocations(projectId);
         persistedLocations.stream()

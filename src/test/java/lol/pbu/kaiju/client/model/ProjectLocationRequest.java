@@ -35,6 +35,7 @@ import jakarta.annotation.Generated;
     ProjectLocationRequest.JSON_PROPERTY_LATITUDE,
     ProjectLocationRequest.JSON_PROPERTY_STATE_PROVINCE,
     ProjectLocationRequest.JSON_PROPERTY_POSTAL_CODE,
+    ProjectLocationRequest.JSON_PROPERTY_TIMEZONE,
 })
 @Serdeable
 @Generated("io.micronaut.openapi.generator.JavaMicronautClientCodegen")
@@ -48,6 +49,7 @@ public class ProjectLocationRequest {
     public static final String JSON_PROPERTY_LATITUDE = "latitude";
     public static final String JSON_PROPERTY_STATE_PROVINCE = "stateProvince";
     public static final String JSON_PROPERTY_POSTAL_CODE = "postalCode";
+    public static final String JSON_PROPERTY_TIMEZONE = "timezone";
 
     @NotNull
     @Size(min = 1, max = 255, message = "Location name must be between 1 and 255 characters.")
@@ -92,6 +94,12 @@ public class ProjectLocationRequest {
     @JsonProperty(JSON_PROPERTY_POSTAL_CODE)
     @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
     private String postalCode;
+
+    @Nullable
+    @Size(min = 1, max = 100, message = "Location timezone must be between 1 and 100 characters.")
+    @JsonProperty(JSON_PROPERTY_TIMEZONE)
+    @JsonInclude(JsonInclude.Include.USE_DEFAULTS)
+    private String timezone;
 
     public ProjectLocationRequest() {
     }
@@ -313,6 +321,32 @@ public class ProjectLocationRequest {
         return this;
     }
 
+    /**
+     * @return the timezone property value
+     */
+    public String getTimezone() {
+        return timezone;
+    }
+
+    /**
+     * Set the timezone property value
+     *
+     * @param timezone property value to set
+     */
+    public void setTimezone(String timezone) {
+        this.timezone = timezone;
+    }
+
+    /**
+     * Set timezone in a chainable fashion.
+     *
+     * @return The same instance of ProjectLocationRequest for chaining.
+     */
+    public ProjectLocationRequest timezone(String timezone) {
+        this.timezone = timezone;
+        return this;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -329,12 +363,13 @@ public class ProjectLocationRequest {
             && Objects.equals(this.longitude, projectLocationRequest.longitude)
             && Objects.equals(this.latitude, projectLocationRequest.latitude)
             && Objects.equals(this.stateProvince, projectLocationRequest.stateProvince)
-            && Objects.equals(this.postalCode, projectLocationRequest.postalCode);
+            && Objects.equals(this.postalCode, projectLocationRequest.postalCode)
+            && Objects.equals(this.timezone, projectLocationRequest.timezone);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, addressLine, city, countryCode, longitude, latitude, stateProvince, postalCode);
+        return Objects.hash(name, addressLine, city, countryCode, longitude, latitude, stateProvince, postalCode, timezone);
     }
 
     @Override
@@ -347,7 +382,8 @@ public class ProjectLocationRequest {
             + "longitude: " + getLongitude() + ", "
             + "latitude: " + getLatitude() + ", "
             + "stateProvince: " + getStateProvince() + ", "
-            + "postalCode: " + getPostalCode()
+            + "postalCode: " + getPostalCode() + ", "
+            + "timezone: " + getTimezone()
             + ")";
     }
 

@@ -1,5 +1,6 @@
 package lol.pbu.kaiju.repository;
 
+import io.micronaut.data.annotation.Query;
 import io.micronaut.data.jdbc.annotation.JdbcRepository;
 import io.micronaut.data.model.CursoredPage;
 import io.micronaut.data.model.CursoredPageable;
@@ -20,6 +21,9 @@ public interface TagRepository extends PageableRepository<Tag, UUID> {
 
     @NonNull
     List<Tag> findByIdIn(@NonNull Collection<UUID> ids);
+
+    @Query("UPDATE tags SET name = :name WHERE id = :id")
+    long updateName(@NonNull UUID id, @NonNull String name);
 
     long removeById(@NonNull UUID id);
 }

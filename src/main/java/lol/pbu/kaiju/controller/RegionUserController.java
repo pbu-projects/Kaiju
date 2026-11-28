@@ -119,10 +119,11 @@ public class RegionUserController {
             Principal principal
     ) {
         verifyRegionDirectorAuthority(principal, regionId);
-        RegionUserId id = new RegionUserId(userId, regionId);
-        regionUserRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(NOT_FOUND, "Region user not found"));
-        return regionUserRepository.update(new RegionUser(id, request.role()));
+        long updatedCount = regionUserRepository.updateRole(userId, regionId, request.role());
+        if (updatedCount == 0) {
+            throw new HttpStatusException(NOT_FOUND, "Region user not found");
+        }
+        return new RegionUser(new RegionUserId(userId, regionId), request.role());
     }
 
     /**

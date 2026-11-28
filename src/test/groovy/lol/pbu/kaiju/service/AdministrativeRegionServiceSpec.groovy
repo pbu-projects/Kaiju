@@ -943,7 +943,7 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
     }
 
     def "UNIT | should return 404 when deleteAdministrativeRegion removes zero rows"() {
-        given: "a region that disappears before delete executes"
+        given: "a region that does not exist when atomic delete executes"
         AdministrativeRegionRepository mockRegionRepo = Mock(AdministrativeRegionRepository)
         UserRepository mockUserRepo = Mock(UserRepository)
         ObjectMapper mockMapper = Mock(ObjectMapper)
@@ -952,12 +952,9 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         UUID actorId = UUID.randomUUID()
         UUID regionId = UUID.randomUUID()
         User admin = dataBuilder.user().asAdmin().build().withId(actorId)
-        AdministrativeRegion region = new AdministrativeRegion(regionId, "Unit Region", null, null, 1, "US", "CO", null, null)
 
         mockUserRepo.findById(actorId) >> Optional.of(admin)
-        mockRegionRepo.findById(regionId) >> Optional.of(region)
-        mockMapper.writeValueAsString(_) >> '{"deletedName":"Unit Region"}'
-        mockRegionRepo.removeById(regionId) >> 0L
+        mockRegionRepo.deleteAndReturnName(regionId) >> Optional.empty()
 
         when: "deleting the region"
         unitService.deleteAdministrativeRegion(regionId, actorId)
@@ -979,10 +976,9 @@ class AdministrativeRegionServiceSpec extends BaseControllerSpec {
         UUID actorId = UUID.randomUUID()
         UUID regionId = UUID.randomUUID()
         User admin = dataBuilder.user().asAdmin().build().withId(actorId)
-        AdministrativeRegion region = new AdministrativeRegion(regionId, "Unit Region", null, null, 1, "US", "CO", null, null)
 
         mockUserRepo.findById(actorId) >> Optional.of(admin)
-        mockRegionRepo.findById(regionId) >> Optional.of(region)
+        mockRegionRepo.deleteAndReturnName(regionId) >> Optional.of("Unit Region")
 
         when: "deleting the region"
         unitService.deleteAdministrativeRegion(regionId, actorId)

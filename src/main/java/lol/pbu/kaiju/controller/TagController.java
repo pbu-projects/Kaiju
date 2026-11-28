@@ -90,7 +90,7 @@ public class TagController {
     }
 
     /**
-     * Updates an existing tag by its ID after validating that it exists.
+     * Updates an existing tag by its ID.
      * Restricted to platform administrators and regional managers.
      * Throws 404 NOT_FOUND if the tag does not exist.
      *
@@ -101,9 +101,11 @@ public class TagController {
     @Secured({SYSTEM_ADMIN_CLAIM, REGION_MANAGE_CLAIM})
     @Put("/{id}")
     public Tag updateTag(@PathVariable UUID id, @Valid @Body UpdateTagRequest request) {
-        tagRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, TAG_NOT_FOUND));
-        return tagRepository.update(new Tag(id, request.name()));
+        long updatedCount = tagRepository.updateName(id, request.name());
+        if (updatedCount == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, TAG_NOT_FOUND);
+        }
+        return new Tag(id, request.name());
     }
 
     /**

@@ -81,10 +81,11 @@ public class OrganizationUserController {
             Principal principal
     ) {
         verifyOrgAdminAuthority(principal, organizationId);
-        OrganizationUserId id = new OrganizationUserId(userId, organizationId);
-        organizationUserRepository.findById(id)
-                .orElseThrow(() -> new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found"));
-        return organizationUserRepository.update(new OrganizationUser(id, request.role()));
+        long updatedCount = organizationUserRepository.updateRole(userId, organizationId, request.role());
+        if (updatedCount == 0) {
+            throw new HttpStatusException(HttpStatus.NOT_FOUND, "Organization user not found");
+        }
+        return new OrganizationUser(new OrganizationUserId(userId, organizationId), request.role());
     }
 
     @Delete("/{userId}/{organizationId}")

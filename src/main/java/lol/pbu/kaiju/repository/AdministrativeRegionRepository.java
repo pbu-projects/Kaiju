@@ -23,6 +23,9 @@ public interface AdministrativeRegionRepository extends PageableRepository<Admin
 
     long removeById(@NonNull UUID id);
 
+    @Query(value = "DELETE FROM administrative_regions WHERE id = :id RETURNING name", nativeQuery = true)
+    Optional<String> deleteAndReturnName(@NonNull UUID id);
+
     @Query(value = """
         SELECT id, name, level, country_code, state_code, time_zone
         FROM administrative_regions

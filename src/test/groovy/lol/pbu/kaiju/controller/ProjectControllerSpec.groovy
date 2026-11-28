@@ -219,6 +219,70 @@ class ProjectControllerSpec extends BaseControllerSpec {
         }
     }
 
+    def "CREATE | resolves timezone from spatial boundaries for inline project locations"() {
+        given: "a project create request with an inline location inside Denver boundaries"
+        def org = getRandomOrganization()
+        def denverLoc = new ProjectLocationRequest(
+                "Denver Inline Loc",
+                "1600 Stout St",
+                "Denver",
+                "CO",
+                "80202",
+                "US",
+                -104.9903d,
+                39.7392d
+        )
+        def request = createProjectRequest(org.id(), "Denver Inline Timezone Project", "Description with at least twenty characters here.", STANDARD, DRAFT, null, [denverLoc])
+
+        when: "submitting the project via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
+        Project saved = track(response.body())
+
+        then: "the inline location receives the PostGIS boundary timezone"
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.locations() != null
+            saved.locations().size() == 1
+            saved.locations()[0].timezone() == "America/Denver"
+        }
+    }
+
+    @Unroll
+    def "CREATE | inline project location #scenario resolves timezone to #expectedTimezone"() {
+        given: "a project create request with an inline location"
+        def org = getRandomOrganization()
+        def locRequest = new ProjectLocationRequest(
+                "Inline Loc ${faker.number().digits(5)}",
+                "10 Main St",
+                city,
+                state,
+                postalCode,
+                countryCode,
+                longitude,
+                latitude,
+                requestedTimezone
+        )
+        def request = createProjectRequest(org.id(), "Inline TZ ${faker.number().digits(5)}", "Description with at least twenty characters here.", STANDARD, DRAFT, null, [locRequest])
+
+        when: "submitting the project via HTTP POST"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.POST("/projects", request)), Project)
+        Project saved = track(response.body())
+
+        then: "the expected timezone is applied"
+        verifyAll {
+            response.status == HttpStatus.OK
+            saved.locations() != null
+            saved.locations().size() == 1
+            saved.locations()[0].timezone() == expectedTimezone
+        }
+
+        where:
+        scenario                                    | city     | state | postalCode | countryCode | longitude | latitude | requestedTimezone || expectedTimezone
+        "outside boundaries without fallback"       | "London" | null  | "SW1A 2AA" | "GB"        | -0.1276d  | 51.5072d | null              || null
+        "outside boundaries with explicit fallback" | "London" | null  | "SW1A 2AA" | "GB"        | -0.1276d  | 51.5072d | "Europe/London"   || "Europe/London"
+        "inside boundary overrides explicit fallback" | "Denver" | "CO" | "80202"    | "US"        | -104.9903d | 39.7392d | "America/Chicago" || "America/Denver"
+    }
+
     def "CREATE | should fail when boundaries list is empty (Issue #41)"() {
         given: "a request with empty boundaries"
         def org = getRandomOrganization()
@@ -2351,6 +2415,78 @@ class ProjectControllerSpec extends BaseControllerSpec {
             locations()[0].id() == updated.locations()[0].id()
             locations()[0].name() == "New Denver Loc"
         }
+    }
+
+    @Unroll
+    def "UPDATE | inline project location #scenario persists timezone #expectedTimezone"() {
+        given: "an active project with an existing Denver location"
+        def org = getRandomOrganization()
+        def oldLoc = dataBuilder.location()
+                .withName("Old TZ Loc")
+                .withAddressLine("1600 Stout St")
+                .withCity("Denver")
+                .withStateProvince("CO")
+                .withPostalCode("80202")
+                .withCountryCode("US")
+                .atPoint(-104.9903, 39.7392)
+                .persist()
+        def saved = dataBuilder.project()
+                .forOrg(org)
+                .withTitle("Update Inline TZ Project ${faker.number().digits(5)}")
+                .withDescription("Description with at least twenty characters here.")
+                .withType(STANDARD)
+                .withStatus(ACTIVE)
+                .atLocation(oldLoc)
+                .persist()
+
+        and: "an update request with a new inline location"
+        def newLocReq = new ProjectLocationRequest(
+                "Updated Inline Loc",
+                "100 Main St",
+                city,
+                state,
+                postalCode,
+                countryCode,
+                longitude,
+                latitude,
+                requestedTimezone
+        )
+        def updateRequest = new UpdateProjectRequest(
+                org.id(),
+                null,
+                "Updated Inline TZ Title",
+                "Updated description with at least twenty characters.",
+                STANDARD,
+                [newLocReq],
+                defaultBoundaries()
+        )
+
+        when: "updating the project via HTTP PUT"
+        def response = client.exchange(asGlobalAdmin(HttpRequest.PUT("/projects/${saved.id()}", updateRequest)), Project)
+        Project updated = response.body()
+
+        then: "the updated location returns and persists the expected timezone"
+        def fetched = client.exchange(asGlobalAdmin(HttpRequest.GET("/projects/${saved.id()}")), Project).body()
+        def dbProject = projectRepository.findById(saved.id()).orElse(null)
+        verifyAll {
+            response.status == HttpStatus.OK
+            updated.locations() != null
+            updated.locations().size() == 1
+            updated.locations()[0].id() != null
+            updated.locations()[0].timezone() == expectedTimezone
+            fetched.locations().size() == 1
+            fetched.locations()[0].timezone() == expectedTimezone
+            dbProject != null
+            dbProject.locations().size() == 1
+            dbProject.locations()[0].timezone() == expectedTimezone
+        }
+
+        where:
+        scenario                                      | city      | state | postalCode | countryCode | longitude  | latitude | requestedTimezone || expectedTimezone
+        "inside Chicago boundary without fallback"    | "Chicago" | "IL"  | "60601"    | "US"        | -87.6298d  | 41.8781d | null              || "America/Chicago"
+        "outside boundaries with explicit fallback"   | "London"  | null  | "SW1A 2AA" | "GB"        | -0.1276d   | 51.5072d | "Europe/London"   || "Europe/London"
+        "outside boundaries without fallback"         | "London"  | null  | "SW1A 2AA" | "GB"        | -0.1276d   | 51.5072d | null              || null
+        "inside Denver boundary overrides fallback"   | "Denver"  | "CO"  | "80202"    | "US"        | -104.9850d | 39.7435d | "America/Chicago" || "America/Denver"
     }
 
     def "UPDATE | should prevent REGION_AGENT from approving project after clearing locations to empty list"() {
